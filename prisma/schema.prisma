@@ -12,16 +12,18 @@ model Member {
   secondName  String
   visitsTotal Int    @default(0)
   visitsUsed  Int    @default(0)
+  card        Card?
 
   @@map("members")
 }
 
-model Admin {
-  id         String @id @default(uuid())
-  email      String @unique
-  password   String
-  firstName  String
-  secondName String
+model Card {
+  id        String   @id @default(uuid())
+  cardCode  String   @unique
+  member    Member   @relation(fields: [memberId], references: [id])
+  memberId  String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
-  @@map("admins")
+  @@map("cards")
 }
