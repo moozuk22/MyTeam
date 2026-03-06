@@ -158,6 +158,12 @@ export default function AdminMembersPage() {
             </div>
 
             <div className="flex gap-3">
+              <button
+                onClick={() => router.push(`/admin/members/${member.id}/edit`)}
+                className="btn btn-secondary w-full"
+              >
+                Edit
+              </button>
               <button 
                 onClick={() => {
                   if (member.cards.length > 0) {

@@ -15,10 +15,12 @@ export async function POST(request: NextRequest) {
 
     try {
         const { firstName, secondName, visitsTotal } = await request.json();
+        const safeFirstName = String(firstName ?? "").trim();
+        const safeSecondName = String(secondName ?? "").trim();
 
-        if (!firstName || !secondName) {
+        if (!safeFirstName) {
             return NextResponse.json(
-                { error: "First name and second name are required" },
+                { error: "First name is required" },
                 { status: 400 }
             );
         }
@@ -27,8 +29,8 @@ export async function POST(request: NextRequest) {
 
         const newMember = await prisma.member.create({
             data: {
-                firstName,
-                secondName,
+                firstName: safeFirstName,
+                secondName: safeSecondName,
                 visitsTotal: visitsTotal || 0,
                 visitsUsed: 0,
                 cards: {

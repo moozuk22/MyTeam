@@ -81,7 +81,6 @@ export default function AddMemberPage() {
             </label>
             <input
               type="text"
-              required
               value={secondName}
               onChange={(e) => setSecondName(e.target.value)}
               className="w-full px-4 py-3 bg-secondary border border-color rounded-lg text-primary placeholder-text-muted focus:outline-none focus:border-accent-gold transition-colors"
