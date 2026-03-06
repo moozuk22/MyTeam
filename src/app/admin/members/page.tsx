@@ -46,82 +46,105 @@ export default function AdminMembersPage() {
     router.push("/admin/login");
   };
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (loading) return (
+    <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
+      <div className="text-center">
+        <div className="loading mb-4"></div>
+        <p className="text-secondary">Зареждане на членове...</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="container mx-auto p-8 max-w-4xl">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Admin Dashboard - Members</h1>
-        <div className="flex gap-4">
-          <button 
-            onClick={() => router.push("/admin/members/add")}
-            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-          >
-            Add New Member
-          </button>
-          <button 
-            onClick={handleLogout}
-            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-          >
-            Logout
-          </button>
-        </div>
+    <div className="container p-6 fade-in">
+      <div className="text-center mb-8">
+        <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
+        <h1 className="text-gold mb-2" style={{ fontSize: '2rem', fontWeight: '600' }}>
+          Администраторски панел
+        </h1>
       </div>
 
-      {/* Members List */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visits</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card Code</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {members.map((member) => (
-              <tr key={member.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+      <div className="flex justify-center gap-4 mb-8">
+        <button 
+          onClick={() => router.push("/admin/members/add")}
+          className="btn btn-primary"
+        >
+          Добави член
+        </button>
+        <button 
+          onClick={handleLogout}
+          className="btn btn-secondary"
+        >
+          Изход
+        </button>
+      </div>
+
+      {/* Members Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {members.map((member) => (
+          <div key={member.id} className="card">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-gold mb-1" style={{ fontSize: '1.2rem' }}>
                   {member.firstName} {member.secondName}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {member.visitsUsed} / {member.visitsTotal}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
-                  {member.card?.cardCode || "No Card"}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${member.card?.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {member.card?.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button 
-                    onClick={() => {
-                      if (member.card?.cardCode) {
-                        router.push(`/member/${member.card.cardCode}`);
-                      } else {
-                        alert("This member has no card assigned.");
-                      }
-                    }}
-                    className="text-indigo-600 hover:text-indigo-900"
-                  >
-                    View Page
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {members.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                  No members found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                </h3>
+                <p className="text-muted" style={{ fontSize: '0.9rem' }}>ID: {member.id}</p>
+              </div>
+              <div className="text-gold" style={{ fontSize: '1.5rem' }}>♦</div>
+            </div>
+
+            <div className="visit-info mb-6">
+              <div className="visit-item">
+                <span className="visit-number">{member.visitsTotal}</span>
+                <div className="visit-label">Карта</div>
+              </div>
+              <div className="visit-item">
+                <span className="visit-number">{member.visitsUsed}</span>
+                <div className="visit-label">Използвани</div>
+              </div>
+              <div className="visit-item">
+                <span className="visit-number text-gold">
+                  {member.visitsTotal - member.visitsUsed}
+                </span>
+                <div className="visit-label">Остават</div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-secondary text-sm mb-2">
+                Карта: <span className="text-gold font-mono">{member.card?.cardCode || "Няма карта"}</span>
+              </p>
+              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                member.card?.isActive 
+                  ? 'bg-green-900 text-green-200' 
+                  : 'bg-red-900 text-red-200'
+              }`}>
+                {member.card?.isActive ? 'Активна' : 'Неактивна'}
+              </span>
+            </div>
+
+            <button 
+              onClick={() => {
+                if (member.card?.cardCode) {
+                  router.push(`/member/${member.card.cardCode}`);
+                } else {
+                  alert("Този член няма присвоена карта.");
+                }
+              }}
+              className="btn btn-primary w-full"
+            >
+              Виж страницата
+            </button>
+          </div>
+        ))}
+        {members.length === 0 && (
+          <div className="col-span-full text-center">
+            <div className="alert alert-warning">
+              <strong>Няма намерени членове</strong>
+              <p className="mt-2 mb-0">Все още няма добавени членове в системата.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

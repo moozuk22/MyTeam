@@ -38,73 +38,102 @@ export default function AddMemberPage() {
   };
 
   return (
-    <div className="container mx-auto p-8 max-w-2xl">
-      <div className="mb-8">
-        <Link 
-          href="/admin/members" 
-          className="text-indigo-600 hover:text-indigo-900 flex items-center mb-4"
-        >
-          ← Back to Dashboard
-        </Link>
-        <h1 className="text-2xl font-bold">Add New Member</h1>
+    <div className="container p-6 fade-in add-user">
+      <div className="text-center mb-8">
+        <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
+        <h1 className="text-gold mb-2" style={{ fontSize: '2rem', fontWeight: '600' }}>
+          Добави нов член
+        </h1>
       </div>
 
-      <div className="bg-white p-8 rounded-lg shadow-md">
-        <form onSubmit={handleCreateMember} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+      <div className="flex justify-center mb-8">
+        <Link 
+          href="/admin/members" 
+          className="btn btn-secondary"
+        >
+          ← Обратно към членовете
+        </Link>
+      </div>
+
+      <div className="member-card add-card" style={{ maxWidth: '500px', width: '100%' }}>
+        <form onSubmit={handleCreateMember} className="space-y-6 text-center flex flex-col justify-center gap-3 w-75">
+          <div className="text-left">
+            <label className="text-secondary mb-2 block" style={{ fontSize: '1rem', fontWeight: '500' }}>
+              Име
+            </label>
             <input
               type="text"
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-3"
-              placeholder="e.g. Ivan"
+              className="w-full px-4 py-3 bg-secondary border border-color rounded-lg text-primary placeholder-text-muted focus:outline-none focus:border-accent-gold transition-colors"
+              placeholder="Въведете име"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+              }}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Second Name</label>
+          <div className="text-left">
+            <label className="text-secondary mb-2 block" style={{ fontSize: '1rem', fontWeight: '500' }}>
+              Фамилия
+            </label>
             <input
               type="text"
               required
               value={secondName}
               onChange={(e) => setSecondName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-3"
-              placeholder="e.g. Ivanov"
+              className="w-full px-4 py-3 bg-secondary border border-color rounded-lg text-primary placeholder-text-muted focus:outline-none focus:border-accent-gold transition-colors"
+              placeholder="Въведете фамилия"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+              }}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Total Visits</label>
+          <div className="text-left">
+            <label className="text-secondary mb-2 block" style={{ fontSize: '1rem', fontWeight: '500' }}>
+              Общо посещения
+            </label>
             <input
               type="number"
               required
               min="1"
               value={visitsTotal}
               onChange={(e) => setVisitsTotal(parseInt(e.target.value))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 border p-3"
+              className="w-full px-4 py-3 bg-secondary border border-color rounded-lg text-primary placeholder-text-muted focus:outline-none focus:border-accent-gold transition-colors"
+              placeholder="Въведете брой посещения"
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+              }}
             />
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+            <div className="alert alert-error text-center">
               {error}
             </div>
           )}
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-4 pt-4 justify-center">
             <button
               type="button"
               onClick={() => router.push("/admin/members")}
-              className="flex-1 bg-gray-100 text-gray-700 px-4 py-3 rounded-md hover:bg-gray-200 transition"
+              className="btn btn-secondary flex-1"
             >
-              Cancel
+              Отказ
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-md hover:bg-indigo-700 disabled:bg-indigo-400 transition"
+              className="btn btn-primary flex-1"
+              style={{ cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
             >
-              {isSubmitting ? "Creating..." : "Create Member"}
+              {isSubmitting ? "Създаване..." : "Създай член"}
             </button>
           </div>
         </form>

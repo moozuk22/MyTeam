@@ -213,22 +213,6 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
           </div>
         )}
 
-        {/* Debug информация */}
-        <div style={{ 
-          position: 'fixed', 
-          top: '10px', 
-          right: '10px', 
-          background: 'rgba(0,0,0,0.8)', 
-          color: 'white', 
-          padding: '10px', 
-          borderRadius: '5px',
-          fontSize: '12px'
-        }}>
-          isAdmin: {isAdmin.toString()}<br/>
-          member.visits_used: {member?.visits_used || 0}<br/>
-          remaining: {remaining}
-        </div>
-
         {/* Бутон за изход от администраторски режим */}
         {isAdmin && (
           <button
