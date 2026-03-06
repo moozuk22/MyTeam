@@ -16,22 +16,6 @@ export default function AdminMembersPage() {
   const [isAdmin, setIsAdmin] = useState<boolean>(true) // Mock admin check
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  useEffect(() => {
-    // Mock data - в реалност тук ще има API call
-    const mockMembers: Member[] = [
-      { id: 1, name: 'Anna Petrova', visits_total: 8, visits_used: 4 },
-      { id: 2, name: 'Maria Ivanova', visits_total: 10, visits_used: 10 },
-      { id: 3, name: 'Elena Georgieva', visits_total: 5, visits_used: 2 },
-      { id: 4, name: 'Sofia Hristova', visits_total: 12, visits_used: 0 },
-      { id: 5, name: 'Viktoria Popova', visits_total: 8, visits_used: 8 }
-    ]
-
-    setTimeout(() => {
-      setMembers(mockMembers)
-      setLoading(false)
-    }, 500)
-  }, [])
-
   const handleCheckIn = (memberId: number) => {
     const member = members.find(m => m.id === memberId)
     if (!member) return
