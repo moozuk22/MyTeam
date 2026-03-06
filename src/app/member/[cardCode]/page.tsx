@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Member {
   id: string
@@ -17,6 +18,7 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
+  const router = useRouter()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,7 +69,7 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
 
   const handleCheckIn = async () => {
     if (!member || isExhausted) return
-    
+
     try {
       const response = await fetch(`/api/members/${resolvedParams.cardCode}/check-in`, {
         method: 'POST',
@@ -87,8 +89,8 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
   }
 
   const handleReset = async () => {
-    if (!member) return
-    
+    if (!member || !isExhausted) return
+
     try {
       const response = await fetch(`/api/members/${resolvedParams.cardCode}/reset`, {
         method: 'POST',
@@ -117,73 +119,88 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
     }
   }
 
+  const handleGoToAdmin = () => {
+    router.push('/admin/members')
+  }
+
   if (loading) {
     return (
-      <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
-        <div className="text-center">
-          <div className="loading mb-4"></div>
-          <p className="text-secondary">Зареждане...</p>
+        <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
+          <div className="text-center">
+            <div className="loading mb-4"></div>
+            <p className="text-secondary">Зареждане...</p>
+          </div>
         </div>
-      </div>
     )
   }
 
   if (error) {
     return (
-      <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
-        <div className="alert alert-error">
-          <h3 className="mb-2">Грешка</h3>
-          <p>{error}</p>
+        <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
+          <div className="alert alert-error">
+            <h3 className="mb-2">Грешка</h3>
+            <p>{error}</p>
+          </div>
         </div>
-      </div>
     )
   }
 
   if (!member) {
     return (
-      <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
-        <div className="alert alert-warning">
-          <h3 className="mb-2">Член не е намерен</h3>
-          <p>Не съществува член с код на карта: {resolvedParams.cardCode}</p>
+        <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
+          <div className="alert alert-warning">
+            <h3 className="mb-2">Член не е намерен</h3>
+            <p>Не съществува член с код на карта: {resolvedParams.cardCode}</p>
+          </div>
         </div>
-      </div>
     )
   }
 
   return (
-    <div className="container flex items-center justify-center fade-in" style={{ minHeight: '100vh' }}>
-      <div className="member-card" style={{ maxWidth: '420px', width: '100%' }}>
-        <div className="text-center mb-6">
-          <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
-          <h1 className="member-name">{member.name}</h1>
-          {member.isActive === false && (
-            <div className="badge badge-warning mb-2">Активиране на карта...</div>
-          )}
-        </div>
+      <div className="container flex flex-col items-center justify-center fade-in" style={{ minHeight: '100vh' }}>
+        {isAdmin && (
+          <div className="flex justify-center mb-4" style={{ maxWidth: '420px', width: '100%' }}>
+            <button
+              onClick={handleGoToAdmin}
+              className="btn btn-secondary px-6"
+              style={{ cursor: 'pointer' }}
+            >
+              ← Админ панел
+            </button>
+          </div>
+        )}
+        <div className="member-card" style={{ maxWidth: '420px', width: '100%' }}>
+          <div className="text-center mb-6">
+            <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
+            <h1 className="member-name">{member.name}</h1>
+            {member.isActive === false && (
+                <div className="badge badge-warning mb-2">Активиране на карта...</div>
+            )}
+          </div>
 
-        <div className="visit-info mb-6">
-          <div className="visit-item">
-            <span className="visit-number">{member.visits_total}</span>
-            <div className="visit-label">Карта</div>
-          </div>
-          <div className="visit-item">
-            <span className="visit-number">{member.visits_used}</span>
-            <div className="visit-label">Използвани</div>
-          </div>
-          <div className="visit-item">
+          <div className="visit-info mb-6">
+            <div className="visit-item">
+              <span className="visit-number">{member.visits_total}</span>
+              <div className="visit-label">Карта</div>
+            </div>
+            <div className="visit-item">
+              <span className="visit-number">{member.visits_used}</span>
+              <div className="visit-label">Използвани</div>
+            </div>
+            <div className="visit-item">
             <span className={`visit-number ${isExhausted ? 'text-error' : 'text-gold'}`}>
               {remaining}
             </span>
-            <div className="visit-label">Остават</div>
+              <div className="visit-label">Остават</div>
+            </div>
           </div>
-        </div>
 
-        {isExhausted && (
-          <div className="alert alert-warning mb-6">
-            <strong>Картата е изчерпана</strong>
-            <p className="mt-2 mb-0">Няма оставащи посещения. Моля, свържете се с администратор.</p>
-          </div>
-        )}
+          {isExhausted && (
+              <div className="alert alert-warning mb-6">
+                <strong>Картата е изчерпана</strong>
+                <p className="mt-2 mb-0">Няма оставащи посещения. Моля, свържете се с администратор.</p>
+              </div>
+          )}
 
         {/* Admin controls */}
         {isAdmin && (
@@ -198,14 +215,16 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
             </button>
             <button
               onClick={handleReset}
+              disabled={!isExhausted}
               className="btn btn-outline w-full"
               style={{ 
-                cursor: 'pointer',
+                cursor: !isExhausted ? 'not-allowed' : 'pointer',
                 border: '1px solid var(--gold)',
                 color: 'var(--gold)',
                 background: 'transparent',
                 padding: '0.75rem',
-                borderRadius: 'var(--radius)'
+                borderRadius: 'var(--radius)',
+                opacity: !isExhausted ? 0.5 : 1
               }}
             >
               Reset
@@ -213,26 +232,26 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
           </div>
         )}
 
-        {/* Бутон за изход от администраторски режим */}
-        {isAdmin && (
-          <button
-            onClick={handleAdminLogout}
-            className="btn btn-secondary w-full mb-6"
-            style={{ cursor: 'pointer' }}
-          >
-            Изход от администраторски режим
-          </button>
-        )}
+          {/* Бутон за изход от администраторски режим */}
+          {isAdmin && (
+              <button
+                  onClick={handleAdminLogout}
+                  className="btn btn-secondary w-full mb-6"
+                  style={{ cursor: 'pointer' }}
+              >
+                Изход от администраторски режим
+              </button>
+          )}
 
-        <div className="mt-6 text-center">
-          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-            Dalida Dance Studio
-          </p>
-          <p className="text-muted" style={{ fontSize: '0.75rem' }}>
-            NFC Check-in System
-          </p>
+          <div className="mt-6 text-center">
+            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+              Dalida Dance Studio
+            </p>
+            <p className="text-muted" style={{ fontSize: '0.75rem' }}>
+              NFC Check-in System
+            </p>
+          </div>
         </div>
       </div>
-    </div>
   )
 }
