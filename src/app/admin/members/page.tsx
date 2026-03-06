@@ -15,12 +15,14 @@ interface Member {
   secondName: string;
   visitsTotal: number;
   visitsUsed: number;
-  card?: Card;
+  cards: Card[];
 }
 
 export default function AdminMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingMember, setDeletingMember] = useState<Member | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   const fetchMembers = async () => {
@@ -44,6 +46,29 @@ export default function AdminMembersPage() {
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
     router.push("/admin/login");
+  };
+
+  const handleDelete = async () => {
+    if (!deletingMember) return;
+    
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/members/${deletingMember.id}`, {
+        method: "DELETE",
+      });
+      
+      if (response.ok) {
+        setMembers(members.filter(m => m.id !== deletingMember.id));
+        setDeletingMember(null);
+      } else {
+        alert("Грешка при изтриване на член.");
+      }
+    } catch (err) {
+      console.error("Error deleting member:", err);
+      alert("Грешка при изтриване на член.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (loading) return (
@@ -112,29 +137,46 @@ export default function AdminMembersPage() {
 
             <div className="mb-4">
               <p className="text-secondary text-sm mb-2">
-                Карта: <span className="text-gold font-mono">{member.card?.cardCode || "Няма карта"}</span>
+                Карти: {member.cards.length === 0 && <span className="text-muted">Няма карти</span>}
+                {member.cards.map((card, idx) => (
+                  <span key={card.id} className="text-gold font-mono">
+                    {card.cardCode}{idx < member.cards.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
               </p>
-              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                member.card?.isActive 
-                  ? 'bg-green-900 text-green-200' 
-                  : 'bg-red-900 text-red-200'
-              }`}>
-                {member.card?.isActive ? 'Активна' : 'Неактивна'}
-              </span>
+              <div className="flex flex-wrap gap-1">
+                {member.cards.map((card) => (
+                  <span key={card.id} className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    card.isActive 
+                      ? 'bg-green-900 text-green-200' 
+                      : 'bg-red-900 text-red-200'
+                  }`}>
+                    {card.cardCode}: {card.isActive ? 'Активна' : 'Неактивна'}
+                  </span>
+                ))}
+              </div>
             </div>
 
-            <button 
-              onClick={() => {
-                if (member.card?.cardCode) {
-                  router.push(`/member/${member.card.cardCode}`);
-                } else {
-                  alert("Този член няма присвоена карта.");
-                }
-              }}
-              className="btn btn-primary w-full"
-            >
-              Виж страницата
-            </button>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => {
+                  if (member.cards.length > 0) {
+                    router.push(`/member/${member.cards[0].cardCode}`);
+                  } else {
+                    alert("Този член няма присвоена карта.");
+                  }
+                }}
+                className="btn btn-primary w-full"
+              >
+                Виж страницата
+              </button>
+              <button 
+                onClick={() => setDeletingMember(member)}
+                className="btn btn-error w-full"
+              >
+                Изтрий член
+              </button>
+            </div>
           </div>
         ))}
         {members.length === 0 && (
@@ -146,6 +188,39 @@ export default function AdminMembersPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      {deletingMember && (
+        <div className="modal-overlay">
+          <div className="modal-content fade-in">
+            <h3 className="text-gold mb-4">Потвърждение</h3>
+            <p className="mb-6">
+              Сигурни ли сте, че искате да изтриете член <br />
+              <strong>{deletingMember.firstName} {deletingMember.secondName}</strong>?
+              <br />
+              <span className="text-error" style={{ fontSize: '0.85rem' }}>
+                Това действие е необратимо и ще изтрие и свързаната карта.
+              </span>
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button 
+                onClick={() => setDeletingMember(null)}
+                className="btn btn-secondary px-6"
+                disabled={isDeleting}
+              >
+                Отказ
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="btn btn-error px-6"
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Изтриване..." : "Изтрий"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

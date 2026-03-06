@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
                 secondName,
                 visitsTotal: visitsTotal || 0,
                 visitsUsed: 0,
-                card: {
+                cards: {
                     create: {
                         cardCode,
                         isActive: false,
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
                 },
             },
             include: {
-                card: true,
+                cards: true,
             },
         });
 
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     try {
         const members = await prisma.member.findMany({
             include: {
-                card: true,
+                cards: true,
             },
             orderBy: {
                 firstName: "asc",

@@ -5,43 +5,41 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ cardCode: string }> }
 ) {
   const { cardCode } = await params;
+
   try {
-    const member = await prisma.member.findFirst({
+    const card = await prisma.card.findUnique({
       where: {
-        card: {
-          cardCode: cardCode
-        }
+        cardCode,
       },
       include: {
-        card: true
-      }
+        member: true,
+      },
     });
 
-    if (!member) {
+    if (!card) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
     // Auto-activate card on first access if it's inactive
-    if (member.card && !member.card.isActive) {
+    if (!card.isActive) {
       await prisma.card.update({
-        where: { id: member.card.id },
+        where: { id: card.id },
         data: { isActive: true }
       });
-      // Update the local member object to reflect the change for the response
-      member.card.isActive = true;
+      card.isActive = true;
     }
 
     return NextResponse.json({
-        id: member.id,
-        cardCode: member.card?.cardCode,
-        name: `${member.firstName} ${member.secondName}`,
-        visits_total: member.visitsTotal,
-        visits_used: member.visitsUsed,
-        isActive: member.card?.isActive
+        id: card.member.id,
+        cardCode: card.cardCode,
+        name: `${card.member.firstName} ${card.member.secondName}`,
+        visits_total: card.member.visitsTotal,
+        visits_used: card.member.visitsUsed,
+        isActive: card.isActive
     });
   } catch (error) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

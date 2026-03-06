@@ -13,7 +13,7 @@ model Member {
   secondName  String
   visitsTotal Int    @default(0)
   visitsUsed  Int    @default(0)
-  card        Card?
+  cards       Card[]
 
   @@map("members")
 }
@@ -22,7 +22,7 @@ model Card {
   id        String   @id @default(uuid())
   cardCode  String   @unique
   member    Member   @relation(fields: [memberId], references: [id])
-  memberId  String   @unique
+  memberId  String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 

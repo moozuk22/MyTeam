@@ -20,8 +20,10 @@ export async function POST(
   try {
     const member = await prisma.member.findFirst({
       where: {
-        card: {
-          cardCode,
+        cards: {
+          some: {
+            cardCode,
+          },
         },
       },
     });
