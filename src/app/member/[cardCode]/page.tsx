@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
@@ -150,7 +150,6 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
       <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
         <div className="text-center">
           <div className="loading mb-4"></div>
-          <p className="text-secondary">Зареждане...</p>
         </div>
       </div>
     )
@@ -182,7 +181,12 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
       )}
       <div className="member-card" style={{ maxWidth: '420px', width: '100%' }}>
         <div className="text-center mb-6">
-          <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className="mb-3 mx-auto"
+            style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+          />
           <h1 className="member-name">{member ? member.name : 'Не е намерен потребител'}</h1>
           {member?.isActive === false && (
             <div className="badge badge-warning mb-2">Активиране на карта...</div>
@@ -193,7 +197,7 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
           <div className="visit-info mb-6">
             <div className="visit-item">
               <span className="visit-number">{member.visits_total}</span>
-              <div className="visit-label">Карта</div>
+              <div className="visit-label">Общо</div>
             </div>
             <div className="visit-item">
               <span className="visit-number">{member.visits_used}</span>
@@ -256,15 +260,6 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
             Изход от администраторски режим
           </button>
         )}
-
-        <div className="mt-6 text-center">
-          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-            Dalida Dance Studio
-          </p>
-          <p className="text-muted" style={{ fontSize: '0.75rem' }}>
-            NFC Check-in System
-          </p>
-        </div>
       </div>
     </div>
   )

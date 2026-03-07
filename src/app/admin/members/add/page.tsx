@@ -39,8 +39,13 @@ export default function AddMemberPage() {
 
   return (
     <div className="container p-6 fade-in add-user">
-      <div className="text-center mb-8">
-        <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
+      <div className="flex-col flex items-center text-center mb-8">
+        <img
+          src="/logo.png"
+          alt="Logo"
+          className="mb-3 mx-auto"
+          style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+        />
         <h1 className="text-gold mb-2" style={{ fontSize: '2rem', fontWeight: '600' }}>
           Добави нов член
         </h1>

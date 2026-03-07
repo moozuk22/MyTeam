@@ -40,7 +40,12 @@ export default function AdminLoginPage() {
     <div className="container flex items-center justify-center fade-in" style={{ minHeight: '100vh' }}>
       <div className="member-card" style={{ maxWidth: '420px', width: '100%' }}>
         <div className="text-center mb-8">
-          <div className="text-gold mb-5" style={{ fontSize: '3.5rem' }}>♦</div>
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className="mb-5 mx-auto"
+            style={{ width: '56px', height: '56px', objectFit: 'contain' }}
+          />
           <h2 className="text-gold mb-2" style={{ fontSize: '2rem', fontWeight: '600' }}>
             Администраторски вход
           </h2>

@@ -75,15 +75,19 @@ export default function AdminMembersPage() {
     <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
       <div className="text-center">
         <div className="loading mb-4"></div>
-        <p className="text-secondary">Зареждане на членове...</p>
       </div>
     </div>
   );
 
   return (
     <div className="container p-6 fade-in">
-      <div className="text-center mb-8">
-        <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
+      <div className="flex-col flex items-center text-center mb-8">
+        <img
+          src="/logo.png"
+          alt="Logo"
+          className="mb-3 mx-auto"
+          style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+        />
         <h1 className="text-gold mb-2" style={{ fontSize: '2rem', fontWeight: '600' }}>
           Администраторски панел
         </h1>
@@ -115,13 +119,12 @@ export default function AdminMembersPage() {
                 </h3>
                 <p className="text-muted" style={{ fontSize: '0.9rem' }}>ID: {member.id}</p>
               </div>
-              <div className="text-gold" style={{ fontSize: '1.5rem' }}>♦</div>
             </div>
 
             <div className="visit-info mb-6">
               <div className="visit-item">
                 <span className="visit-number">{member.visitsTotal}</span>
-                <div className="visit-label">Карта</div>
+                <div className="visit-label">Общо</div>
               </div>
               <div className="visit-item">
                 <span className="visit-number">{member.visitsUsed}</span>

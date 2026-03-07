@@ -67,7 +67,6 @@ export default function AdminMembersPage() {
       <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
         <div className="text-center">
           <div className="loading mb-4"></div>
-          <p className="text-secondary">Зареждане на членове...</p>
         </div>
       </div>
     )
@@ -76,7 +75,12 @@ export default function AdminMembersPage() {
   return (
     <div className="container p-6 fade-in">
       <div className="text-center mb-6">
-        <div className="text-gold mb-3" style={{ fontSize: '2.5rem' }}>♦</div>
+        <img
+          src="/logo.png"
+          alt="Logo"
+          className="mb-3 mx-auto"
+          style={{ width: '100px', height: '100px', objectFit: 'contain' }}
+        />
         <h1>Администраторски панел</h1>
         <p className="text-secondary mt-2">Управление на посещенията на членове</p>
       </div>
@@ -118,13 +122,17 @@ export default function AdminMembersPage() {
                   <h3 className="text-gold mb-1">{member.name}</h3>
                   <p className="text-muted" style={{ fontSize: '0.9rem' }}>ID: {member.id}</p>
                 </div>
-                <div className="text-gold" style={{ fontSize: '1.5rem' }}>♦</div>
+                <img
+                src="/logo.png"
+                alt="Logo"
+                style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+              />
               </div>
 
               <div className="visit-info mb-6">
                 <div className="visit-item">
                   <span className="visit-number">{member.visits_total}</span>
-                  <div className="visit-label">Карта</div>
+                  <div className="visit-label">Общо</div>
                 </div>
                 <div className="visit-item">
                   <span className="visit-number">{member.visits_used}</span>
@@ -156,15 +164,6 @@ export default function AdminMembersPage() {
             </div>
           )
         })}
-      </div>
-
-      <div className="text-center mt-8">
-        <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-          Dalida Dance Studio Admin Panel
-        </p>
-        <p className="text-muted" style={{ fontSize: '0.75rem' }}>
-          NFC Check-in System v1.0
-        </p>
       </div>
     </div>
   )
