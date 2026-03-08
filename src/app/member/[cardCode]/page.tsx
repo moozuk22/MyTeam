@@ -12,6 +12,16 @@ interface Member {
   isActive?: boolean
 }
 
+interface Question {
+  id: string
+  text: string
+}
+
+interface MemberAnswer {
+  questionId: string
+  answer: string
+}
+
 export default function MemberPage({ params }: { params: Promise<{ cardCode: string }> }) {
   const resolvedParams = use(params)
   const [member, setMember] = useState<Member | null>(null)
@@ -19,7 +29,10 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
   const [error, setError] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
   const [isCheckingIn, setIsCheckingIn] = useState(false)
-  const [questions, setQuestions] = useState<string[]>([])
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [savingAnswers, setSavingAnswers] = useState<Record<string, boolean>>({})
+  const [answerStatus, setAnswerStatus] = useState<Record<string, string>>({})
   const router = useRouter()
 
   const fetchMember = async (cardCode: string, shouldSetLoading = false) => {
@@ -58,11 +71,28 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
         const sessionData = await sessionRes.json()
         setIsAdmin(sessionData.isAdmin)
 
-        // Fetch questions
-        const questionsRes = await fetch('/api/admin/questions')
-        if (questionsRes.ok) {
-          const questionsData = await questionsRes.json()
-          setQuestions(questionsData.map((q: any) => q.text))
+        if (!sessionData.isAdmin) {
+          const [questionsRes, answersRes] = await Promise.all([
+            fetch('/api/questions'),
+            fetch(`/api/members/${resolvedParams.cardCode}/answers`, { cache: 'no-store' }),
+          ])
+
+          if (questionsRes.ok) {
+            const questionsData: Question[] = await questionsRes.json()
+            setQuestions(questionsData)
+          }
+
+          if (answersRes.ok) {
+            const answersData: { answers: MemberAnswer[] } = await answersRes.json()
+            const answersMap = Object.fromEntries(
+              answersData.answers.map((item) => [item.questionId, item.answer])
+            ) as Record<string, string>
+            setAnswers(answersMap)
+          }
+        } else {
+          setQuestions([])
+          setAnswers({})
+          setAnswerStatus({})
         }
       } catch (err) {
         console.error('Error fetching data:', err)
@@ -95,6 +125,43 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
 
   const remaining = member ? member.visits_total - member.visits_used : 0
   const isExhausted = member ? remaining <= 0 : false
+
+  const handleAnswerChange = (questionId: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: value }))
+  }
+
+  const handleSaveAnswer = async (questionId: string) => {
+    const currentAnswer = (answers[questionId] ?? '').trim()
+    if (!currentAnswer) {
+      setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Моля, въведете отговор.' }))
+      return
+    }
+
+    setSavingAnswers((prev) => ({ ...prev, [questionId]: true }))
+    setAnswerStatus((prev) => ({ ...prev, [questionId]: '' }))
+
+    try {
+      const response = await fetch(`/api/members/${resolvedParams.cardCode}/answers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId,
+          answer: currentAnswer,
+        }),
+      })
+
+      if (response.ok) {
+        setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Запазено.' }))
+      } else {
+        setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Грешка при запазване.' }))
+      }
+    } catch (err) {
+      console.error('Save answer error:', err)
+      setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Грешка при запазване.' }))
+    } finally {
+      setSavingAnswers((prev) => ({ ...prev, [questionId]: false }))
+    }
+  }
 
   const handleCheckIn = async () => {
     if (!member || isExhausted || isCheckingIn) return
@@ -237,7 +304,7 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
               border: '1px solid var(--border-color)'
             }}>
               {questions.map((question, index) => (
-                <div key={index} style={{ 
+                <div key={question.id} style={{ 
                   marginBottom: index < questions.length - 1 ? '12px' : '0',
                   paddingBottom: index < questions.length - 1 ? '12px' : '0',
                   borderBottom: index < questions.length - 1 ? '1px solid var(--border-color)' : 'none',
@@ -245,7 +312,38 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
                   fontSize: '14px',
                   lineHeight: '1.4'
                 }}>
-                  {question}
+                  <div style={{ marginBottom: '8px' }}>{question.text}</div>
+                  <input
+                    type="text"
+                    value={answers[question.id] ?? ''}
+                    onChange={(event) => handleAnswerChange(question.id, event.target.value)}
+                    placeholder="Вашият отговор"
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      color: 'var(--text-primary)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSaveAnswer(question.id)}
+                    disabled={savingAnswers[question.id] === true}
+                    className="btn btn-secondary"
+                    style={{
+                      marginTop: '8px',
+                      cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
+                  </button>
+                  {answerStatus[question.id] && (
+                    <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
+                      {answerStatus[question.id]}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

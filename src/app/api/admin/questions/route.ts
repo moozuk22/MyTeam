@@ -50,9 +50,6 @@ export async function GET(request: NextRequest) {
 
   try {
     const questions = await prisma.question.findMany({
-      where: {
-        isActive: true,
-      },
       orderBy: {
         createdAt: "desc",
       },
