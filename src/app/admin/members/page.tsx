@@ -343,12 +343,6 @@ export default function AdminMembersPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
-                  onClick={() => router.push(`/admin/members/${member.id}/edit`)}
-                  className="btn btn-secondary w-full"
-                >
-                  Edit
-                </button>
                 <button 
                   onClick={() => {
                     if (member.cards.length > 0) {
@@ -359,7 +353,13 @@ export default function AdminMembersPage() {
                   }}
                   className="btn btn-primary w-full"
                 >
-                  Виж страницата
+                  Виж профил
+                </button>
+                <button
+                  onClick={() => router.push(`/admin/members/${member.id}/edit`)}
+                  className="btn btn-secondary w-full"
+                >
+                  Edit
                 </button>
                 <button 
                   onClick={() => setDeletingMember(member)}

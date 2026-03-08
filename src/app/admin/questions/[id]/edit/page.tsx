@@ -87,15 +87,14 @@ export default function EditQuestionPage() {
       <div className="container flex items-center justify-center" style={{ minHeight: "100vh" }}>
         <div className="text-center">
           <div className="loading mb-4"></div>
-          <p className="text-secondary">Loading question...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container p-6 fade-in" style={{ maxWidth: "700px" }}>
-      <div className="card">
+    <div className="container p-6 fade-in" style={{ maxWidth: "700px", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="card" style={{ width: "100%" }}>
         <h1 className="text-gold mb-6" style={{ fontSize: "1.8rem" }}>Редакция на въпрос</h1>
 
         {error && <div className="alert alert-error mb-4">{error}</div>}
@@ -136,7 +135,7 @@ export default function EditQuestionPage() {
             </select>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex justify-center gap-3 pt-2 mt-4">
             <button
               type="button"
               onClick={() => router.push("/admin/members")}
