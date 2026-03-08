@@ -1,66 +1,63 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { verifyAdminToken } from "@/lib/adminAuth";
 
-interface Question {
-  id: string;
-  question: string;
-  targetMemberId?: string;
-  isActive: boolean;
-  createdAt: Date;
-}
-
-// Mock storage for questions
-const questions: Question[] = [];
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const token = request.cookies.get("admin_session")?.value;
+
+  if (!token || !(await verifyAdminToken(token))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const { question, targetMemberId } = body;
+    const rawQuestion = body?.question ?? body?.text;
+    const text = String(rawQuestion ?? "").trim();
 
-    // Validate input
-    if (!question || question.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Question is required' },
-        { status: 400 }
-      );
+    if (!text) {
+      return NextResponse.json({ error: "Question is required" }, { status: 400 });
     }
 
-    // Create new question
-    const newQuestion: Question = {
-      id: Date.now().toString(),
-      question: question.trim(),
-      targetMemberId: targetMemberId || null,
-      isActive: true,
-      createdAt: new Date()
-    };
-
-    // Add to mock storage
-    questions.push(newQuestion);
+    const newQuestion = await prisma.question.create({
+      data: {
+        text,
+        isActive: true,
+      },
+    });
 
     return NextResponse.json(
-      { 
+      {
         success: true,
-        question: newQuestion 
+        question: newQuestion,
       },
       { status: 201 }
     );
-
   } catch (error) {
-    console.error('Error creating question:', error);
-    return NextResponse.json(
-      { error: 'Failed to create question' },
-      { status: 500 }
-    );
+    console.error("Error creating question:", error);
+    return NextResponse.json({ error: "Failed to create question" }, { status: 500 });
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get("admin_session")?.value;
+
+  if (!token || !(await verifyAdminToken(token))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
+    const questions = await prisma.question.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
     return NextResponse.json(questions);
   } catch (error) {
-    console.error('Error fetching questions:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch questions' },
-      { status: 500 }
-    );
+    console.error("Error fetching questions:", error);
+    return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 });
   }
 }
