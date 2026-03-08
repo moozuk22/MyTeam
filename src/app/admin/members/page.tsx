@@ -384,67 +384,73 @@ export default function AdminMembersPage() {
       {/* Questions Grid */}
       {view === 'questions' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {questions.map((question, index) => (
-            <div key={question.id || index} className="card">
-              <div className="mb-4">
-                <h3 className="text-gold mb-2" style={{ fontSize: '1rem', fontWeight: '600' }}>
-                  Въпрос #{questions.length - index}
-                </h3>
-                <p className="text-muted" style={{ fontSize: '0.8rem' }}>
-                  {new Date(question.createdAt).toLocaleDateString('bg-BG')}
-                </p>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    marginTop: '8px',
-                    padding: '4px 10px',
-                    borderRadius: '999px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: question.isActive ? '#bbf7d0' : '#fecaca',
-                    background: question.isActive ? 'rgba(22, 101, 52, 0.45)' : 'rgba(127, 29, 29, 0.45)',
-                    border: `1px solid ${question.isActive ? 'rgba(34, 197, 94, 0.55)' : 'rgba(239, 68, 68, 0.55)'}`,
-                  }}
-                >
-                  {question.isActive ? 'Активен' : 'Неактивен'}
-                </span>
-              </div>
-              
-              <div style={{
-                background: 'var(--bg-secondary)',
-                borderRadius: '8px',
-                padding: '16px',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                fontSize: '14px',
-                lineHeight: '1.4',
-                minHeight: '80px'
-              }}>
-                {question.text || question.question}
-              </div>
-
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => handleViewAnswers(question)}
-                  className="btn btn-primary w-full"
-                >
-                  Виж отговори ({question.answersCount ?? 0})
-                </button>
-                <button
-                  onClick={() => router.push(`/admin/questions/${question.id}/edit`)}
-                  className="btn btn-secondary w-full"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setDeletingQuestion(question)}
-                  className="btn btn-error w-full"
-                >
-                  Изтрий
-                </button>
-              </div>
+          {loading ? (
+            <div className="col-span-full text-center">
+              <div className="loading mb-4"></div>
             </div>
-          ))}
+          ) : (
+            questions.map((question, index) => (
+              <div key={question.id || index} className="card">
+                <div className="mb-4">
+                  <h3 className="text-gold mb-2" style={{ fontSize: '1rem', fontWeight: '600' }}>
+                    Въпрос #{questions.length - index}
+                  </h3>
+                  <p className="text-muted" style={{ fontSize: '0.8rem' }}>
+                    {new Date(question.createdAt).toLocaleDateString('bg-BG')}
+                  </p>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      marginTop: '8px',
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: question.isActive ? '#bbf7d0' : '#fecaca',
+                      background: question.isActive ? 'rgba(22, 101, 52, 0.45)' : 'rgba(127, 29, 29, 0.45)',
+                      border: `1px solid ${question.isActive ? 'rgba(34, 197, 94, 0.55)' : 'rgba(239, 68, 68, 0.55)'}`,
+                    }}
+                  >
+                    {question.isActive ? 'Активен' : 'Неактивен'}
+                  </span>
+                </div>
+                
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                  lineHeight: '1.4',
+                  minHeight: '80px'
+                }}>
+                  {question.text || question.question}
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => handleViewAnswers(question)}
+                    className="btn btn-primary w-full"
+                  >
+                    Виж отговори ({question.answersCount ?? 0})
+                  </button>
+                  <button
+                    onClick={() => router.push(`/admin/questions/${question.id}/edit`)}
+                    className="btn btn-secondary w-full"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setDeletingQuestion(question)}
+                    className="btn btn-error w-full"
+                  >
+                    Изтрий
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
           {questions.length === 0 && (
             <div className="col-span-full text-center">
               <div className="alert alert-warning">

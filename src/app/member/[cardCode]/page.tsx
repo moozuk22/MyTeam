@@ -332,7 +332,14 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
         )}
 
         {!isAdmin && questions.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-6" style={{ 
+            background: 'var(--bg-secondary)', 
+            borderRadius: '8px', 
+            padding: '16px',
+            border: '1px solid var(--border-color)',
+            maxHeight: '50vh',
+            overflow: 'auto'
+          }}>
             <h3 style={{ 
               fontSize: '1rem', 
               fontWeight: '600', 
@@ -341,55 +348,160 @@ export default function MemberPage({ params }: { params: Promise<{ cardCode: str
             }}>
               Въпроси:
             </h3>
-            <div style={{ 
-              background: 'var(--bg-secondary)', 
-              borderRadius: '8px', 
-              padding: '16px',
-              border: '1px solid var(--border-color)'
-            }}>
-              {questions.map((question, index) => (
-                <div key={question.id} style={{ 
-                  marginBottom: index < questions.length - 1 ? '12px' : '0',
-                  paddingBottom: index < questions.length - 1 ? '12px' : '0',
-                  borderBottom: index < questions.length - 1 ? '1px solid var(--border-color)' : 'none',
-                  color: 'var(--text-primary)',
-                  fontSize: '14px',
-                  lineHeight: '1.4'
-                }}>
-                  <div style={{ marginBottom: '8px' }}>{question.text}</div>
-                  <input
-                    type="text"
-                    value={answers[question.id] ?? ''}
-                    onChange={(event) => handleAnswerChange(question.id, event.target.value)}
-                    placeholder="Вашият отговор"
-                    style={{
-                      width: '100%',
-                      background: 'transparent',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '6px',
-                      padding: '8px 10px',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleSaveAnswer(question.id)}
-                    disabled={savingAnswers[question.id] === true}
-                    className="btn btn-secondary"
-                    style={{
-                      marginTop: '8px',
-                      cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
-                  </button>
-                  {answerStatus[question.id] && (
-                    <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
-                      {answerStatus[question.id]}
-                    </div>
-                  )}
+            <div>
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <div className="loading mb-4"></div>
                 </div>
-              ))}
+              ) : (
+                questions.map((question, index) => {
+                  if (index % 2 === 0 && index > 0) {
+                    return (
+                      <div key={question.id} style={{ 
+                        marginBottom: '12px',
+                        paddingBottom: '12px',
+                        borderBottom: '1px solid var(--border-color)',
+                        color: 'var(--text-primary)',
+                        fontSize: '14px',
+                        lineHeight: '1.4'
+                      }}>
+                        <div style={{ marginBottom: '8px' }}>{question.text}</div>
+                        <textarea
+                          value={answers[question.id] ?? ''}
+                          onChange={(event) => handleAnswerChange(question.id, event.target.value)}
+                          placeholder="Вашият отговор"
+                          style={{
+                            width: '100%',
+                            minHeight: '80px',
+                            background: 'transparent',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            padding: '8px 10px',
+                            color: 'var(--text-primary)',
+                            resize: 'vertical',
+                            fontFamily: 'inherit',
+                            fontSize: '14px',
+                            lineHeight: '1.4'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveAnswer(question.id)}
+                          disabled={savingAnswers[question.id] === true}
+                          className="btn btn-secondary"
+                          style={{
+                            marginTop: '8px',
+                            cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
+                        </button>
+                        {answerStatus[question.id] && (
+                          <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
+                            {answerStatus[question.id]}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  } else if (index === questions.length - 1) {
+                    return (
+                      <div key={question.id} style={{ 
+                        marginBottom: '0',
+                        paddingBottom: '0',
+                        borderBottom: 'none',
+                        color: 'var(--text-primary)',
+                        fontSize: '14px',
+                        lineHeight: '1.4'
+                      }}>
+                        <div style={{ marginBottom: '8px' }}>{question.text}</div>
+                        <textarea
+                          value={answers[question.id] ?? ''}
+                          onChange={(event) => handleAnswerChange(question.id, event.target.value)}
+                          placeholder="Вашият отговор"
+                          style={{
+                            width: '100%',
+                            minHeight: '80px',
+                            background: 'transparent',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            padding: '8px 10px',
+                            color: 'var(--text-primary)',
+                            resize: 'vertical',
+                            fontFamily: 'inherit',
+                            fontSize: '14px',
+                            lineHeight: '1.4'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveAnswer(question.id)}
+                          disabled={savingAnswers[question.id] === true}
+                          className="btn btn-secondary"
+                          style={{
+                            marginTop: '8px',
+                            cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
+                        </button>
+                        {answerStatus[question.id] && (
+                          <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
+                            {answerStatus[question.id]}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div key={question.id} style={{ 
+                        marginBottom: '12px',
+                        paddingBottom: '12px',
+                        borderBottom: '1px solid var(--border-color)',
+                        color: 'var(--text-primary)',
+                        fontSize: '14px',
+                        lineHeight: '1.4'
+                      }}>
+                        <div style={{ marginBottom: '8px' }}>{question.text}</div>
+                        <textarea
+                          value={answers[question.id] ?? ''}
+                          onChange={(event) => handleAnswerChange(question.id, event.target.value)}
+                          placeholder="Вашият отговор"
+                          style={{
+                            width: '100%',
+                            minHeight: '80px',
+                            background: 'transparent',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            padding: '8px 10px',
+                            color: 'var(--text-primary)',
+                            resize: 'vertical',
+                            fontFamily: 'inherit',
+                            fontSize: '14px',
+                            lineHeight: '1.4'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveAnswer(question.id)}
+                          disabled={savingAnswers[question.id] === true}
+                          className="btn btn-secondary"
+                          style={{
+                            marginTop: '8px',
+                            cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
+                        </button>
+                        {answerStatus[question.id] && (
+                          <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
+                            {answerStatus[question.id]}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                })
+              )}
             </div>
           </div>
         )}
