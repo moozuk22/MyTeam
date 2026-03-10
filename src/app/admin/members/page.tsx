@@ -38,6 +38,7 @@ interface QuestionAnswer {
 
 export default function AdminMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
@@ -195,6 +196,23 @@ export default function AdminMembersPage() {
     }
   };
 
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredMembers = members.filter((member) => {
+    if (!normalizedSearchTerm) return true;
+
+    const fullName = `${member.firstName} ${member.secondName}`.toLowerCase();
+    const idMatch = member.id.toLowerCase().includes(normalizedSearchTerm);
+    const nameMatch =
+      member.firstName.toLowerCase().includes(normalizedSearchTerm) ||
+      member.secondName.toLowerCase().includes(normalizedSearchTerm) ||
+      fullName.includes(normalizedSearchTerm);
+    const cardMatch = member.cards.some((card) =>
+      card.cardCode.toLowerCase().includes(normalizedSearchTerm)
+    );
+
+    return idMatch || nameMatch || cardMatch;
+  });
+
   return (
     <div className="container p-6 fade-in">
       <div className="flex-col flex items-center text-center mb-8">
@@ -296,6 +314,48 @@ export default function AdminMembersPage() {
 
       {/* Members Grid */}
       {view === 'members' && (
+        <div className="space-y-6">
+          <div className="mb-6 flex justify-center">
+            <div style={{ width: "100%", maxWidth: "560px", padding: "20px"}}>
+              <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                className="input w-full"
+                style={{ paddingRight: "44px" }}
+                placeholder="Търси член по име, ID или карта"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => setSearchTerm("")}
+                  style={{
+                    position: "absolute",
+                    right: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "999px",
+                    border: "1px solid var(--border-color)",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-secondary)",
+                    fontSize: "16px",
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  X
+                </button>
+              )}
+            </div>
+          </div>
+          </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {isMembersLoading ? (
             <div
@@ -305,7 +365,7 @@ export default function AdminMembersPage() {
               <div className="loading"></div>
             </div>
           ) : (
-            members.map((member) => (
+            filteredMembers.map((member) => (
             <div key={member.id} className="card">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -384,7 +444,7 @@ export default function AdminMembersPage() {
             </div>
             ))
           )}
-          {!isMembersLoading && members.length === 0 && (
+          {!isMembersLoading && filteredMembers.length === 0 && (
             <div className="col-span-full text-center">
               <div className="alert alert-warning">
                 <strong>Няма намерени членове</strong>
@@ -392,6 +452,7 @@ export default function AdminMembersPage() {
               </div>
             </div>
           )}
+        </div>
         </div>
       )}
 
