@@ -38,7 +38,8 @@ interface QuestionAnswer {
 
 export default function AdminMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isMembersLoading, setIsMembersLoading] = useState(true);
+  const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
   const [deletingMember, setDeletingMember] = useState<Member | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState<Question | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -50,7 +51,11 @@ export default function AdminMembersPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const router = useRouter();
 
-  const fetchMembers = async () => {
+  const fetchMembers = async (showLoader = true) => {
+    if (showLoader) {
+      setIsMembersLoading(true);
+    }
+
     try {
       const response = await fetch("/api/admin/members");
       if (response.ok) {
@@ -60,11 +65,17 @@ export default function AdminMembersPage() {
     } catch (err) {
       console.error("Error fetching members:", err);
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setIsMembersLoading(false);
+      }
     }
   };
 
-  const fetchQuestions = async () => {
+  const fetchQuestions = async (showLoader = true) => {
+    if (showLoader) {
+      setIsQuestionsLoading(true);
+    }
+
     try {
       const response = await fetch("/api/admin/questions");
       if (response.ok) {
@@ -74,7 +85,9 @@ export default function AdminMembersPage() {
     } catch (err) {
       console.error("Error fetching questions:", err);
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setIsQuestionsLoading(false);
+      }
     }
   };
 
@@ -94,7 +107,7 @@ export default function AdminMembersPage() {
       try {
         const payload = JSON.parse(event.data) as { type?: string };
         if (payload.type === "questions-updated") {
-          await fetchQuestions();
+          await fetchQuestions(false);
         }
       } catch (err) {
         console.error("Admin questions SSE parse error:", err);
@@ -181,14 +194,6 @@ export default function AdminMembersPage() {
       setIsLoadingAnswers(false);
     }
   };
-
-  if (loading) return (
-    <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
-      <div className="text-center">
-        <div className="loading mb-4"></div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="container p-6 fade-in">
@@ -292,7 +297,15 @@ export default function AdminMembersPage() {
       {/* Members Grid */}
       {view === 'members' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {members.map((member) => (
+          {isMembersLoading ? (
+            <div
+              className="col-span-full flex items-center justify-center"
+              style={{ minHeight: "260px" }}
+            >
+              <div className="loading"></div>
+            </div>
+          ) : (
+            members.map((member) => (
             <div key={member.id} className="card">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -369,8 +382,9 @@ export default function AdminMembersPage() {
                 </button>
               </div>
             </div>
-          ))}
-          {members.length === 0 && (
+            ))
+          )}
+          {!isMembersLoading && members.length === 0 && (
             <div className="col-span-full text-center">
               <div className="alert alert-warning">
                 <strong>Няма намерени членове</strong>
@@ -384,9 +398,12 @@ export default function AdminMembersPage() {
       {/* Questions Grid */}
       {view === 'questions' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loading ? (
-            <div className="col-span-full text-center">
-              <div className="loading mb-4"></div>
+          {isQuestionsLoading ? (
+            <div
+              className="col-span-full flex items-center justify-center"
+              style={{ minHeight: "260px" }}
+            >
+              <div className="loading"></div>
             </div>
           ) : (
             questions.map((question, index) => (
@@ -451,7 +468,7 @@ export default function AdminMembersPage() {
               </div>
             ))
           )}
-          {questions.length === 0 && (
+          {!isQuestionsLoading && questions.length === 0 && (
             <div className="col-span-full text-center">
               <div className="alert alert-warning">
                 <strong>Няма намерени въпроси</strong>
