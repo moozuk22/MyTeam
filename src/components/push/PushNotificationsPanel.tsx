@@ -307,7 +307,6 @@ export function PushNotificationsPanel({ cardCode }: PushNotificationsPanelProps
         icon: "/logo.png",
         badge: "/logo.png",
         tag: `sw-test-${Date.now()}`,
-        renotify: false,
         data: { url: window.location.pathname },
       });
 
