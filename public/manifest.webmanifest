@@ -1,6 +1,6 @@
 {
-  "name": "CheckIn NFC Member App",
-  "short_name": "CheckIn",
+  "name": "Dalida Dance",
+  "short_name": "Dalida Dance",
   "description": "NFC member profile and attendance tracking with browser notifications.",
   "start_url": "/",
   "scope": "/",

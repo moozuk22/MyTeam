@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "CheckIn NFC",
-  title: "CheckIn NFC",
+  applicationName: "Dalida Dance",
+  title: "Dalida Dance",
   description: "NFC member management and attendance tracking.",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "CheckIn",
+    title: "Dalida Dance",
     statusBarStyle: "black-translucent",
   },
 };
