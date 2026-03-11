@@ -15,6 +15,7 @@ model Member {
   visitsUsed  Int                    @default(0)
   cards       Card[]
   answers     MemberQuestionAnswer[]
+  pushSubscriptions PushSubscription[]
 
   @@map("members")
 }
@@ -53,4 +54,21 @@ model MemberQuestionAnswer {
 
   @@unique([memberId, questionId])
   @@map("member_question_answers")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  memberId  String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  device    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, isActive])
+  @@map("push_subscriptions")
 }

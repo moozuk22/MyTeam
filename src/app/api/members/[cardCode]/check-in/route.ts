@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { publishMemberUpdated } from "@/lib/memberEvents";
+import { buildNotificationPayload } from "@/lib/push/templates";
+import { sendPushToMember } from "@/lib/push/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +48,29 @@ export async function POST(
     });
 
     publishMemberUpdated(cardCode, "check-in");
+    const remainingVisits = updatedMember.visitsTotal - updatedMember.visitsUsed;
+
+    try {
+      const visitPayload = buildNotificationPayload({
+        type: "visit_registered",
+        memberName: `${updatedMember.firstName} ${updatedMember.secondName}`.trim(),
+        remainingVisits,
+        url: `/member/${cardCode}`,
+      });
+      await sendPushToMember(updatedMember.id, visitPayload);
+
+      if (remainingVisits > 0 && remainingVisits <= 1) {
+        const almostFinishedPayload = buildNotificationPayload({
+          type: "membership_almost_finished",
+          memberName: `${updatedMember.firstName} ${updatedMember.secondName}`.trim(),
+          remainingVisits,
+          url: `/member/${cardCode}`,
+        });
+        await sendPushToMember(updatedMember.id, almostFinishedPayload);
+      }
+    } catch (pushError) {
+      console.error("Push notification dispatch failed after check-in:", pushError);
+    }
 
     return NextResponse.json({
       id: updatedMember.id,

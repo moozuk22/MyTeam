@@ -6,9 +6,10 @@
   --text-primary: #ffffff;
   --text-secondary: #cccccc;
   --text-muted: #888888;
-  --accent-gold: #d4af37;
-  --accent-gold-light: #f4e5bc;
-  --accent-gold-dark: #b8941f;
+  --accent-gold: linear-gradient(135deg, rgb(201, 168, 76), rgb(232, 201, 109), rgb(201, 168, 76));
+  --accent-gold-color: rgb(201, 168, 76);
+  --accent-gold-light: rgb(232, 201, 109);
+  --accent-gold-dark: rgb(201, 168, 76);
   --border-color: #333333;
   --success: #4caf50;
   --error: #f44336;
@@ -85,13 +86,13 @@ a {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-dark));
+  background: var(--accent-gold);
   color: var(--bg-primary);
   box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold));
+  background: linear-gradient(135deg, var(--accent-gold-light), var(--accent-gold-dark));
   box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
   transform: translateY(-1px);
 }
@@ -105,8 +106,8 @@ a {
 
 .btn-secondary {
   background: transparent;
-  color: var(--accent-gold);
-  border: 2px solid var(--accent-gold);
+  color: var(--accent-gold-color);
+  border: 2px solid var(--accent-gold-color);
 }
 
 .btn-secondary:hover {
@@ -173,7 +174,11 @@ h3 {
 }
 
 .text-gold {
-  color: var(--accent-gold);
+  color: var(--accent-gold-color);
+  background: var(--accent-gold);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .text-secondary {
@@ -196,9 +201,31 @@ input, select {
   transition: border-color 0.3s ease;
 }
 
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(1) brightness(1.2);
+}
+
+input[type="date"]::-moz-calendar-picker-indicator,
+input[type="time"]::-moz-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+input[type="date"]::-moz-calendar-picker-indicator:hover,
+input[type="time"]::-moz-calendar-picker-indicator:hover {
+  filter: invert(1) brightness(1.2);
+}
+
 input:focus, select:focus {
   outline: none;
-  border-color: var(--accent-gold);
+  border-color: var(--accent-gold-color);
   box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
 }
 
@@ -259,7 +286,7 @@ input:focus, select:focus {
 
 .stat-card {
   background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
-  border: 1px solid var(--accent-gold);
+  border: 1px solid var(--accent-gold-color);
   border-radius: 12px;
   padding: 20px;
   text-align: center;
@@ -274,13 +301,13 @@ input:focus, select:focus {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--accent-gold), var(--accent-gold-light));
+  background: linear-gradient(90deg, var(--accent-gold-color), var(--accent-gold-light));
 }
 
 .stat-number {
   font-size: 2.5rem;
   font-weight: 700;
-  color: var(--accent-gold);
+  color: var(--accent-gold-color);
   margin-bottom: 8px;
 }
 
@@ -346,7 +373,7 @@ input:focus, select:focus {
 .visit-number {
   font-size: 2rem;
   font-weight: 700;
-  color: var(--accent-gold);
+  color: var(--accent-gold-color);
   display: block;
 }
 
@@ -403,9 +430,9 @@ input:focus, select:focus {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border: 3px solid rgba(212, 175, 55, 0.3);
+  border: 3px solid rgba(201, 168, 76, 0.3);
   border-radius: 50%;
-  border-top-color: var(--accent-gold);
+  border-top-color: var(--accent-gold-color);
   animation: spin 1s ease-in-out infinite;
 }
 

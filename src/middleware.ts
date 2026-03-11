@@ -11,7 +11,11 @@ export async function middleware(request: NextRequest) {
   // Protect admin routes
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     // Exception for login page and login API
-    if (pathname === "/admin/login" || pathname === "/api/admin/login") {
+    if (
+      pathname === "/admin/login" ||
+      pathname === "/api/admin/login" ||
+      pathname === "/api/admin/check-session"
+    ) {
       if (adminSession && pathname === "/admin/login") {
         try {
           await jwtVerify(adminSession, SECRET);
