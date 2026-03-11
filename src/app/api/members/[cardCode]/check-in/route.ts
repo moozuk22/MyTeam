@@ -59,7 +59,7 @@ export async function POST(
       });
       await sendPushToMember(updatedMember.id, visitPayload);
 
-      if (remainingVisits > 0 && remainingVisits <= 2) {
+      if (remainingVisits > 0 && remainingVisits <= 1) {
         const almostFinishedPayload = buildNotificationPayload({
           type: "membership_almost_finished",
           memberName: `${updatedMember.firstName} ${updatedMember.secondName}`.trim(),
