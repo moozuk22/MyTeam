@@ -403,12 +403,36 @@ export default function AdminMembersPage() {
                 <p className="text-secondary text-sm mb-2">
                   Карти: {member.cards.length === 0 && <span className="text-muted">няма карти</span>}
                   {member.cards.map((card, idx) => (
-                    <span key={card.id} className="text-gold font-mono">
+                    <span key={card.id} style={{
+                      color: card.isActive ? '#4caf50' : '#f44336'
+                    }}>
                       {card.cardCode}{idx < member.cards.length - 1 ? ', ' : ''}
                     </span>
                   ))}
                 </p>
-                <div className="flex flex-wrap gap-1">
+                {member.cards.length > 0 && (
+                  <div className="flex gap-4 text-xs text-muted" style={{ marginTop: "8px" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ 
+                        width: "8px", 
+                        height: "8px", 
+                        borderRadius: "50%", 
+                        backgroundColor: "#4caf50" 
+                      }}></span>
+                      Активна
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ 
+                        width: "8px", 
+                        height: "8px", 
+                        borderRadius: "50%", 
+                        backgroundColor: "#f44336" 
+                      }}></span>
+                      Неактивна
+                    </span>
+                  </div>
+                )}
+                {/* <div className="flex flex-wrap gap-1">
                   {member.cards.map((card) => (
                     <span key={card.id} className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       card.isActive 
@@ -418,7 +442,7 @@ export default function AdminMembersPage() {
                       {card.cardCode}: {card.isActive ? 'Активна' : 'Неактивна'}
                     </span>
                   ))}
-                </div>
+                </div> */}
               </div>
 
               <div className="flex gap-3">

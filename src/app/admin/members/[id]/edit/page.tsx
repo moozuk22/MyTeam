@@ -241,7 +241,7 @@ export default function EditMemberPage() {
                 </span>
               ))}
             </div>
-            <div className="mt-3">
+            <div className="mt-4">
               <button
                 type="button"
                 className="btn btn-primary"
@@ -250,13 +250,13 @@ export default function EditMemberPage() {
               >
                 {assigningCard ? "Създаване..." : "Създай нова карта"}
               </button>
-              <p className="text-muted mt-2" style={{ fontSize: "0.85rem" }}>
+              <p className="text-muted mt-4" style={{ fontSize: "0.85rem" }}>
                 Създаването на нова карта ще деактивира всички предишни карти на този член.
               </p>
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-2 mt-4">
             <button
               type="button"
               onClick={() => router.push("/admin/members")}
