@@ -1,647 +1,339 @@
 "use client";
+import { useState } from "react";
+import "./page.css";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+/* ── Club Logo ── */
+const ClubLogo = ({ className = "" }) => (
+  <svg viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <path d="M60 2 L115 20 L115 85 Q115 120 60 138 Q5 120 5 85 L5 20 Z" fill="#1a5c1a" stroke="#32cd32" strokeWidth="3"/>
+    <path d="M60 8 L109 24 L109 83 Q109 114 60 132 Q11 114 11 83 L11 24 Z" fill="#0d3d0d"/>
+    <rect x="15" y="18" width="90" height="22" rx="2" fill="#1a5c1a"/>
+    <text x="60" y="33" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="800" fontFamily="Arial, sans-serif">ФК ВИХЪР</text>
+    <rect x="20" y="44" width="16" height="40" fill="#ffffff"/>
+    <rect x="36" y="44" width="16" height="40" fill="#32cd32"/>
+    <rect x="52" y="44" width="16" height="40" fill="#ffffff"/>
+    <rect x="68" y="44" width="16" height="40" fill="#32cd32"/>
+    <rect x="84" y="44" width="16" height="40" fill="#ffffff"/>
+    <circle cx="60" cy="64" r="14" fill="#1a5c1a" stroke="#32cd32" strokeWidth="1.5"/>
+    <circle cx="60" cy="64" r="10" fill="none" stroke="#ffffff" strokeWidth="1"/>
+    <text x="60" y="68" textAnchor="middle" fill="#ffffff" fontSize="12">⚽</text>
+    <rect x="15" y="88" width="90" height="20" rx="2" fill="#1a5c1a"/>
+    <text x="60" y="102" textAnchor="middle" fill="#ffffff" fontSize="8.5" fontWeight="700" fontFamily="Arial, sans-serif">ВОЙВОДИНОВО</text>
+    <text x="60" y="122" textAnchor="middle" fill="#32cd32" fontSize="14" fontWeight="800" fontFamily="Arial, sans-serif">1961</text>
+  </svg>
+);
 
-type StatusFilter = "all" | "paid" | "unpaid";
+/* ── Icons ── */
+const ChartColumnIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+  </svg>
+);
+const BellIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.268 21a2 2 0 0 0 3.464 0"/>
+    <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>
+  </svg>
+);
+const TriangleAlertIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>
+    <path d="M12 9v4"/><path d="M12 17h.01"/>
+  </svg>
+);
+const ChevronRightIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m9 18 6-6-6-6"/>
+  </svg>
+);
+const ChevronDownIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m6 9 6 6 6-6"/>
+  </svg>
+);
+const XIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+  </svg>
+);
+const UsersIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+    <path d="M16 3.128a4 4 0 0 1 0 7.744"/>
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+    <circle cx="9" cy="7" r="4"/>
+  </svg>
+);
+const TrendingUpIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/>
+  </svg>
+);
+const CircleAlertIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" x2="12" y1="8" y2="12"/>
+    <line x1="12" x2="12.01" y1="16" y2="16"/>
+  </svg>
+);
+const PrinterIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+    <path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/>
+    <rect x="6" y="14" width="12" height="8" rx="1"/>
+  </svg>
+);
+const CalendarIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 2v4"/><path d="M16 2v4"/>
+    <rect width="18" height="18" x="3" y="4" rx="2"/>
+    <path d="M3 10h18"/>
+  </svg>
+);
 
-interface PaymentLog {
-  id: string;
-  paidAt: string;
-}
-
-interface Player {
-  id: string;
-  fullName: string;
-  teamGroup: number | null;
-  paymentLogs: PaymentLog[];
-}
-
-const BG_MONTHS = [
-  "Януари",
-  "Февруари",
-  "Март",
-  "Април",
-  "Май",
-  "Юни",
-  "Юли",
-  "Август",
-  "Септември",
-  "Октомври",
-  "Ноември",
-  "Декември",
+/* ── Player data ── */
+const PLAYERS = [
+  { id: 1,  name: "Алекс Гърдев",          group: 2017, date: "—", paid: false },
+  { id: 2,  name: "Александър Вълчев",      group: 2021, date: "—", paid: false },
+  { id: 3,  name: "Андрей Андреев",         group: 2013, date: "—", paid: false },
+  { id: 4,  name: "Божидар Арбов",          group: 2019, date: "—", paid: false },
+  { id: 5,  name: "Божидар Нечев",          group: 2017, date: "—", paid: false },
+  { id: 6,  name: "Георги Видков",          group: 2017, date: "—", paid: false },
+  { id: 7,  name: "Георги Тодовичин",       group: 2015, date: "—", paid: false },
+  { id: 8,  name: "Данимир Спасов",         group: 2018, date: "—", paid: false },
+  { id: 9,  name: "Димитър Бофиров",        group: 2019, date: "—", paid: false },
+  { id: 10, name: "Димитър Ефтимов",        group: 2014, date: "—", paid: false },
+  { id: 11, name: "Димитър Колев",          group: 2015, date: "—", paid: false },
+  { id: 12, name: "Димитър Найденов",       group: 2014, date: "—", paid: false },
+  { id: 13, name: "Емануел Кисьов",         group: 2014, date: "—", paid: false },
+  { id: 14, name: "Емил Йорданов",          group: 2018, date: "—", paid: false },
+  { id: 15, name: "Захари Господинов",      group: 2020, date: "—", paid: false },
+  { id: 16, name: "Ивайло Чокойски",        group: 2020, date: "—", paid: false },
+  { id: 17, name: "Йоан Митев",             group: 2018, date: "—", paid: false },
+  { id: 18, name: "Костадин Танев",         group: 2021, date: "—", paid: false },
+  { id: 19, name: "Кристиан Каламов",       group: 2020, date: "—", paid: false },
+  { id: 20, name: "Лъчезар Русев",          group: 2021, date: "—", paid: false },
+  { id: 21, name: "Мартин Христев",         group: 2012, date: "—", paid: false },
+  { id: 22, name: "Матео Чакракчиев",       group: 2021, date: "—", paid: false },
+  { id: 23, name: "Михаил Ковашки",         group: 2016, date: "—", paid: false },
+  { id: 24, name: "Николай Добринов",       group: 2014, date: "—", paid: false },
+  { id: 25, name: "Николай Митев",          group: 2014, date: "—", paid: false },
+  { id: 26, name: "Петко Делов",            group: 2020, date: "—", paid: false },
+  { id: 27, name: "Петко Димитров",         group: 2016, date: "—", paid: false },
+  { id: 28, name: "Петьо Асърджийски",      group: 2012, date: "—", paid: false },
+  { id: 29, name: "Пламен Политов",         group: 2020, date: "—", paid: false },
+  { id: 30, name: "Стоян Воденичаров",      group: 2012, date: "—", paid: false },
+  { id: 31, name: "Стоян Иванов",           group: 2012, date: "—", paid: false },
+  { id: 32, name: "Теодор Димов",           group: 2019, date: "—", paid: false },
 ];
 
-const BG_MONTHS_SHORT = BG_MONTHS.map((m) => m.slice(0, 3));
+const MONTHS = ["Януари","Февруари","Март","Април","Май","Юни","Юли","Август","Септември","Октомври","Ноември","Декември"];
+const GROUPS = [...new Set(PLAYERS.map(p => p.group))].sort((a,b) => b-a);
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+/* ── Reports Dialog ── */
+function ReportsDialog({ onClose }) {
+  const [month, setMonth]       = useState("Март");
+  const [year, setYear]         = useState("2026");
+  const [group, setGroup]       = useState("Всички");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-function printViaIframe(html: string): void {
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-  document.body.appendChild(iframe);
+  const paidCount = PLAYERS.filter(p => p.paid).length;
+  const total     = PLAYERS.length;
+  const pct       = total > 0 ? Math.round((paidCount / total) * 100) : 0;
+  const missing   = total - paidCount;
 
-  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-  if (!doc) {
-    document.body.removeChild(iframe);
-    return;
-  }
-
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  setTimeout(() => {
-    try {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-    } catch {
-      // ignore
-    }
-
-    const cleanup = () => {
-      try {
-        document.body.removeChild(iframe);
-      } catch {
-        // ignore
-      }
-    };
-
-    try {
-      iframe.contentWindow?.addEventListener("afterprint", cleanup, { once: true });
-    } catch {
-      // ignore
-    }
-    setTimeout(cleanup, 60_000);
-  }, 450);
-}
-
-export default function AdminPlayersPage() {
-  const router = useRouter();
-  const now = new Date();
-  const currentYear = now.getFullYear();
-
-  const [open, setOpen] = useState(false);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingAnnual, setLoadingAnnual] = useState(false);
-
-  const [month, setMonth] = useState(now.getMonth());
-  const [year, setYear] = useState(Math.max(2026, currentYear));
-  const [groupFilter, setGroupFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  useEffect(() => {
-    if (!open) return;
-
-    const loadPlayers = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch("/api/admin/members", { cache: "no-store" });
-        if (!response.ok) {
-          setPlayers([]);
-          return;
-        }
-
-        const data = (await response.json()) as Array<{
-          id: string;
-          fullName: string;
-          teamGroup: number | null;
-          paymentLogs?: PaymentLog[];
-        }>;
-
-        setPlayers(
-          data.map((p) => ({
-            id: p.id,
-            fullName: p.fullName,
-            teamGroup: p.teamGroup ?? null,
-            paymentLogs: p.paymentLogs ?? [],
-          }))
-        );
-      } catch (error) {
-        console.error("Failed to fetch players:", error);
-        setPlayers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadPlayers();
-  }, [open]);
-
-  const years = useMemo(() => {
-    const end = Math.max(2026, currentYear + 1);
-    return Array.from({ length: end - 2026 + 1 }, (_, i) => 2026 + i);
-  }, [currentYear]);
-
-  const groups = useMemo(
-    () =>
-      Array.from(
-        new Set(players.map((p) => p.teamGroup).filter((g): g is number => g !== null))
-      ).sort((a, b) => a - b),
-    [players]
-  );
-
-  const filteredPlayers =
-    groupFilter === "all"
-      ? players
-      : players.filter((p) => p.teamGroup === Number(groupFilter));
-
-  const paidIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const player of filteredPlayers) {
-      for (const log of player.paymentLogs) {
-        const d = new Date(log.paidAt);
-        if (d.getMonth() === month && d.getFullYear() === year) {
-          set.add(player.id);
-          break;
-        }
-      }
-    }
-    return set;
-  }, [filteredPlayers, month, year]);
-
-  const paidPlayers = filteredPlayers.filter((p) => paidIds.has(p.id));
-  const unpaidPlayers = filteredPlayers.filter((p) => !paidIds.has(p.id));
-  const total = filteredPlayers.length;
-  const paidCount = paidPlayers.length;
-  const unpaidCount = unpaidPlayers.length;
-  const percentage = total > 0 ? Math.round((paidCount / total) * 100) : 0;
-
-  const displayPlayers =
-    statusFilter === "paid"
-      ? paidPlayers
-      : statusFilter === "unpaid"
-        ? unpaidPlayers
-        : filteredPlayers;
-
-  const paidAtMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const player of filteredPlayers) {
-      const latest = player.paymentLogs
-        .filter((log) => {
-          const d = new Date(log.paidAt);
-          return d.getMonth() === month && d.getFullYear() === year;
-        })
-        .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())[0];
-      if (latest) {
-        map.set(player.id, latest.paidAt);
-      }
-    }
-    return map;
-  }, [filteredPlayers, month, year]);
-
-  const percentColor =
-    percentage >= 75 ? "#32cd32" : percentage >= 50 ? "#ffd700" : "#ff4d4d";
-
-  const todayFormatted = new Date().toLocaleDateString("bg-BG", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
+  const filtered = PLAYERS.filter(p => {
+    if (group !== "Всички" && p.group !== Number(group)) return false;
+    if (statusFilter === "paid" && !p.paid) return false;
+    if (statusFilter === "unpaid" && p.paid) return false;
+    return true;
   });
 
-  const handleMonthlyReport = () => {
-    const rows = displayPlayers
-      .map((p, i) => {
-        const isPaid = paidIds.has(p.id);
-        const paidAt = paidAtMap.get(p.id);
-        const dateStr = isPaid && paidAt ? new Date(paidAt).toLocaleDateString("bg-BG") : "—";
-        return `<tr>
-          <td>${i + 1}</td>
-          <td>${esc(p.fullName)}</td>
-          <td>${p.teamGroup ?? "—"}</td>
-          <td>${dateStr}</td>
-          <td>${isPaid ? "Платено" : "Неплатено"}</td>
-        </tr>`;
-      })
-      .join("");
-
-    const groupLine =
-      groupFilter !== "all"
-        ? `<p style="margin:4px 0 0;font-size:13px;color:#555">Набор: ${esc(groupFilter)}</p>`
-        : "";
-
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>
-  @page { size: portrait; margin: 15mm; }
-  body { font-family: Arial, sans-serif; color: #000; margin: 0; padding: 20px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { border-bottom: 2px solid #000; padding: 6px 8px; text-align: left; }
-  td { border-bottom: 1px solid #ddd; padding: 6px 8px; }
-</style></head><body>
-  <h1 style="margin:0 0 6px;font-size:20px;font-weight:800">ФК ВИХЪР ВОЙВОДИНОВО</h1>
-  <h2 style="margin:0 0 12px;font-size:16px;font-weight:600">ФИНАНСОВ ОТЧЕТ ЗА ${esc(BG_MONTHS[month].toUpperCase())} ${year}</h2>
-  ${groupLine}
-  <p style="font-size:14px;margin-bottom:16px"><strong>Платили:</strong> ${paidCount} / ${total} (${percentage}%)</p>
-  <table>
-    <thead><tr><th>#</th><th>Име</th><th>Набор</th><th>Дата на плащане</th><th>Статус</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <p style="margin-top:24px;font-size:11px;color:#888">Генериран на ${todayFormatted}</p>
-</body></html>`;
-
-    printViaIframe(html);
-  };
-
-  const handleAnnualReport = async () => {
-    setLoadingAnnual(true);
-    try {
-      const filtered = [...filteredPlayers].sort((a, b) => {
-        if (groupFilter === "all") {
-          const ga = a.teamGroup ?? 0;
-          const gb = b.teamGroup ?? 0;
-          if (ga !== gb) return ga - gb;
-        }
-        return a.fullName.localeCompare(b.fullName, "bg");
-      });
-
-      const rows = filtered
-        .map((p, i) => {
-          const paidMonths = new Set(
-            p.paymentLogs
-              .map((l) => new Date(l.paidAt))
-              .filter((d) => d.getFullYear() === year)
-              .map((d) => d.getMonth())
-          );
-          const cells = BG_MONTHS.map((_, mi) => {
-            const paid = paidMonths.has(mi);
-            return `<td style="text-align:center;color:${paid ? "#228B22" : "#CC0000"};font-weight:${paid ? 700 : 400}">${paid ? "✓" : "—"}</td>`;
-          }).join("");
-          return `<tr><td style="text-align:center">${i + 1}</td><td style="white-space:nowrap">${esc(p.fullName)}</td>${cells}</tr>`;
-        })
-        .join("");
-
-      const monthHeaders = BG_MONTHS_SHORT.map(
-        (m) =>
-          `<th style="padding:4px 2px;text-align:center;font-size:10px;font-weight:600">${m}</th>`
-      ).join("");
-
-      const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>
-  @page { size: landscape; margin: 10mm; }
-  body { font-family: Arial, sans-serif; color: #000; margin: 0; padding: 10px; zoom: 0.9; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { border-bottom: 2px solid #000; padding: 4px 6px; font-size: 10px; font-weight: 600; }
-  td { border-bottom: 1px solid #ddd; padding: 4px 6px; font-size: 11px; }
-</style></head><body>
-  <h1 style="margin:0 0 6px;font-size:18px;font-weight:800">ФК ВИХЪР ВОЙВОДИНОВО</h1>
-  <h2 style="margin:0 0 12px;font-size:14px;font-weight:600">ГОДИШЕН ОТЧЕТ ЗА СЪБИРАЕМОСТ - ${year} Г.</h2>
-  <table>
-    <thead><tr><th>#</th><th style="text-align:left;min-width:120px">Име</th>${monthHeaders}</tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <p style="margin-top:16px;font-size:10px;color:#888">Генериран на ${todayFormatted}</p>
-</body></html>`;
-
-      printViaIframe(html);
-    } finally {
-      setLoadingAnnual(false);
-    }
-  };
-
   return (
-    <div className="container p-6 fade-in">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-gold" style={{ fontSize: "2rem", fontWeight: 700 }}>
-          Играчи
-        </h1>
-        <button className="btn btn-secondary" onClick={() => router.push("/admin/members")}>
-          Назад
-        </button>
-      </div>
+    <div className="rd-overlay" onClick={onClose}>
+      <div className="rd-dialog" onClick={e => e.stopPropagation()}>
 
-      <button
-        className="btn"
-        onClick={() => setOpen(true)}
-        style={{
-          border: "1px solid rgba(50,205,50,0.35)",
-          color: "#32cd32",
-          background: "rgba(50,205,50,0.08)",
-          fontWeight: 700,
-        }}
-      >
-        Център за отчети
-      </button>
+        {/* Close */}
+        <button className="rd-close" onClick={onClose} aria-label="Затвори"><XIcon/></button>
 
-      {open && (
-        <div className="modal-overlay" onClick={() => setOpen(false)}>
-          <div
-            className="modal-content fade-in"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: "980px",
-              width: "100%",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              background: "#0d0d0d",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "#fff",
-            }}
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h2 style={{ margin: 0, color: "#32cd32", fontSize: "1.65rem", fontWeight: 800 }}>
-                Център за отчети
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "rgba(255,255,255,0.7)",
-                  fontSize: "2rem",
-                  lineHeight: 1,
-                  cursor: "pointer",
-                }}
-              >
-                ×
-              </button>
-            </div>
+        {/* Header */}
+        <div className="rd-header">
+          <h2 className="rd-title">
+            <ChartColumnIcon size={20}/>
+            Център за отчети
+          </h2>
+        </div>
 
-            <div className="flex flex-wrap gap-3 items-end mb-5">
-              <div className="flex gap-2">
-                <div>
-                  <label className="text-xs mb-1 block" style={{ color: "rgba(255,255,255,0.5)" }}>
-                    Месец
-                  </label>
-                  <select
-                    className="input"
-                    style={{ width: "140px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-                    value={String(month)}
-                    onChange={(e) => setMonth(Number(e.target.value))}
-                  >
-                    {BG_MONTHS.map((m, i) => (
-                      <option key={m} value={String(i)}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs mb-1 block" style={{ color: "rgba(255,255,255,0.5)" }}>
-                    Година
-                  </label>
-                  <select
-                    className="input"
-                    style={{ width: "110px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-                    value={String(year)}
-                    onChange={(e) => setYear(Number(e.target.value))}
-                  >
-                    {years.map((y) => (
-                      <option key={y} value={String(y)}>
-                        {y}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs mb-1 block" style={{ color: "rgba(255,255,255,0.5)" }}>
-                  Набор
-                </label>
-                <select
-                  className="input"
-                  style={{ width: "130px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-                  value={groupFilter}
-                  onChange={(e) => setGroupFilter(e.target.value)}
-                >
-                  <option value="all">Всички</option>
-                  {groups.map((g) => (
-                    <option key={g} value={String(g)}>
-                      {g}
-                    </option>
-                  ))}
+        {/* Filters row */}
+        <div className="rd-filters">
+          <div className="rd-filters-left">
+            <div className="rd-field">
+              <label className="rd-label">Месец</label>
+              <div className="rd-select-wrap">
+                <select className="rd-select rd-select--w140" value={month} onChange={e => setMonth(e.target.value)}>
+                  {MONTHS.map(m => <option key={m}>{m}</option>)}
                 </select>
-              </div>
-
-              <div>
-                <label className="text-xs mb-1 block" style={{ color: "rgba(255,255,255,0.5)" }}>
-                  Статус
-                </label>
-                <div
-                  style={{
-                    display: "flex",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                  }}
-                >
-                  {(
-                    [
-                      ["all", "Всички"],
-                      ["paid", "Платили"],
-                      ["unpaid", "Неплатили"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      onClick={() => setStatusFilter(value)}
-                      style={{
-                        border: "none",
-                        padding: "8px 12px",
-                        fontSize: "0.82rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        color:
-                          statusFilter === value ? "#32cd32" : "rgba(255,255,255,0.5)",
-                        background:
-                          statusFilter === value
-                            ? "rgba(50,205,50,0.18)"
-                            : "rgba(255,255,255,0.05)",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <ChevronDownIcon/>
               </div>
             </div>
-
-            {loading ? (
-              <div className="flex justify-center py-10">
-                <div className="loading"></div>
+            <div className="rd-field">
+              <label className="rd-label">Година</label>
+              <div className="rd-select-wrap">
+                <select className="rd-select rd-select--w100" value={year} onChange={e => setYear(e.target.value)}>
+                  {["2024","2025","2026"].map(y => <option key={y}>{y}</option>)}
+                </select>
+                <ChevronDownIcon/>
               </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                  <div
-                    style={{
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: "rgba(255,255,255,0.05)",
-                      padding: "16px",
-                    }}
-                  >
-                    <div className="text-xs mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
-                      👥 Общо събрани такси
-                    </div>
-                    <div className="text-2xl font-bold" style={{ color: "#32cd32" }}>
-                      {paidCount}
-                      <span className="text-sm ml-1" style={{ color: "rgba(255,255,255,0.45)" }}>
-                        / {total}
-                      </span>
-                    </div>
-                  </div>
+            </div>
+          </div>
 
-                  <div
-                    style={{
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: "rgba(255,255,255,0.05)",
-                      padding: "16px",
-                    }}
-                  >
-                    <div className="text-xs mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
-                      📈 Процент събираемост
-                    </div>
-                    <div className="text-2xl font-bold" style={{ color: percentColor }}>
-                      {percentage}%
-                    </div>
-                  </div>
+          <div className="rd-field">
+            <label className="rd-label">Набор</label>
+            <div className="rd-select-wrap">
+              <select className="rd-select rd-select--w120" value={group} onChange={e => setGroup(e.target.value)}>
+                <option>Всички</option>
+                {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <ChevronDownIcon/>
+            </div>
+          </div>
 
-                  <div
-                    style={{
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      background: "rgba(255,255,255,0.05)",
-                      padding: "16px",
-                    }}
-                  >
-                    <div className="text-xs mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
-                      ⚠ Липсващи плащания
-                    </div>
-                    <div className="text-2xl font-bold" style={{ color: unpaidCount > 0 ? "#ff4d4d" : "#32cd32" }}>
-                      {unpaidCount}
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    maxHeight: "320px",
-                    overflowY: "auto",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                  }}
-                >
-                  <table className="w-full text-sm">
-                    <thead
-                      style={{
-                        position: "sticky",
-                        top: 0,
-                        background: "#1a1a1a",
-                        color: "rgba(255,255,255,0.5)",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      <tr>
-                        <th className="py-2 px-3 text-left font-medium">#</th>
-                        <th className="py-2 px-3 text-left font-medium">Име</th>
-                        <th className="py-2 px-3 text-left font-medium">Набор</th>
-                        <th className="py-2 px-3 text-left font-medium">Дата на плащане</th>
-                        <th className="py-2 px-3 text-left font-medium">Статус</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayPlayers.map((player, idx) => {
-                        const isPaid = paidIds.has(player.id);
-                        const paidAt = paidAtMap.get(player.id);
-                        return (
-                          <tr key={player.id} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                            <td className="py-2 px-3" style={{ color: "rgba(255,255,255,0.45)" }}>
-                              {idx + 1}
-                            </td>
-                            <td className="py-2 px-3">{player.fullName}</td>
-                            <td className="py-2 px-3" style={{ color: "rgba(255,255,255,0.6)" }}>
-                              {player.teamGroup ?? "—"}
-                            </td>
-                            <td className="py-2 px-3" style={{ color: "rgba(255,255,255,0.6)" }}>
-                              {isPaid && paidAt ? new Date(paidAt).toLocaleDateString("bg-BG") : "—"}
-                            </td>
-                            <td className="py-2 px-3">
-                              {isPaid ? (
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    borderRadius: "999px",
-                                    padding: "2px 9px",
-                                    fontSize: "0.75rem",
-                                    fontWeight: 700,
-                                    background: "rgba(50,205,50,0.2)",
-                                    color: "#32cd32",
-                                  }}
-                                >
-                                  Платено
-                                </span>
-                              ) : (
-                                <span
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    borderRadius: "999px",
-                                    padding: "2px 9px",
-                                    fontSize: "0.75rem",
-                                    fontWeight: 700,
-                                    background: "rgba(255,77,77,0.2)",
-                                    color: "#ff4d4d",
-                                  }}
-                                >
-                                  Неплатено
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-
-                      {displayPlayers.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center" style={{ color: "rgba(255,255,255,0.35)" }}>
-                            Няма играчи за показване
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex justify-end gap-2 mt-4">
-                  <button
-                    className="btn"
-                    onClick={handleMonthlyReport}
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      color: "#fff",
-                      background: "rgba(255,255,255,0.05)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Генерирай месечен отчет
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={handleAnnualReport}
-                    disabled={loadingAnnual}
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      color: "#fff",
-                      background: "rgba(255,255,255,0.05)",
-                      fontWeight: 600,
-                      opacity: loadingAnnual ? 0.7 : 1,
-                    }}
-                  >
-                    {loadingAnnual ? "Зареждане..." : "Генерирай годишен отчет"}
-                  </button>
-                </div>
-              </>
-            )}
+          <div className="rd-field">
+            <label className="rd-label">Статус</label>
+            <div className="rd-seg">
+              <button className={`rd-seg-btn${statusFilter==="all" ? " active" : ""}`} onClick={() => setStatusFilter("all")}>Всички</button>
+              <button className={`rd-seg-btn${statusFilter==="paid" ? " active" : ""}`} onClick={() => setStatusFilter("paid")}>Платили</button>
+              <button className={`rd-seg-btn${statusFilter==="unpaid" ? " active" : ""}`} onClick={() => setStatusFilter("unpaid")}>Неплатили</button>
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Stats cards */}
+        <div className="rd-stats">
+          <div className="rd-stat">
+            <div className="rd-stat-label"><UsersIcon/>Общо събрани такси</div>
+            <div className="rd-stat-num rd-stat-num--green">
+              {paidCount}<span className="rd-stat-denom">/ {total}</span>
+            </div>
+          </div>
+          <div className="rd-stat">
+            <div className="rd-stat-label"><TrendingUpIcon/>Процент събираемост</div>
+            <div className="rd-stat-num rd-stat-num--red">{pct}%</div>
+          </div>
+          <div className="rd-stat">
+            <div className="rd-stat-label"><CircleAlertIcon/>Липсващи плащания</div>
+            <div className="rd-stat-num rd-stat-num--red">{missing}</div>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="rd-table-wrap">
+          <table className="rd-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Име</th>
+                <th>Набор</th>
+                <th>Дата на плащане</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p, i) => (
+                <tr key={p.id}>
+                  <td className="rd-td-muted">{i + 1}</td>
+                  <td>{p.name}</td>
+                  <td className="rd-td-dim">{p.group}</td>
+                  <td className="rd-td-dim">{p.date}</td>
+                  <td>
+                    <span className={`rd-badge ${p.paid ? "rd-badge--paid" : "rd-badge--unpaid"}`}>
+                      {p.paid ? "Платено" : "Неплатено"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer buttons */}
+        <div className="rd-footer">
+          <button className="rd-footer-btn" onClick={() => window.print()}>
+            <PrinterIcon/>
+            Генерирай месечен отчет
+          </button>
+          <button className="rd-footer-btn" onClick={() => window.print()}>
+            <CalendarIcon/>
+            Генерирай годишен отчет
+          </button>
+        </div>
+
+      </div>
     </div>
+  );
+}
+
+/* ── Main Page ── */
+export default function AdminPlayersPage() {
+  const [reportsOpen, setReportsOpen] = useState(false);
+
+  return (
+    <main className="mp-page">
+      <div className="mp-dot-grid" aria-hidden="true"/>
+
+      <div className="mp-inner">
+
+        {/* Header */}
+        <div className="mp-header">
+          <h1 className="mp-title">Списък играчи</h1>
+          <p className="mp-subtitle">Търсене, филтриране и ръчно отбелязване на плащания</p>
+          <div className="mp-title-line"/>
+        </div>
+
+        {/* Reports button */}
+        <button className="mp-reports-btn" onClick={() => setReportsOpen(true)}>
+          <ChartColumnIcon/>
+          Център за отчети
+        </button>
+
+        {/* Demo actions */}
+        <div className="mp-demo-box">
+          <p className="mp-demo-label">DEMO ACTIONS</p>
+          <div className="mp-demo-actions">
+            <button className="mp-demo-btn mp-demo-btn--yellow">
+              <BellIcon/>
+              Симулирай Напомняне (25-то число)
+            </button>
+            <button className="mp-demo-btn mp-demo-btn--red">
+              <TriangleAlertIcon/>
+              Симулирай Просрочие (1-во число)
+            </button>
+          </div>
+        </div>
+
+        {/* Team selector */}
+        <div className="mp-teams-section">
+          <h2 className="mp-teams-title">Изберете отбор</h2>
+          <div className="mp-teams-grid">
+            <div className="mp-team-card">
+              <div className="mp-team-card-content">
+                <div className="mp-team-logo-wrap">
+                  <ClubLogo className="mp-team-logo"/>
+                </div>
+                <div className="mp-team-info">
+                  <h3 className="mp-team-name">ФК Вихър Войводиново</h3>
+                  <p className="mp-team-slug">vihar</p>
+                </div>
+                <ChevronRightIcon/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Reports Dialog */}
+      {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)}/>}
+    </main>
   );
 }
