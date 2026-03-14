@@ -18,7 +18,7 @@ export async function GET(
         isActive: true,
       },
       include: {
-        member: true,
+        player: true,
       },
     });
 
@@ -45,9 +45,9 @@ export async function GET(
 
     try {
       const [items, count] = await Promise.all([
-        prisma.memberNotification.findMany({
+        prisma.playerNotification.findMany({
           where: {
-            memberId: card.member.id,
+            playerId: card.player.id,
             sentAt: {
               gte: oneWeekAgo,
             },
@@ -55,9 +55,9 @@ export async function GET(
           orderBy: { sentAt: "desc" },
           take: 20,
         }),
-        prisma.memberNotification.count({
+        prisma.playerNotification.count({
           where: {
-            memberId: card.member.id,
+            playerId: card.player.id,
             readAt: null,
             sentAt: {
               gte: oneWeekAgo,
@@ -83,12 +83,17 @@ export async function GET(
 
     return NextResponse.json(
       {
-        id: card.member.id,
+        id: card.player.id,
         cardCode: card.cardCode,
-        name: `${card.member.firstName} ${card.member.secondName}`,
-        visits_total: card.member.visitsTotal,
-        visits_used: card.member.visitsUsed,
+        name: card.player.fullName,
+        visits_total: 0,
+        visits_used: 0,
         isActive: card.isActive,
+        team_group: card.player.teamGroup,
+        jerseyNumber: card.player.jerseyNumber,
+        birthDate: card.player.birthDate,
+        status: card.player.status,
+        last_payment_date: card.player.lastPaymentDate,
         notifications: notifications.map((item) => ({
           id: item.id,
           type: item.type,

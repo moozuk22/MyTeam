@@ -1,759 +1,304 @@
-'use client'
+"use client";
 
-import { useState, useEffect, use, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { PushNotificationsPanel } from '@/components/push/PushNotificationsPanel'
+import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import "./page.css";
 
-interface Member {
-  id: string
-  cardCode: string
-  name: string
-  visits_total: number
-  visits_used: number
-  isActive?: boolean
-  notifications?: MemberNotification[]
-  unread_notifications?: number
+interface MemberProfile {
+  id: string;
+  cardCode: string;
+  name: string;
+  jerseyNumber?: string | null;
+  birthDate?: string | null;
+  isActive?: boolean;
+  team_group?: number | null;
+  status?: "paid" | "warning" | "overdue";
+  last_payment_date?: string | null;
+  notifications?: Array<{
+    id: string;
+    title: string;
+    sentAt: string;
+  }>;
 }
 
-interface MemberNotification {
-  id: string
-  type: string
-  title: string
-  body: string
-  url?: string | null
-  sentAt: string
-  readAt?: string | null
-}
+const SPEED_LINES = [8, 16, 24, 33, 42, 54, 65, 76, 85, 93];
 
-interface Question {
-  id: string
-  text: string
-}
+const ClubLogo = () => (
+  <svg viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
+    <path d="M60 2 L115 20 L115 85 Q115 120 60 138 Q5 120 5 85 L5 20 Z" fill="#1a5c1a" stroke="#32cd32" strokeWidth="3" />
+    <path d="M60 8 L109 24 L109 83 Q109 114 60 132 Q11 114 11 83 L11 24 Z" fill="#0d3d0d" />
+    <rect x="15" y="18" width="90" height="22" rx="2" fill="#1a5c1a" />
+    <text x="60" y="33" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="800" fontFamily="Arial, sans-serif">ФК ВИХЪР</text>
+    <rect x="20" y="44" width="16" height="40" fill="#ffffff" />
+    <rect x="36" y="44" width="16" height="40" fill="#32cd32" />
+    <rect x="52" y="44" width="16" height="40" fill="#ffffff" />
+    <rect x="68" y="44" width="16" height="40" fill="#32cd32" />
+    <rect x="84" y="44" width="16" height="40" fill="#ffffff" />
+    <circle cx="60" cy="64" r="14" fill="#1a5c1a" stroke="#32cd32" strokeWidth="1.5" />
+    <circle cx="60" cy="64" r="10" fill="none" stroke="#ffffff" strokeWidth="1" />
+    <text x="60" y="68" textAnchor="middle" fill="#ffffff" fontSize="12">⚽</text>
+    <rect x="15" y="88" width="90" height="20" rx="2" fill="#1a5c1a" />
+    <text x="60" y="102" textAnchor="middle" fill="#ffffff" fontSize="8.5" fontWeight="700" fontFamily="Arial, sans-serif">ВОЙВОДИНОВО</text>
+    <text x="60" y="122" textAnchor="middle" fill="#32cd32" fontSize="14" fontWeight="800" fontFamily="Arial, sans-serif">1961</text>
+  </svg>
+);
 
-interface MemberAnswer {
-  questionId: string
-  answer: string
-}
+const STATUS_MAP = {
+  paid: { label: "ТАКСА: ПЛАТЕНА", cls: "green glow" },
+  warning: { label: "ПРЕДСТОЯЩО ПЛАЩАНЕ", cls: "yellow glow-yellow" },
+  overdue: { label: "ТАКСА: ДЪЛЖИМА", cls: "red glow-red" },
+} as const;
 
-export default function MemberPage({ params }: { params: Promise<{ cardCode: string }> }) {
-  const resolvedParams = use(params)
-  const [member, setMember] = useState<Member | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState<boolean>(false)
-  const [isCheckingIn, setIsCheckingIn] = useState(false)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [savingAnswers, setSavingAnswers] = useState<Record<string, boolean>>({})
-  const [answerStatus, setAnswerStatus] = useState<Record<string, string>>({})
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
-  const notificationsDropdownRef = useRef<HTMLDivElement | null>(null)
-  const router = useRouter()
+const ShareIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2v13" />
+    <path d="m16 6-4-4-4 4" />
+    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+  </svg>
+);
 
-  const refreshQuestions = async () => {
-    try {
-      const questionsRes = await fetch('/api/questions', { cache: 'no-store' })
-      if (questionsRes.ok) {
-        const questionsData: Question[] = await questionsRes.json()
-        setQuestions(questionsData)
-      }
-    } catch (err) {
-      console.error('Questions refresh error:', err)
-    }
-  }
+const PlusIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14" />
+    <path d="M12 5v14" />
+  </svg>
+);
 
-  const fetchMember = async (cardCode: string, shouldSetLoading = false) => {
-    if (shouldSetLoading) {
-      setLoading(true)
-    }
+const XIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
 
-    try {
-      const memberRes = await fetch(`/api/members/${cardCode}`, { cache: 'no-store' })
-      if (memberRes.ok) {
-        const data = await memberRes.json()
-        setMember(data)
-        setError(null)
-      } else if (memberRes.status === 404) {
-        setMember(null)
-        setError(null)
-      } else {
-        setMember(null)
-        setError('Грешка при зареждане на потребителя')
-      }
-    } catch (err) {
-      console.error('Error fetching member:', err)
-      setMember(null)
-      setError('Грешка при зареждане на потребителя')
-    } finally {
-      if (shouldSetLoading) {
-        setLoading(false)
-      }
-    }
-  }
+export default function MemberCardPage({
+  params,
+}: {
+  params: Promise<{ cardCode: string }>;
+}) {
+  const { cardCode } = use(params);
+  const router = useRouter();
+
+  const [member, setMember] = useState<MemberProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
+  const [accordionOpen, setAccordionOpen] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchMember = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const sessionRes = await fetch('/api/admin/check-session')
-        const sessionData = await sessionRes.json()
-        setIsAdmin(sessionData.isAdmin)
-
-        if (!sessionData.isAdmin) {
-          const answersRes = await fetch(`/api/members/${resolvedParams.cardCode}/answers`, { cache: 'no-store' })
-          await refreshQuestions()
-
-          if (answersRes.ok) {
-            const answersData: { answers: MemberAnswer[] } = await answersRes.json()
-            const answersMap = Object.fromEntries(
-              answersData.answers.map((item) => [item.questionId, item.answer])
-            ) as Record<string, string>
-            setAnswers(answersMap)
-          }
-        } else {
-          setQuestions([])
-          setAnswers({})
-          setAnswerStatus({})
+        const response = await fetch(`/api/members/${cardCode}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          setMember(null);
+          setError("Профилът не е намерен.");
+          return;
         }
-      } catch (err) {
-        console.error('Error fetching data:', err)
+        const data = (await response.json()) as MemberProfile;
+        setMember(data);
+      } catch (e) {
+        console.error("Failed to fetch member:", e);
+        setError("Възникна грешка при зареждане.");
+      } finally {
+        setLoading(false);
       }
+    };
 
-      await fetchMember(resolvedParams.cardCode, true)
-    }
+    void fetchMember();
+  }, [cardCode]);
 
-    fetchData()
-  }, [resolvedParams.cardCode])
-
-  useEffect(() => {
-    const eventSource = new EventSource(`/api/members/${resolvedParams.cardCode}/events`)
-
-    eventSource.onmessage = async (event) => {
-      try {
-        const payload = JSON.parse(event.data) as { type?: string }
-        if (
-          payload.type === 'check-in' ||
-          payload.type === 'reset' ||
-          payload.type === 'notification-created'
-        ) {
-          await fetchMember(resolvedParams.cardCode)
-        }
-        if ((payload.type === 'questions-updated' || payload.type === 'question-created') && !isAdmin) {
-          await refreshQuestions()
-        }
-      } catch (err) {
-        console.error('SSE parse error:', err)
-      }
-    }
-
-    return () => {
-      eventSource.close()
-    }
-  }, [resolvedParams.cardCode, isAdmin])
-
-  useEffect(() => {
-    if (isAdmin) return
-
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== 'questions_updated_at') return
-      void refreshQuestions()
-    }
-
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [isAdmin])
-
-  useEffect(() => {
-    if (isAdmin) return
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        void fetchMember(resolvedParams.cardCode)
-        void refreshQuestions()
-      }
-    }
-
-    const onFocus = () => {
-      void fetchMember(resolvedParams.cardCode)
-      void refreshQuestions()
-    }
-
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', onFocus)
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [isAdmin])
-
-  useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      if (
-        isNotificationsOpen &&
-        notificationsDropdownRef.current &&
-        !notificationsDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsNotificationsOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', onPointerDown)
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown)
-    }
-  }, [isNotificationsOpen])
-
-  const remaining = member ? member.visits_total - member.visits_used : 0
-  const isExhausted = member ? remaining <= 0 : false
-  const unreadCount = Number(member?.unread_notifications ?? 0)
-  const formatNotificationTime = (value: string) => {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) {
-      return value
-    }
-
-    return new Intl.DateTimeFormat('bg-BG', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(date)
-  }
-
-  const markNotificationsAsRead = async () => {
-    if (!member || !member.unread_notifications || member.unread_notifications <= 0) return
-
-    try {
-      await fetch(`/api/members/${resolvedParams.cardCode}/notifications/read`, {
-        method: 'POST',
-      })
-      setMember((prev) => {
-        if (!prev) return prev
-        const nowIso = new Date().toISOString()
-        return {
-          ...prev,
-          unread_notifications: 0,
-          notifications: prev.notifications?.map((notification) =>
-            notification.readAt ? notification : { ...notification, readAt: nowIso }
-          ),
-        }
-      })
-    } catch (err) {
-      console.error('Mark notifications read error:', err)
-    }
-  }
-
-  const handleAnswerChange = (questionId: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: value }))
-  }
-
-  const handleSaveAnswer = async (questionId: string) => {
-    const currentAnswer = (answers[questionId] ?? '').trim()
-    if (!currentAnswer) {
-      setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Моля, въведете отговор.' }))
-      return
-    }
-
-    setSavingAnswers((prev) => ({ ...prev, [questionId]: true }))
-    setAnswerStatus((prev) => ({ ...prev, [questionId]: '' }))
-
-    try {
-      const response = await fetch(`/api/members/${resolvedParams.cardCode}/answers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId,
-          answer: currentAnswer,
-        }),
-      })
-
-      if (response.ok) {
-        setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Запазено.' }))
-      } else {
-        setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Грешка при запазване.' }))
-      }
-    } catch (err) {
-      console.error('Save answer error:', err)
-      setAnswerStatus((prev) => ({ ...prev, [questionId]: 'Грешка при запазване.' }))
-    } finally {
-      setSavingAnswers((prev) => ({ ...prev, [questionId]: false }))
-    }
-  }
-
-  const handleCheckIn = async () => {
-    if (!member || isExhausted || isCheckingIn) return
-
-    setIsCheckingIn(true)
-    try {
-      const response = await fetch(`/api/members/${resolvedParams.cardCode}/check-in`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        const updatedMember = await response.json()
-        setMember(updatedMember)
-      } else {
-        setError('Грешка при чекиране')
-      }
-    } catch (err) {
-      console.error('Check-in error:', err)
-      setError('Грешка при чекиране')
-    } finally {
-      setIsCheckingIn(false)
-    }
-  }
-
-  const handleReset = async () => {
-    if (!member || !isExhausted) return
-
-    try {
-      const response = await fetch(`/api/members/${resolvedParams.cardCode}/reset`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        const updatedMember = await response.json()
-        setMember(updatedMember)
-      } else {
-        setError('Грешка при нулиране')
-      }
-    } catch (err) {
-      console.error('Reset error:', err)
-      setError('Грешка при нулиране')
-    }
-  }
-
-  const handleAdminLogout = async () => {
-    try {
-      await fetch('/api/admin/logout', { method: 'POST' })
-      setIsAdmin(false)
-    } catch (err) {
-      console.error('Logout error:', err)
-      setIsAdmin(false)
-    }
-  }
-
-  const handleGoToAdmin = () => {
-    router.push('/admin/members')
-  }
+  const statusKey = member?.status ?? "paid";
+  const status = STATUS_MAP[statusKey];
+  const lastPaymentText = member?.last_payment_date
+    ? new Date(member.last_payment_date).toLocaleDateString("bg-BG")
+    : "Няма плащане";
+  const birthDateText = member?.birthDate
+    ? new Date(member.birthDate).toLocaleDateString("bg-BG")
+    : "-";
 
   if (loading) {
     return (
-      <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
-        <div className="text-center">
-          <div className="loading mb-4"></div>
+      <main className="page-bg">
+        <div className="page-inner">
+          <div className="card-shell">
+            <div className="card-body">
+              <p style={{ color: "rgba(255,255,255,0.7)", textAlign: "center" }}>Зареждане...</p>
+            </div>
+          </div>
         </div>
-      </div>
-    )
+      </main>
+    );
   }
 
-  if (error) {
+  if (error || !member) {
     return (
-      <div className="container flex items-center justify-center" style={{ minHeight: '100vh' }}>
-        <div className="alert alert-error">
-          <h3 className="mb-2">Грешка</h3>
-          <p>{error}</p>
+      <main className="page-bg">
+        <div className="page-inner">
+          <div className="card-shell">
+            <div className="card-body" style={{ gap: "12px" }}>
+              <p style={{ color: "#e03535", textAlign: "center", margin: 0 }}>{error ?? "Профилът не е намерен."}</p>
+              <button className="add-btn" onClick={() => router.push("/admin/members")}>
+                Назад
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    )
+      </main>
+    );
   }
 
   return (
-    <div className="container flex flex-col items-center justify-center fade-in" style={{ minHeight: '100vh' }}>
-      {isAdmin && member && (
-        <div className="flex justify-center mb-4" style={{ maxWidth: '420px', width: '100%' }}>
-          <button
-            onClick={handleGoToAdmin}
-            className="btn btn-secondary px-6"
-            style={{ cursor: 'pointer' }}
-          >
-            ← Админ панел
-          </button>
-        </div>
-      )}
-
-      <div className="member-card" style={{ maxWidth: '420px', width: '100%' }}>
-        {member && !isAdmin && (
-          <div ref={notificationsDropdownRef} style={{ position: 'relative', display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsNotificationsOpen((prev) => {
-                  const next = !prev
-                  if (next) {
-                    void markNotificationsAsRead()
-                  }
-                  return next
-                })
-              }}
-              aria-label="Toggle notifications"
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '999px',
-                padding: 0,
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '10px',
-                cursor: 'pointer',
-                border: 'none',
-                background: 'var(--accent-gold-color)',
-                color: '#fff',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M12 4.5C9.51472 4.5 7.5 6.51472 7.5 9V12.2143C7.5 13.1375 7.18026 14.0322 6.59512 14.7462L5.5 16.0833H18.5L17.4049 14.7462C16.8197 14.0322 16.5 13.1375 16.5 12.2143V9C16.5 6.51472 14.4853 4.5 12 4.5Z"
-                  stroke="#FFFFFF"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="12" cy="18" r="1.2" fill="#FFFFFF" />
-              </svg>
-              {unreadCount > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '-3px',
-                    right: '-3px',
-                    minWidth: '18px',
-                    height: '18px',
-                    borderRadius: '999px',
-                    background: '#ef4444',
-                    color: '#fff',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0 4px',
-                    border: '1px solid rgba(0,0,0,0.25)',
-                  }}
-                >
-                  {Math.min(unreadCount, 99)}
-                </span>
-              )}
-            </button>
-
-            {isNotificationsOpen && (
+    <main className="page-bg">
+      <div className="page-inner">
+        <div className="card-shell">
+          <div className="speed-lines-layer" aria-hidden="true">
+            {SPEED_LINES.map((left, i) => (
               <div
+                key={i}
+                className="speed-line"
                 style={{
-                  position: 'absolute',
-                  top: '50px',
-                  right: 0,
-                  width: '320px',
-                  maxWidth: '100%',
-                  maxHeight: '300px',
-                  overflow: 'auto',
-                  zIndex: 20,
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '10px',
-                  boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-                  padding: '12px',
+                  left: `${left}%`,
+                  width: i % 3 === 0 ? "3px" : "2px",
+                  opacity: 0.06 + (i % 3) * 0.03,
+                  filter: `blur(${i % 2 === 0 ? 1 : 3}px)`,
                 }}
-              >
-                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '10px', color: 'var(--accent-gold-color)' }}>
-                  Известия
-                </div>
-                {member.notifications && member.notifications.length > 0 ? (
-                  <div style={{ display: 'grid', gap: '8px' }}>
-                    {member.notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        style={{
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '6px',
-                          padding: '8px',
-                          background: 'rgba(255,255,255,0.02)'
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, marginBottom: '4px', fontSize: '13px' }}>{notification.title}</div>
-                        <div style={{ fontSize: '12px', opacity: 0.95 }}>{notification.body}</div>
-                        <div style={{ fontSize: '10px', opacity: 0.75, marginTop: '6px' }}>
-                          {formatNotificationTime(notification.sentAt)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '12px', opacity: 0.75 }}>
-                    Няма скорошни известия
-                  </div>
-                )}
-              </div>
-            )}
+              />
+            ))}
+            <div className="speed-line speed-line--wide" style={{ left: "18%" }} />
+            <div className="speed-line speed-line--wide2" style={{ left: "70%" }} />
           </div>
-        )}
+          <div className="vignette" aria-hidden="true" />
 
-        <div className="text-center mb-6">
-          <img
-            src="/logo.png"
-            alt="Logo"
-            className="mb-3 mx-auto"
-            style={{ width: '100px', height: '100px', objectFit: 'contain' }}
-          />
-          <h1 className="member-name">{member ? member.name : 'Не е намерен потребител'}</h1>
-          {member?.isActive === false && (
-            <div className="badge badge-warning mb-2">Активиране на карта...</div>
+          <div className="card-body">
+            <div className="header">
+              <div className="header-logo"><ClubLogo /></div>
+              <div className="header-center">
+                <h1 className="card-title">КЛУБНА КАРТА <span>2026</span></h1>
+                <p className="card-subtitle">ФК Вихър Войводиново</p>
+              </div>
+              <div className="shield">
+                <svg viewBox="0 0 50 56" fill="none" className="shield-bg">
+                  <path d="M25 2 L47 12 L47 35 Q47 50 25 54 Q3 50 3 35 L3 12 Z" fill="rgba(50,205,50,0.1)" stroke="#32cd32" strokeWidth="2.5" />
+                </svg>
+                <span className="shield-num">
+                  {member.jerseyNumber ? `№${member.jerseyNumber}` : "\u2116 3"}
+                </span>
+              </div>
+            </div>
+
+            <div className="divider" />
+
+            <div className="central">
+              <div className="photo-wrap">
+                <div className="photo-inner">
+                  <span className="photo-letter">
+                    {(member.name?.trim()?.charAt(0) || "?").toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              <div className="divider divider--short" />
+              <div className="info-rows">
+                <div className="info-row">
+                  <span className="info-lbl">Име:</span>
+                  <span className="info-val">{member.name}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-lbl">Роден:</span>
+                  <span className="info-val">{birthDateText}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-lbl">Набор:</span>
+                  <span className="info-val green">{member.team_group ?? "-"}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-lbl">Статус:</span>
+                  <span className={`info-val ${status.cls}`}>{status.label}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-lbl">Последно плащане:</span>
+                  <span className="info-val">{lastPaymentText}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="divider divider--mt" />
+          </div>
+        </div>
+
+        <div className="below-card">
+          <button className="add-btn" onClick={() => setInstructionsOpen((v) => !v)}>
+            <ShareIcon size={16} />
+            Добавете към начален екран
+          </button>
+
+          <p className="hint-text">
+            За да активирате известията на iPhone, натиснете бутона Share и изберете &ldquo;Добавяне към начален екран&rdquo;.
+          </p>
+
+          {instructionsOpen && (
+            <div className="instr-box">
+              <button className="instr-close" onClick={() => setInstructionsOpen(false)} aria-label="Затвори">
+                <XIcon />
+              </button>
+              <p className="instr-heading">Как да активирате известия на iPhone:</p>
+              <ol className="instr-list">
+                <li>
+                  <span className="step-badge">1</span>
+                  <span>Натиснете бутона <ShareIcon size={14} /> <strong>Share</strong> в долната лента на Safari</span>
+                </li>
+                <li>
+                  <span className="step-badge">2</span>
+                  <span>Превъртете надолу и изберете <PlusIcon /> <strong>&ldquo;Добавяне към начален екран&rdquo;</strong></span>
+                </li>
+                <li>
+                  <span className="step-badge">3</span>
+                  <span>Отворете приложението от началния екран и натиснете <strong>&ldquo;Активиране на известия&rdquo;</strong></span>
+                </li>
+              </ol>
+            </div>
           )}
         </div>
 
-        {member && (
-          <div className="visit-info mb-6">
-            <div className="visit-item">
-              <span className="visit-number">{member.visits_total}</span>
-              <div className="visit-label">Общо</div>
-            </div>
-            <div className="visit-item">
-              <span className="visit-number">{member.visits_used}</span>
-              <div className="visit-label">Използвани</div>
-            </div>
-            <div className="visit-item">
-              <span className={`visit-number ${isExhausted ? 'text-error' : 'text-gold'}`}>
-                {remaining}
-              </span>
-              <div className="visit-label">Остават</div>
-            </div>
-          </div>
-        )}
+        <p className="push-hint">Получавайте push известия дори когато браузърът е затворен.</p>
 
-        {member && isExhausted && (
-          <div className="alert alert-warning mb-6">
-            <strong>Картата е изчерпана</strong>
-            <p className="mt-2 mb-0">Няма оставащи посещения. Моля, свържете се с администратор.</p>
-          </div>
-        )}
-
-        {member && !isAdmin && (
-          <PushNotificationsPanel cardCode={resolvedParams.cardCode} />
-        )}
-        {member && !isAdmin && questions.length > 0 && (
-          <div className="mb-6" style={{
-            background: 'var(--bg-secondary)',
-            borderRadius: '8px',
-            padding: '16px',
-            border: '1px solid var(--border-color)',
-            maxHeight: '50vh',
-            overflow: 'auto'
-          }}>
-            <h3 style={{
-              fontSize: '1rem',
-              fontWeight: '600',
-              marginBottom: '12px',
-              color: 'var(--accent-gold-color)'
-            }}>
-              Въпроси:
-            </h3>
-            <div>
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <div className="loading mb-4"></div>
-                </div>
-              ) : (
-                questions.map((question, index) => {
-                  if (index % 2 === 0 && index > 0) {
-                    return (
-                      <div key={question.id} style={{
-                        marginBottom: '12px',
-                        paddingBottom: '12px',
-                        borderBottom: '1px solid var(--border-color)',
-                        color: 'var(--text-primary)',
-                        fontSize: '14px',
-                        lineHeight: '1.4'
-                      }}>
-                        <div style={{ marginBottom: '8px' }}>{question.text}</div>
-                        <textarea
-                          value={answers[question.id] ?? ''}
-                          onChange={(event) => handleAnswerChange(question.id, event.target.value)}
-                          placeholder="Вашият отговор"
-                          style={{
-                            width: '100%',
-                            minHeight: '80px',
-                            background: 'transparent',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            padding: '8px 10px',
-                            color: 'var(--text-primary)',
-                            resize: 'vertical',
-                            fontFamily: 'inherit',
-                            fontSize: '14px',
-                            lineHeight: '1.4'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveAnswer(question.id)}
-                          disabled={savingAnswers[question.id] === true}
-                          className="btn btn-secondary"
-                          style={{
-                            marginTop: '8px',
-                            cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
-                        </button>
-                        {answerStatus[question.id] && (
-                          <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
-                            {answerStatus[question.id]}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  } else if (index === questions.length - 1) {
-                    return (
-                      <div key={question.id} style={{
-                        marginBottom: '0',
-                        paddingBottom: '0',
-                        borderBottom: 'none',
-                        color: 'var(--text-primary)',
-                        fontSize: '14px',
-                        lineHeight: '1.4'
-                      }}>
-                        <div style={{ marginBottom: '8px' }}>{question.text}</div>
-                        <textarea
-                          value={answers[question.id] ?? ''}
-                          onChange={(event) => handleAnswerChange(question.id, event.target.value)}
-                          placeholder="Вашият отговор"
-                          style={{
-                            width: '100%',
-                            minHeight: '80px',
-                            background: 'transparent',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            padding: '8px 10px',
-                            color: 'var(--text-primary)',
-                            resize: 'vertical',
-                            fontFamily: 'inherit',
-                            fontSize: '14px',
-                            lineHeight: '1.4'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveAnswer(question.id)}
-                          disabled={savingAnswers[question.id] === true}
-                          className="btn btn-secondary"
-                          style={{
-                            marginTop: '8px',
-                            cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
-                        </button>
-                        {answerStatus[question.id] && (
-                          <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
-                            {answerStatus[question.id]}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div key={question.id} style={{
-                        marginBottom: '12px',
-                        paddingBottom: '12px',
-                        borderBottom: '1px solid var(--border-color)',
-                        color: 'var(--text-primary)',
-                        fontSize: '14px',
-                        lineHeight: '1.4'
-                      }}>
-                        <div style={{ marginBottom: '8px' }}>{question.text}</div>
-                        <textarea
-                          value={answers[question.id] ?? ''}
-                          onChange={(event) => handleAnswerChange(question.id, event.target.value)}
-                          placeholder="Вашият отговор"
-                          style={{
-                            width: '100%',
-                            minHeight: '80px',
-                            background: 'transparent',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            padding: '8px 10px',
-                            color: 'var(--text-primary)',
-                            resize: 'vertical',
-                            fontFamily: 'inherit',
-                            fontSize: '14px',
-                            lineHeight: '1.4'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveAnswer(question.id)}
-                          disabled={savingAnswers[question.id] === true}
-                          className="btn btn-secondary"
-                          style={{
-                            marginTop: '8px',
-                            cursor: savingAnswers[question.id] ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          {savingAnswers[question.id] ? 'Saving...' : 'Запази'}
-                        </button>
-                        {answerStatus[question.id] && (
-                          <div style={{ marginTop: '6px', fontSize: '12px', opacity: 0.85 }}>
-                            {answerStatus[question.id]}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                })
-              )}
-            </div>
-          </div>
-        )}
-
-
-
-        {isAdmin && member && (
-          <div className="space-y-4 mb-6">
-            <button
-              onClick={handleCheckIn}
-              disabled={isExhausted || isCheckingIn}
-              className="btn btn-primary w-full"
-              style={{
-                cursor: (isExhausted || isCheckingIn) ? 'not-allowed' : 'pointer',
-                opacity: isCheckingIn ? 0.7 : 1,
-              }}
-            >
-              {isCheckingIn ? 'Checking In...' : 'Check In'}
-            </button>
-            <button
-              onClick={handleReset}
-              disabled={!isExhausted}
-              className="btn btn-outline w-full"
-              style={{
-                cursor: !isExhausted ? 'not-allowed' : 'pointer',
-                border: '1px solid var(--gold)',
-                color: 'var(--gold)',
-                background: 'transparent',
-                padding: '0.75rem',
-                borderRadius: 'var(--radius)',
-                opacity: !isExhausted ? 0.5 : 1,
-              }}
-            >
-              Reset
-            </button>
-          </div>
-        )}
-
-        {isAdmin && (
-          <button
-            onClick={handleAdminLogout}
-            className="btn btn-secondary w-full mb-6"
-            style={{ cursor: 'pointer' }}
-          >
-            Изход от администраторски режим
+        <div className="accordion" style={{ marginTop: "14px" }}>
+          <button className="accordion-btn" onClick={() => setAccordionOpen((v) => !v)}>
+            <span>История на плащания<span className="acc-count"> ({member.notifications?.length ?? 0})</span></span>
+            <svg className={`chevron${accordionOpen ? " open" : ""}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
           </button>
-        )}
+
+          <div className={`acc-body${accordionOpen ? " acc-body--open" : ""}`}>
+            <div className="acc-inner">
+              <div className="acc-scroll">
+                <div className="payment-list">
+                  {member.notifications && member.notifications.length > 0 ? (
+                    member.notifications.map((item) => (
+                      <div className="payment-row" key={item.id}>
+                        <div className="payment-info">
+                          <p className="p-month">{item.title}</p>
+                          <p className="p-date">{new Date(item.sentAt).toLocaleDateString("bg-BG")}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="payment-row">
+                      <div className="payment-info">
+                        <p className="p-month">Няма налична история.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  )
+    </main>
+  );
 }
