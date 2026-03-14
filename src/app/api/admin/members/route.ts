@@ -145,7 +145,25 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const clubId = request.nextUrl.searchParams.get("clubId")?.trim() ?? "";
+    if (clubId) {
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clubId);
+      if (!uuidLike) {
+        return NextResponse.json({ error: "Club not found" }, { status: 404 });
+      }
+
+      const clubExists = await prisma.club.findUnique({
+        where: { id: clubId },
+        select: { id: true },
+      });
+
+      if (!clubExists) {
+        return NextResponse.json({ error: "Club not found" }, { status: 404 });
+      }
+    }
+
     const players = await prisma.player.findMany({
+      where: clubId ? { clubId } : undefined,
       include: {
         club: true,
         cards: {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import "./page.css";
 
 /* ── Icons ── */
@@ -226,17 +226,27 @@ function PlayerCard({ member, onClick }) {
 /* ── Main Page ── */
 export default function AdminMembersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const clubId = searchParams.get("clubId") ?? "";
   const [members, setMembers]                   = useState([]);
   const [loading, setLoading]                   = useState(true);
   const [searchTerm, setSearchTerm]             = useState("");
   const [selectedGroup, setSelectedGroup]       = useState("all");
   const [selectedMember, setSelectedMember]     = useState(null);
+  const [clubName, setClubName]                 = useState("Всички отбори");
 
   useEffect(() => {
     const fetchMembers = async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/admin/members");
+        const endpoint = clubId
+          ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
+          : "/api/admin/members";
+        const res = await fetch(endpoint);
+        if (res.status === 404 && clubId) {
+          router.replace("/404");
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           const normalized = data.map((item) => {
@@ -260,6 +270,16 @@ export default function AdminMembersPage() {
             };
           });
           setMembers(normalized);
+          if (!clubId) {
+            setClubName("Всички отбори");
+          } else {
+            const nameFromMembers = normalized[0]?.club?.name;
+            if (nameFromMembers) {
+              setClubName(nameFromMembers);
+            } else {
+              setClubName("Отбор");
+            }
+          }
         }
       } catch (err) {
         console.error("Error fetching members:", err);
@@ -267,8 +287,33 @@ export default function AdminMembersPage() {
         setLoading(false);
       }
     };
+
+    const fetchClubName = async () => {
+      if (!clubId) {
+        setClubName("Всички отбори");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/admin/clubs", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+        const clubs = await response.json();
+        const selectedClub = Array.isArray(clubs)
+          ? clubs.find((club) => String(club?.id) === clubId)
+          : null;
+        if (selectedClub?.name) {
+          setClubName(String(selectedClub.name));
+        }
+      } catch (err) {
+        console.error("Error fetching clubs:", err);
+      }
+    };
+
     fetchMembers();
-  }, []);
+    void fetchClubName();
+  }, [clubId, router]);
 
   /* ── Derived ── */
   const groupOptions = [...new Set(
@@ -316,7 +361,7 @@ export default function AdminMembersPage() {
           </div>
           <div className="amp-club-info">
             <div className="amp-club-icon">🏆</div>
-            <h2 className="amp-club-name">ФК Вихър Войводиново</h2>
+            <h2 className="amp-club-name">{clubName}</h2>
           </div>
         </div>
 

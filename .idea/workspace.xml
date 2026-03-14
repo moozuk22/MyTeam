@@ -4,10 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06619c23-95cc-4928-af2e-0b409c84a947" name="Changes" comment="Changed admin/members page">
+    <list default="true" id="06619c23-95cc-4928-af2e-0b409c84a947" name="Changes" comment="Fix /member/cardCode page">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/api/members/[cardCode]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/members/[cardCode]/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/member/[cardCode]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/member/[cardCode]/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/admin/members/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/admin/members/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/admin/players/page.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/admin/players/page.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/admin/players/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/admin/players/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/admin/members/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/admin/members/route.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -70,11 +72,14 @@
   }
 }</component>
   <component name="RecapUselessUpdatesCounter">
-    <option name="suspendCountdown" value="9" />
+    <option name="suspendCountdown" value="7" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\Lenovo\Desktop\MyClub" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Lenovo\Desktop\MyClub\src\app\member\[cardCode]" />
     </key>
   </component>
   <component name="RunManager" selected="npm.Next.js: server-side">
@@ -134,7 +139,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773484366203</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Fix /member/cardCode page">
+      <option name="closed" value="true" />
+      <created>1773493149771</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1773493149771</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -144,6 +157,7 @@
     <MESSAGE value="First commit" />
     <MESSAGE value="database changes: updated schema.prisma" />
     <MESSAGE value="Changed admin/members page" />
-    <option name="LAST_COMMIT_MESSAGE" value="Changed admin/members page" />
+    <MESSAGE value="Fix /member/cardCode page" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix /member/cardCode page" />
   </component>
 </project>
