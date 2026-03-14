@@ -72,10 +72,10 @@ export async function POST(request: NextRequest) {
   if (broadcast) {
     const subscribedMembers = await prisma.pushSubscription.findMany({
       where: { isActive: true },
-      distinct: ["memberId"],
-      select: { memberId: true },
+      distinct: ["playerId"],
+      select: { playerId: true },
     });
-    memberIds = subscribedMembers.map((item) => item.memberId);
+    memberIds = subscribedMembers.map((item) => item.playerId);
   }
 
   if (memberIds.length === 0) {
@@ -85,14 +85,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const members = await prisma.member.findMany({
+  const members = await prisma.player.findMany({
     where: { id: { in: memberIds } },
     select: {
       id: true,
-      firstName: true,
-      secondName: true,
-      visitsTotal: true,
-      visitsUsed: true,
+      fullName: true,
       cards: {
         select: { cardCode: true },
         where: { isActive: true },
@@ -109,8 +106,7 @@ export async function POST(request: NextRequest) {
   try {
     const results = await Promise.all(
       members.map(async (member) => {
-        const memberName = `${member.firstName} ${member.secondName}`.trim();
-        const remainingVisits = member.visitsTotal - member.visitsUsed;
+        const memberName = member.fullName.trim();
         const fallbackUrl = member.cards[0]
           ? `/member/${member.cards[0].cardCode}`
           : "/";
@@ -130,7 +126,6 @@ export async function POST(request: NextRequest) {
         const pushPayload = buildNotificationPayload({
           type,
           memberName,
-          remainingVisits,
           trainingDate,
           trainerMessage,
           url,

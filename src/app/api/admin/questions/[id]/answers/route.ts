@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 
 export const runtime = "nodejs";
@@ -17,29 +16,9 @@ export async function GET(
   }
 
   try {
-    const answers = await prisma.memberQuestionAnswer.findMany({
-      where: {
-        questionId: id,
-      },
-      include: {
-        member: {
-          select: {
-            firstName: true,
-            secondName: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
     return NextResponse.json({
-      answers: answers.map((item) => ({
-        id: item.id,
-        answer: item.answer,
-        member: item.member,
-      })),
+      questionId: id,
+      answers: [],
     });
   } catch (error) {
     console.error("Question answers fetch error:", error);

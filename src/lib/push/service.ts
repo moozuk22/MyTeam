@@ -40,7 +40,7 @@ export async function savePushSubscription(input: SavePushSubscriptionInput) {
       endpoint: input.subscription.endpoint,
     },
     update: {
-      memberId: input.memberId,
+      playerId: input.memberId,
       p256dh: input.subscription.keys.p256dh,
       auth: input.subscription.keys.auth,
       userAgent: input.userAgent ?? undefined,
@@ -48,7 +48,7 @@ export async function savePushSubscription(input: SavePushSubscriptionInput) {
       isActive: true,
     },
     create: {
-      memberId: input.memberId,
+      playerId: input.memberId,
       endpoint: input.subscription.endpoint,
       p256dh: input.subscription.keys.p256dh,
       auth: input.subscription.keys.auth,
@@ -63,7 +63,7 @@ export async function deactivatePushSubscription(endpoint: string, memberId?: st
   return await prisma.pushSubscription.updateMany({
     where: {
       endpoint,
-      ...(memberId ? { memberId } : {}),
+      ...(memberId ? { playerId: memberId } : {}),
     },
     data: {
       isActive: false,
@@ -84,7 +84,7 @@ export async function sendPushToMember(
 ): Promise<SendPushResult> {
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
-      memberId,
+      playerId: memberId,
       isActive: true,
     },
     select: {

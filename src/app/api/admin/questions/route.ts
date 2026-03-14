@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import { publishQuestionsUpdated } from "@/lib/memberEvents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,34 +11,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const body = await request.json();
-    const rawQuestion = body?.question ?? body?.text;
-    const text = String(rawQuestion ?? "").trim();
-
-    if (!text) {
-      return NextResponse.json({ error: "Question is required" }, { status: 400 });
-    }
-
-    const newQuestion = await prisma.question.create({
-      data: {
-        text,
-        isActive: true,
-      },
-    });
-    publishQuestionsUpdated();
-
-    return NextResponse.json(
-      {
-        success: true,
-        question: newQuestion,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error creating question:", error);
-    return NextResponse.json({ error: "Failed to create question" }, { status: 500 });
-  }
+  return NextResponse.json(
+    { error: "Questions module is not configured in the current database schema" },
+    { status: 410 }
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -50,28 +24,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const questions = await prisma.question.findMany({
-      include: {
-        _count: {
-          select: {
-            answers: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    return NextResponse.json(
-      questions.map((question) => ({
-        ...question,
-        answersCount: question._count.answers,
-      }))
-    );
-  } catch (error) {
-    console.error("Error fetching questions:", error);
-    return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 });
-  }
+  return NextResponse.json(
+    { error: "Questions module is not configured in the current database schema", questions: [] },
+    { status: 410 }
+  );
 }

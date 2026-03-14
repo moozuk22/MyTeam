@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import { publishQuestionsUpdated } from "@/lib/memberEvents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,20 +15,10 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const question = await prisma.question.findUnique({
-      where: { id },
-    });
-
-    if (!question) {
-      return NextResponse.json({ error: "Question not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(question);
-  } catch (error) {
-    console.error("Question fetch error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
+  return NextResponse.json({
+    error: "Questions module is not configured in the current database schema",
+    questionId: id,
+  }, { status: 410 });
 }
 
 export async function PUT(
@@ -44,30 +32,10 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const body = await request.json();
-    const text = String(body?.text ?? "").trim();
-    const isActive = Boolean(body?.isActive);
-
-    if (!text) {
-      return NextResponse.json({ error: "Question text is required" }, { status: 400 });
-    }
-
-    const updatedQuestion = await prisma.question.update({
-      where: { id },
-      data: {
-        text,
-        isActive,
-      },
-    });
-
-    publishQuestionsUpdated();
-
-    return NextResponse.json(updatedQuestion);
-  } catch (error) {
-    console.error("Question update error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
+  return NextResponse.json({
+    error: "Questions module is not configured in the current database schema",
+    questionId: id,
+  }, { status: 410 });
 }
 
 export async function DELETE(
@@ -81,16 +49,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    await prisma.question.delete({
-      where: { id },
-    });
-
-    publishQuestionsUpdated();
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Question delete error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  }
+  return NextResponse.json({
+    error: "Questions module is not configured in the current database schema",
+    questionId: id,
+  }, { status: 410 });
 }

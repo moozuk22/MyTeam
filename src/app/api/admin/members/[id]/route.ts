@@ -18,16 +18,16 @@ export async function GET(
   }
 
   try {
-    const member = await prisma.member.findUnique({
+    const player = await prisma.player.findUnique({
       where: { id },
       include: { cards: { orderBy: { createdAt: "desc" } } },
     });
 
-    if (!member) {
-      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    if (!player) {
+      return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
 
-    return NextResponse.json(member);
+    return NextResponse.json(player);
   } catch (error) {
     console.error("Member fetch error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -47,51 +47,60 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const firstName = String(body.firstName ?? "").trim();
-    const secondName = String(body.secondName ?? "").trim();
-    const visitsTotal = Number(body.visitsTotal);
-    const visitsUsed = Number(body.visitsUsed);
+    const fullName = String(body.fullName ?? "").trim();
+    const jerseyNumberRaw = body.jerseyNumber;
+    const teamGroupRaw = body.teamGroup;
+    const statusRaw = String(body.status ?? "").trim();
+    const birthDateRaw = body.birthDate;
+    const avatarUrlRaw = body.avatarUrl;
 
-    if (!firstName) {
+    if (!fullName) {
       return NextResponse.json(
-        { error: "First name is required" },
+        { error: "fullName is required" },
         { status: 400 }
       );
     }
 
-    if (!Number.isInteger(visitsTotal) || visitsTotal < 0) {
-      return NextResponse.json(
-        { error: "visitsTotal must be a non-negative integer" },
-        { status: 400 }
-      );
+    const status =
+      statusRaw === "paid" || statusRaw === "warning" || statusRaw === "overdue"
+        ? statusRaw
+        : undefined;
+    const teamGroup =
+      teamGroupRaw === null || teamGroupRaw === undefined || teamGroupRaw === ""
+        ? null
+        : Number(teamGroupRaw);
+    if (teamGroup !== null && !Number.isInteger(teamGroup)) {
+      return NextResponse.json({ error: "teamGroup must be an integer" }, { status: 400 });
     }
 
-    if (!Number.isInteger(visitsUsed) || visitsUsed < 0) {
-      return NextResponse.json(
-        { error: "visitsUsed must be a non-negative integer" },
-        { status: 400 }
-      );
+    const birthDate =
+      birthDateRaw === null || birthDateRaw === undefined || birthDateRaw === ""
+        ? null
+        : new Date(String(birthDateRaw));
+    if (birthDate && Number.isNaN(birthDate.getTime())) {
+      return NextResponse.json({ error: "birthDate is invalid" }, { status: 400 });
     }
 
-    if (visitsUsed > visitsTotal) {
-      return NextResponse.json(
-        { error: "visitsUsed cannot be greater than visitsTotal" },
-        { status: 400 }
-      );
-    }
-
-    const updatedMember = await prisma.member.update({
+    const updatedPlayer = await prisma.player.update({
       where: { id },
       data: {
-        firstName,
-        secondName,
-        visitsTotal,
-        visitsUsed,
+        fullName,
+        jerseyNumber:
+          jerseyNumberRaw === null || jerseyNumberRaw === undefined || jerseyNumberRaw === ""
+            ? null
+            : String(jerseyNumberRaw),
+        teamGroup,
+        birthDate,
+        avatarUrl:
+          avatarUrlRaw === null || avatarUrlRaw === undefined || avatarUrlRaw === ""
+            ? null
+            : String(avatarUrlRaw),
+        ...(status ? { status } : {}),
       },
       include: { cards: { orderBy: { createdAt: "desc" } } },
     });
 
-    return NextResponse.json(updatedMember);
+    return NextResponse.json(updatedPlayer);
   } catch (error) {
     console.error("Member update error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -117,36 +126,36 @@ export async function PATCH(
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
 
-    const memberExists = await prisma.member.findUnique({
+    const playerExists = await prisma.player.findUnique({
       where: { id },
       select: { id: true },
     });
 
-    if (!memberExists) {
-      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    if (!playerExists) {
+      return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
 
-    let updatedMember = null;
+    let updatedPlayer = null;
     let lastError: unknown = null;
 
     for (let i = 0; i < 5; i++) {
       const cardCode = randomBytes(4).toString("hex").toUpperCase();
       try {
-        updatedMember = await prisma.$transaction(async (tx) => {
+        updatedPlayer = await prisma.$transaction(async (tx) => {
           await tx.card.updateMany({
-            where: { memberId: id },
+            where: { playerId: id },
             data: { isActive: false },
           });
 
           await tx.card.create({
             data: {
-              memberId: id,
+              playerId: id,
               cardCode,
               isActive: true,
             },
           });
 
-          return tx.member.findUnique({
+          return tx.player.findUnique({
             where: { id },
             include: { cards: { orderBy: { createdAt: "desc" } } },
           });
@@ -164,11 +173,11 @@ export async function PATCH(
       }
     }
 
-    if (!updatedMember) {
+    if (!updatedPlayer) {
       throw lastError ?? new Error("Failed to generate unique card code");
     }
 
-    return NextResponse.json(updatedMember);
+    return NextResponse.json(updatedPlayer);
   } catch (error) {
     console.error("Assign new card error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -187,18 +196,15 @@ export async function DELETE(
     }
 
     try {
-        // Manually delete the cards first since we don't have onDelete: Cascade
-        // The error P2003 was because of the foreign key constraint.
         await prisma.card.deleteMany({
-            where: { memberId: id },
+            where: { playerId: id },
         });
 
-        // Now delete the member
-        await prisma.member.delete({
+        await prisma.player.delete({
             where: { id },
         });
 
-        return NextResponse.json({ message: "Member and associated cards deleted successfully" });
+        return NextResponse.json({ message: "Player and associated cards deleted successfully" });
     } catch (error) {
         console.error("Member deletion error:", error);
         return NextResponse.json(

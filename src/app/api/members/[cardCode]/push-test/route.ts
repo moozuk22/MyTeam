@@ -20,13 +20,10 @@ export async function POST(
         isActive: true,
       },
       include: {
-        member: {
+        player: {
           select: {
             id: true,
-            firstName: true,
-            secondName: true,
-            visitsTotal: true,
-            visitsUsed: true,
+            fullName: true,
           },
         },
       },
@@ -36,26 +33,24 @@ export async function POST(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    const memberName = `${card.member.firstName} ${card.member.secondName}`.trim();
-    const remainingVisits = card.member.visitsTotal - card.member.visitsUsed;
+    const memberName = card.player.fullName.trim();
 
     const payload = buildNotificationPayload({
       type: "trainer_message",
       memberName,
-      remainingVisits,
       trainerMessage: "Тестово известие: push notifications работят.",
       url: `/member/${cardCode}`,
     });
 
-    const result = await sendPushToMember(card.member.id, payload);
+    const result = await sendPushToMember(card.player.id, payload);
     if (result.sent > 0) {
-      await saveMemberNotificationHistory(card.member.id, "trainer_message", payload);
+      await saveMemberNotificationHistory(card.player.id, "trainer_message", payload);
     }
 
     return NextResponse.json({
       success: true,
       ...result,
-      memberId: card.member.id,
+      memberId: card.player.id,
     });
   } catch (error) {
     console.error("Push test send error:", error);

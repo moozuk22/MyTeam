@@ -4,11 +4,22 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06619c23-95cc-4928-af2e-0b409c84a947" name="Changes" comment="Add cloudinary integration, support for avatar upload and image transformations">
-      <change beforePath="$PROJECT_DIR$/src/app/admin/players/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/admin/players/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/api/members/[cardCode]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/members/[cardCode]/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/member/[cardCode]/page.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/member/[cardCode]/page.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/member/[cardCode]/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/member/[cardCode]/page.tsx" afterDir="false" />
+    <list default="true" id="06619c23-95cc-4928-af2e-0b409c84a947" name="Changes" comment="Fixed payment logic">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/admin/members/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/admin/members/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/admin/members/[id]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/admin/members/[id]/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/admin/notifications/send/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/admin/notifications/send/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/admin/questions/[id]/answers/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/admin/questions/[id]/answers/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/admin/questions/[id]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/admin/questions/[id]/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/admin/questions/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/admin/questions/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/members/[cardCode]/answers/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/members/[cardCode]/answers/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/members/[cardCode]/check-in/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/members/[cardCode]/check-in/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/members/[cardCode]/notifications/read/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/members/[cardCode]/notifications/read/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/members/[cardCode]/push-subscriptions/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/members/[cardCode]/push-subscriptions/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/members/[cardCode]/push-test/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/members/[cardCode]/push-test/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/push/history.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/push/history.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/push/service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/push/service.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -162,7 +173,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773502988895</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="Fixed payment logic">
+      <option name="closed" value="true" />
+      <created>1773504825691</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1773504825691</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -175,6 +194,7 @@
     <MESSAGE value="Fix /member/cardCode page" />
     <MESSAGE value="Add backend connection to the frontend" />
     <MESSAGE value="Add cloudinary integration, support for avatar upload and image transformations" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add cloudinary integration, support for avatar upload and image transformations" />
+    <MESSAGE value="Fixed payment logic" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fixed payment logic" />
   </component>
 </project>

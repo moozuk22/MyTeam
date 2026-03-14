@@ -17,7 +17,7 @@ export async function POST(
         cardCode,
         isActive: true,
       },
-      select: { memberId: true },
+      select: { playerId: true },
     });
 
     if (!card) {
@@ -25,9 +25,9 @@ export async function POST(
     }
 
     try {
-      const updated = await prisma.memberNotification.updateMany({
+      const updated = await prisma.playerNotification.updateMany({
         where: {
-          memberId: card.memberId,
+          playerId: card.playerId,
           readAt: null,
           sentAt: {
             gte: oneWeekAgo,

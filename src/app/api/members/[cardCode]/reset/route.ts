@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import { publishMemberUpdated } from "@/lib/memberEvents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,40 +16,11 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const member = await prisma.member.findFirst({
-      where: {
-        cards: {
-          some: {
-            cardCode,
-            isActive: true,
-          },
-        },
-      },
-    });
-
-    if (!member) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-
-    const updatedMember = await prisma.member.update({
-      where: { id: member.id },
-      data: { visitsUsed: 0 },
-    });
-
-    publishMemberUpdated(cardCode, "reset");
-
-    return NextResponse.json({
-      id: updatedMember.id,
-      name: `${updatedMember.firstName} ${updatedMember.secondName}`,
-      visits_total: updatedMember.visitsTotal,
-      visits_used: updatedMember.visitsUsed,
-    });
-  } catch (error) {
-    console.error("Reset visits error:", error);
-    return NextResponse.json(
-        { error: "Internal Server Error" },
-        { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error: "Reset visits flow is not configured in the current database schema",
+      cardCode,
+    },
+    { status: 410 }
+  );
 }

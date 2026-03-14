@@ -21,7 +21,7 @@ export async function POST(
       isActive: true,
     },
     select: {
-      memberId: true,
+      playerId: true,
     },
   });
 
@@ -51,7 +51,7 @@ export async function POST(
     const device = inferDeviceLabel(userAgent);
 
     const saved = await savePushSubscription({
-      memberId: card.memberId,
+      memberId: card.playerId,
       subscription,
       userAgent,
       device,
@@ -82,7 +82,7 @@ export async function DELETE(
       isActive: true,
     },
     select: {
-      memberId: true,
+      playerId: true,
     },
   });
 
@@ -106,7 +106,7 @@ export async function DELETE(
   }
 
   try {
-    await deactivatePushSubscription(endpoint.trim(), card.memberId);
+    await deactivatePushSubscription(endpoint.trim(), card.playerId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Push subscription deactivate error:", error);

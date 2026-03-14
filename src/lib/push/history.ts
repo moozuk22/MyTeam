@@ -7,9 +7,9 @@ export async function saveMemberNotificationHistory(
   type: NotificationTemplateType,
   payload: PushNotificationPayload
 ) {
-  const saved = await prisma.memberNotification.create({
+  const saved = await prisma.playerNotification.create({
     data: {
-      memberId,
+      playerId: memberId,
       type,
       title: payload.title,
       body: payload.body,
@@ -20,7 +20,7 @@ export async function saveMemberNotificationHistory(
   try {
     const cards = await prisma.card.findMany({
       where: {
-        memberId,
+        playerId: memberId,
         isActive: true,
       },
       select: { cardCode: true },

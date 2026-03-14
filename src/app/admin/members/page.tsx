@@ -1,8 +1,48 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import "./page.css";
+
+type PlayerStatus = "paid" | "warning" | "overdue";
+
+interface PaymentLog {
+  id: string;
+  paidFor: string;
+  paidAt: string;
+}
+
+interface MemberCard {
+  cardCode: string;
+  isActive: boolean;
+}
+
+interface MemberClub {
+  id: string;
+  name: string;
+}
+
+interface Member {
+  id: string;
+  fullName: string;
+  nfcTagId: string;
+  status: PlayerStatus;
+  teamGroup: number | null;
+  jerseyNumber: string | null;
+  avatarUrl: string | null;
+  lastPaymentDate: string | null;
+  club?: MemberClub;
+  paymentLogs: PaymentLog[];
+  cards: MemberCard[];
+}
+
+interface StatusMeta {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  cls: string;
+}
 
 /* ── Icons ── */
 const ArrowLeftIcon = () => (
@@ -15,7 +55,7 @@ const SearchIcon = () => (
     <path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>
   </svg>
 );
-const CircleCheckBigIcon = ({ size = 24 }) => (
+const CircleCheckBigIcon = ({ size = 24 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>
   </svg>
@@ -33,7 +73,7 @@ const PlusIcon = () => (
 );
 
 /* ── Status helpers ── */
-const getStatusMeta = (status) => {
+const getStatusMeta = (status: PlayerStatus): StatusMeta => {
   if (status === "paid") return {
     label: "Платено",
     color: "#32cd32",
@@ -83,12 +123,12 @@ const ReceiptIcon = () => (
 );
 
 /* ── Member Detail Modal ── */
-function MemberDetailModal({ member, onClose }) {
+function MemberDetailModal({ member, onClose }: { member: Member; onClose: () => void }) {
   const s = getStatusMeta(member.status);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const paymentHistory = [...(member.paymentLogs ?? [])].sort(
-    (a, b) => new Date(b.paidAt) - new Date(a.paidAt)
+    (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
   );
   const lastPayment = paymentHistory[0];
 
@@ -165,7 +205,7 @@ function MemberDetailModal({ member, onClose }) {
                   </div>
                 ) : (
                   <div className="amp-acc-list">
-                    {paymentHistory.map(p => (
+                    {paymentHistory.map((p) => (
                       <div key={p.id} className="amp-acc-row">
                         <span className="amp-acc-period">{p.paidFor}</span>
                         <span className="amp-acc-date">{new Date(p.paidAt).toLocaleDateString("bg-BG")}</span>
@@ -184,7 +224,7 @@ function MemberDetailModal({ member, onClose }) {
 }
 
 /* ── Player Card ── */
-function PlayerCard({ member, onClick }) {
+function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }) {
   const s = getStatusMeta(member.status);
   const initial = member.fullName.trim().charAt(0).toUpperCase() || "?";
   const needsAction = member.status === "overdue" || member.status === "warning";
@@ -224,15 +264,15 @@ function PlayerCard({ member, onClick }) {
 }
 
 /* ── Main Page ── */
-export default function AdminMembersPage() {
+function AdminMembersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clubId = searchParams.get("clubId") ?? "";
-  const [members, setMembers]                   = useState([]);
+  const [members, setMembers]                   = useState<Member[]>([]);
   const [loading, setLoading]                   = useState(true);
   const [searchTerm, setSearchTerm]             = useState("");
   const [selectedGroup, setSelectedGroup]       = useState("all");
-  const [selectedMember, setSelectedMember]     = useState(null);
+  const [selectedMember, setSelectedMember]     = useState<Member | null>(null);
   const [clubName, setClubName]                 = useState("Всички отбори");
 
   useEffect(() => {
@@ -248,23 +288,45 @@ export default function AdminMembersPage() {
           return;
         }
         if (res.ok) {
-          const data = await res.json();
-          const normalized = data.map((item) => {
+          const data: unknown = await res.json();
+          const rawItems = Array.isArray(data) ? data : [];
+          const normalized: Member[] = rawItems.map((item: any) => {
             const fullName = String(item.fullName ?? "").trim();
-            const cards = Array.isArray(item.cards) ? item.cards : [];
-            const activeCard = cards.find(c => c.isActive);
+            const cards: MemberCard[] = Array.isArray(item.cards)
+              ? item.cards.map((card: any) => ({
+                  cardCode: String(card?.cardCode ?? ""),
+                  isActive: Boolean(card?.isActive),
+                }))
+              : [];
+            const activeCard = cards.find((c) => c.isActive);
             const nfcTagId = activeCard?.cardCode ?? cards[0]?.cardCode ?? "";
-            const paymentLogs = Array.isArray(item.paymentLogs) ? item.paymentLogs : [];
+            const paymentLogs: PaymentLog[] = Array.isArray(item.paymentLogs)
+              ? item.paymentLogs.map((log: any) => ({
+                  id: String(log?.id ?? ""),
+                  paidFor: String(log?.paidFor ?? ""),
+                  paidAt: String(log?.paidAt ?? ""),
+                }))
+              : [];
+            const rawStatus = item.status;
+            const status: PlayerStatus =
+              rawStatus === "paid" || rawStatus === "warning" || rawStatus === "overdue"
+                ? rawStatus
+                : "paid";
             return {
               id: String(item.id ?? ""),
               fullName,
               nfcTagId,
-              status: item.status ?? "paid",
-              teamGroup: item.teamGroup ?? null,
-              jerseyNumber: item.jerseyNumber ?? null,
-              avatarUrl: item.avatarUrl ?? item.imageUrl ?? null,
-              lastPaymentDate: item.lastPaymentDate ?? null,
-              club: item.club ?? undefined,
+              status,
+              teamGroup: typeof item.teamGroup === "number" ? item.teamGroup : null,
+              jerseyNumber: item.jerseyNumber ? String(item.jerseyNumber) : null,
+              avatarUrl: item.avatarUrl ? String(item.avatarUrl) : item.imageUrl ? String(item.imageUrl) : null,
+              lastPaymentDate: item.lastPaymentDate ? String(item.lastPaymentDate) : null,
+              club: item.club
+                ? {
+                    id: String(item.club.id ?? ""),
+                    name: String(item.club.name ?? ""),
+                  }
+                : undefined,
               paymentLogs,
               cards,
             };
@@ -299,9 +361,9 @@ export default function AdminMembersPage() {
         if (!response.ok) {
           return;
         }
-        const clubs = await response.json();
+        const clubs: unknown = await response.json();
         const selectedClub = Array.isArray(clubs)
-          ? clubs.find((club) => String(club?.id) === clubId)
+          ? clubs.find((club: any) => String(club?.id) === clubId)
           : null;
         if (selectedClub?.name) {
           setClubName(String(selectedClub.name));
@@ -317,10 +379,10 @@ export default function AdminMembersPage() {
 
   /* ── Derived ── */
   const groupOptions = [...new Set(
-    members.map(m => m.teamGroup).filter(g => g !== null)
+    members.map((m) => m.teamGroup).filter((g): g is number => g !== null)
   )].sort((a, b) => b - a);
 
-  const filtered = members.filter(m => {
+  const filtered = members.filter((m) => {
     const matchGroup = selectedGroup === "all" || String(m.teamGroup) === selectedGroup;
     if (!matchGroup) return false;
     if (!searchTerm.trim()) return true;
@@ -329,7 +391,7 @@ export default function AdminMembersPage() {
       m.fullName.toLowerCase().includes(q) ||
       m.id.toLowerCase().includes(q) ||
       (m.jerseyNumber ?? "").toLowerCase().includes(q) ||
-      m.cards.some(c => c.cardCode.toLowerCase().includes(q)) ||
+      m.cards.some((c) => c.cardCode.toLowerCase().includes(q)) ||
       (m.club?.name ?? "").toLowerCase().includes(q)
     );
   });
@@ -376,7 +438,7 @@ export default function AdminMembersPage() {
             >
               Всички
             </button>
-            {groupOptions.map(g => (
+            {groupOptions.map((g) => (
               <button
                 key={g}
                 className={`amp-pill${selectedGroup === String(g) ? " amp-pill--active" : ""}`}
@@ -395,7 +457,7 @@ export default function AdminMembersPage() {
               type="text"
               placeholder="Търси по име или номер..."
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button className="amp-search-clear" onClick={() => setSearchTerm("")}>
@@ -411,7 +473,7 @@ export default function AdminMembersPage() {
             </div>
           ) : (
             <div className="amp-cards">
-              {filtered.map(m => (
+              {filtered.map((m) => (
                 <PlayerCard key={m.id} member={m} onClick={() => setSelectedMember(m)}/>
               ))}
               {filtered.length === 0 && (
@@ -431,5 +493,13 @@ export default function AdminMembersPage() {
         />
       )}
     </main>
+  );
+}
+
+export default function AdminMembersPage() {
+  return (
+    <Suspense fallback={<main className="amp-page" />}>
+      <AdminMembersPageContent />
+    </Suspense>
   );
 }
