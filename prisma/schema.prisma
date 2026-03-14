@@ -7,59 +7,62 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Member {
-  id                    String                 @id @default(uuid())
-  firstName             String
-  secondName            String
-  visitsTotal           Int                    @default(0)
-  visitsUsed            Int                    @default(0)
-  cards                 Card[]
-  answers               MemberQuestionAnswer[]
-  pushSubscriptions PushSubscription[]
-  notifications         MemberNotification[]
+enum PlayerStatus {
+  paid
+  warning
+  overdue
 
-  @@map("members")
+  @@map("player_status")
 }
 
-model Card {
-  id        String   @id @default(uuid())
-  cardCode  String   @unique
-  member    Member   @relation(fields: [memberId], references: [id])
-  memberId  String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+model Club {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  emblemUrl String?  @map("emblem_url")
+  players   Player[]
 
-  @@map("cards")
+  @@map("clubs")
 }
 
-model Question {
-  id        String                 @id @default(uuid())
-  text      String
-  isActive  Boolean                @default(true)
-  answers   MemberQuestionAnswer[]
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
+model Player {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId             String               @map("club_id") @db.Uuid
+  fullName           String               @map("full_name")
+  cards              Card[]
+  status             PlayerStatus         @default(paid)
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  jerseyNumber       String?              @map("jersey_number")
+  birthDate          DateTime?            @map("birth_date") @db.Date
+  teamGroup          Int?                 @map("team_group")
+  lastPaymentDate    DateTime?            @map("last_payment_date") @db.Timestamptz(6)
+  avatarUrl          String?              @map("avatar_url")
+  club               Club                 @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  paymentLogs        PaymentLog[]
+  pushSubscriptions  PushSubscription[]
+  playerNotification PlayerNotification[]
 
-  @@map("questions")
+  @@index([clubId])
+  @@map("players")
 }
 
-model MemberQuestionAnswer {
-  id         String   @id @default(uuid())
-  memberId   String
-  questionId String
-  answer     String
-  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model PaymentLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  playerId   String   @map("player_id") @db.Uuid
+  paidFor    String   @map("paid_for")
+  paidAt     DateTime @default(now()) @map("paid_at") @db.Timestamptz(6)
+  recordedBy String   @default("admin") @map("recorded_by")
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
-  @@unique([memberId, questionId])
-  @@map("member_question_answers")
+  @@index([playerId])
+  @@map("payment_logs")
 }
 
 model PushSubscription {
   id        String   @id @default(uuid())
-  memberId  String
+  playerId  String
   endpoint  String   @unique
   p256dh    String
   auth      String
@@ -68,24 +71,35 @@ model PushSubscription {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  member    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
-  @@index([memberId, isActive])
+  @@index([playerId, isActive])
   @@map("push_subscriptions")
 }
 
-model MemberNotification {
-  id        String   @id @default(uuid())
-  memberId  String
-  type      String
-  title     String
-  body      String
-  url       String?
-  sentAt    DateTime @default(now())
-  readAt    DateTime?
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+model PlayerNotification {
+  id       String    @id @default(uuid())
+  playerId String
+  type     String
+  title    String
+  body     String
+  url      String?
+  sentAt   DateTime  @default(now())
+  readAt   DateTime?
+  player   Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
-  @@index([memberId, sentAt])
-  @@index([memberId, readAt])
-  @@map("member_notifications")
+  @@index([playerId, sentAt])
+  @@index([playerId, readAt])
+  @@map("player_notifications")
+}
+
+model Card {
+  id        String   @id @default(uuid())
+  cardCode  String   @unique
+  player    Player   @relation(fields: [playerId], references: [id])
+  playerId  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("cards")
 }
