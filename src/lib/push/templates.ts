@@ -65,6 +65,17 @@ export function buildNotificationPayload(
         tag: "trainer-message",
         data: { type: input.type },
       };
+    case "monthly_membership_payment_reminder":
+      return {
+        title: "Напомняне",
+        body:
+          "Напомняне: Здравейте! Напомняме Ви, че предстои плащането на месечния Ви членски внос.",
+        url,
+        icon: DEFAULT_ICON,
+        badge: DEFAULT_ICON,
+        tag: "monthly-membership-payment-reminder",
+        data: { type: input.type },
+      };
     default:
       return {
         title: "Ново известие",
