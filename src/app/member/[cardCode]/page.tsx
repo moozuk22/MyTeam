@@ -88,6 +88,13 @@ const BellOffIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
+const SpinnerIcon = ({ size = 16 }: { size?: number }) => (
+  <svg className="spin-icon" width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+  </svg>
+);
+
 const PlusIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M5 12h14" />
@@ -626,13 +633,13 @@ export default function MemberCardPage({
           {(!isIPhoneDevice || isStandaloneMode) && (
             isPushEnabled ? (
               <button className="bell-btn bell-btn--disable" onClick={handleDisablePushNotifications} disabled={isEnablingPush}>
-                <BellOffIcon size={16} />
-                Изключване на известия
+                {isEnablingPush ? <SpinnerIcon size={16} /> : <BellOffIcon size={16} />}
+                {isEnablingPush ? "Изключване..." : "Изключване на известия"}
               </button>
             ) : (
               <button className="bell-btn" onClick={handleEnablePushNotifications} disabled={isEnablingPush}>
-                <BellIcon size={16} />
-                Активиране на известия
+                {isEnablingPush ? <SpinnerIcon size={16} /> : <BellIcon size={16} />}
+                {isEnablingPush ? "Активиране..." : "Активиране на известия"}
               </button>
             )
           )}
