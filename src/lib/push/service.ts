@@ -7,6 +7,7 @@ import type {
 } from "@/lib/push/types";
 
 let isWebPushConfigured = false;
+const MIN_AGE_FOR_404_DEACTIVATION_MS = 24 * 60 * 60 * 1000;
 
 function ensureWebPushConfigured() {
   if (isWebPushConfigured) {
@@ -25,6 +26,18 @@ function getPushErrorStatusCode(error: unknown) {
 
   const maybeError = error as { statusCode?: number };
   return typeof maybeError.statusCode === "number" ? maybeError.statusCode : null;
+}
+
+function shouldDeactivateSubscription(statusCode: number | null, createdAt: Date) {
+  if (statusCode === 410) {
+    return true;
+  }
+
+  if (statusCode === 404) {
+    return Date.now() - createdAt.getTime() >= MIN_AGE_FOR_404_DEACTIVATION_MS;
+  }
+
+  return false;
 }
 
 export interface SavePushSubscriptionInput {
@@ -92,6 +105,7 @@ export async function sendPushToMember(
       endpoint: true,
       p256dh: true,
       auth: true,
+      createdAt: true,
     },
   });
 
@@ -124,12 +138,17 @@ export async function sendPushToMember(
         failed += 1;
         const statusCode = getPushErrorStatusCode(error);
 
-        if (statusCode === 404 || statusCode === 410) {
+        if (shouldDeactivateSubscription(statusCode, subscription.createdAt)) {
           deactivated += 1;
           await prisma.pushSubscription.update({
             where: { id: subscription.id },
             data: { isActive: false },
           });
+        } else if (statusCode === 404) {
+          console.warn(
+            "Push endpoint returned 404 but was kept active because it is too new:",
+            subscription.id
+          );
         }
 
         console.error("Push delivery error:", error);

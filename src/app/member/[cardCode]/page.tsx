@@ -388,15 +388,30 @@ export default function MemberCardPage({
       const { publicKey } = (await keyResponse.json()) as { publicKey: string };
 
       const existingSubscription = await registration.pushManager.getSubscription();
-      if (existingSubscription) {
-        // Re-subscribe with current VAPID key pair after key rotation.
-        await existingSubscription.unsubscribe();
+      let subscription = existingSubscription;
+
+      if (!subscription) {
+        try {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          });
+        } catch (subscribeError) {
+          if (
+            subscribeError instanceof DOMException &&
+            subscribeError.name === "AbortError"
+          ) {
+            throw new Error(
+              "Push subscription failed at browser push service. Disable ad blockers/privacy apps for this site, avoid Incognito mode, and allow access to fcm.googleapis.com, then retry."
+            );
+          }
+          throw subscribeError;
+        }
       }
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
+      if (!subscription) {
+        throw new Error("Failed to obtain push subscription.");
+      }
 
       const saveResponse = await fetch(
         `/api/members/${encodeURIComponent(cardCode)}/push-subscriptions`,
