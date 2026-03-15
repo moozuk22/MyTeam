@@ -346,6 +346,33 @@
 
 .pc-badges { display: flex; align-items: center; gap: 8px; }
 
+.pc-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.pc-profile-btn {
+  border: 1px solid rgba(50,205,50,0.45);
+  border-radius: 10px;
+  background: rgba(50,205,50,0.12);
+  color: #7fff00;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  height: 30px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.pc-profile-btn:hover {
+  background: rgba(50,205,50,0.2);
+  border-color: rgba(50,205,50,0.75);
+  box-shadow: 0 0 12px rgba(50,205,50,0.25);
+}
+
 /* ── Shared badge ── */
 .amp-badge {
   display: inline-flex;

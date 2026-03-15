@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import "./page.css";
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
@@ -29,7 +30,7 @@ export default function AdminLoginPage() {
         const data = await response.json();
         setError(data.error || "Login failed");
       }
-    } catch (err) {
+    } catch {
       setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
@@ -37,53 +38,40 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="container flex items-center justify-center fade-in" style={{ minHeight: '100vh' }}>
-      <div className="member-card" style={{ maxWidth: '420px', width: '100%' }}>
-        <div className="text-center mb-8">
-          <img
-            src="/logo.png"
-            alt="Logo"
-            className="mb-5 mx-auto"
-            style={{ width: '56px', height: '56px', objectFit: 'contain' }}
-          />
-          <h2 className="text-gold mb-2" style={{ fontSize: '2rem', fontWeight: '600' }}>
-            Администраторски вход
-          </h2>
-        </div>
-        
-        <form className="space-y-8" onSubmit={handleSubmit}>
-          <div>
+    <main className="al-page">
+      <div className="al-dot-grid" aria-hidden="true" />
+
+      <div className="al-inner">
+        <header className="al-header">
+          <img src="/logo.png" alt="Logo" className="al-logo" />
+          <h1 className="al-title">{"\u0410\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440\u0441\u043a\u0438 \u0432\u0445\u043e\u0434"}</h1>
+          <div className="al-title-line" />
+        </header>
+
+        <section className="al-card">
+          <form className="al-form" onSubmit={handleSubmit}>
             <input
               id="password"
               name="password"
               type="password"
               autoComplete="current-password"
               required
-              placeholder="Въведете парола"
+              placeholder={"\u0412\u044a\u0432\u0435\u0434\u0435\u0442\u0435 \u043f\u0430\u0440\u043e\u043b\u0430"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500"
+              className="al-input"
             />
-          </div>
 
-          {error && (
-            <div className="alert alert-error text-center">
-              {error}
-            </div>
-          )}
+            {error && <div className="al-error">{error}</div>}
 
-          <div className="mt-8">
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn btn-primary w-full"
-              style={{ cursor: loading ? 'not-allowed' : 'pointer', padding: '12px 20px' }}
-            >
-              {loading ? "Влизане..." : "Вход"}
+            <button type="submit" disabled={loading} className="al-submit-btn">
+              {loading
+                ? "\u0412\u043b\u0438\u0437\u0430\u043d\u0435..."
+                : "\u0412\u0445\u043e\u0434"}
             </button>
-          </div>
-        </form>
+          </form>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

@@ -299,9 +299,14 @@ function ConfirmDeleteModal({
 }
 
 function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }) {
+  const router = useRouter();
   const s = getStatusMeta(member.status);
   const initial = member.fullName.trim().charAt(0).toUpperCase() || "?";
   const needsAction = member.status === "overdue" || member.status === "warning";
+  const cardCode =
+    member.cards.find((card) => card.isActive)?.cardCode ||
+    member.nfcTagId ||
+    "";
 
   return (
     <div className="pc-card" onClick={onClick}>
@@ -326,12 +331,27 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
           </div>
         </div>
 
-        {/* Right: check icon for paid, nothing for others (clicking opens modal) */}
-        {!needsAction && (
-          <span style={{ color: "#32cd32", flexShrink: 0 }}>
-            <CircleCheckBigIcon size={24}/>
-          </span>
-        )}
+        <div className="pc-actions">
+          {cardCode && (
+            <button
+              type="button"
+              className="pc-profile-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/member/${encodeURIComponent(cardCode)}`);
+              }}
+            >
+              виж профил
+            </button>
+          )}
+
+          {/* Right: check icon for paid, nothing for others (clicking opens modal) */}
+          {!needsAction && (
+            <span style={{ color: "#32cd32", flexShrink: 0 }}>
+              <CircleCheckBigIcon size={24}/>
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
