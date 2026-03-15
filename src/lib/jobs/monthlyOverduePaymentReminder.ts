@@ -246,7 +246,7 @@ export async function runMonthlyOverduePaymentReminder(
     };
   }
 
-  if (day !== 15) {
+  if (day !== 1) {
     return {
       success: true,
       skipped: true,

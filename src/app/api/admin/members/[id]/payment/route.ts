@@ -8,6 +8,32 @@ import { sendPushToMember } from "@/lib/push/service";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type YM = { year: number; month: number };
+
+function toYM(date: Date): YM {
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() };
+}
+
+function cmpYM(a: YM, b: YM): number {
+  if (a.year !== b.year) return a.year - b.year;
+  return a.month - b.month;
+}
+
+function addMonths(ym: YM, count: number): YM {
+  const d = new Date(Date.UTC(ym.year, ym.month + count, 1));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
+}
+
+function resolveStatusForLatestPaidMonth(latestPaidDate: Date): "paid" | "warning" | "overdue" {
+  const latestPaidYM = toYM(latestPaidDate);
+  const currentYM = toYM(new Date());
+  const previousYM = addMonths(currentYM, -1);
+
+  if (cmpYM(latestPaidYM, currentYM) >= 0) return "paid";
+  if (cmpYM(latestPaidYM, previousYM) >= 0) return "warning";
+  return "overdue";
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -82,12 +108,22 @@ export async function POST(
       },
     });
 
+    const latestPaymentAfterInsert = await prisma.paymentLog.findFirst({
+      where: { playerId: id },
+      orderBy: { paidFor: "desc" },
+      select: { paidFor: true },
+    });
+
+    if (!latestPaymentAfterInsert) {
+      throw new Error("Latest payment could not be resolved after insert.");
+    }
+
     // Update player's last payment date and status
     await prisma.player.update({
       where: { id },
       data: {
         lastPaymentDate: new Date(),
-        status: "paid",
+        status: resolveStatusForLatestPaidMonth(latestPaymentAfterInsert.paidFor),
       },
     });
 

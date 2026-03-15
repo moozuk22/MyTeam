@@ -31,6 +31,16 @@ function ymToDate(ym: YM): Date {
   return new Date(Date.UTC(ym.year, ym.month, 1));
 }
 
+function resolveStatusForLatestPaidMonth(latestPaidYM: YM): "paid" | "warning" | "overdue" {
+  const now = new Date();
+  const currentYM: YM = { year: now.getUTCFullYear(), month: now.getUTCMonth() };
+  const previousYM = addMonths(currentYM, -1);
+
+  if (cmpYM(latestPaidYM, currentYM) >= 0) return "paid";
+  if (cmpYM(latestPaidYM, previousYM) >= 0) return "warning";
+  return "overdue";
+}
+
 function formatPaidMonthLabel(date: Date): string {
   return date.toLocaleDateString("bg-BG", {
     month: "long",
@@ -111,6 +121,8 @@ export async function POST(
       return NextResponse.json({ error: "This period is already paid" }, { status: 400 });
     }
 
+    const nextStatus = resolveStatusForLatestPaidMonth(targetYM);
+
     await prisma.$transaction(async (tx) => {
       await tx.paymentLog.createMany({
         data: monthsToCreate.map((date) => ({
@@ -124,7 +136,7 @@ export async function POST(
         where: { id: card.playerId },
         data: {
           lastPaymentDate: new Date(),
-          status: "paid",
+          status: nextStatus,
         },
       });
     });
