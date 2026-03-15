@@ -139,6 +139,10 @@ function MemberDetailModal({
     (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
   );
   const lastPayment = paymentHistory[0];
+  const activeCardCode =
+    member.cards.find((card) => card.isActive)?.cardCode ||
+    member.nfcTagId ||
+    "Няма активна карта";
 
   return (
     <div className="amp-overlay" onClick={onClose}>
@@ -181,6 +185,11 @@ function MemberDetailModal({
               <span className="amp-badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
                 {s.label}
               </span>
+            </div>
+
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Активна карта:</span>
+              <span className="amp-val">{activeCardCode}</span>
             </div>
 
             {/* Row 3 full: Последно плащане */}
