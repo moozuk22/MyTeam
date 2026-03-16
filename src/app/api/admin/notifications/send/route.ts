@@ -66,6 +66,14 @@ export async function POST(request: NextRequest) {
   }
 
   const broadcast = payload.broadcast === true;
+  const rawCustomUrl =
+    typeof payload.url === "string" && payload.url.trim()
+      ? payload.url.trim()
+      : "";
+  const customUrl =
+    rawCustomUrl && rawCustomUrl !== "/" && !rawCustomUrl.startsWith("/admin")
+      ? rawCustomUrl
+      : null;
   let memberIds = normalizeMemberIds(payload);
 
   if (broadcast) {
@@ -109,10 +117,7 @@ export async function POST(request: NextRequest) {
         const fallbackUrl = member.cards[0]
           ? `/member/${member.cards[0].cardCode}`
           : "/";
-        const url =
-          typeof payload.url === "string" && payload.url.trim()
-            ? payload.url.trim()
-            : fallbackUrl;
+        const url = customUrl ?? fallbackUrl;
         const trainingDate =
           typeof payload.trainingDate === "string" && payload.trainingDate.trim()
             ? payload.trainingDate.trim()

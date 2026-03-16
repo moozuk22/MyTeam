@@ -544,7 +544,6 @@ export default function AdminPlayersPage() {
           type: "trainer_message",
           broadcast: true,
           trainerMessage,
-          url: "/",
         }),
       });
 
