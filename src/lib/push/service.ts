@@ -93,7 +93,8 @@ export interface SendPushResult {
 
 export async function sendPushToMember(
   memberId: string,
-  payload: PushNotificationPayload
+  payload: PushNotificationPayload,
+  notificationType?: NotificationTemplateType
 ): Promise<SendPushResult> {
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
@@ -155,6 +156,15 @@ export async function sendPushToMember(
       }
     })
   );
+
+  // Save notification to history if type is provided
+  if (notificationType) {
+    try {
+      await saveMemberNotificationHistory(memberId, notificationType, payload);
+    } catch (error) {
+      console.error("Failed to save notification history:", error);
+    }
+  }
 
   return {
     total: subscriptions.length,
