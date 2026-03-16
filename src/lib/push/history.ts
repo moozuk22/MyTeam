@@ -34,3 +34,34 @@ export async function saveMemberNotificationHistory(
 
   return saved;
 }
+
+export async function getMemberNotifications(memberId: string) {
+  return await prisma.playerNotification.findMany({
+    where: {
+      playerId: memberId,
+    },
+    orderBy: {
+      sentAt: "desc",
+    },
+  });
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  return await prisma.playerNotification.update({
+    where: {
+      id: notificationId,
+    },
+    data: {
+      readAt: new Date(),
+    },
+  });
+}
+
+export async function getUnreadNotificationCount(memberId: string) {
+  return await prisma.playerNotification.count({
+    where: {
+      playerId: memberId,
+      readAt: null,
+    },
+  });
+}
