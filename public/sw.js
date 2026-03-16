@@ -25,7 +25,16 @@ self.addEventListener("push", (event) => {
   const data = typeof payload === "object" && payload ? payload : {};
   const title = typeof data.title === "string" ? data.title : "CheckIn";
   const body = typeof data.body === "string" ? data.body : "";
-  const url = typeof data.url === "string" ? data.url : "/";
+  const cardCode =
+    typeof data.cardCode === "string" && data.cardCode.trim()
+      ? data.cardCode.trim()
+      : null;
+  const url =
+    typeof data.url === "string" && data.url.trim()
+      ? data.url.trim()
+      : cardCode
+      ? `/member/${encodeURIComponent(cardCode)}`
+      : "/";
   const icon = typeof data.icon === "string" ? data.icon : "/logo.png";
   const badge = typeof data.badge === "string" ? data.badge : "/logo.png";
   const tag = typeof data.tag === "string" ? data.tag : "checkin-notification";
@@ -49,10 +58,26 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetPath =
-    event.notification?.data && typeof event.notification.data.url === "string"
-      ? event.notification.data.url
+  const cardCode =
+    event.notification?.data &&
+    typeof event.notification.data.cardCode === "string" &&
+    event.notification.data.cardCode.trim()
+      ? event.notification.data.cardCode.trim()
+      : null;
+  const requestedPath =
+    event.notification?.data &&
+    typeof event.notification.data.url === "string" &&
+    event.notification.data.url.trim()
+      ? event.notification.data.url.trim()
+      : cardCode
+      ? `/member/${encodeURIComponent(cardCode)}`
       : "/";
+  const targetPath =
+    requestedPath === "/admin" || requestedPath.startsWith("/admin/")
+      ? cardCode
+        ? `/member/${encodeURIComponent(cardCode)}`
+        : "/"
+      : requestedPath;
   const destination = new URL(targetPath, self.location.origin).toString();
 
   event.waitUntil(
