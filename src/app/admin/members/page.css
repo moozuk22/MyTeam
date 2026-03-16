@@ -667,6 +667,11 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+.amp-edit-input--file {
+  height: auto;
+  padding: 8px 10px;
+}
+
 .amp-edit-input option {
   background: #141414;
   color: #ffffff;
@@ -679,6 +684,22 @@
 .amp-edit-input:focus {
   border-color: rgba(50,205,50,0.5);
   box-shadow: 0 0 12px rgba(50,205,50,0.18);
+}
+
+.amp-edit-avatar-preview {
+  width: 100%;
+  max-width: 180px;
+  aspect-ratio: 4 / 5;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.2);
+  object-fit: cover;
+  background: rgba(255,255,255,0.04);
+}
+
+.amp-edit-image-empty {
+  margin: 0;
+  color: rgba(255,255,255,0.45);
+  font-size: 12px;
 }
 
 @media (max-width: 640px) {

@@ -80,12 +80,28 @@ export async function PUT(
     const statusRaw = String(body.status ?? "").trim();
     const birthDateRaw = body.birthDate;
     const avatarUrlRaw = body.avatarUrl;
+    const imageUrlRaw = body.imageUrl;
+    const imagePublicIdRaw = body.imagePublicId;
+    const hasImageUrl = Object.prototype.hasOwnProperty.call(body, "imageUrl");
+    const hasImagePublicId = Object.prototype.hasOwnProperty.call(body, "imagePublicId");
 
     if (!fullName) {
       return NextResponse.json(
         { error: "fullName is required" },
         { status: 400 }
       );
+    }
+
+    const existingPlayer = await prisma.player.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        imagePublicId: true,
+        imageUrl: true,
+      },
+    });
+    if (!existingPlayer) {
+      return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
 
     const clubId =
@@ -123,6 +139,23 @@ export async function PUT(
       return NextResponse.json({ error: "birthDate is invalid" }, { status: 400 });
     }
 
+    const nextImageUrl = hasImageUrl
+      ? imageUrlRaw === null || imageUrlRaw === undefined || String(imageUrlRaw).trim() === ""
+        ? null
+        : String(imageUrlRaw).trim()
+      : undefined;
+    const nextImagePublicId = hasImagePublicId
+      ? imagePublicIdRaw === null || imagePublicIdRaw === undefined || String(imagePublicIdRaw).trim() === ""
+        ? null
+        : String(imagePublicIdRaw).trim()
+      : undefined;
+
+    const previousImagePublicId = getCloudinaryPublicId(existingPlayer);
+    const replacingWithUploadedImage =
+      typeof nextImagePublicId === "string" &&
+      nextImagePublicId.length > 0 &&
+      nextImagePublicId !== previousImagePublicId;
+
     const updatedPlayer = await prisma.player.update({
       where: { id },
       data: {
@@ -138,6 +171,8 @@ export async function PUT(
           avatarUrlRaw === null || avatarUrlRaw === undefined || avatarUrlRaw === ""
             ? null
             : String(avatarUrlRaw),
+        ...(hasImageUrl ? { imageUrl: nextImageUrl } : {}),
+        ...(hasImagePublicId ? { imagePublicId: nextImagePublicId } : {}),
         ...(status ? { status } : {}),
       },
       include: {
@@ -145,6 +180,20 @@ export async function PUT(
         club: true,
       },
     });
+
+    if (replacingWithUploadedImage && previousImagePublicId) {
+      try {
+        const result = await cloudinary.uploader.destroy(previousImagePublicId, {
+          resource_type: "image",
+          invalidate: true,
+        });
+        if (result.result !== "ok" && result.result !== "not found") {
+          console.warn("Unexpected Cloudinary destroy result:", result);
+        }
+      } catch (cloudinaryError) {
+        console.error("Cloudinary deletion error during update:", cloudinaryError);
+      }
+    }
 
     return NextResponse.json(updatedPlayer);
   } catch (error) {

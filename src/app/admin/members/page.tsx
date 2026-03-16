@@ -2,6 +2,8 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
+import { uploadImage } from "@/lib/uploadImage";
 import "./page.css";
 
 type PlayerStatus = "paid" | "warning" | "overdue";
@@ -35,11 +37,70 @@ interface Member {
   teamGroup: number | null;
   jerseyNumber: string | null;
   avatarUrl: string | null;
+  imageUrl: string | null;
+  imagePublicId: string | null;
   birthDate: string | null;
   lastPaymentDate: string | null;
   club?: MemberClub;
   paymentLogs: PaymentLog[];
   cards: MemberCard[];
+}
+
+function normalizeMember(item: unknown): Member {
+  const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+  const fullName = String(raw.fullName ?? "").trim();
+  const cards: MemberCard[] = Array.isArray(raw.cards)
+    ? raw.cards.map((card) => {
+        const cardRaw = typeof card === "object" && card !== null ? (card as Record<string, unknown>) : {};
+        return {
+          cardCode: String(cardRaw.cardCode ?? ""),
+          isActive: Boolean(cardRaw.isActive),
+        };
+      })
+    : [];
+  const activeCard = cards.find((c) => c.isActive);
+  const nfcTagId = activeCard?.cardCode ?? cards[0]?.cardCode ?? "";
+  const paymentLogs: PaymentLog[] = Array.isArray(raw.paymentLogs)
+    ? raw.paymentLogs.map((log) => {
+        const logRaw = typeof log === "object" && log !== null ? (log as Record<string, unknown>) : {};
+        return {
+          id: String(logRaw.id ?? ""),
+          paidFor: String(logRaw.paidFor ?? ""),
+          paidAt: String(logRaw.paidAt ?? ""),
+        };
+      })
+    : [];
+  const rawStatus = raw.status;
+  const status: PlayerStatus =
+    rawStatus === "paid" || rawStatus === "warning" || rawStatus === "overdue"
+      ? rawStatus
+      : "paid";
+
+  const imageUrl = raw.imageUrl ? String(raw.imageUrl) : null;
+  const avatarUrl = raw.avatarUrl ? String(raw.avatarUrl) : imageUrl;
+  const clubRaw = typeof raw.club === "object" && raw.club !== null ? (raw.club as Record<string, unknown>) : null;
+
+  return {
+    id: String(raw.id ?? ""),
+    fullName,
+    nfcTagId,
+    status,
+    teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
+    jerseyNumber: raw.jerseyNumber ? String(raw.jerseyNumber) : null,
+    avatarUrl,
+    imageUrl,
+    imagePublicId: raw.imagePublicId ? String(raw.imagePublicId) : null,
+    birthDate: raw.birthDate ? String(raw.birthDate) : null,
+    lastPaymentDate: raw.lastPaymentDate ? String(raw.lastPaymentDate) : null,
+    club: clubRaw
+      ? {
+          id: String(clubRaw.id ?? ""),
+          name: String(clubRaw.name ?? ""),
+        }
+      : undefined,
+    paymentLogs,
+    cards,
+  };
 }
 
 interface StatusMeta {
@@ -395,8 +456,18 @@ function AdminMembersPageContent() {
     jerseyNumber: "",
     birthDate: "",
     avatarUrl: "",
+    imageUrl: "",
+    imagePublicId: "",
   });
+  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
+  const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState("");
   const [clubName, setClubName]                 = useState("Всички отбори");
+
+  const closeEditModal = () => {
+    setMemberToEdit(null);
+    setEditAvatarFile(null);
+    setEditAvatarPreviewUrl("");
+  };
 
   const handleDeleteMember = async () => {
     if (!memberToDelete || isDeletingMember) return;
@@ -461,6 +532,8 @@ function AdminMembersPageContent() {
       }
     }
     setMemberToEdit(member);
+    setEditAvatarFile(null);
+    setEditAvatarPreviewUrl("");
     setEditForm({
       fullName: member.fullName,
       clubId: member.club?.id ?? "",
@@ -468,8 +541,24 @@ function AdminMembersPageContent() {
       jerseyNumber: member.jerseyNumber ?? "",
       birthDate: member.birthDate ? new Date(member.birthDate).toISOString().slice(0, 10) : "",
       avatarUrl: member.avatarUrl ?? "",
+      imageUrl: member.imageUrl ?? "",
+      imagePublicId: member.imagePublicId ?? "",
     });
   };
+
+  useEffect(() => {
+    if (!editAvatarFile) {
+      setEditAvatarPreviewUrl("");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(editAvatarFile);
+    setEditAvatarPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [editAvatarFile]);
 
   const handleSaveMemberEdit = async () => {
     if (!memberToEdit || isSavingEdit) return;
@@ -493,6 +582,21 @@ function AdminMembersPageContent() {
     setIsSavingEdit(true);
     setEditError("");
     try {
+      let resolvedAvatarUrl = editForm.avatarUrl.trim() || null;
+      let resolvedImageUrl = editForm.imageUrl.trim() || null;
+      let resolvedImagePublicId = editForm.imagePublicId.trim() || null;
+
+      if (editAvatarFile) {
+        const uploaded = await uploadImage(
+          editAvatarFile,
+          "player",
+          fullName || editAvatarFile.name,
+        );
+        resolvedAvatarUrl = uploaded.secure_url;
+        resolvedImageUrl = extractUploadPathFromCloudinaryUrl(uploaded.secure_url);
+        resolvedImagePublicId = uploaded.public_id;
+      }
+
       const response = await fetch(`/api/admin/members/${memberToEdit.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -502,7 +606,9 @@ function AdminMembersPageContent() {
           teamGroup: parsedTeamGroup,
           jerseyNumber: editForm.jerseyNumber.trim() || null,
           birthDate: editForm.birthDate.trim() || null,
-          avatarUrl: editForm.avatarUrl.trim() || null,
+          avatarUrl: resolvedAvatarUrl,
+          imageUrl: resolvedImageUrl,
+          imagePublicId: resolvedImagePublicId,
         }),
       });
 
@@ -516,42 +622,18 @@ function AdminMembersPageContent() {
         return;
       }
 
-      const selectedClub = clubs.find((club) => club.id === editForm.clubId);
+      const updatedMember = normalizeMember(data);
       setMembers((prev) =>
         prev.map((m) =>
-          m.id === memberToEdit.id
-            ? {
-                ...m,
-                fullName,
-                club: selectedClub
-                  ? { id: selectedClub.id, name: selectedClub.name }
-                  : m.club,
-                teamGroup: parsedTeamGroup,
-                jerseyNumber: editForm.jerseyNumber.trim() || null,
-                birthDate: editForm.birthDate.trim() || null,
-                avatarUrl: editForm.avatarUrl.trim() || null,
-              }
-            : m
+          m.id === memberToEdit.id ? updatedMember : m
         )
       );
 
       setSelectedMember((prev) =>
-        prev?.id === memberToEdit.id
-          ? {
-              ...prev,
-              fullName,
-              club: selectedClub
-                ? { id: selectedClub.id, name: selectedClub.name }
-                : prev.club,
-              teamGroup: parsedTeamGroup,
-              jerseyNumber: editForm.jerseyNumber.trim() || null,
-              birthDate: editForm.birthDate.trim() || null,
-              avatarUrl: editForm.avatarUrl.trim() || null,
-            }
-          : prev
+        prev?.id === memberToEdit.id ? updatedMember : prev
       );
 
-      setMemberToEdit(null);
+      closeEditModal();
     } catch (error) {
       console.error("Error updating member:", error);
       setEditError("Възникна грешка при редактиране.");
@@ -575,48 +657,7 @@ function AdminMembersPageContent() {
         if (res.ok) {
           const data: unknown = await res.json();
           const rawItems = Array.isArray(data) ? data : [];
-          const normalized: Member[] = rawItems.map((item: any) => {
-            const fullName = String(item.fullName ?? "").trim();
-            const cards: MemberCard[] = Array.isArray(item.cards)
-              ? item.cards.map((card: any) => ({
-                  cardCode: String(card?.cardCode ?? ""),
-                  isActive: Boolean(card?.isActive),
-                }))
-              : [];
-            const activeCard = cards.find((c) => c.isActive);
-            const nfcTagId = activeCard?.cardCode ?? cards[0]?.cardCode ?? "";
-            const paymentLogs: PaymentLog[] = Array.isArray(item.paymentLogs)
-              ? item.paymentLogs.map((log: any) => ({
-                  id: String(log?.id ?? ""),
-                  paidFor: String(log?.paidFor ?? ""),
-                  paidAt: String(log?.paidAt ?? ""),
-                }))
-              : [];
-            const rawStatus = item.status;
-            const status: PlayerStatus =
-              rawStatus === "paid" || rawStatus === "warning" || rawStatus === "overdue"
-                ? rawStatus
-                : "paid";
-            return {
-              id: String(item.id ?? ""),
-              fullName,
-              nfcTagId,
-              status,
-              teamGroup: typeof item.teamGroup === "number" ? item.teamGroup : null,
-              jerseyNumber: item.jerseyNumber ? String(item.jerseyNumber) : null,
-              avatarUrl: item.avatarUrl ? String(item.avatarUrl) : item.imageUrl ? String(item.imageUrl) : null,
-              birthDate: item.birthDate ? String(item.birthDate) : null,
-              lastPaymentDate: item.lastPaymentDate ? String(item.lastPaymentDate) : null,
-              club: item.club
-                ? {
-                    id: String(item.club.id ?? ""),
-                    name: String(item.club.name ?? ""),
-                  }
-                : undefined,
-              paymentLogs,
-              cards,
-            };
-          });
+          const normalized: Member[] = rawItems.map((item) => normalizeMember(item));
           setMembers(normalized);
           if (!clubId) {
             setClubName("Всички отбори");
@@ -649,7 +690,13 @@ function AdminMembersPageContent() {
         }
         const clubs: unknown = await response.json();
         const selectedClub = Array.isArray(clubs)
-          ? clubs.find((club: any) => String(club?.id) === clubId)
+          ? clubs.find((club) => {
+              const item =
+                typeof club === "object" && club !== null
+                  ? (club as { id?: unknown })
+                  : {};
+              return String(item.id ?? "") === clubId;
+            })
           : null;
         if (selectedClub?.name) {
           setClubName(String(selectedClub.name));
@@ -784,14 +831,14 @@ function AdminMembersPageContent() {
         />
       )}
       {memberToEdit && (
-        <div className="amp-overlay" onClick={isSavingEdit ? undefined : () => setMemberToEdit(null)}>
+        <div className="amp-overlay" onClick={isSavingEdit ? undefined : closeEditModal}>
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true"/>
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">Редактиране на играч</span>
               <button
                 className="amp-modal-close"
-                onClick={() => setMemberToEdit(null)}
+                onClick={closeEditModal}
                 aria-label="Затвори"
                 disabled={isSavingEdit}
               >
@@ -858,11 +905,25 @@ function AdminMembersPageContent() {
                   />
                 </label>
                 <label className="amp-edit-field amp-edit-field--full">
-                  <span className="amp-lbl">Снимка (URL)</span>
+                  <span className="amp-lbl">Текуща снимка</span>
+                  {editAvatarPreviewUrl || editForm.avatarUrl ? (
+                    <img
+                      src={editAvatarPreviewUrl || editForm.avatarUrl}
+                      alt={editForm.fullName || "Player avatar"}
+                      className="amp-edit-avatar-preview"
+                    />
+                  ) : (
+                    <p className="amp-edit-image-empty">Няма качена снимка.</p>
+                  )}
+                </label>
+                <label className="amp-edit-field amp-edit-field--full">
+                  <span className="amp-lbl">Качи нова снимка</span>
                   <input
-                    className="amp-edit-input"
-                    value={editForm.avatarUrl}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, avatarUrl: e.target.value }))}
+                    className="amp-edit-input amp-edit-input--file"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setEditAvatarFile(e.target.files?.[0] ?? null)}
+                    disabled={isSavingEdit}
                   />
                 </label>
               </div>
@@ -872,7 +933,7 @@ function AdminMembersPageContent() {
               <div className="amp-modal-actions">
                 <button
                   className="amp-btn amp-btn--ghost"
-                  onClick={() => setMemberToEdit(null)}
+                  onClick={closeEditModal}
                   disabled={isSavingEdit}
                 >
                   Отказ
