@@ -646,11 +646,38 @@ function AdminMembersPageContent() {
     const fetchMembers = async () => {
       setLoading(true);
       try {
-        const endpoint = clubId
-          ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
-          : "/api/admin/members";
+        if (!clubId) {
+          router.replace("/404");
+          return;
+        }
+
+        const clubsResponse = await fetch("/api/admin/clubs", { cache: "no-store" });
+        if (!clubsResponse.ok) {
+          router.replace("/404");
+          return;
+        }
+
+        const clubsPayload: unknown = await clubsResponse.json();
+        const selectedClub = Array.isArray(clubsPayload)
+          ? clubsPayload.find((club) => {
+              const item =
+                typeof club === "object" && club !== null
+                  ? (club as { id?: unknown; name?: unknown })
+                  : {};
+              return String(item.id ?? "") === clubId;
+            })
+          : null;
+
+        if (!selectedClub || typeof selectedClub.name !== "string" || !selectedClub.name.trim()) {
+          router.replace("/404");
+          return;
+        }
+
+        setClubName(selectedClub.name.trim());
+
+        const endpoint = `/api/admin/members?clubId=${encodeURIComponent(clubId)}`;
         const res = await fetch(endpoint);
-        if (res.status === 404 && clubId) {
+        if (res.status === 404) {
           router.replace("/404");
           return;
         }
@@ -706,7 +733,7 @@ function AdminMembersPageContent() {
       }
     };
 
-    fetchMembers();
+    void fetchMembers();
     void fetchClubName();
   }, [clubId, router]);
 
