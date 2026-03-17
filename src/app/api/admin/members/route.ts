@@ -175,7 +175,6 @@ export async function GET(request: NextRequest) {
 
     const players = await prisma.player.findMany({
       where: {
-        isActive: true,
         ...(clubId ? { clubId } : {}),
       },
       include: {
