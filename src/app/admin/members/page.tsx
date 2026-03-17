@@ -1207,7 +1207,7 @@ function AdminMembersPageContent() {
               <ArrowLeftIcon/>
               Назад към отбори
             </button>
-            <button className="amp-add-btn" onClick={() => router.push("/admin/members/add")}>
+            <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}`)}>
               <PlusIcon/>
               Добави играч
             </button>

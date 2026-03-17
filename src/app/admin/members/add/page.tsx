@@ -1,28 +1,87 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { uploadImage } from "@/lib/uploadImage";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import "./page.css";
 
 export default function AddMemberPage() {
+  const searchParams = useSearchParams();
+  const clubId = searchParams.get("clubId")?.trim() ?? "";
   const [fullName, setFullName] = useState("");
-  const [clubId, setClubId] = useState("");
   const [status, setStatus] = useState<"paid" | "warning" | "overdue">("paid");
   const [jerseyNumber, setJerseyNumber] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [teamGroup, setTeamGroup] = useState("");
-  const [lastPaymentDate, setLastPaymentDate] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [isClubValidated, setIsClubValidated] = useState(false);
+  const [isValidatingClubId, setIsValidatingClubId] = useState(true);
   const router = useRouter();
+  const returnUrl = `/admin/members?clubId=${encodeURIComponent(clubId)}`;
+
+  useEffect(() => {
+    let isActive = true;
+
+    const validateClubId = async () => {
+      if (!clubId) {
+        router.replace("/404");
+        return;
+      }
+
+      setIsValidatingClubId(true);
+      try {
+        const response = await fetch("/api/admin/clubs", { cache: "no-store" });
+        if (!response.ok) {
+          router.replace("/404");
+          return;
+        }
+
+        const clubsPayload: unknown = await response.json();
+        const hasClub = Array.isArray(clubsPayload) && clubsPayload.some((club) => {
+          const item =
+            typeof club === "object" && club !== null
+              ? (club as { id?: unknown })
+              : {};
+          return String(item.id ?? "") === clubId;
+        });
+
+        if (!hasClub) {
+          router.replace("/404");
+          return;
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        setIsClubValidated(true);
+      } catch (validationError) {
+        console.error("Failed to validate club id:", validationError);
+        router.replace("/404");
+      } finally {
+        if (isActive) {
+          setIsValidatingClubId(false);
+        }
+      }
+    };
+
+    void validateClubId();
+
+    return () => {
+      isActive = false;
+    };
+  }, [clubId, router]);
 
   const handleCreateMember = async (e: FormEvent) => {
     e.preventDefault();
+    if (!isClubValidated) {
+      return;
+    }
     setIsSubmitting(true);
     setError("");
 
@@ -44,13 +103,12 @@ export default function AddMemberPage() {
       const payload: Record<string, string> = {
         fullName: fullName.trim(),
         status,
+        clubId,
       };
 
-      if (clubId.trim()) payload.clubId = clubId.trim();
       if (jerseyNumber.trim()) payload.jerseyNumber = jerseyNumber.trim();
       if (birthDate.trim()) payload.birthDate = birthDate.trim();
       if (teamGroup.trim()) payload.teamGroup = teamGroup.trim();
-      if (lastPaymentDate.trim()) payload.lastPaymentDate = lastPaymentDate.trim();
       if (resolvedAvatarUrl) payload.avatarUrl = resolvedAvatarUrl;
       if (resolvedImagePath) payload.imageUrl = resolvedImagePath;
       if (resolvedImagePublicId) payload.imagePublicId = resolvedImagePublicId;
@@ -62,7 +120,7 @@ export default function AddMemberPage() {
       });
 
       if (response.ok) {
-        router.push("/admin/members");
+        router.push(returnUrl);
       } else {
         const data = await response.json();
         setError(data.error || "Грешка при създаване на играч");
@@ -74,6 +132,17 @@ export default function AddMemberPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isValidatingClubId || !isClubValidated) {
+    return (
+      <div className="add-member-page">
+        <div className="add-member-dot-grid" />
+        <div className="add-member-inner" style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+          <p className="add-member-hint">Зареждане...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="add-member-page">
@@ -104,7 +173,7 @@ export default function AddMemberPage() {
         </div>
 
         {/* Back button */}
-        <Link href="/admin/members" className="add-member-back-btn">
+        <Link href={returnUrl} className="add-member-back-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
           </svg>
@@ -124,17 +193,6 @@ export default function AddMemberPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 className="add-member-input"
                 placeholder="Въведете пълно име"
-              />
-            </div>
-
-            <div className="add-member-field">
-              <label className="add-member-label">Club ID <span style={{ color: "rgba(255,255,255,0.25)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(по желание, ако има само един клуб)</span></label>
-              <input
-                type="text"
-                value={clubId}
-                onChange={(e) => setClubId(e.target.value)}
-                className="add-member-input"
-                placeholder="Club UUID"
               />
             </div>
 
@@ -199,14 +257,6 @@ export default function AddMemberPage() {
                 onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
                 className="add-member-input"
               />
-              <input
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                className="add-member-input"
-                placeholder="https://... (или оставете празно при качване)"
-                style={{ marginTop: "8px" }}
-              />
             </div>
 
             {error && (
@@ -216,7 +266,7 @@ export default function AddMemberPage() {
             <div className="add-member-actions">
               <button
                 type="button"
-                onClick={() => router.push("/admin/members")}
+                onClick={() => router.push(returnUrl)}
                 className="add-member-btn-cancel"
               >
                 Отказ
