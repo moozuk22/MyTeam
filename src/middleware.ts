@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
         try {
           await jwtVerify(adminSession, SECRET);
           // If valid session, redirect away from login to admin dashboard
-          return NextResponse.redirect(new URL("/admin/members", request.url));
+          return NextResponse.redirect(new URL("/admin/players", request.url));
         } catch (e) {
           // Invalid token, allow access to login
         }
