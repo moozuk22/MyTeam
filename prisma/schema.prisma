@@ -15,6 +15,11 @@ enum PlayerStatus {
   @@map("player_status")
 }
 
+enum UserRole {
+  admin
+  coach
+}
+
 model Club {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name          String
@@ -26,6 +31,16 @@ model Club {
   players       Player[]
 
   @@map("clubs")
+}
+
+model User {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  password  String
+  roles     UserRole[]
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("users")
 }
 
 model Player {

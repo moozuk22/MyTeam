@@ -867,6 +867,7 @@ function AdminMembersPageContent() {
   const searchParams = useSearchParams();
   const clubId = searchParams.get("clubId") ?? "";
   const [members, setMembers]                   = useState<Member[]>([]);
+  const [isAdmin, setIsAdmin]                   = useState(false);
   const [loading, setLoading]                   = useState(true);
   const [searchTerm, setSearchTerm]             = useState("");
   const [selectedGroup, setSelectedGroup]       = useState("all");
@@ -1073,6 +1074,29 @@ function AdminMembersPageContent() {
   };
 
   useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const response = await fetch("/api/admin/check-session", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (!response.ok) {
+          setIsAdmin(false);
+          return;
+        }
+
+        const payload = (await response.json()) as { isAdmin?: boolean; roles?: string[] };
+        setIsAdmin(Boolean(payload.isAdmin) || (Array.isArray(payload.roles) && payload.roles.includes("admin")));
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+
+    void fetchSession();
+  }, []);
+
+  useEffect(() => {
     const fetchMembers = async () => {
       setLoading(true);
       try {
@@ -1203,10 +1227,10 @@ function AdminMembersPageContent() {
         {/* ── Nav row ── */}
         <div className="amp-nav-row">
           <div className="amp-nav-left">
-            <button className="amp-back-btn" onClick={() => router.push("/admin/players")}>
+            {isAdmin && (<button className="amp-back-btn" onClick={() => router.push("/admin/players")}>
               <ArrowLeftIcon/>
               Назад към отбори
-            </button>
+            </button>)}
             <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}`)}>
               <PlusIcon/>
               Добави играч

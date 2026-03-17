@@ -7,9 +7,14 @@ export async function GET(request: Request) {
   const token = cookies["admin_session"];
 
   if (!token) {
-    return NextResponse.json({ isAdmin: false });
+    return NextResponse.json({ isAdmin: false, isCoach: false, roles: [] });
   }
 
   const payload = await verifyAdminToken(token);
-  return NextResponse.json({ isAdmin: !!payload });
+  const roles = payload?.roles ?? [];
+  return NextResponse.json({
+    isAdmin: roles.includes("admin"),
+    isCoach: roles.includes("coach"),
+    roles,
+  });
 }
