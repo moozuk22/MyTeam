@@ -1244,6 +1244,14 @@ function AdminMembersPageContent() {
               Добави играч
             </button>
           </div>
+          {isAdmin && clubId && (
+            <button
+              className="amp-edit-team-btn"
+              onClick={() => router.push(`/admin/teams/${encodeURIComponent(clubId)}/edit`)}
+            >
+              Редактирай отбор
+            </button>
+          )}
           <div className="amp-club-info">
             {clubLogoUrl ? (
               <img

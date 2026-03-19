@@ -117,6 +117,29 @@
   transform: scale(1.05);
 }
 
+.amp-edit-team-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: linear-gradient(to right, #202020, #252525);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s, background 0.2s;
+}
+
+.amp-edit-team-btn:hover {
+  border-color: rgba(255,255,255,0.45);
+  background: linear-gradient(to right, #252525, #2b2b2b);
+  box-shadow: 0 0 16px rgba(255,255,255,0.12);
+  transform: scale(1.05);
+}
+
 .amp-club-info {
   display: flex;
   align-items: center;
