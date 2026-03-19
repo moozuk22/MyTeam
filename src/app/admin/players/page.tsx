@@ -4,23 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import "./page.css";
 
-const ClubLogo = ({ className = "" }: { className?: string }) => (
-  <svg viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <path d="M60 2 L115 20 L115 85 Q115 120 60 138 Q5 120 5 85 L5 20 Z" fill="#1a5c1a" stroke="#32cd32" strokeWidth="3" />
-    <path d="M60 8 L109 24 L109 83 Q109 114 60 132 Q11 114 11 83 L11 24 Z" fill="#0d3d0d" />
-    <rect x="15" y="18" width="90" height="22" rx="2" fill="#1a5c1a" />
-    <rect x="20" y="44" width="16" height="40" fill="#ffffff" />
-    <rect x="36" y="44" width="16" height="40" fill="#32cd32" />
-    <rect x="52" y="44" width="16" height="40" fill="#ffffff" />
-    <rect x="68" y="44" width="16" height="40" fill="#32cd32" />
-    <rect x="84" y="44" width="16" height="40" fill="#ffffff" />
-    <circle cx="60" cy="64" r="14" fill="#1a5c1a" stroke="#32cd32" strokeWidth="1.5" />
-    <circle cx="60" cy="64" r="10" fill="none" stroke="#ffffff" strokeWidth="1" />
-    <rect x="15" y="88" width="90" height="20" rx="2" fill="#1a5c1a" />
-    <text x="60" y="122" textAnchor="middle" fill="#32cd32" fontSize="14" fontWeight="800" fontFamily="Arial, sans-serif">1961</text>
-  </svg>
-);
-
 const BellIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10.268 21a2 2 0 0 0 3.464 0" />
@@ -202,7 +185,7 @@ export default function AdminPlayersPage() {
                     {club.imageUrl || club.emblemUrl ? (
                       <img src={club.imageUrl || club.emblemUrl || ""} alt={club.name} className="mp-team-logo mp-team-logo--img" />
                     ) : (
-                      <ClubLogo className="mp-team-logo" />
+                      <span className="mp-team-logo">🏆</span>
                     )}
                   </div>
                   <div className="mp-team-info">

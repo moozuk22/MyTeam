@@ -1141,15 +1141,9 @@ function AdminMembersPageContent() {
           const normalized: Member[] = rawItems.map((item) => normalizeMember(item));
           const activeMembers = normalized.filter((member) => member.isActive);
           setMembers(activeMembers);
-          if (!clubId) {
-            setClubName("Всички отбори");
-          } else {
-            const nameFromMembers = normalized[0]?.club?.name;
-            if (nameFromMembers) {
-              setClubName(nameFromMembers);
-            } else {
-              setClubName("Отбор");
-            }
+          const nameFromMembers = normalized[0]?.club?.name;
+          if (nameFromMembers) {
+            setClubName(nameFromMembers);
           }
         }
       } catch (err) {

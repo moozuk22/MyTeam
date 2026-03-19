@@ -1,44 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage } from "@/lib/uploadImage";
 import "./page.css";
 
 interface TeamForm {
   name: string;
-  emblemUrl: string | null;
-  imageUrl: string | null;
-  imagePublicId: string | null;
 }
 
 export default function AdminAddTeamPage() {
   const router = useRouter();
   const [formData, setFormData] = useState<TeamForm>({
     name: "",
-    emblemUrl: null,
-    imageUrl: null,
-    imagePublicId: null,
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const result = await uploadImage(file, "club", formData.name);
-      setFormData((prev) => ({
-        ...prev,
-        imageUrl: result.secure_url,
-        imagePublicId: result.public_id,
-      }));
-    } catch (error) {
-      console.error("Image upload error:", error);
-      setErrorMessage("Грешка при качване на изображението");
+  useEffect(() => {
+    if (!imageFile) {
+      setPreviewUrl(null);
+      return;
     }
-  };
+
+    const objectUrl = URL.createObjectURL(imageFile);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [imageFile]);
 
   const generateSlug = (name: string): string => {
     return name
@@ -60,13 +54,13 @@ export default function AdminAddTeamPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim()) {
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
       setErrorMessage("Името на отбора е задължително");
       return;
     }
 
-    const slug = generateSlug(formData.name.trim());
-
+    const slug = generateSlug(trimmedName);
     if (!slug) {
       setErrorMessage("Моля, въведете валидно име на отбор");
       return;
@@ -76,16 +70,29 @@ export default function AdminAddTeamPage() {
     setErrorMessage("");
 
     try {
+      let resolvedImageUrl: string | null = null;
+      let resolvedImagePublicId: string | null = null;
+
+      if (imageFile) {
+        const uploaded = await uploadImage(
+          imageFile,
+          "club",
+          trimmedName || imageFile.name,
+        );
+        resolvedImageUrl = extractUploadPathFromCloudinaryUrl(uploaded.secure_url);
+        resolvedImagePublicId = uploaded.public_id;
+      }
+
       const response = await fetch("/api/admin/teams", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: formData.name.trim(),
+          name: trimmedName,
           slug,
-          imageUrl: formData.imageUrl,
-          imagePublicId: formData.imagePublicId,
+          imageUrl: resolvedImageUrl,
+          imagePublicId: resolvedImagePublicId,
         }),
       });
 
@@ -139,19 +146,13 @@ export default function AdminAddTeamPage() {
               Емблема на отбора
             </label>
             <div className="image-upload">
-              {formData.imageUrl ? (
+              {previewUrl ? (
                 <div className="image-preview">
-                  <img src={formData.imageUrl} alt="Емблема" className="preview-image" />
+                  <img src={previewUrl} alt="Емблема" className="preview-image" />
                   <button
                     type="button"
                     className="remove-image-btn"
-                    onClick={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        imageUrl: null,
-                        imagePublicId: null,
-                      }))
-                    }
+                    onClick={() => setImageFile(null)}
                   >
                     Премахни
                   </button>
@@ -162,7 +163,7 @@ export default function AdminAddTeamPage() {
                     type="file"
                     id="image"
                     accept="image/*"
-                    onChange={handleImageUpload}
+                    onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
                     className="file-input"
                   />
                   <div className="upload-placeholder">
