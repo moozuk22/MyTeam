@@ -879,6 +879,8 @@ function AdminMembersPageContent() {
   const [isDeletingMember, setIsDeletingMember] = useState(false);
   const [editError, setEditError]               = useState("");
   const [isSavingEdit, setIsSavingEdit]         = useState(false);
+  const [isAssigningNewCard, setIsAssigningNewCard] = useState(false);
+  const [isNewCardConfirmOpen, setIsNewCardConfirmOpen] = useState(false);
   const [clubs, setClubs]                       = useState<ClubOption[]>([]);
   const [editForm, setEditForm] = useState({
     fullName: "",
@@ -900,6 +902,7 @@ function AdminMembersPageContent() {
     setMemberToEdit(null);
     setEditAvatarFile(null);
     setEditAvatarPreviewUrl("");
+    setIsNewCardConfirmOpen(false);
   };
 
   const handleDeleteMember = async () => {
@@ -1073,6 +1076,46 @@ function AdminMembersPageContent() {
     } finally {
       setIsSavingEdit(false);
     }
+  };
+
+  const handleAssignNewCard = async () => {
+    if (!memberToEdit || isSavingEdit || isAssigningNewCard) return;
+
+    setIsAssigningNewCard(true);
+    setEditError("");
+
+    try {
+      const response = await fetch(`/api/admin/members/${memberToEdit.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "assign_new_card" }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          typeof data?.error === "string" && data.error.trim()
+            ? data.error.trim()
+            : "Неуспешно генериране на нова карта.";
+        setEditError(message);
+        return;
+      }
+
+      const updatedMember = normalizeMember(data);
+      setMembers((prev) => prev.map((m) => (m.id === memberToEdit.id ? updatedMember : m)));
+      setSelectedMember((prev) => (prev?.id === memberToEdit.id ? updatedMember : prev));
+      setMemberToEdit(updatedMember);
+    } catch (error) {
+      console.error("Error assigning new card:", error);
+      setEditError("Възникна грешка при генериране на нова карта.");
+    } finally {
+      setIsAssigningNewCard(false);
+    }
+  };
+
+  const handleConfirmAssignNewCard = async () => {
+    setIsNewCardConfirmOpen(false);
+    await handleAssignNewCard();
   };
 
   useEffect(() => {
@@ -1352,7 +1395,7 @@ function AdminMembersPageContent() {
                 className="amp-modal-close"
                 onClick={closeEditModal}
                 aria-label="Затвори"
-                disabled={isSavingEdit}
+                disabled={isSavingEdit || isAssigningNewCard}
               >
                 <XIcon/>
               </button>
@@ -1435,9 +1478,27 @@ function AdminMembersPageContent() {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setEditAvatarFile(e.target.files?.[0] ?? null)}
-                    disabled={isSavingEdit}
+                    disabled={isSavingEdit || isAssigningNewCard}
                   />
                 </label>
+                <div className="amp-edit-field amp-edit-field--full">
+                  <span className="amp-lbl">Активна карта</span>
+                  <div className="amp-modal-actions amp-modal-actions--end">
+                    <p className="amp-val" style={{ marginRight: "auto" }}>
+                      {memberToEdit.cards.find((card) => card.isActive)?.cardCode ||
+                        memberToEdit.cards[0]?.cardCode ||
+                        "Няма активна карта"}
+                    </p>
+                    <button
+                      className="amp-btn amp-btn--ghost"
+                      onClick={() => setIsNewCardConfirmOpen(true)}
+                      disabled={isSavingEdit || isAssigningNewCard}
+                      type="button"
+                    >
+                      {isAssigningNewCard ? "Генериране..." : "Нова карта"}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {editError && <p className="amp-confirm-error">{editError}</p>}
@@ -1446,14 +1507,14 @@ function AdminMembersPageContent() {
                 <button
                   className="amp-btn amp-btn--ghost"
                   onClick={closeEditModal}
-                  disabled={isSavingEdit}
+                  disabled={isSavingEdit || isAssigningNewCard}
                 >
                   Отказ
                 </button>
                 <button
                   className="amp-btn amp-btn--primary"
                   onClick={handleSaveMemberEdit}
-                  disabled={isSavingEdit}
+                  disabled={isSavingEdit || isAssigningNewCard}
                 >
                   {isSavingEdit ? "Запазване..." : "Запази"}
                 </button>
@@ -1461,6 +1522,18 @@ function AdminMembersPageContent() {
             </div>
           </div>
         </div>
+      )}
+      {memberToEdit && isNewCardConfirmOpen && (
+        <ConfirmNewCardModal
+          member={memberToEdit}
+          onCancel={() => {
+            if (!isAssigningNewCard) {
+              setIsNewCardConfirmOpen(false);
+            }
+          }}
+          onConfirm={handleConfirmAssignNewCard}
+          isAssigning={isAssigningNewCard}
+        />
       )}
       {memberToDelete && (
         <ConfirmDeleteModal
@@ -1486,5 +1559,54 @@ export default function AdminMembersPage() {
     <Suspense fallback={<main className="amp-page" />}>
       <AdminMembersPageContent />
     </Suspense>
+  );
+}
+
+function ConfirmNewCardModal({
+  member,
+  onCancel,
+  onConfirm,
+  isAssigning,
+}: {
+  member: Member;
+  onCancel: () => void;
+  onConfirm: () => void;
+  isAssigning: boolean;
+}) {
+  const currentCardCode =
+    member.cards.find((card) => card.isActive)?.cardCode ||
+    member.cards[0]?.cardCode ||
+    "Няма активна карта";
+
+  return (
+    <div className="amp-overlay amp-overlay--confirm" onClick={isAssigning ? undefined : onCancel}>
+      <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="amp-modal-tint" aria-hidden="true" />
+        <h2 className="amp-modal-title">
+          <span className="amp-modal-title-gradient">Потвърди нова карта</span>
+          <button className="amp-modal-close" onClick={onCancel} aria-label="Затвори" disabled={isAssigning}>
+            <XIcon />
+          </button>
+        </h2>
+
+        <div className="amp-modal-body">
+          <p className="amp-confirm-text">
+            Сигурен ли си, че искаш да генерираш нова карта за <strong>{member.fullName}</strong>?
+          </p>
+          <p className="amp-confirm-subtext">
+            Текущата активна карта <strong>{currentCardCode}</strong> ще бъде автоматично деактивирана.
+          </p>
+
+          <div className="amp-modal-actions">
+            <button className="amp-btn amp-btn--ghost" onClick={onCancel} disabled={isAssigning}>
+              Отказ
+            </button>
+            <button className="amp-btn amp-btn--primary" onClick={onConfirm} disabled={isAssigning}>
+              {isAssigning ? "Генериране..." : "Генерирай нова карта"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
