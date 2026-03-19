@@ -252,7 +252,7 @@ const PrinterIcon = () => (
 );
 
 // Reports Dialog Component
-function ReportsDialog({ onClose }: { onClose: () => void }) {
+function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: string }) {
   const now = new Date();
   const [month, setMonth] = useState(MONTHS[now.getMonth()] ?? MONTHS[0]);
   const [year, setYear] = useState(String(Math.max(2026, now.getFullYear())));
@@ -265,7 +265,8 @@ function ReportsDialog({ onClose }: { onClose: () => void }) {
     const fetchPlayers = async () => {
       setLoading(true);
       try {
-        const response = await fetch("/api/admin/members", { cache: "no-store" });
+        const endpoint = clubId ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}` : "/api/admin/members";
+        const response = await fetch(endpoint, { cache: "no-store" });
         if (!response.ok) {
           setPlayers([]);
           return;
@@ -281,7 +282,7 @@ function ReportsDialog({ onClose }: { onClose: () => void }) {
     };
 
     void fetchPlayers();
-  }, []);
+  }, [clubId]);
 
   const years = Array.from(
     { length: Math.max(1, now.getFullYear() - 2026 + 2) },
@@ -753,7 +754,7 @@ function MemberDetailModal({
   );
 }
 
-/* ── Player Card ── */
+/* ── Confirm Delete Modal ── */
 function ConfirmDeleteModal({
   member,
   onCancel,
@@ -802,6 +803,7 @@ function ConfirmDeleteModal({
   );
 }
 
+/* ── Player Card ── */
 function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }) {
   const router = useRouter();
   const s = getStatusMeta(member.status);
@@ -849,7 +851,6 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
             </button>
           )}
 
-          {/* Right: check icon for paid, nothing for others (clicking opens modal) */}
           {!needsAction && (
             <span style={{ color: "#32cd32", flexShrink: 0 }}>
               <CircleCheckBigIcon size={24}/>
@@ -892,7 +893,8 @@ function AdminMembersPageContent() {
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState("");
   const [clubName, setClubName]                 = useState("Всички отбори");
-  const [reportsOpen, setReportsOpen]             = useState(false);
+  const [clubLogoUrl, setClubLogoUrl]           = useState<string | null>(null);
+  const [reportsOpen, setReportsOpen]           = useState(false);
 
   const closeEditModal = () => {
     setMemberToEdit(null);
@@ -1129,6 +1131,12 @@ function AdminMembersPageContent() {
 
         setClubName(selectedClub.name.trim());
 
+        // Set club logo if available
+        const logo = (selectedClub as Record<string, unknown>).imageUrl;
+        if (typeof logo === "string" && logo) {
+          setClubLogoUrl(logo);
+        }
+
         const endpoint = `/api/admin/members?clubId=${encodeURIComponent(clubId)}`;
         const res = await fetch(endpoint);
         if (res.status === 404) {
@@ -1177,6 +1185,10 @@ function AdminMembersPageContent() {
         if (selectedClub?.name) {
           setClubName(String(selectedClub.name));
         }
+        const logo = (selectedClub as Record<string, unknown> | null)?.imageUrl;
+        if (typeof logo === "string" && logo) {
+          setClubLogoUrl(logo);
+        }
       } catch (err) {
         console.error("Error fetching clubs:", err);
       }
@@ -1221,17 +1233,27 @@ function AdminMembersPageContent() {
         {/* ── Nav row ── */}
         <div className="amp-nav-row">
           <div className="amp-nav-left">
-            {isAdmin && (<button className="amp-back-btn" onClick={() => router.push("/admin/players")}>
-              <ArrowLeftIcon/>
-              Назад към отбори
-            </button>)}
+            {isAdmin && (
+              <button className="amp-back-btn" onClick={() => router.push("/admin/players")}>
+                <ArrowLeftIcon/>
+                Назад към отбори
+              </button>
+            )}
             <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}`)}>
               <PlusIcon/>
               Добави играч
             </button>
           </div>
           <div className="amp-club-info">
-            <div className="amp-club-icon">🏆</div>
+            {clubLogoUrl ? (
+              <img
+                src={clubLogoUrl}
+                alt={clubName}
+                className="amp-club-logo"
+              />
+            ) : (
+              <div className="amp-club-icon">🏆</div>
+            )}
             <h2 className="amp-club-name">{clubName}</h2>
           </div>
         </div>
@@ -1446,7 +1468,7 @@ function AdminMembersPageContent() {
           error={deleteError}
         />
       )}
-      {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} />}
+      {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} clubId={clubId} />}
     </main>
   );
 }
