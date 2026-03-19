@@ -192,7 +192,10 @@ export default function AdminAddTeamPage() {
                   </button>
                 </div>
               ) : (
-                <div className="upload-area">
+                <div 
+                  className="upload-area"
+                  onClick={() => document.getElementById('image')?.click()}
+                >
                   <input
                     type="file"
                     id="image"
