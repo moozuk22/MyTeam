@@ -15,9 +15,10 @@ export async function POST(
   { params }: { params: Promise<{ cardCode: string }> }
 ) {
   const { cardCode } = await params;
+  const normalizedCardCode = cardCode.trim().toUpperCase();
   const card = await prisma.card.findFirst({
     where: {
-      cardCode,
+      cardCode: normalizedCardCode,
       isActive: true,
     },
     select: {
@@ -76,9 +77,10 @@ export async function DELETE(
   { params }: { params: Promise<{ cardCode: string }> }
 ) {
   const { cardCode } = await params;
+  const normalizedCardCode = cardCode.trim().toUpperCase();
   const card = await prisma.card.findFirst({
     where: {
-      cardCode,
+      cardCode: normalizedCardCode,
       isActive: true,
     },
     select: {

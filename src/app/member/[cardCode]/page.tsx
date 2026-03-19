@@ -178,6 +178,7 @@ export default function MemberCardPage({
   params: Promise<{ cardCode: string }>;
 }) {
   const { cardCode } = use(params);
+  const normalizedCardCode = cardCode.trim().toUpperCase();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -276,7 +277,7 @@ export default function MemberCardPage({
   const fetchNotifications = async () => {
     setLoadingNotifications(true);
     try {
-      const response = await fetch(`/api/members/${cardCode}/notifications`, { cache: "no-store" });
+      const response = await fetch(`/api/members/${normalizedCardCode}/notifications`, { cache: "no-store" });
       if (response.ok) {
         const data = await response.json();
         setNotifications(data.notifications || []);
@@ -296,7 +297,7 @@ export default function MemberCardPage({
     // Mark all as read when opening the panel
     if (unreadCount > 0) {
       try {
-        const response = await fetch(`/api/members/${cardCode}/notifications/read`, {
+        const response = await fetch(`/api/members/${normalizedCardCode}/notifications/read`, {
           method: "POST",
         });
         if (response.ok) {
@@ -315,7 +316,7 @@ export default function MemberCardPage({
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/members/${cardCode}`, { cache: "no-store" });
+        const response = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
         if (!response.ok) {
           setMember(null);
           setError("Профилът не е намерен.");
@@ -331,13 +332,13 @@ export default function MemberCardPage({
       }
     };
     void fetchMember();
-  }, [cardCode]);
+  }, [normalizedCardCode]);
 
   // Fetch unread notification count on page load
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const response = await fetch(`/api/members/${cardCode}/notifications`, { cache: "no-store" });
+        const response = await fetch(`/api/members/${normalizedCardCode}/notifications`, { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
           setUnreadCount(data.unreadCount || 0);
@@ -347,7 +348,7 @@ export default function MemberCardPage({
       }
     };
     void fetchUnreadCount();
-  }, [cardCode]);
+  }, [normalizedCardCode]);
 
   useEffect(() => {
     const pushOpenTs = searchParams.get("pushOpenTs");
@@ -365,7 +366,7 @@ export default function MemberCardPage({
     void (async () => {
       setLoadingNotifications(true);
       try {
-        const response = await fetch(`/api/members/${cardCode}/notifications`, { cache: "no-store" });
+        const response = await fetch(`/api/members/${normalizedCardCode}/notifications`, { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
           setNotifications(data.notifications || []);
@@ -378,7 +379,7 @@ export default function MemberCardPage({
       }
 
       try {
-        const response = await fetch(`/api/members/${cardCode}/notifications/read`, {
+        const response = await fetch(`/api/members/${normalizedCardCode}/notifications/read`, {
           method: "POST",
         });
         if (response.ok) {
@@ -395,9 +396,9 @@ export default function MemberCardPage({
     cleanedParams.delete("openBell");
     cleanedParams.delete("pushOpenTs");
     const cleanedQuery = cleanedParams.toString();
-    const cleanPath = `/member/${encodeURIComponent(cardCode)}`;
+    const cleanPath = `/member/${encodeURIComponent(normalizedCardCode)}`;
     router.replace(cleanedQuery ? `${cleanPath}?${cleanedQuery}` : cleanPath, { scroll: false });
-  }, [cardCode, lastHandledPushOpenTs, router, searchParams]);
+  }, [normalizedCardCode, lastHandledPushOpenTs, router, searchParams]);
 
   useEffect(() => {
     const checkAdminSession = async () => {
@@ -518,7 +519,7 @@ export default function MemberCardPage({
       });
 
       const saveResponse = await fetch(
-        `/api/members/${encodeURIComponent(cardCode)}/push-subscriptions`,
+        `/api/members/${encodeURIComponent(normalizedCardCode)}/push-subscriptions`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -586,7 +587,7 @@ export default function MemberCardPage({
       await existingSubscription.unsubscribe();
 
       const deleteResponse = await fetch(
-        `/api/members/${encodeURIComponent(cardCode)}/push-subscriptions`,
+        `/api/members/${encodeURIComponent(normalizedCardCode)}/push-subscriptions`,
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -622,7 +623,7 @@ export default function MemberCardPage({
     setPaymentLoading(true);
     setPaymentError(null);
     try {
-      const response = await fetch(`/api/members/${cardCode}/payment`, {
+      const response = await fetch(`/api/members/${normalizedCardCode}/payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paidFor: toISOMonth(selectedYM) }),
@@ -631,7 +632,7 @@ export default function MemberCardPage({
         const err = await response.json();
         throw new Error(err.error || "Грешка при плащане");
       }
-      const refreshed = await fetch(`/api/members/${cardCode}`, { cache: "no-store" });
+      const refreshed = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
       if (refreshed.ok) setMember(await refreshed.json());
       setPaymentModalOpen(false);
     } catch (e) {

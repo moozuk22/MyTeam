@@ -9,11 +9,12 @@ export async function GET(
   { params }: { params: Promise<{ cardCode: string }> }
 ) {
   const { cardCode } = await params;
+  const normalizedCardCode = cardCode.trim().toUpperCase();
 
   try {
     const card = await prisma.card.findFirst({
       where: {
-        cardCode,
+        cardCode: normalizedCardCode,
         isActive: true,
       },
       select: { playerId: true },

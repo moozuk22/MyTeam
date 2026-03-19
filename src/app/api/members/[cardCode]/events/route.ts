@@ -10,9 +10,10 @@ export async function GET(
   { params }: { params: Promise<{ cardCode: string }> }
 ) {
   const { cardCode } = await params;
+  const normalizedCardCode = cardCode.trim().toUpperCase();
   const card = await prisma.card.findFirst({
     where: {
-      cardCode,
+      cardCode: normalizedCardCode,
       isActive: true,
     },
     select: { id: true },
@@ -37,9 +38,9 @@ export async function GET(
       };
 
       // Connected event
-      send({ type: "connected", cardCode, timestamp: Date.now() });
+      send({ type: "connected", cardCode: normalizedCardCode, timestamp: Date.now() });
 
-      const unsubscribe = subscribeMemberEvents(cardCode, (event) => {
+      const unsubscribe = subscribeMemberEvents(normalizedCardCode, (event) => {
         send(event);
       });
 

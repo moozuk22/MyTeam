@@ -10,12 +10,13 @@ export async function GET(
   { params }: { params: Promise<{ cardCode: string }> }
 ) {
   const { cardCode } = await params;
+  const normalizedCardCode = cardCode.trim().toUpperCase();
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   try {
     const card = await prisma.card.findFirst({
       where: {
-        cardCode,
+        cardCode: normalizedCardCode,
         isActive: true,
       },
       include: {

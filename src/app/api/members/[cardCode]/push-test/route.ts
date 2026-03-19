@@ -12,11 +12,12 @@ export async function POST(
   { params }: { params: Promise<{ cardCode: string }> }
 ) {
   const { cardCode } = await params;
+  const normalizedCardCode = cardCode.trim().toUpperCase();
 
   try {
     const card = await prisma.card.findFirst({
       where: {
-        cardCode,
+        cardCode: normalizedCardCode,
         isActive: true,
       },
       include: {
@@ -39,7 +40,7 @@ export async function POST(
       type: "trainer_message",
       memberName,
       trainerMessage: "Тестово известие: push notifications работят.",
-      url: `/member/${cardCode}`,
+      url: `/member/${normalizedCardCode}`,
     });
 
     const result = await sendPushToMember(card.player.id, payload);

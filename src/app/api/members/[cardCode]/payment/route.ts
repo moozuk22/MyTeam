@@ -54,6 +54,7 @@ export async function POST(
 ) {
   try {
     const { cardCode } = await params;
+    const normalizedCardCode = cardCode.trim().toUpperCase();
     const body = await request.json().catch(() => ({}));
     const paidForRaw = (body as { paidFor?: unknown }).paidFor;
 
@@ -71,7 +72,7 @@ export async function POST(
 
     const card = await prisma.card.findFirst({
       where: {
-        cardCode,
+        cardCode: normalizedCardCode,
         isActive: true,
       },
       select: {
@@ -156,7 +157,7 @@ export async function POST(
 
     let pushResult = { total: 0, sent: 0, failed: 0, deactivated: 0 };
     if (player) {
-      const targetCardCode = player.cards[0]?.cardCode ?? cardCode;
+      const targetCardCode = player.cards[0]?.cardCode ?? normalizedCardCode;
       const firstPaidDate = monthsToCreate[0];
       const lastPaidDate = monthsToCreate[monthsToCreate.length - 1];
       const trainerMessage =
