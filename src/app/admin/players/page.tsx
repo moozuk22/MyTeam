@@ -173,6 +173,16 @@ export default function AdminPlayersPage() {
           </div>
         </div>
 
+        <div className="mp-add-team-section">
+          <button 
+            className="mp-add-team-btn"
+            onClick={() => router.push("/admin/teams/add")}
+          >
+            <span className="mp-add-team-icon">+</span>
+            Добави отбор
+          </button>
+        </div>
+
         <div className="mp-teams-section">
           <h2 className="mp-teams-title">Изберете отбор</h2>
           <div className="mp-teams-grid">

@@ -502,6 +502,40 @@
   flex-wrap: wrap;
 }
 
+/* Add Team Section */
+.mp-add-team-section {
+  margin: 32px 0;
+}
+
+.mp-add-team-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #32cd32 0%, #28a428 100%);
+  border: 1px solid rgba(50, 205, 50, 0.3);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(50, 205, 50, 0.2);
+  text-decoration: none;
+}
+
+.mp-add-team-btn:hover {
+  background: linear-gradient(135deg, #28a428 0%, #22c55e 100%);
+  box-shadow: 0 4px 12px rgba(50, 205, 50, 0.3);
+  transform: translateY(-1px);
+}
+
+.mp-add-team-icon {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .rd-footer-btn {
   display: inline-flex;
   align-items: center;
