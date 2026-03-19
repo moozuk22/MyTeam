@@ -36,25 +36,26 @@ export async function GET(
 ) {
   const { cardCode } = await params;
   const playerName = await getPlayerShortcutName(cardCode);
+  const encodedCardCode = encodeURIComponent(cardCode.trim().toUpperCase());
 
   return NextResponse.json({
     id: "/app",
     name: playerName,
     short_name: playerName,
-    start_url: `/member/${cardCode}`,
+    start_url: `/member/${encodedCardCode}`,
     scope: "/",
     display: "standalone",
     background_color: "#000000",
     theme_color: "#000000",
     icons: [
       {
-        src: "/icon-192.png",
+        src: `/api/manifest/${encodedCardCode}/icon/192`,
         sizes: "192x192",
         type: "image/png",
         purpose: "any maskable",
       },
       {
-        src: "/icon-512.png",
+        src: `/api/manifest/${encodedCardCode}/icon/512`,
         sizes: "512x512",
         type: "image/png",
         purpose: "any maskable",
