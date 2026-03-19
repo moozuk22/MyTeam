@@ -51,6 +51,13 @@ export async function generateMetadata(
           sizes: "180x180",
         },
       ],
+      shortcut: [
+        {
+          url: `/api/manifest/${encodeURIComponent(normalizedCardCode)}/icon/192`,
+          sizes: "192x192",
+          type: "image/png",
+        },
+      ],
       icon: [
         {
           url: `/api/manifest/${encodeURIComponent(normalizedCardCode)}/icon/192`,
