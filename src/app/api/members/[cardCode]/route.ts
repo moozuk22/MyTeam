@@ -24,6 +24,7 @@ export async function GET(
           include: {
             club: {
               select: {
+                id: true,
                 name: true,
                 imageUrl: true,
                 emblemUrl: true,
@@ -118,6 +119,7 @@ export async function GET(
         id: card.player.id,
         cardCode: card.cardCode,
         name: card.player.fullName,
+        clubId: card.player.club?.id ?? null,
         clubName: card.player.club?.name ?? null,
         clubLogoUrl,
         avatarUrl:

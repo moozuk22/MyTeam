@@ -8,6 +8,7 @@ interface MemberProfile {
   id: string;
   cardCode: string;
   name: string;
+  clubId?: string | null;
   clubName?: string | null;
   clubLogoUrl?: string | null;
   avatarUrl?: string | null;
@@ -773,7 +774,13 @@ export default function MemberCardPage({
           {isAdmin && (
             <button
               className="amp-back-btn"
-              onClick={() => router.push("/admin/members")}
+              onClick={() =>
+                router.push(
+                  member.clubId
+                    ? `/admin/members?clubId=${encodeURIComponent(member.clubId)}`
+                    : "/admin/members",
+                )
+              }
             >
               <ArrowLeftIcon />
               Назад към играчи
