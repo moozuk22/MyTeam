@@ -70,24 +70,24 @@ function normalizeMember(item: unknown): Member {
   const fullName = String(raw.fullName ?? "").trim();
   const cards: MemberCard[] = Array.isArray(raw.cards)
     ? raw.cards.map((card) => {
-        const cardRaw = typeof card === "object" && card !== null ? (card as Record<string, unknown>) : {};
-        return {
-          cardCode: String(cardRaw.cardCode ?? ""),
-          isActive: Boolean(cardRaw.isActive),
-        };
-      })
+      const cardRaw = typeof card === "object" && card !== null ? (card as Record<string, unknown>) : {};
+      return {
+        cardCode: String(cardRaw.cardCode ?? ""),
+        isActive: Boolean(cardRaw.isActive),
+      };
+    })
     : [];
   const activeCard = cards.find((c) => c.isActive);
   const nfcTagId = activeCard?.cardCode ?? cards[0]?.cardCode ?? "";
   const paymentLogs: PaymentLog[] = Array.isArray(raw.paymentLogs)
     ? raw.paymentLogs.map((log) => {
-        const logRaw = typeof log === "object" && log !== null ? (log as Record<string, unknown>) : {};
-        return {
-          id: String(logRaw.id ?? ""),
-          paidFor: String(logRaw.paidFor ?? ""),
-          paidAt: String(logRaw.paidAt ?? ""),
-        };
-      })
+      const logRaw = typeof log === "object" && log !== null ? (log as Record<string, unknown>) : {};
+      return {
+        id: String(logRaw.id ?? ""),
+        paidFor: String(logRaw.paidFor ?? ""),
+        paidAt: String(logRaw.paidAt ?? ""),
+      };
+    })
     : [];
   const rawStatus = raw.status;
   const status: PlayerStatus =
@@ -113,9 +113,9 @@ function normalizeMember(item: unknown): Member {
     lastPaymentDate: raw.lastPaymentDate ? String(raw.lastPaymentDate) : null,
     club: clubRaw
       ? {
-          id: String(clubRaw.id ?? ""),
-          name: String(clubRaw.name ?? ""),
-        }
+        id: String(clubRaw.id ?? ""),
+        name: String(clubRaw.name ?? ""),
+      }
       : undefined,
     paymentLogs,
     cards,
@@ -134,28 +134,28 @@ interface StatusMeta {
 /* ── Icons ── */
 const ArrowLeftIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
+    <path d="m12 19-7-7 7-7" /><path d="M19 12H5" />
   </svg>
 );
 const SearchIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>
+    <path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" />
   </svg>
 );
 const CircleCheckBigIcon = ({ size = 24 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>
+    <path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" />
   </svg>
 );
 const XIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
   </svg>
 );
 
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12h14"/><path d="M12 5v14"/>
+    <path d="M5 12h14" /><path d="M12 5v14" />
   </svg>
 );
 
@@ -186,26 +186,26 @@ const getStatusMeta = (status: PlayerStatus): StatusMeta => {
 
 const UserIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: "rgba(255,255,255,0.4)" }}>
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
   </svg>
 );
 const CalendarIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: "rgba(255,255,255,0.4)" }}>
-    <path d="M8 2v4"/><path d="M16 2v4"/>
-    <rect width="18" height="18" x="3" y="4" rx="2"/>
-    <path d="M3 10h18"/>
+    <path d="M8 2v4" /><path d="M16 2v4" />
+    <rect width="18" height="18" x="3" y="4" rx="2" />
+    <path d="M3 10h18" />
   </svg>
 );
 const ChevronDownIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m6 9 6 6 6-6"/>
+    <path d="m6 9 6 6 6-6" />
   </svg>
 );
 const ReceiptIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/>
-    <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
-    <path d="M12 17.5v-11"/>
+    <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+    <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+    <path d="M12 17.5v-11" />
   </svg>
 );
 
@@ -648,13 +648,13 @@ function MemberDetailModal({
       <div className="amp-modal" onClick={e => e.stopPropagation()}>
 
         {/* green tint */}
-        <div className="amp-modal-tint" aria-hidden="true"/>
+        <div className="amp-modal-tint" aria-hidden="true" />
 
         {/* Title */}
         <h2 className="amp-modal-title">
           <span className="amp-modal-title-gradient">Статистика - {member.fullName}</span>
           <button className="amp-modal-close" onClick={onClose} aria-label="Затвори">
-            <XIcon/>
+            <XIcon />
           </button>
         </h2>
 
@@ -665,7 +665,7 @@ function MemberDetailModal({
 
             {/* Row 1 col 1: Име */}
             <div className="amp-info-cell">
-              <UserIcon/>
+              <UserIcon />
               <div>
                 <p className="amp-lbl">Име</p>
                 <p className="amp-val">{member.fullName}</p>
@@ -693,7 +693,7 @@ function MemberDetailModal({
 
             {/* Row 3 full: Последно плащане */}
             <div className="amp-info-cell amp-info-cell--full">
-              <CalendarIcon/>
+              <CalendarIcon />
               <div>
                 <p className="amp-lbl">Последно плащане</p>
                 <p className="amp-val">
@@ -710,13 +710,13 @@ function MemberDetailModal({
           <div className="amp-acc">
             <button className="amp-acc-trigger" onClick={() => setHistoryOpen(v => !v)}>
               <span>История на плащанията</span>
-              <span className={`amp-acc-chevron${historyOpen ? " open" : ""}`}><ChevronDownIcon/></span>
+              <span className={`amp-acc-chevron${historyOpen ? " open" : ""}`}><ChevronDownIcon /></span>
             </button>
             <div className={`amp-acc-body${historyOpen ? " open" : ""}`}>
               <div className="amp-acc-inner">
                 {paymentHistory.length === 0 ? (
                   <div className="amp-acc-empty">
-                    <ReceiptIcon/>
+                    <ReceiptIcon />
                     <p>Все още няма регистрирани плащания</p>
                   </div>
                 ) : (
@@ -771,11 +771,11 @@ function ConfirmDeleteModal({
   return (
     <div className="amp-overlay amp-overlay--confirm" onClick={isDeleting ? undefined : onCancel}>
       <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
-        <div className="amp-modal-tint" aria-hidden="true"/>
+        <div className="amp-modal-tint" aria-hidden="true" />
         <h2 className="amp-modal-title">
           <span className="amp-modal-title-gradient">Потвърди премахване</span>
           <button className="amp-modal-close" onClick={onCancel} aria-label="Затвори" disabled={isDeleting}>
-            <XIcon/>
+            <XIcon />
           </button>
         </h2>
 
@@ -816,11 +816,11 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
 
   return (
     <div className="pc-card" onClick={onClick}>
-      <div className="pc-shimmer" aria-hidden="true"/>
+      <div className="pc-shimmer" aria-hidden="true" />
       <div className="pc-content">
         {/* Avatar */}
         {member.avatarUrl ? (
-          <img src={member.avatarUrl} alt={member.fullName} className="pc-avatar pc-avatar--img"/>
+          <img src={member.avatarUrl} alt={member.fullName} className="pc-avatar pc-avatar--img" />
         ) : (
           <div className="pc-avatar" style={{ color: s.color, background: s.bg, borderColor: s.border }}>
             <span className="pc-avatar-letter">{initial}</span>
@@ -853,7 +853,7 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
 
           {!needsAction && (
             <span style={{ color: "#32cd32", flexShrink: 0 }}>
-              <CircleCheckBigIcon size={24}/>
+              <CircleCheckBigIcon size={24} />
             </span>
           )}
         </div>
@@ -867,19 +867,19 @@ function AdminMembersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clubId = searchParams.get("clubId") ?? "";
-  const [members, setMembers]                   = useState<Member[]>([]);
-  const [isAdmin, setIsAdmin]                   = useState(false);
-  const [loading, setLoading]                   = useState(true);
-  const [searchTerm, setSearchTerm]             = useState("");
-  const [selectedGroup, setSelectedGroup]       = useState("all");
-  const [selectedMember, setSelectedMember]     = useState<Member | null>(null);
-  const [memberToEdit, setMemberToEdit]         = useState<Member | null>(null);
-  const [memberToDelete, setMemberToDelete]     = useState<Member | null>(null);
-  const [deleteError, setDeleteError]           = useState("");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState("all");
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [isDeletingMember, setIsDeletingMember] = useState(false);
-  const [editError, setEditError]               = useState("");
-  const [isSavingEdit, setIsSavingEdit]         = useState(false);
-  const [clubs, setClubs]                       = useState<ClubOption[]>([]);
+  const [editError, setEditError] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [clubs, setClubs] = useState<ClubOption[]>([]);
   const [editForm, setEditForm] = useState({
     fullName: "",
     clubId: "",
@@ -892,9 +892,9 @@ function AdminMembersPageContent() {
   });
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState("");
-  const [clubName, setClubName]                 = useState("Всички отбори");
-  const [clubLogoUrl, setClubLogoUrl]           = useState<string | null>(null);
-  const [reportsOpen, setReportsOpen]           = useState(false);
+  const [clubName, setClubName] = useState("Всички отбори");
+  const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
+  const [reportsOpen, setReportsOpen] = useState(false);
 
   const closeEditModal = () => {
     setMemberToEdit(null);
@@ -946,17 +946,17 @@ function AdminMembersPageContent() {
           const clubsPayload: unknown = await response.json();
           const normalizedClubs: ClubOption[] = Array.isArray(clubsPayload)
             ? clubsPayload
-                .map((club) => {
-                  const item =
-                    typeof club === "object" && club !== null
-                      ? (club as { id?: unknown; name?: unknown })
-                      : {};
-                  return {
-                    id: String(item.id ?? ""),
-                    name: String(item.name ?? ""),
-                  };
-                })
-                .filter((club) => club.id && club.name)
+              .map((club) => {
+                const item =
+                  typeof club === "object" && club !== null
+                    ? (club as { id?: unknown; name?: unknown })
+                    : {};
+                return {
+                  id: String(item.id ?? ""),
+                  name: String(item.name ?? ""),
+                };
+              })
+              .filter((club) => club.id && club.name)
             : [];
           setClubs(normalizedClubs);
         }
@@ -1116,12 +1116,12 @@ function AdminMembersPageContent() {
         const clubsPayload: unknown = await clubsResponse.json();
         const selectedClub = Array.isArray(clubsPayload)
           ? clubsPayload.find((club) => {
-              const item =
-                typeof club === "object" && club !== null
-                  ? (club as { id?: unknown; name?: unknown })
-                  : {};
-              return String(item.id ?? "") === clubId;
-            })
+            const item =
+              typeof club === "object" && club !== null
+                ? (club as { id?: unknown; name?: unknown })
+                : {};
+            return String(item.id ?? "") === clubId;
+          })
           : null;
 
         if (!selectedClub || typeof selectedClub.name !== "string" || !selectedClub.name.trim()) {
@@ -1175,12 +1175,12 @@ function AdminMembersPageContent() {
         const clubs: unknown = await response.json();
         const selectedClub = Array.isArray(clubs)
           ? clubs.find((club) => {
-              const item =
-                typeof club === "object" && club !== null
-                  ? (club as { id?: unknown })
-                  : {};
-              return String(item.id ?? "") === clubId;
-            })
+            const item =
+              typeof club === "object" && club !== null
+                ? (club as { id?: unknown })
+                : {};
+            return String(item.id ?? "") === clubId;
+          })
           : null;
         if (selectedClub?.name) {
           setClubName(String(selectedClub.name));
@@ -1219,7 +1219,7 @@ function AdminMembersPageContent() {
 
   return (
     <main className="amp-page">
-      <div className="amp-dot-grid" aria-hidden="true"/>
+      <div className="amp-dot-grid" aria-hidden="true" />
 
       <div className="amp-inner">
 
@@ -1227,7 +1227,20 @@ function AdminMembersPageContent() {
         <div className="amp-header">
           <h1 className="amp-title">Списък играчи</h1>
           <p className="amp-subtitle">Търсене, филтриране и ръчно отбелязване на плащания</p>
-          <div className="amp-title-line"/>
+          <div className="amp-title-line" />
+        </div>
+
+        <div className="amp-club-info">
+          {clubLogoUrl ? (
+            <img
+              src={clubLogoUrl}
+              alt={clubName}
+              className="amp-club-logo"
+            />
+          ) : (
+            <div className="amp-club-icon">🏆</div>
+          )}
+          <h2 className="amp-club-name">{clubName}</h2>
         </div>
 
         {/* ── Nav row ── */}
@@ -1235,12 +1248,12 @@ function AdminMembersPageContent() {
           <div className="amp-nav-left">
             {isAdmin && (
               <button className="amp-back-btn" onClick={() => router.push("/admin/players")}>
-                <ArrowLeftIcon/>
+                <ArrowLeftIcon />
                 Назад към отбори
               </button>
             )}
             <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}`)}>
-              <PlusIcon/>
+              <PlusIcon />
               Добави играч
             </button>
           </div>
@@ -1252,18 +1265,6 @@ function AdminMembersPageContent() {
               Редактирай отбор
             </button>
           )}
-          <div className="amp-club-info">
-            {clubLogoUrl ? (
-              <img
-                src={clubLogoUrl}
-                alt={clubName}
-                className="amp-club-logo"
-              />
-            ) : (
-              <div className="amp-club-icon">🏆</div>
-            )}
-            <h2 className="amp-club-name">{clubName}</h2>
-          </div>
         </div>
 
         {/* Reports button */}
@@ -1296,7 +1297,7 @@ function AdminMembersPageContent() {
 
           {/* Search */}
           <div className="amp-search-wrap">
-            <SearchIcon/>
+            <SearchIcon />
             <input
               className="amp-search"
               type="text"
@@ -1306,7 +1307,7 @@ function AdminMembersPageContent() {
             />
             {searchTerm && (
               <button className="amp-search-clear" onClick={() => setSearchTerm("")}>
-                <XIcon/>
+                <XIcon />
               </button>
             )}
           </div>
@@ -1314,12 +1315,12 @@ function AdminMembersPageContent() {
           {/* Cards */}
           {loading ? (
             <div className="amp-loading">
-              <div className="amp-spinner"/>
+              <div className="amp-spinner" />
             </div>
           ) : (
             <div className="amp-cards">
               {filtered.map((m) => (
-                <PlayerCard key={m.id} member={m} onClick={() => setSelectedMember(m)}/>
+                <PlayerCard key={m.id} member={m} onClick={() => setSelectedMember(m)} />
               ))}
               {filtered.length === 0 && (
                 <p className="amp-empty">Няма намерени играчи</p>
@@ -1345,7 +1346,7 @@ function AdminMembersPageContent() {
       {memberToEdit && (
         <div className="amp-overlay" onClick={isSavingEdit ? undefined : closeEditModal}>
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
-            <div className="amp-modal-tint" aria-hidden="true"/>
+            <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">Редактиране на играч</span>
               <button
@@ -1354,7 +1355,7 @@ function AdminMembersPageContent() {
                 aria-label="Затвори"
                 disabled={isSavingEdit}
               >
-                <XIcon/>
+                <XIcon />
               </button>
             </h2>
 
