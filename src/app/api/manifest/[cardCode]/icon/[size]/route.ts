@@ -15,13 +15,14 @@ function buildCloudinaryPngSquare(url: string, size: number): string {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ cardCode: string; size: string }> },
 ) {
   const { cardCode: cardCodeRaw, size: sizeRaw } = await params;
   const cardCode = cardCodeRaw.trim().toUpperCase();
   const parsedSize = Number.parseInt(sizeRaw, 10);
   const size = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 192;
+  const origin = new URL(req.url).origin;
 
   try {
     const card = await prisma.card.findFirst({
@@ -55,12 +56,35 @@ export async function GET(
 
     if (baseLogoUrl) {
       const iconUrl = buildCloudinaryPngSquare(baseLogoUrl, size);
-      return NextResponse.redirect(iconUrl, 302);
+      const upstream = await fetch(iconUrl, { cache: "no-store" });
+      if (upstream.ok) {
+        const contentType = upstream.headers.get("content-type") || "image/png";
+        const body = await upstream.arrayBuffer();
+        return new NextResponse(body, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=300",
+          },
+        });
+      }
     }
   } catch (error) {
     console.error("Manifest icon route error:", error);
   }
 
   const fallback = size >= 512 ? "/icon-512.png" : "/icon-192.png";
-  return NextResponse.redirect(fallback, 302);
+  const fallbackResponse = await fetch(`${origin}${fallback}`, { cache: "no-store" });
+  if (fallbackResponse.ok) {
+    const body = await fallbackResponse.arrayBuffer();
+    return new NextResponse(body, {
+      status: 200,
+      headers: {
+        "Content-Type": fallbackResponse.headers.get("content-type") || "image/png",
+        "Cache-Control": "public, max-age=300",
+      },
+    });
+  }
+
+  return new NextResponse("Icon not found", { status: 404 });
 }
