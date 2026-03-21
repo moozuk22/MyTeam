@@ -1168,11 +1168,6 @@ function AdminMembersPageContent() {
     const fetchMembers = async () => {
       setLoading(true);
       try {
-        if (!clubId) {
-          router.replace("/404");
-          return;
-        }
-
         const clubsResponse = await fetch("/api/admin/clubs", { cache: "no-store" });
         if (!clubsResponse.ok) {
           router.replace("/404");
@@ -1180,30 +1175,38 @@ function AdminMembersPageContent() {
         }
 
         const clubsPayload: unknown = await clubsResponse.json();
-        const selectedClub = Array.isArray(clubsPayload)
-          ? clubsPayload.find((club) => {
-            const item =
-              typeof club === "object" && club !== null
-                ? (club as { id?: unknown; name?: unknown })
-                : {};
-            return String(item.id ?? "") === clubId;
-          })
-          : null;
+        if (clubId) {
+          const selectedClub = Array.isArray(clubsPayload)
+            ? clubsPayload.find((club) => {
+              const item =
+                typeof club === "object" && club !== null
+                  ? (club as { id?: unknown; name?: unknown })
+                  : {};
+              return String(item.id ?? "") === clubId;
+            })
+            : null;
 
-        if (!selectedClub || typeof selectedClub.name !== "string" || !selectedClub.name.trim()) {
-          router.replace("/404");
-          return;
+          if (!selectedClub || typeof selectedClub.name !== "string" || !selectedClub.name.trim()) {
+            router.replace("/404");
+            return;
+          }
+
+          setClubName(selectedClub.name.trim());
+
+          const logo = (selectedClub as Record<string, unknown>).imageUrl;
+          if (typeof logo === "string" && logo) {
+            setClubLogoUrl(logo);
+          } else {
+            setClubLogoUrl(null);
+          }
+        } else {
+          setClubName("Р’СЃРёС‡РєРё РѕС‚Р±РѕСЂРё");
+          setClubLogoUrl(null);
         }
 
-        setClubName(selectedClub.name.trim());
-
-        // Set club logo if available
-        const logo = (selectedClub as Record<string, unknown>).imageUrl;
-        if (typeof logo === "string" && logo) {
-          setClubLogoUrl(logo);
-        }
-
-        const endpoint = `/api/admin/members?clubId=${encodeURIComponent(clubId)}`;
+        const endpoint = clubId
+          ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
+          : "/api/admin/members";
         const res = await fetch(endpoint);
         if (res.status === 404) {
           router.replace("/404");
@@ -1216,7 +1219,7 @@ function AdminMembersPageContent() {
           const activeMembers = normalized.filter((member) => member.isActive);
           setMembers(activeMembers);
           const nameFromMembers = normalized[0]?.club?.name;
-          if (nameFromMembers) {
+          if (clubId && nameFromMembers) {
             setClubName(nameFromMembers);
           }
         }
