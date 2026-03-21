@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useInstallShortcut } from "@/components/pwa/useInstallShortcut";
 import "./page.css";
 
 const BellIcon = () => (
@@ -61,6 +62,15 @@ export default function AdminPlayersPage() {
   const [clubsSearch, setClubsSearch] = useState("");
   const [clubsLoading, setClubsLoading] = useState(true);
   const [demoSendingType, setDemoSendingType] = useState<"reminder" | "overdue" | null>(null);
+
+  useInstallShortcut({
+    manifestHref: "/api/manifest/admin/players",
+    title: "Admin Players | My Team",
+    appleIconHref: "/apple-touch-icon.png",
+    shortcutIconHref: "/icon-192.png",
+    icon192Href: "/icon-192.png",
+    icon512Href: "/icon-512.png",
+  });
 
   useEffect(() => {
     const fetchClubs = async () => {

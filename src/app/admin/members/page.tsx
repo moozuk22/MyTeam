@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage } from "@/lib/uploadImage";
+import { useInstallShortcut } from "@/components/pwa/useInstallShortcut";
 import "./page.css";
 
 // Reports-related imports
@@ -870,6 +871,12 @@ function AdminMembersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clubId = searchParams.get("clubId") ?? "";
+  const encodedClubId = encodeURIComponent(clubId);
+  const membersManifestQuery = clubId ? `?clubId=${encodedClubId}` : "";
+  const membersManifestHref = `/api/manifest/admin/members${membersManifestQuery}`;
+  const membersAppleIconHref = `/api/manifest/admin/members/icon/180${membersManifestQuery}`;
+  const membersIcon192Href = `/api/manifest/admin/members/icon/192${membersManifestQuery}`;
+  const membersIcon512Href = `/api/manifest/admin/members/icon/512${membersManifestQuery}`;
   const [members, setMembers] = useState<Member[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -911,6 +918,15 @@ function AdminMembersPageContent() {
   const [clubEditError, setClubEditError] = useState("");
   const [isNewCardConfirmOpen, setIsNewCardConfirmOpen] = useState(false);
   const [isAssigningNewCard, setIsAssigningNewCard] = useState(false);
+
+  useInstallShortcut({
+    manifestHref: membersManifestHref,
+    title: "Admin Members | My Team",
+    appleIconHref: membersAppleIconHref,
+    shortcutIconHref: membersIcon192Href,
+    icon192Href: membersIcon192Href,
+    icon512Href: membersIcon512Href,
+  });
 
   const closeEditModal = () => {
     setMemberToEdit(null);

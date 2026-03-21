@@ -1,0 +1,96 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { buildCloudinaryUrlFromUploadPath } from "@/lib/cloudinaryImagePath";
+
+function buildCloudinaryPngSquare(url: string, size: number): string {
+  const marker = "/upload/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) {
+    return url;
+  }
+
+  const prefix = url.slice(0, idx + marker.length);
+  const suffix = url.slice(idx + marker.length);
+  return `${prefix}c_fill,w_${size},h_${size},q_auto,f_png/${suffix}`;
+}
+
+async function getClubLogoUrl(clubIdRaw: string): Promise<string | null> {
+  const clubId = clubIdRaw.trim();
+  if (!clubId) {
+    return null;
+  }
+
+  try {
+    const club = await prisma.club.findUnique({
+      where: { id: clubId },
+      select: {
+        imageUrl: true,
+        emblemUrl: true,
+      },
+    });
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
+    const imagePath = club?.imageUrl ?? null;
+    if (imagePath) {
+      if (imagePath.startsWith("http")) {
+        return imagePath;
+      }
+      if (cloudName) {
+        return buildCloudinaryUrlFromUploadPath(imagePath, cloudName);
+      }
+    }
+
+    return club?.emblemUrl ?? null;
+  } catch (error) {
+    console.error("Admin members manifest icon club lookup error:", error);
+    return null;
+  }
+}
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ size: string }> },
+) {
+  const { size: sizeRaw } = await params;
+  const parsedSize = Number.parseInt(sizeRaw, 10);
+  const size = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 192;
+  const url = new URL(req.url);
+  const clubId = url.searchParams.get("clubId") ?? "";
+  const origin = url.origin;
+
+  try {
+    const baseLogoUrl = await getClubLogoUrl(clubId);
+    if (baseLogoUrl) {
+      const iconUrl = buildCloudinaryPngSquare(baseLogoUrl, size);
+      const upstream = await fetch(iconUrl, { cache: "no-store" });
+      if (upstream.ok) {
+        const contentType = upstream.headers.get("content-type") || "image/png";
+        const body = await upstream.arrayBuffer();
+        return new NextResponse(body, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=300",
+          },
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Admin members manifest icon route error:", error);
+  }
+
+  const fallback = size >= 512 ? "/icon-512.png" : "/icon-192.png";
+  const fallbackResponse = await fetch(`${origin}${fallback}`, { cache: "no-store" });
+  if (fallbackResponse.ok) {
+    const body = await fallbackResponse.arrayBuffer();
+    return new NextResponse(body, {
+      status: 200,
+      headers: {
+        "Content-Type": fallbackResponse.headers.get("content-type") || "image/png",
+        "Cache-Control": "public, max-age=300",
+      },
+    });
+  }
+
+  return new NextResponse("Icon not found", { status: 404 });
+}
