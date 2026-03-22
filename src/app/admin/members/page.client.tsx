@@ -833,7 +833,11 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
 
         {/* Name + badge */}
         <div className="pc-info">
-          <span className="pc-name">{member.fullName}</span>
+          <div className="pc-name-container">
+            {member.fullName.split(' ').map((part, index) => (
+              <span key={index} className="pc-name-row">{part}</span>
+            ))}
+          </div>
           <div className="pc-badges">
             <span className="amp-badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
               {s.label}
@@ -851,12 +855,12 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
                 router.push(`/member/${encodeURIComponent(cardCode)}`);
               }}
             >
-              виж профил
+              профил
             </button>
           )}
 
           {!needsAction && (
-            <span style={{ color: "#32cd32", flexShrink: 0 }}>
+            <span style={{ color: "#32cd32", flexShrink: 0, display: "flex" }}>
               <CircleCheckBigIcon size={24} />
             </span>
           )}
