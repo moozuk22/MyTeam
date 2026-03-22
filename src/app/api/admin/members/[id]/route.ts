@@ -236,7 +236,7 @@ export async function PATCH(
     const body = await request.json().catch(() => ({}));
     const action = String((body as { action?: unknown })?.action ?? "").trim();
 
-    if (action !== "assign_new_card") {
+    if (action !== "assign_new_card" && action !== "reactivate" && action !== "delete_permanently") {
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
 
@@ -247,6 +247,40 @@ export async function PATCH(
 
     if (!playerExists) {
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
+    }
+
+    if (action === "reactivate") {
+      const reactivatedPlayer = await prisma.player.update({
+        where: { id },
+        data: { isActive: true },
+        include: {
+          cards: { orderBy: { createdAt: "desc" } },
+          club: true,
+          images: true,
+        },
+      });
+
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
+      const imagePath = getPrimaryPlayerImagePath(reactivatedPlayer.images);
+      return NextResponse.json({
+        ...reactivatedPlayer,
+        imageUrl: imagePath,
+        avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
+        imagePublicId: null,
+      });
+    }
+
+    if (action === "delete_permanently") {
+      await prisma.$transaction([
+        prisma.card.deleteMany({
+          where: { playerId: id },
+        }),
+        prisma.player.delete({
+          where: { id },
+        }),
+      ]);
+
+      return NextResponse.json({ success: true, id });
     }
 
     let updatedPlayer = null;
@@ -293,7 +327,7 @@ export async function PATCH(
 
     return NextResponse.json(updatedPlayer);
   } catch (error) {
-    console.error("Assign new card error:", error);
+    console.error("Member patch error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
