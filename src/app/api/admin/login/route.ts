@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminToken, verifyPassword } from "@/lib/adminAuth";
 import { prisma } from "@/lib/db";
 
+// Browser vendors may cap max cookie lifetime, but this keeps sessions persistent.
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 10;
+
 export async function POST(request: NextRequest) {
   try {
     const { password } = await request.json();
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
           path: "/",
+          maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
         });
         return response;
       }
@@ -67,6 +71,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
+      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
     });
 
     return response;

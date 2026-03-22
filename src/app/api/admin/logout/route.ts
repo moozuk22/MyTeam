@@ -7,7 +7,10 @@ export async function POST() {
     name: "admin_session",
     value: "",
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
     expires: new Date(0),
+    maxAge: 0,
     path: "/",
   });
 
