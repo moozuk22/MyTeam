@@ -808,7 +808,23 @@ function ConfirmDeleteModal({
 }
 
 /* ── Player Card ── */
-function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }) {
+function PlayerCard({
+  member,
+  onClick,
+  actionMode = "profile",
+  isActionLoading = false,
+  onReactivate,
+  isDeleteLoading = false,
+  onPermanentDelete,
+}: {
+  member: Member;
+  onClick: () => void;
+  actionMode?: "profile" | "reactivate";
+  isActionLoading?: boolean;
+  onReactivate?: () => void;
+  isDeleteLoading?: boolean;
+  onPermanentDelete?: () => void;
+}) {
   const router = useRouter();
   const s = getStatusMeta(member.status);
   const initial = member.fullName.trim().charAt(0).toUpperCase() || "?";
@@ -842,7 +858,7 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
         </div>
 
         <div className="pc-actions">
-          {cardCode && (
+          {actionMode === "profile" && cardCode && (
             <button
               type="button"
               className="pc-profile-btn"
@@ -855,7 +871,34 @@ function PlayerCard({ member, onClick }: { member: Member; onClick: () => void }
             </button>
           )}
 
-          {!needsAction && (
+          {actionMode === "reactivate" && (
+            <>
+              <button
+                type="button"
+                className="pc-reactivate-btn"
+                disabled={isActionLoading || isDeleteLoading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReactivate?.();
+                }}
+              >
+                {isActionLoading ? "Активиране..." : "Активирай"}
+              </button>
+              <button
+                type="button"
+                className="pc-delete-permanent-btn"
+                disabled={isActionLoading || isDeleteLoading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPermanentDelete?.();
+                }}
+              >
+                {isDeleteLoading ? "Изтриване..." : "Изтрий"}
+              </button>
+            </>
+          )}
+
+          {actionMode === "profile" && !needsAction && (
             <span style={{ color: "#32cd32", flexShrink: 0 }}>
               <CircleCheckBigIcon size={24} />
             </span>
@@ -912,6 +955,11 @@ function AdminMembersPageContent() {
   const [clubEditError, setClubEditError] = useState("");
   const [isNewCardConfirmOpen, setIsNewCardConfirmOpen] = useState(false);
   const [isAssigningNewCard, setIsAssigningNewCard] = useState(false);
+  const [inactivePlayersOpen, setInactivePlayersOpen] = useState(false);
+  const [reactivatingMemberId, setReactivatingMemberId] = useState<string | null>(null);
+  const [deletingPermanentMemberId, setDeletingPermanentMemberId] = useState<string | null>(null);
+  const [memberToPermanentDelete, setMemberToPermanentDelete] = useState<Member | null>(null);
+  const [inactiveActionError, setInactiveActionError] = useState("");
 
   const closeEditModal = () => {
     setMemberToEdit(null);
@@ -943,7 +991,17 @@ function AdminMembersPageContent() {
         return;
       }
 
-      setMembers((prev) => prev.filter((member) => member.id !== memberToDelete.id));
+      setMembers((prev) =>
+        prev.map((member) =>
+          member.id === memberToDelete.id
+            ? {
+              ...member,
+              isActive: false,
+              cards: member.cards.map((card) => ({ ...card, isActive: false })),
+            }
+            : member,
+        ),
+      );
       setSelectedMember((prev) => (prev?.id === memberToDelete.id ? null : prev));
       setMemberToDelete(null);
     } catch (error) {
@@ -1142,6 +1200,88 @@ function AdminMembersPageContent() {
     await handleAssignNewCard();
   };
 
+  const handleReactivateMember = async (member: Member) => {
+    if (reactivatingMemberId || deletingPermanentMemberId) return;
+    setInactiveActionError("");
+    setReactivatingMemberId(member.id);
+    try {
+      const response = await fetch(`/api/admin/members/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reactivate" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          typeof data?.error === "string" && data.error.trim()
+            ? data.error.trim()
+            : "Неуспешно активиране на играч.";
+        setInactiveActionError(message);
+        return;
+      }
+
+      const updatedMember = normalizeMember(data);
+      setMembers((prev) => prev.map((m) => (m.id === member.id ? updatedMember : m)));
+      setSelectedMember((prev) => (prev?.id === member.id ? updatedMember : prev));
+    } catch (error) {
+      console.error("Error reactivating member:", error);
+      setInactiveActionError("Възникна грешка при активиране на играч.");
+    } finally {
+      setReactivatingMemberId(null);
+    }
+  };
+
+  const handlePermanentDeleteMember = async () => {
+    if (!memberToPermanentDelete || reactivatingMemberId || deletingPermanentMemberId) return;
+    const member = memberToPermanentDelete;
+
+    setInactiveActionError("");
+    setDeletingPermanentMemberId(member.id);
+    try {
+      const response = await fetch(`/api/admin/members/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_permanently" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          typeof data?.error === "string" && data.error.trim()
+            ? data.error.trim()
+            : "Неуспешно изтриване на играч.";
+        setInactiveActionError(message);
+        return;
+      }
+
+      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      setSelectedMember((prev) => (prev?.id === member.id ? null : prev));
+    } catch (error) {
+      console.error("Error permanently deleting member:", error);
+      setInactiveActionError("Възникна грешка при изтриване на играч.");
+    } finally {
+      setDeletingPermanentMemberId(null);
+      setMemberToPermanentDelete(null);
+    }
+  };
+
+  const refreshMembersList = async () => {
+    try {
+      const endpoint = clubId
+        ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
+        : "/api/admin/members";
+      const response = await fetch(endpoint, { cache: "no-store" });
+      if (!response.ok) {
+        return;
+      }
+      const data: unknown = await response.json();
+      const rawItems = Array.isArray(data) ? data : [];
+      const normalized: Member[] = rawItems.map((item) => normalizeMember(item));
+      setMembers(normalized);
+    } catch (error) {
+      console.error("Error refreshing members list:", error);
+    }
+  };
+
   useEffect(() => {
     const fetchSession = async () => {
       try {
@@ -1217,8 +1357,7 @@ function AdminMembersPageContent() {
           const data: unknown = await res.json();
           const rawItems = Array.isArray(data) ? data : [];
           const normalized: Member[] = rawItems.map((item) => normalizeMember(item));
-          const activeMembers = normalized.filter((member) => member.isActive);
-          setMembers(activeMembers);
+          setMembers(normalized);
           const nameFromMembers = normalized[0]?.club?.name;
           if (clubId && nameFromMembers) {
             setClubName(nameFromMembers);
@@ -1268,12 +1407,25 @@ function AdminMembersPageContent() {
     void fetchClubName();
   }, [clubId, router]);
 
+  useEffect(() => {
+    if (!isAdmin) {
+      setInactivePlayersOpen(false);
+      setReactivatingMemberId(null);
+      setDeletingPermanentMemberId(null);
+      setMemberToPermanentDelete(null);
+      setInactiveActionError("");
+    }
+  }, [isAdmin]);
+
   /* ── Derived ── */
   const groupOptions = [...new Set(
     members.map((m) => m.teamGroup).filter((g): g is number => g !== null)
   )].sort((a, b) => b - a);
+  const inactiveMembers = members.filter((m) => !m.isActive);
 
   const filtered = members.filter((m) => {
+    if (!m.isActive) return false;
+
     const matchGroup = selectedGroup === "all" || String(m.teamGroup) === selectedGroup;
     if (!matchGroup) return false;
     if (!searchTerm.trim()) return true;
@@ -1330,6 +1482,19 @@ function AdminMembersPageContent() {
               Добави играч
             </button>
           </div>
+          {isAdmin && (
+            <button
+              className="amp-inactive-toggle-btn"
+              onClick={async () => {
+                setInactiveActionError("");
+                await refreshMembersList();
+                setInactivePlayersOpen(true);
+              }}
+              type="button"
+            >
+              Покажи неактивни играчи
+            </button>
+          )}
           {isAdmin && clubId && (
             <button
               className="amp-edit-team-btn"
@@ -1583,7 +1748,149 @@ function AdminMembersPageContent() {
         />
       )}
       {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} clubId={clubId} />}
+      {inactivePlayersOpen && (
+        <InactivePlayersModal
+          members={inactiveMembers}
+          isReactivating={Boolean(reactivatingMemberId)}
+          reactivatingMemberId={reactivatingMemberId}
+          isDeletingPermanent={Boolean(deletingPermanentMemberId)}
+          deletingPermanentMemberId={deletingPermanentMemberId}
+          error={inactiveActionError}
+          onClose={() => {
+            if (reactivatingMemberId || deletingPermanentMemberId || memberToPermanentDelete) return;
+            setInactivePlayersOpen(false);
+            setInactiveActionError("");
+          }}
+          onSelectMember={(member) => {
+            if (reactivatingMemberId || deletingPermanentMemberId || memberToPermanentDelete) return;
+            setInactivePlayersOpen(false);
+            setSelectedMember(member);
+          }}
+          onReactivate={handleReactivateMember}
+          onPermanentDelete={(member) => {
+            if (reactivatingMemberId || deletingPermanentMemberId) return;
+            setInactiveActionError("");
+            setMemberToPermanentDelete(member);
+          }}
+        />
+      )}
+      {memberToPermanentDelete && (
+        <ConfirmPermanentDeleteModal
+          member={memberToPermanentDelete}
+          isDeleting={Boolean(deletingPermanentMemberId)}
+          onCancel={() => {
+            if (!deletingPermanentMemberId) {
+              setMemberToPermanentDelete(null);
+            }
+          }}
+          onConfirm={handlePermanentDeleteMember}
+        />
+      )}
     </main>
+  );
+}
+
+function InactivePlayersModal({
+  members,
+  isReactivating,
+  reactivatingMemberId,
+  isDeletingPermanent,
+  deletingPermanentMemberId,
+  error,
+  onClose,
+  onSelectMember,
+  onReactivate,
+  onPermanentDelete,
+}: {
+  members: Member[];
+  isReactivating: boolean;
+  reactivatingMemberId: string | null;
+  isDeletingPermanent: boolean;
+  deletingPermanentMemberId: string | null;
+  error: string;
+  onClose: () => void;
+  onSelectMember: (member: Member) => void;
+  onReactivate: (member: Member) => void;
+  onPermanentDelete: (member: Member) => void;
+}) {
+  return (
+    <div className="amp-overlay" onClick={onClose}>
+      <div className="amp-modal amp-modal--inactive" onClick={(e) => e.stopPropagation()}>
+        <div className="amp-modal-tint" aria-hidden="true" />
+        <h2 className="amp-modal-title">
+          <span className="amp-modal-title-gradient">Неактивни играчи</span>
+          <button className="amp-modal-close" onClick={onClose} aria-label="Затвори">
+            <XIcon />
+          </button>
+        </h2>
+
+        <div className="amp-modal-body">
+          {error && <p className="amp-confirm-error">{error}</p>}
+          {members.length === 0 ? (
+            <p className="amp-empty amp-empty--modal">Няма неактивни играчи</p>
+          ) : (
+            <div className="amp-cards">
+              {members.map((member) => (
+                <PlayerCard
+                  key={member.id}
+                  member={member}
+                  onClick={() => onSelectMember(member)}
+                  actionMode="reactivate"
+                  isActionLoading={isReactivating && reactivatingMemberId === member.id}
+                  onReactivate={() => onReactivate(member)}
+                  isDeleteLoading={isDeletingPermanent && deletingPermanentMemberId === member.id}
+                  onPermanentDelete={() => onPermanentDelete(member)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmPermanentDeleteModal({
+  member,
+  isDeleting,
+  onCancel,
+  onConfirm,
+}: {
+  member: Member;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="amp-overlay amp-overlay--confirm" onClick={isDeleting ? undefined : onCancel}>
+      <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="amp-modal-tint" aria-hidden="true" />
+        <h2 className="amp-modal-title">
+          <span className="amp-modal-title-gradient">Потвърди изтриване завинаги</span>
+          <button className="amp-modal-close" onClick={onCancel} aria-label="Затвори" disabled={isDeleting}>
+            <XIcon />
+          </button>
+        </h2>
+
+        <div className="amp-modal-body">
+          <p className="amp-confirm-text">
+            Сигурен ли си, че искаш да изтриеш завинаги <strong>{member.fullName}</strong>?
+          </p>
+          <p className="amp-confirm-subtext">
+            Това действие е необратимо и ще премахне играча и свързаните данни.
+          </p>
+
+          <div className="amp-modal-actions">
+            <button className="amp-btn amp-btn--ghost" onClick={onCancel} disabled={isDeleting}>
+              Отказ
+            </button>
+            <button className="amp-btn amp-btn--danger" onClick={onConfirm} disabled={isDeleting}>
+              {isDeleting ? "Изтриване..." : "Изтрий завинаги"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

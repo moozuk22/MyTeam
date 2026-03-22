@@ -140,6 +140,29 @@
   transform: scale(1.05);
 }
 
+.amp-inactive-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 77, 77, 0.35);
+  background: rgba(255, 77, 77, 0.08);
+  color: #ff7a7a;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s, color 0.2s;
+}
+
+.amp-inactive-toggle-btn:hover {
+  background: rgba(255, 77, 77, 0.16);
+  border-color: rgba(255, 77, 77, 0.55);
+  box-shadow: 0 0 16px rgba(255, 77, 77, 0.2);
+  transform: scale(1.05);
+}
+
 .amp-club-info {
   display: flex;
   align-items: center;
@@ -409,6 +432,56 @@
   box-shadow: 0 0 12px rgba(50,205,50,0.25);
 }
 
+.pc-reactivate-btn {
+  border: 1px solid rgba(50,205,50,0.45);
+  border-radius: 10px;
+  background: rgba(50,205,50,0.12);
+  color: #7fff00;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  height: 30px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.pc-reactivate-btn:hover:not(:disabled) {
+  background: rgba(50,205,50,0.2);
+  border-color: rgba(50,205,50,0.75);
+  box-shadow: 0 0 12px rgba(50,205,50,0.25);
+}
+
+.pc-reactivate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pc-delete-permanent-btn {
+  border: 1px solid rgba(255,77,77,0.5);
+  border-radius: 10px;
+  background: rgba(255,77,77,0.16);
+  color: #ffb0b0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  height: 30px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.pc-delete-permanent-btn:hover:not(:disabled) {
+  background: rgba(255,77,77,0.24);
+  border-color: rgba(255,77,77,0.8);
+  box-shadow: 0 0 12px rgba(255,77,77,0.25);
+}
+
+.pc-delete-permanent-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ── Shared badge ── */
 .amp-badge {
   display: inline-flex;
@@ -651,6 +724,14 @@
 
 .amp-modal--confirm {
   max-width: 460px;
+}
+
+.amp-modal--inactive {
+  max-width: 720px;
+}
+
+.amp-empty--modal {
+  padding: 24px 0;
 }
 
 .amp-confirm-text {
