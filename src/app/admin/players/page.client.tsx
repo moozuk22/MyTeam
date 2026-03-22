@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import "./page.css";
 
 const BellIcon = () => (
@@ -144,6 +145,9 @@ export default function AdminPlayersPage() {
       <div className="mp-dot-grid" aria-hidden="true" />
 
       <div className="mp-inner">
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "10px" }}>
+          <AdminLogoutButton />
+        </div>
         <div className="mp-header">
           <h1 className="mp-title">Списък играчи</h1>
           <p className="mp-subtitle">Търсене, филтриране и ръчно отбелязване на плащания</p>

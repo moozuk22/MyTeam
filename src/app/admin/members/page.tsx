@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminMembersPageClient from "./page.client";
 
 type MembersPageSearchParams = {
@@ -76,20 +75,5 @@ export async function generateMetadata(
 }
 
 export default function AdminMembersPage() {
-  return (
-    <>
-      <div
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "16px 20px 0",
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
-        <AdminLogoutButton />
-      </div>
-      <AdminMembersPageClient />
-    </>
-  );
+  return <AdminMembersPageClient />;
 }

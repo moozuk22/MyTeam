@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage } from "@/lib/uploadImage";
+import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import "./page.css";
 
 // Reports-related imports
@@ -1291,6 +1292,9 @@ function AdminMembersPageContent() {
       <div className="amp-dot-grid" aria-hidden="true" />
 
       <div className="amp-inner">
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "10px" }}>
+          <AdminLogoutButton />
+        </div>
 
         {/* ── Page header ── */}
         <div className="amp-header">

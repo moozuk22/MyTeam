@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminPlayersPageClient from "./page.client";
 
 export const metadata: Metadata = {
@@ -38,20 +37,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPlayersPage() {
-  return (
-    <>
-      <div
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "16px 20px 0",
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
-        <AdminLogoutButton />
-      </div>
-      <AdminPlayersPageClient />
-    </>
-  );
+  return <AdminPlayersPageClient />;
 }
