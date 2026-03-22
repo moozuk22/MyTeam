@@ -90,7 +90,7 @@ export default function Home() {
             </div>
             <div className="club-card-inner">
               <span className="card-label">Клубна карта 2026</span>
-              <div className="card-team-name">ФК My Team</div>
+              <div className="card-team-name">My Team</div>
               <div>
                 <div className="card-member-label">Иmе:</div>
                 <div className="card-member-name">Moozuk</div>
@@ -115,13 +115,13 @@ export default function Home() {
                 <img src="./footballer-phone.jpg" alt="" />
               </div>
               <div className="phone-name">Moozuk</div>
-              <div className="phone-stats-row">
+              {/* <div className="phone-stats-row">
                 <span className="phone-stat"><ClockSVG />&nbsp;5.9ТТ.Ш</span>
                 <div className="phone-stat-divider" />
                 <span className="phone-stat">NV5</span>
-              </div>
+              </div> */}
               <div className="status-btn">
-                <span className="status-btn-label">STATUS</span>
+                {/* <span className="status-btn-label">STATUS</span> */}
                 <span className="status-btn-text">ПЛАТЕНО</span>
               </div>
             </div>

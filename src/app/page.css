@@ -2,7 +2,13 @@
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-body { background: #0d1118; -webkit-font-smoothing: antialiased; }
+body { 
+  background: #0d1118; 
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
 
 .page {
   min-height: 100vh;
@@ -639,4 +645,14 @@ body { background: #0d1118; -webkit-font-smoothing: antialiased; }
   letter-spacing: 1px;
   /* color: rgba(180, 223, 177, 0.50); */
   color: #b4dfb1;
+}
+
+@media (max-width: 400px) {
+  .club-card {
+    width: 200px;
+  }
+
+  .phone {
+    width: 144px;
+  }
 }

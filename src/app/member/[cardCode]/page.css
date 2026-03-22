@@ -1164,3 +1164,36 @@
 
   .receipt-content { padding: 16px !important; }
 }
+
+/* Mobile header adjustments */
+@media (max-width: 400px) {
+  .header {
+    gap: 8px;
+  }
+  
+  .header-logo {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .shield {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .card-title {
+    font-size: 16px;
+  }
+  
+  .card-subtitle {
+    font-size: 9px;
+  }
+  
+  .shield-num {
+    font-size: 12px;
+  }
+  
+  .header-logo-fallback {
+    font-size: 20px;
+  }
+}
