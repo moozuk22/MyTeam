@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import "./page.css";
 
 export default function AdminLoginPage() {
@@ -9,6 +9,12 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next") ?? "";
+  const safeNextPath =
+    nextParam.startsWith("/admin") && !nextParam.startsWith("/admin/login")
+      ? nextParam
+      : "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +31,7 @@ export default function AdminLoginPage() {
       });
 
       if (response.ok) {
-        router.push("/admin/players");
+        router.push(safeNextPath || "/admin/login");
       } else {
         const data = await response.json();
         setError(data.error || "Login failed");

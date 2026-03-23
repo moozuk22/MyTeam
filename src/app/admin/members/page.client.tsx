@@ -163,6 +163,16 @@ const PlusIcon = () => (
   </svg>
 );
 
+const TrashIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" />
+    <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+  </svg>
+);
+
 /* ── Status helpers ── */
 const getStatusMeta = (status: PlayerStatus): StatusMeta => {
   if (status === "paid") return {
@@ -960,6 +970,13 @@ function AdminMembersPageContent() {
   const [deletingPermanentMemberId, setDeletingPermanentMemberId] = useState<string | null>(null);
   const [memberToPermanentDelete, setMemberToPermanentDelete] = useState<Member | null>(null);
   const [inactiveActionError, setInactiveActionError] = useState("");
+  const [isDeletingTeam, setIsDeletingTeam] = useState(false);
+  const [isTeamDeleteConfirmOpen, setIsTeamDeleteConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (!clubId) return;
+    document.cookie = `admin_last_club_id=${encodeURIComponent(clubId)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  }, [clubId]);
 
   const closeEditModal = () => {
     setMemberToEdit(null);
@@ -1009,6 +1026,41 @@ function AdminMembersPageContent() {
       setDeleteError("Възникна грешка при премахване на играч.");
     } finally {
       setIsDeletingMember(false);
+    }
+  };
+
+  const handleDeleteTeam = async () => {
+    if (!isAdmin || !clubId || isDeletingTeam) {
+      return;
+    }
+
+    const displayTeamName = clubName?.trim() || "този отбор";
+    setIsDeletingTeam(true);
+    try {
+      const response = await fetch(`/api/admin/teams/${encodeURIComponent(clubId)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const message =
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно изтриване на отбора.";
+        throw new Error(message);
+      }
+
+      window.alert(`Отбор "${displayTeamName}" беше изтрит успешно.`);
+      setIsTeamDeleteConfirmOpen(false);
+      router.push("/admin/players");
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Възникна грешка при изтриване на отбора.",
+      );
+    } finally {
+      setIsDeletingTeam(false);
     }
   };
 
@@ -1306,6 +1358,11 @@ function AdminMembersPageContent() {
   }, []);
 
   useEffect(() => {
+    if (!clubId) {
+      router.replace("/admin/login");
+      return;
+    }
+
     const fetchMembers = async () => {
       setLoading(true);
       try {
@@ -1341,7 +1398,7 @@ function AdminMembersPageContent() {
             setClubLogoUrl(null);
           }
         } else {
-          setClubName("Р’СЃРёС‡РєРё РѕС‚Р±РѕСЂРё");
+          setClubName("Всички отбори");
           setClubLogoUrl(null);
         }
 
@@ -1499,8 +1556,20 @@ function AdminMembersPageContent() {
             <button
               className="amp-edit-team-btn"
               onClick={() => router.push(`/admin/teams/${encodeURIComponent(clubId)}/edit`)}
+              disabled={isDeletingTeam}
             >
               Редактирай отбор
+            </button>
+          )}
+          {isAdmin && clubId && (
+            <button
+              className="amp-delete-team-btn"
+              onClick={() => setIsTeamDeleteConfirmOpen(true)}
+              disabled={isDeletingTeam}
+              type="button"
+            >
+              <TrashIcon />
+              {isDeletingTeam ? "Изтриване..." : "Изтрий отбор"}
             </button>
           )}
         </div>
@@ -1747,6 +1816,18 @@ function AdminMembersPageContent() {
           error={deleteError}
         />
       )}
+      {isTeamDeleteConfirmOpen && isAdmin && clubId && (
+        <ConfirmDeleteTeamModal
+          teamName={clubName?.trim() || "този отбор"}
+          isDeleting={isDeletingTeam}
+          onCancel={() => {
+            if (!isDeletingTeam) {
+              setIsTeamDeleteConfirmOpen(false);
+            }
+          }}
+          onConfirm={handleDeleteTeam}
+        />
+      )}
       {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} clubId={clubId} />}
       {inactivePlayersOpen && (
         <InactivePlayersModal
@@ -1886,6 +1967,50 @@ function ConfirmPermanentDeleteModal({
             </button>
             <button className="amp-btn amp-btn--danger" onClick={onConfirm} disabled={isDeleting}>
               {isDeleting ? "Изтриване..." : "Изтрий завинаги"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteTeamModal({
+  teamName,
+  isDeleting,
+  onCancel,
+  onConfirm,
+}: {
+  teamName: string;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="amp-overlay amp-overlay--confirm" onClick={isDeleting ? undefined : onCancel}>
+      <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="amp-modal-tint" aria-hidden="true" />
+        <h2 className="amp-modal-title">
+          <span className="amp-modal-title-gradient">Потвърди изтриване на отбор</span>
+          <button className="amp-modal-close" onClick={onCancel} aria-label="Затвори" disabled={isDeleting}>
+            <XIcon />
+          </button>
+        </h2>
+
+        <div className="amp-modal-body">
+          <p className="amp-confirm-text">
+            Сигурен ли си, че искаш да изтриеш <strong>{teamName}</strong>?
+          </p>
+          <p className="amp-confirm-subtext">
+            Това действие е необратимо и ще изтрие всички играчи, снимки, плащания, карти и свързани записи.
+          </p>
+
+          <div className="amp-modal-actions">
+            <button className="amp-btn amp-btn--ghost" onClick={onCancel} disabled={isDeleting}>
+              Отказ
+            </button>
+            <button className="amp-btn amp-btn--danger" onClick={onConfirm} disabled={isDeleting}>
+              {isDeleting ? "Изтриване..." : "Изтрий отбора"}
             </button>
           </div>
         </div>

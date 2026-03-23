@@ -63,26 +63,26 @@ export default function AdminPlayersPage() {
   const [clubsLoading, setClubsLoading] = useState(true);
   const [demoSendingType, setDemoSendingType] = useState<"reminder" | "overdue" | null>(null);
 
-  useEffect(() => {
-    const fetchClubs = async () => {
-      setClubsLoading(true);
-      try {
-        const response = await fetch("/api/admin/clubs", { cache: "no-store" });
-        if (!response.ok) {
-          setClubs([]);
-          return;
-        }
-
-        const data = (await response.json()) as ClubRow[];
-        setClubs(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching clubs:", error);
+  const fetchClubs = async () => {
+    setClubsLoading(true);
+    try {
+      const response = await fetch("/api/admin/clubs", { cache: "no-store" });
+      if (!response.ok) {
         setClubs([]);
-      } finally {
-        setClubsLoading(false);
+        return;
       }
-    };
 
+      const data = (await response.json()) as ClubRow[];
+      setClubs(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching clubs:", error);
+      setClubs([]);
+    } finally {
+      setClubsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     void fetchClubs();
   }, []);
 
@@ -217,23 +217,23 @@ export default function AdminPlayersPage() {
             {!clubsLoading && visibleClubs.map((club) => (
               <button
                 key={club.id}
-                type="button"
-                className="mp-team-card"
-                onClick={() => router.push(`/admin/members?clubId=${club.id}`)}
-              >
-                <div className="mp-team-card-content">
-                  <div className="mp-team-logo-wrap">
-                    {club.imageUrl || club.emblemUrl ? (
-                      <img src={club.imageUrl || club.emblemUrl || ""} alt={club.name} className="mp-team-logo mp-team-logo--img" />
-                    ) : (
-                      <span className="mp-team-logo">🏆</span>
-                    )}
+                  type="button"
+                  className="mp-team-card"
+                  onClick={() => router.push(`/admin/members?clubId=${club.id}`)}
+                >
+                  <div className="mp-team-card-content">
+                    <div className="mp-team-logo-wrap">
+                      {club.imageUrl || club.emblemUrl ? (
+                        <img src={club.imageUrl || club.emblemUrl || ""} alt={club.name} className="mp-team-logo mp-team-logo--img" />
+                      ) : (
+                        <span className="mp-team-logo">🏆</span>
+                      )}
+                    </div>
+                    <div className="mp-team-info">
+                      <h3 className="mp-team-name">{club.name}</h3>
+                    </div>
+                    <ChevronRightIcon />
                   </div>
-                  <div className="mp-team-info">
-                    <h3 className="mp-team-name">{club.name}</h3>
-                  </div>
-                  <ChevronRightIcon />
-                </div>
               </button>
             ))}
             {!clubsLoading && clubs.length > 0 && visibleClubs.length === 0 && (
