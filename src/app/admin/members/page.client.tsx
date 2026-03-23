@@ -639,11 +639,21 @@ function MemberDetailModal({
   onClose,
   onRequestDelete,
   onRequestEdit,
+  actionMode = "active",
+  onRequestReactivate,
+  onRequestPermanentDelete,
+  isReactivating = false,
+  isDeletingPermanent = false,
 }: {
   member: Member;
   onClose: () => void;
   onRequestDelete: (member: Member) => void;
   onRequestEdit: (member: Member) => void;
+  actionMode?: "active" | "inactive";
+  onRequestReactivate?: (member: Member) => void;
+  onRequestPermanentDelete?: (member: Member) => void;
+  isReactivating?: boolean;
+  isDeletingPermanent?: boolean;
 }) {
   const s = getStatusMeta(member.status);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -748,18 +758,39 @@ function MemberDetailModal({
           </div>
 
           <div className="amp-modal-actions amp-modal-actions--end">
-            <button
-              className="amp-btn amp-btn--ghost"
-              onClick={() => onRequestEdit(member)}
-            >
-              Редактирай
-            </button>
-            <button
-              className="amp-btn amp-btn--danger"
-              onClick={() => onRequestDelete(member)}
-            >
-              Премахни играч
-            </button>
+            {actionMode === "active" ? (
+              <>
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => onRequestEdit(member)}
+                >
+                  Редактирай
+                </button>
+                <button
+                  className="amp-btn amp-btn--danger"
+                  onClick={() => onRequestDelete(member)}
+                >
+                  Премахни играч
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => onRequestReactivate?.(member)}
+                  disabled={isReactivating || isDeletingPermanent}
+                >
+                  {isReactivating ? "Възстановяване..." : "Възстанови"}
+                </button>
+                <button
+                  className="amp-btn amp-btn--danger"
+                  onClick={() => onRequestPermanentDelete?.(member)}
+                  disabled={isReactivating || isDeletingPermanent}
+                >
+                  {isDeletingPermanent ? "Изтриване..." : "Изтрий"}
+                </button>
+              </>
+            )}
           </div>
 
         </div>
@@ -1620,11 +1651,20 @@ function AdminMembersPageContent() {
         <MemberDetailModal
           member={selectedMember}
           onClose={() => setSelectedMember(null)}
+          actionMode={selectedMember.isActive ? "active" : "inactive"}
           onRequestEdit={openEditMember}
           onRequestDelete={(member) => {
             setDeleteError("");
             setMemberToDelete(member);
           }}
+          onRequestReactivate={handleReactivateMember}
+          onRequestPermanentDelete={(member) => {
+            if (reactivatingMemberId || deletingPermanentMemberId) return;
+            setInactiveActionError("");
+            setMemberToPermanentDelete(member);
+          }}
+          isReactivating={reactivatingMemberId === selectedMember.id}
+          isDeletingPermanent={deletingPermanentMemberId === selectedMember.id}
         />
       )}
       {memberToEdit && (

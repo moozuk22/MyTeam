@@ -250,15 +250,43 @@ export async function PATCH(
     }
 
     if (action === "reactivate") {
-      const reactivatedPlayer = await prisma.player.update({
-        where: { id },
-        data: { isActive: true },
-        include: {
-          cards: { orderBy: { createdAt: "desc" } },
-          club: true,
-          images: true,
-        },
+      const reactivatedPlayer = await prisma.$transaction(async (tx) => {
+        await tx.player.update({
+          where: { id },
+          data: { isActive: true },
+        });
+
+        const latestCard = await tx.card.findFirst({
+          where: { playerId: id },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+
+        if (latestCard) {
+          await tx.card.updateMany({
+            where: { playerId: id },
+            data: { isActive: false },
+          });
+
+          await tx.card.update({
+            where: { id: latestCard.id },
+            data: { isActive: true },
+          });
+        }
+
+        return tx.player.findUnique({
+          where: { id },
+          include: {
+            cards: { orderBy: { createdAt: "desc" } },
+            club: true,
+            images: true,
+          },
+        });
       });
+
+      if (!reactivatedPlayer) {
+        return NextResponse.json({ error: "Player not found" }, { status: 404 });
+      }
 
       const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
       const imagePath = getPrimaryPlayerImagePath(reactivatedPlayer.images);
