@@ -5,6 +5,7 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 
 const REMINDER_TYPE = "monthly_membership_payment_reminder" as const;
 const DEFAULT_TIME_ZONE = "Europe/Sofia";
+const RUN_DAY = 23;
 
 function getDatePartsInTimeZone(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -62,11 +63,11 @@ export async function runMonthlyMembershipPaymentReminder(
     };
   }
 
-  if (day !== 25) {
+  if (day !== RUN_DAY) {
     return {
       success: true,
       skipped: true,
-      reason: `Today is day ${day}; monthly reminders run only on day 25.`,
+      reason: `Today is day ${day}; monthly reminders run only on day ${RUN_DAY}.`,
       timeZone,
       nowIso,
       targetMembers: 0,

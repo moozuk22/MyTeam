@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/monthly-membership-payment-reminder",
-      "schedule": "0 12 18 * *"
+      "schedule": "35 17 23 * *"
     },
     {
       "path": "/api/cron/monthly-overdue-payment-reminder",
-      "schedule": "2 12 18 * *"
+      "schedule": "35 17 23 * *"
     }
   ]
 }

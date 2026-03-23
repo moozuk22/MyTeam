@@ -6,6 +6,7 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 const REMINDER_TYPE = "monthly_overdue_payment_reminder" as const;
 const DEFAULT_TIME_ZONE = "Europe/Sofia";
 const STATUS_ROLLOVER_JOB = "monthly_status_rollover";
+const RUN_DAY = 23;
 
 function getDatePartsInTimeZone(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -246,11 +247,11 @@ export async function runMonthlyOverduePaymentReminder(
     };
   }
 
-  if (day !== 1) {
+  if (day !== RUN_DAY) {
     return {
       success: true,
       skipped: true,
-      reason: `Today is day ${day}; overdue reminders run only on day 1.`,
+      reason: `Today is day ${day}; overdue reminders run only on day ${RUN_DAY}.`,
       timeZone,
       nowIso,
       previousMonthIso: "",
