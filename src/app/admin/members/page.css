@@ -415,7 +415,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
 }
 
 @media (min-width: 640px) {
@@ -429,6 +429,32 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.pc-name-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-name-row {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+/* Mobile name adjustments */
+@media (max-width: 480px) {
+  .pc-name-container {
+    gap: 1px;
+  }
+  
+  .pc-name-row {
+    font-size: 15px;
+    line-height: 1.1;
+  }
 }
 
 .pc-badges { display: flex; align-items: center; gap: 8px; }
@@ -992,6 +1018,7 @@
   flex-wrap: wrap;
   gap: 12px;
   align-items: flex-end;
+  text-align: center;
 }
 
 .rd-filters-left { display: flex; gap: 8px; align-items: flex-end; }
@@ -1020,7 +1047,7 @@
 
 .rd-select {
   appearance: none;
-  padding: 8px 32px 8px 12px;
+  padding: 8px 0;
   height: 36px;
   border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.1);
@@ -1030,10 +1057,19 @@
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s;
+  text-align: center;
 }
 
 .rd-select:focus { border-color: rgba(50,205,50,0.4); }
-.rd-select option { background: #1a1a1a; color: #ffffff; }
+.rd-select option { 
+  background: #1a1a1a; 
+  color: #ffffff; 
+}
+.rd-select option:hover,
+.rd-select option:focus {
+  background: rgba(50,205,50,0.3) !important;
+  color: #ffffff !important;
+}
 
 .rd-select--w140 { width: 140px; }
 .rd-select--w100 { width: 100px; }
@@ -1071,6 +1107,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  text-align: center;
 }
 
 .rd-stat {
@@ -1083,6 +1120,7 @@
 .rd-stat-label {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   font-size: 12px;
   color: rgba(255,255,255,0.5);
@@ -1234,6 +1272,7 @@
 
   .rd-title {
     font-size: 16px;
+    justify-content: center;
   }
 
   .rd-filters {
@@ -1308,6 +1347,22 @@
   .rd-footer-btn {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .rd-seg {
+    flex-direction: column;
+  }
+
+  .rd-seg-btn {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .rd-seg-btn {
+    font-size: 14px;
   }
 }
 

@@ -859,7 +859,11 @@ function PlayerCard({
 
         {/* Name + badge */}
         <div className="pc-info">
-          <span className="pc-name">{member.fullName}</span>
+          <div className="pc-name-container">
+            {member.fullName.split(' ').map((part, index) => (
+              <span key={index} className="pc-name-row">{part}</span>
+            ))}
+          </div>
           <div className="pc-badges">
             <span className="amp-badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
               {s.label}
@@ -877,38 +881,11 @@ function PlayerCard({
                 router.push(`/member/${encodeURIComponent(cardCode)}`);
               }}
             >
-              виж профил
+              профил
             </button>
           )}
 
-          {actionMode === "reactivate" && (
-            <>
-              <button
-                type="button"
-                className="pc-reactivate-btn"
-                disabled={isActionLoading || isDeleteLoading}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReactivate?.();
-                }}
-              >
-                {isActionLoading ? "Активиране..." : "Активирай"}
-              </button>
-              <button
-                type="button"
-                className="pc-delete-permanent-btn"
-                disabled={isActionLoading || isDeleteLoading}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPermanentDelete?.();
-                }}
-              >
-                {isDeleteLoading ? "Изтриване..." : "Изтрий"}
-              </button>
-            </>
-          )}
-
-          {actionMode === "profile" && !needsAction && (
+          {!needsAction && (
             <span style={{ color: "#32cd32", flexShrink: 0 }}>
               <CircleCheckBigIcon size={24} />
             </span>
