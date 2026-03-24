@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, withPrismaPoolRetry } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { randomBytes } from "crypto";
 import { publishMemberUpdated } from "@/lib/memberEvents";
@@ -7,6 +7,11 @@ import {
   applyCloudinaryTransformToUrl,
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
+import {
+  isCurrentMonthWaived,
+  normalizeToMonthStart,
+  resolveStatusFromSettledMonths,
+} from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +60,12 @@ export async function GET(
       where: { id },
       include: {
         cards: { orderBy: { createdAt: "desc" } },
+        paymentLogs: {
+          orderBy: { paidAt: "desc" },
+        },
+        paymentWaivers: {
+          orderBy: { waivedFor: "desc" },
+        },
         images: true,
       },
     });
@@ -66,11 +77,20 @@ export async function GET(
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
     const imagePath = getPrimaryPlayerImagePath(player.images);
 
+    const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
+    const pausedThisMonth = isCurrentMonthWaived(waivedDates);
+    const resolvedStatus = resolveStatusFromSettledMonths({
+      paidDates: player.paymentLogs.map((item) => item.paidFor),
+      waivedDates,
+    });
+
     return NextResponse.json({
       ...player,
+      status: pausedThisMonth ? "paused" : resolvedStatus,
       imageUrl: imagePath,
       avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
       imagePublicId: null,
+      isPausedThisMonth: pausedThisMonth,
     });
   } catch (error) {
     console.error("Member fetch error:", error);
@@ -245,21 +265,28 @@ export async function PATCH(
     const body = await request.json().catch(() => ({}));
     const action = String((body as { action?: unknown })?.action ?? "").trim();
 
-    if (action !== "assign_new_card" && action !== "reactivate" && action !== "delete_permanently") {
+    if (
+      action !== "assign_new_card" &&
+      action !== "reactivate" &&
+      action !== "delete_permanently" &&
+      action !== "manage_pause_months"
+    ) {
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
 
-    const playerExists = await prisma.player.findUnique({
-      where: { id },
-      select: { id: true },
-    });
+    const playerExists = await withPrismaPoolRetry(() =>
+      prisma.player.findUnique({
+        where: { id },
+        select: { id: true },
+      }),
+    );
 
     if (!playerExists) {
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
 
     if (action === "reactivate") {
-      const reactivatedPlayer = await prisma.$transaction(async (tx) => {
+      const reactivatedPlayer = await withPrismaPoolRetry(() => prisma.$transaction(async (tx) => {
         await tx.player.update({
           where: { id },
           data: { isActive: true },
@@ -291,7 +318,7 @@ export async function PATCH(
             images: true,
           },
         });
-      });
+      }));
 
       if (!reactivatedPlayer) {
         return NextResponse.json({ error: "Player not found" }, { status: 404 });
@@ -308,16 +335,126 @@ export async function PATCH(
     }
 
     if (action === "delete_permanently") {
-      await prisma.$transaction([
+      await withPrismaPoolRetry(() => prisma.$transaction([
         prisma.card.deleteMany({
           where: { playerId: id },
         }),
         prisma.player.delete({
           where: { id },
         }),
-      ]);
+      ]));
 
       return NextResponse.json({ success: true, id });
+    }
+
+    if (action === "manage_pause_months") {
+      const modeRaw = String((body as { mode?: unknown }).mode ?? "").trim().toLowerCase();
+      const reasonRaw = String((body as { reason?: unknown }).reason ?? "").trim();
+      const monthsRaw = Array.isArray((body as { months?: unknown }).months)
+        ? ((body as { months?: unknown[] }).months ?? [])
+        : [];
+
+      if (modeRaw !== "pause" && modeRaw !== "remove") {
+        return NextResponse.json({ error: "mode must be pause or remove" }, { status: 400 });
+      }
+
+      if (monthsRaw.length === 0) {
+        return NextResponse.json({ error: "At least one month is required" }, { status: 400 });
+      }
+
+      const normalizedMonths: Date[] = [];
+      for (const item of monthsRaw) {
+        const parsed = new Date(String(item));
+        if (Number.isNaN(parsed.getTime())) {
+          return NextResponse.json({ error: "Invalid month value" }, { status: 400 });
+        }
+        normalizedMonths.push(normalizeToMonthStart(parsed));
+      }
+
+      const uniqueByIso = Array.from(
+        new Map(normalizedMonths.map((date) => [date.toISOString(), date])).values(),
+      );
+
+      const tokenPayload = await verifyAdminToken(token);
+      const createdBy = tokenPayload?.roles.includes("coach") ? "coach" : "admin";
+
+      await withPrismaPoolRetry(() => prisma.$transaction(async (tx) => {
+        if (modeRaw === "pause") {
+          await tx.paymentWaiver.createMany({
+            data: uniqueByIso.map((waivedFor) => ({
+              playerId: id,
+              waivedFor,
+              reason: reasonRaw || null,
+              createdBy,
+            })),
+            skipDuplicates: true,
+          });
+        } else {
+          await tx.paymentWaiver.deleteMany({
+            where: {
+              playerId: id,
+              waivedFor: { in: uniqueByIso },
+            },
+          });
+        }
+
+        const [allPaid, allWaived] = await Promise.all([
+          tx.paymentLog.findMany({
+            where: { playerId: id },
+            select: { paidFor: true },
+          }),
+          tx.paymentWaiver.findMany({
+            where: { playerId: id },
+            select: { waivedFor: true },
+          }),
+        ]);
+
+        await tx.player.update({
+          where: { id },
+          data: {
+            status: resolveStatusFromSettledMonths({
+              paidDates: allPaid.map((row) => row.paidFor),
+              waivedDates: allWaived.map((row) => row.waivedFor),
+            }),
+          },
+        });
+      }));
+
+      const [paymentWaivers, paymentLogs, cards] = await withPrismaPoolRetry(() =>
+        Promise.all([
+          prisma.paymentWaiver.findMany({
+            where: { playerId: id },
+            orderBy: { waivedFor: "desc" },
+          }),
+          prisma.paymentLog.findMany({
+            where: { playerId: id },
+            select: { paidFor: true },
+          }),
+          prisma.card.findMany({
+            where: { playerId: id, isActive: true },
+            select: { cardCode: true },
+            take: 1,
+          }),
+        ]),
+      );
+
+      const pausedThisMonth = isCurrentMonthWaived(paymentWaivers.map((row) => row.waivedFor));
+      const targetCardCode = cards[0]?.cardCode;
+      if (targetCardCode) {
+        publishMemberUpdated(targetCardCode, "status-updated");
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: pausedThisMonth
+          ? "paused"
+          : resolveStatusFromSettledMonths({
+              paidDates: paymentLogs.map((row) => row.paidFor),
+              waivedDates: paymentWaivers.map((row) => row.waivedFor),
+            }),
+        isPausedThisMonth: pausedThisMonth,
+        paymentWaivers,
+      });
     }
 
     let updatedPlayer = null;
@@ -326,7 +463,7 @@ export async function PATCH(
     for (let i = 0; i < 5; i++) {
       const cardCode = randomBytes(4).toString("hex").toUpperCase();
       try {
-        updatedPlayer = await prisma.$transaction(async (tx) => {
+        updatedPlayer = await withPrismaPoolRetry(() => prisma.$transaction(async (tx) => {
           await tx.card.updateMany({
             where: { playerId: id },
             data: { isActive: false },
@@ -344,7 +481,7 @@ export async function PATCH(
             where: { id },
             include: { cards: { orderBy: { createdAt: "desc" } } },
           });
-        });
+        }));
         break;
       } catch (error) {
         lastError = error;
@@ -381,16 +518,16 @@ export async function DELETE(
     }
 
     try {
-        const player = await prisma.player.findUnique({
+        const player = await withPrismaPoolRetry(() => prisma.player.findUnique({
             where: { id },
             select: { id: true },
-        });
+        }));
 
         if (!player) {
             return NextResponse.json({ error: "Player not found" }, { status: 404 });
         }
 
-        await prisma.$transaction([
+        await withPrismaPoolRetry(() => prisma.$transaction([
             prisma.card.updateMany({
                 where: { playerId: id },
                 data: { isActive: false },
@@ -399,7 +536,7 @@ export async function DELETE(
                 where: { id },
                 data: { isActive: false },
             }),
-        ]);
+        ]));
 
         return NextResponse.json({ message: "Player removed successfully" });
     } catch (error) {

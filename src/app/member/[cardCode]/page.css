@@ -990,6 +990,13 @@
   cursor: default;
 }
 
+.pm-month-btn--waived {
+  background: rgba(77, 163, 255, 0.12);
+  border-color: rgba(77, 163, 255, 0.36);
+  color: #8cc5ff;
+  cursor: default;
+}
+
 /* Next unpaid — highlighted, selectable */
 .pm-month-btn--next {
   background: rgba(50,205,50,0.1);
@@ -1049,6 +1056,16 @@
   height: 5px;
   border-radius: 50%;
   background: rgba(50,205,50,0.4);
+}
+
+.pm-waived-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(77, 163, 255, 0.9);
 }
 
 /* Selected summary */

@@ -6,6 +6,10 @@ import {
 } from "@/lib/cloudinaryImagePath";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { cloudinary } from "@/lib/cloudinary";
+import {
+  isCurrentMonthWaived,
+  resolveStatusFromSettledMonths,
+} from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -167,14 +171,34 @@ export async function GET(
       }
     }
 
-    const paymentLogs = await prisma.paymentLog.findMany({
-      where: { playerId: card.player.id },
-      orderBy: { paidAt: "desc" },
-      select: {
-        id: true,
-        paidFor: true,
-        paidAt: true,
-      },
+    const [paymentLogs, paymentWaivers] = await Promise.all([
+      prisma.paymentLog.findMany({
+        where: { playerId: card.player.id },
+        orderBy: { paidAt: "desc" },
+        select: {
+          id: true,
+          paidFor: true,
+          paidAt: true,
+        },
+      }),
+      prisma.paymentWaiver.findMany({
+        where: { playerId: card.player.id },
+        orderBy: { waivedFor: "desc" },
+        select: {
+          id: true,
+          waivedFor: true,
+          reason: true,
+          createdAt: true,
+          createdBy: true,
+        },
+      }),
+    ]);
+
+    const waivedDates = paymentWaivers.map((item) => item.waivedFor);
+    const pausedThisMonth = isCurrentMonthWaived(waivedDates);
+    const resolvedStatus = resolveStatusFromSettledMonths({
+      paidDates: paymentLogs.map((item) => item.paidFor),
+      waivedDates,
     });
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
@@ -204,13 +228,21 @@ export async function GET(
         team_group: card.player.teamGroup,
         jerseyNumber: card.player.jerseyNumber,
         birthDate: card.player.birthDate,
-        status: card.player.status,
+        status: pausedThisMonth ? "paused" : resolvedStatus,
         last_payment_date: card.player.lastPaymentDate,
         paymentLogs: paymentLogs.map((item) => ({
           id: item.id,
           paidFor: item.paidFor,
           paidAt: item.paidAt,
         })),
+        paymentWaivers: paymentWaivers.map((item) => ({
+          id: item.id,
+          waivedFor: item.waivedFor,
+          reason: item.reason,
+          createdAt: item.createdAt,
+          createdBy: item.createdBy,
+        })),
+        isPausedThisMonth: pausedThisMonth,
         notifications: notifications.map((item) => ({
           id: item.id,
           type: item.type,

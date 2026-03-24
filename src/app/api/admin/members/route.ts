@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, withPrismaPoolRetry } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { randomBytes } from "crypto";
 import {
   applyCloudinaryTransformToUrl,
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
+import {
+  isCurrentMonthWaived,
+  resolveStatusFromSettledMonths,
+} from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -218,7 +222,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const players = await prisma.player.findMany({
+    const players = await withPrismaPoolRetry(() =>
+      prisma.player.findMany({
       where: {
         ...(clubId ? { clubId } : {}),
       },
@@ -234,18 +239,31 @@ export async function GET(request: NextRequest) {
             paidAt: "desc",
           },
         },
+        paymentWaivers: {
+          orderBy: {
+            waivedFor: "desc",
+          },
+        },
         images: true,
       },
       orderBy: {
         fullName: "asc",
       },
-    });
+    }),
+    );
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
     const normalizedPlayers = players.map((player) => {
       const imagePath = getPrimaryPlayerImagePath(player.images);
+      const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
+      const pausedThisMonth = isCurrentMonthWaived(waivedDates);
+      const resolvedStatus = resolveStatusFromSettledMonths({
+        paidDates: player.paymentLogs.map((item) => item.paidFor),
+        waivedDates,
+      });
       return {
         ...player,
+        status: pausedThisMonth ? "paused" : resolvedStatus,
         imageUrl: imagePath,
         avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
         imagePublicId: null,

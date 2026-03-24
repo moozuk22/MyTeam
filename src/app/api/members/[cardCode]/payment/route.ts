@@ -4,42 +4,21 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
 import { publishMemberUpdated } from "@/lib/memberEvents";
+import {
+  addMonths,
+  compareYearMonth,
+  normalizeToMonthStart,
+  resolveStatusFromSettledMonths,
+  toMonthKey,
+  toYearMonth,
+  type YearMonth,
+} from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type YM = { year: number; month: number };
-
-function toYM(date: Date): YM {
-  return { year: date.getUTCFullYear(), month: date.getUTCMonth() };
-}
-
-function ymKey(ym: YM): string {
-  return `${ym.year}-${ym.month}`;
-}
-
-function cmpYM(a: YM, b: YM): number {
-  if (a.year !== b.year) return a.year - b.year;
-  return a.month - b.month;
-}
-
-function addMonths(ym: YM, count: number): YM {
-  const d = new Date(Date.UTC(ym.year, ym.month + count, 1));
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
-}
-
-function ymToDate(ym: YM): Date {
+function ymToDate(ym: YearMonth): Date {
   return new Date(Date.UTC(ym.year, ym.month, 1));
-}
-
-function resolveStatusForLatestPaidMonth(latestPaidYM: YM): "paid" | "warning" | "overdue" {
-  const now = new Date();
-  const currentYM: YM = { year: now.getUTCFullYear(), month: now.getUTCMonth() };
-  const previousYM = addMonths(currentYM, -1);
-
-  if (cmpYM(latestPaidYM, currentYM) >= 0) return "paid";
-  if (cmpYM(latestPaidYM, previousYM) >= 0) return "warning";
-  return "overdue";
 }
 
 function formatPaidMonthLabel(date: Date): string {
@@ -63,7 +42,7 @@ export async function POST(
       return NextResponse.json({ error: "paidFor is required" }, { status: 400 });
     }
 
-    const paidForDate = new Date(String(paidForRaw));
+    const paidForDate = normalizeToMonthStart(new Date(String(paidForRaw)));
     if (Number.isNaN(paidForDate.getTime())) {
       return NextResponse.json(
         { error: "paidFor must be a valid date" },
@@ -85,25 +64,37 @@ export async function POST(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    const existingLogs = await prisma.paymentLog.findMany({
-      where: { playerId: card.playerId },
-      select: { paidFor: true },
-      orderBy: { paidFor: "asc" },
-    });
+    const [existingLogs, existingWaivers] = await Promise.all([
+      prisma.paymentLog.findMany({
+        where: { playerId: card.playerId },
+        select: { paidFor: true },
+        orderBy: { paidFor: "asc" },
+      }),
+      prisma.paymentWaiver.findMany({
+        where: { playerId: card.playerId },
+        select: { waivedFor: true },
+      }),
+    ]);
 
-    const targetYM = toYM(paidForDate);
-    const paidSet = new Set(existingLogs.map((log) => ymKey(toYM(log.paidFor))));
+    const targetYM = toYearMonth(paidForDate);
+    const paidSet = new Set(existingLogs.map((log) => toMonthKey(toYearMonth(log.paidFor))));
+    const waivedSet = new Set(existingWaivers.map((row) => toMonthKey(toYearMonth(row.waivedFor))));
+    const settledSet = new Set<string>([...paidSet, ...waivedSet]);
 
-    const firstUnpaidYM: YM = (() => {
+    const firstUnpaidYM: YearMonth = (() => {
       if (existingLogs.length === 0) {
         const now = new Date();
         return { year: now.getFullYear(), month: now.getMonth() };
       }
-      const latestPaid = toYM(existingLogs[existingLogs.length - 1].paidFor);
-      return addMonths(latestPaid, 1);
+      const latestPaid = toYearMonth(existingLogs[existingLogs.length - 1].paidFor);
+      let cursor = addMonths(latestPaid, 1);
+      while (settledSet.has(toMonthKey(cursor))) {
+        cursor = addMonths(cursor, 1);
+      }
+      return cursor;
     })();
 
-    if (cmpYM(targetYM, firstUnpaidYM) < 0) {
+    if (compareYearMonth(targetYM, firstUnpaidYM) < 0) {
       return NextResponse.json(
         { error: "Selected month is before the next unpaid month" },
         { status: 400 },
@@ -112,8 +103,8 @@ export async function POST(
 
     const monthsToCreate: Date[] = [];
     let cursor = firstUnpaidYM;
-    while (cmpYM(cursor, targetYM) <= 0) {
-      if (!paidSet.has(ymKey(cursor))) {
+    while (compareYearMonth(cursor, targetYM) <= 0) {
+      if (!paidSet.has(toMonthKey(cursor)) && !waivedSet.has(toMonthKey(cursor))) {
         monthsToCreate.push(ymToDate(cursor));
       }
       cursor = addMonths(cursor, 1);
@@ -122,8 +113,6 @@ export async function POST(
     if (monthsToCreate.length === 0) {
       return NextResponse.json({ error: "This period is already paid" }, { status: 400 });
     }
-
-    const nextStatus = resolveStatusForLatestPaidMonth(targetYM);
 
     await prisma.$transaction(async (tx) => {
       await tx.paymentLog.createMany({
@@ -134,11 +123,26 @@ export async function POST(
         })),
       });
 
+      const [allPaidDates, allWaivedDates] = await Promise.all([
+        tx.paymentLog.findMany({
+          where: { playerId: card.playerId },
+          select: { paidFor: true },
+        }),
+        tx.paymentWaiver.findMany({
+          where: { playerId: card.playerId },
+          select: { waivedFor: true },
+        }),
+      ]);
+
+      const waivedDates = allWaivedDates.map((row) => row.waivedFor);
       await tx.player.update({
         where: { id: card.playerId },
         data: {
           lastPaymentDate: new Date(),
-          status: nextStatus,
+          status: resolveStatusFromSettledMonths({
+            paidDates: allPaidDates.map((row) => row.paidFor),
+            waivedDates,
+          }),
         },
       });
     });

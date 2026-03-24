@@ -18,7 +18,7 @@ interface MemberProfile {
   birthDate?: string | null;
   isActive?: boolean;
   team_group?: number | null;
-  status?: "paid" | "warning" | "overdue";
+  status?: "paid" | "warning" | "overdue" | "paused";
   last_payment_date?: string | null;
   notifications?: Array<{
     id: string;
@@ -30,6 +30,14 @@ interface MemberProfile {
     paidFor: string;
     paidAt: string;
   }>;
+  paymentWaivers?: Array<{
+    id: string;
+    waivedFor: string;
+    reason?: string | null;
+    createdAt: string;
+    createdBy: string;
+  }>;
+  isPausedThisMonth?: boolean;
 }
 
 const SPEED_LINES = [8, 16, 24, 33, 42, 54, 65, 76, 85, 93];
@@ -214,6 +222,11 @@ export default function MemberCardPage({
   const [selectedYM, setSelectedYM] = useState<{ year: number; month: number } | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [pauseModalOpen, setPauseModalOpen] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
+  const [pauseActionLoading, setPauseActionLoading] = useState(false);
+  const [pauseError, setPauseError] = useState<string | null>(null);
+  const [selectedPauseMonths, setSelectedPauseMonths] = useState<Array<{ year: number; month: number }>>([]);
   const [selectedReceipt, setSelectedReceipt] = useState<{
     id: string;
     paidFor: string;
@@ -227,6 +240,22 @@ export default function MemberCardPage({
       return `${year}-${month}`;
     })
   );
+  const waivedSet = new Set<string>(
+    (member?.paymentWaivers ?? []).map(({ waivedFor }) => {
+      const { year, month } = parseYearMonth(waivedFor);
+      return `${year}-${month}`;
+    })
+  );
+  const settledSet = new Set<string>([...paidSet, ...waivedSet]);
+  const selectedPauseKeys = new Set(
+    selectedPauseMonths.map((item) => `${item.year}-${item.month}`),
+  );
+  const canApplyPause = selectedPauseMonths.some(
+    (item) => !waivedSet.has(`${item.year}-${item.month}`),
+  );
+  const canRemovePause = selectedPauseMonths.some(
+    (item) => waivedSet.has(`${item.year}-${item.month}`),
+  );
 
   // Last paid month
   const lastPaidYM: { year: number; month: number } | null = (() => {
@@ -236,10 +265,18 @@ export default function MemberCardPage({
       .sort((a, b) => cmpYM(b, a))[0];
   })();
 
-  // Next unpaid = month after last paid, or current month if never paid
-  const firstUnpaidYM = lastPaidYM
-    ? addMonths(lastPaidYM, 1)
-    : { year: new Date().getFullYear(), month: new Date().getMonth() };
+  // Next unpaid = first month that is not settled (paid or waived)
+  const firstUnpaidYM = (() => {
+    let candidate = lastPaidYM
+      ? addMonths(lastPaidYM, 1)
+      : { year: new Date().getFullYear(), month: new Date().getMonth() };
+
+    while (settledSet.has(`${candidate.year}-${candidate.month}`)) {
+      candidate = addMonths(candidate, 1);
+    }
+
+    return candidate;
+  })();
 
   const openPaymentModal = () => {
     setCalendarYear(firstUnpaidYM.year);
@@ -249,10 +286,11 @@ export default function MemberCardPage({
   };
 
   // Month state
-  type MonthState = "paid" | "selected" | "next" | "available" | "disabled";
+  type MonthState = "paid" | "waived" | "selected" | "next" | "available" | "disabled";
   const getMonthState = (ym: { year: number; month: number }): MonthState => {
     const key = `${ym.year}-${ym.month}`;
     if (paidSet.has(key)) return "paid";
+    if (waivedSet.has(key)) return "waived";
     if (cmpYM(ym, firstUnpaidYM) < 0) return "disabled";
     const isNext = key === `${firstUnpaidYM.year}-${firstUnpaidYM.month}`;
     if (selectedYM && `${selectedYM.year}-${selectedYM.month}` === key) return "selected";
@@ -262,7 +300,7 @@ export default function MemberCardPage({
 
   const handleMonthClick = (ym: { year: number; month: number }) => {
     const key = `${ym.year}-${ym.month}`;
-    if (paidSet.has(key)) return;
+    if (paidSet.has(key) || waivedSet.has(key)) return;
     // Only allow selecting the exact next unpaid month — no skipping
     if (key !== `${firstUnpaidYM.year}-${firstUnpaidYM.month}`) return;
     setSelectedYM(ym);
@@ -742,6 +780,60 @@ export default function MemberCardPage({
     }
   };
 
+  const togglePauseMonth = (ym: { year: number; month: number }) => {
+    const key = `${ym.year}-${ym.month}`;
+    setSelectedPauseMonths((prev) => {
+      const exists = prev.some((item) => `${item.year}-${item.month}` === key);
+      if (exists) {
+        return prev.filter((item) => `${item.year}-${item.month}` !== key);
+      }
+      return [...prev, ym];
+    });
+  };
+
+  const handleManagePauseMonths = async (mode: "pause" | "remove") => {
+    if (!member || selectedPauseMonths.length === 0) {
+      return;
+    }
+
+    setPauseActionLoading(true);
+    setPauseError(null);
+    try {
+      const response = await fetch(`/api/admin/members/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "manage_pause_months",
+          mode,
+          reason: pauseReason.trim() || null,
+          months: selectedPauseMonths.map((item) => toISOMonth(item)),
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof err?.error === "string" && err.error.trim()
+            ? err.error
+            : "Неуспешна промяна на пауза.",
+        );
+      }
+
+      const refreshed = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
+      if (refreshed.ok) {
+        setMember((await refreshed.json()) as MemberProfile);
+      }
+
+      setSelectedPauseMonths([]);
+      setPauseReason("");
+      setPauseModalOpen(false);
+    } catch (error) {
+      setPauseError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setPauseActionLoading(false);
+    }
+  };
+
   const handleSavePublicEdit = async () => {
     if (!member || editSaving) return;
 
@@ -907,7 +999,8 @@ export default function MemberCardPage({
     }, 100);
   };
 
-  const statusKey = member?.status ?? "paid";
+  const rawStatusKey = member?.status ?? "paid";
+  const statusKey = rawStatusKey === "paused" ? "warning" : rawStatusKey;
   const status = STATUS_MAP[statusKey];
   const lastPaymentText = member?.last_payment_date
     ? new Date(member.last_payment_date).toLocaleDateString("bg-BG")
@@ -1095,7 +1188,9 @@ export default function MemberCardPage({
                 </div>
                 <div className="info-row">
                   <span className="info-lbl">Статус:</span>
-                  <span className={`info-val ${status.cls}`}>{status.label}</span>
+                  <span className={`info-val ${status.cls}`}>
+                    {rawStatusKey === "paused" ? "ПАУЗА" : status.label}
+                  </span>
                 </div>
                 <div className="info-row">
                   <span className="info-lbl">Последно плащане:</span>
@@ -1114,6 +1209,18 @@ export default function MemberCardPage({
             <button className="pay-btn" onClick={openPaymentModal}>
               <PlusIcon />
               Плати
+            </button>
+            <button
+              className="add-btn"
+              onClick={() => {
+                setPauseError(null);
+                setSelectedPauseMonths([]);
+                setPauseReason("");
+                setCalendarYear(new Date().getFullYear());
+                setPauseModalOpen(true);
+              }}
+            >
+              Пауза
             </button>
           </>)}
 
@@ -1429,6 +1536,7 @@ export default function MemberCardPage({
                     cmpYM(ym, firstUnpaidYM) >= 0 &&
                     cmpYM(ym, selectedYM) <= 0 &&
                     state !== "paid" &&
+                    state !== "waived" &&
                     state !== "selected";
                   return (
                     <button
@@ -1436,20 +1544,23 @@ export default function MemberCardPage({
                       className={`pm-month-btn pm-month-btn--${state}${inAdvanceRange ? " pm-month-btn--range" : ""}`}
                       onClick={() => {
                         const state = getMonthState(ym);
-                        if (state === "paid" || state === "disabled") return;
+                        if (state === "paid" || state === "waived" || state === "disabled") return;
                         setSelectedYM(ym);
                       }}
-                      disabled={state === "paid" || state === "disabled"}
+                      disabled={state === "paid" || state === "waived" || state === "disabled"}
                       title={
                         state === "disabled"
                           ? "Платете първо предишните месеци"
                           : state === "paid"
                           ? "Вече платено"
+                          : state === "waived"
+                          ? "Освободен месец (пауза)"
                           : undefined
                       }
                     >
                       {name}
                       {state === "paid" && <span className="pm-paid-dot" />}
+                      {state === "waived" && <span className="pm-waived-dot" />}
                     </button>
                   );
                 })}
@@ -1491,6 +1602,104 @@ export default function MemberCardPage({
         )}
 
         {/* ══ NOTIFICATIONS PANEL ══ */}
+        {pauseModalOpen && (
+          <div className="pm-overlay" onClick={() => !pauseActionLoading && setPauseModalOpen(false)}>
+            <div className="pm-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="pm-close" onClick={() => !pauseActionLoading && setPauseModalOpen(false)}>
+                <XIcon size={16} />
+              </button>
+
+              <div className="pm-header">
+                <div className="pm-title-icon">II</div>
+                <div>
+                  <h2 className="pm-title">Пауза</h2>
+                  <p className="pm-name">{member.name}</p>
+                </div>
+              </div>
+
+              <div className="pm-divider" />
+
+              <div className="pm-year-nav">
+                <button className="pm-year-btn" onClick={() => setCalendarYear((y) => y - 1)}>
+                  <ChevronIcon direction="left" />
+                </button>
+                <span className="pm-year-label">{calendarYear}</span>
+                <button className="pm-year-btn" onClick={() => setCalendarYear((y) => y + 1)}>
+                  <ChevronIcon direction="right" />
+                </button>
+              </div>
+
+              <div className="pm-months-grid">
+                {MONTH_NAMES_BG.map((name, i) => {
+                  const ym = { year: calendarYear, month: i };
+                  const key = `${ym.year}-${ym.month}`;
+                  const isPaid = paidSet.has(key);
+                  const isWaived = waivedSet.has(key);
+                  const isSelected = selectedPauseKeys.has(key);
+
+                  return (
+                    <button
+                      key={i}
+                      className={`pm-month-btn ${isSelected ? "pm-month-btn--selected" : isWaived ? "pm-month-btn--waived" : "pm-month-btn--available"}`}
+                      disabled={isPaid}
+                      title={isPaid ? "Вече платен месец не може да бъде освободен." : isWaived ? "Месецът е вече в пауза." : undefined}
+                      onClick={() => togglePauseMonth(ym)}
+                    >
+                      {name}
+                      {isPaid && <span className="pm-paid-dot" />}
+                      {isWaived && <span className="pm-waived-dot" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <label style={{ display: "grid", gap: 6, marginTop: 8 }}>
+                <span className="pm-info-lbl">Причина (по избор)</span>
+                <input
+                  value={pauseReason}
+                  onChange={(event) => setPauseReason(event.target.value)}
+                  placeholder="напр. контузия, пътуване, изпити"
+                  style={{
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.22)",
+                    borderRadius: "10px",
+                    padding: "10px 12px",
+                    color: "#fff",
+                  }}
+                />
+              </label>
+
+              {pauseError && <div className="pm-error">{pauseError}</div>}
+
+              <div className="pm-divider" />
+
+              <div className="pm-actions">
+                <button
+                  className="pm-btn pm-btn--cancel"
+                  onClick={() => setPauseModalOpen(false)}
+                  disabled={pauseActionLoading}
+                >
+                  Отказ
+                </button>
+                <button
+                  className="pm-btn pm-btn--ghost"
+                  onClick={() => void handleManagePauseMonths("remove")}
+                  disabled={pauseActionLoading || !canRemovePause}
+                >
+                  {pauseActionLoading ? "Запазване..." : "Премахни пауза"}
+                </button>
+                <button
+                  className="pm-btn pm-btn--submit"
+                  onClick={() => void handleManagePauseMonths("pause")}
+                  disabled={pauseActionLoading || !canApplyPause}
+                >
+                  {pauseActionLoading ? "Запазване..." : "Приложи пауза"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {notificationsPanelOpen && (
           <div className="pm-overlay" onClick={() => setNotificationsPanelOpen(false)}>
             <div className="pm-modal" onClick={(e) => e.stopPropagation()}>

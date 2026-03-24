@@ -164,6 +164,18 @@ async function runMonthlyStatusRollover(year: number, month: number) {
   const currentMonthStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
   const nextMonthStart = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
 
+  const pausedCurrentMonthRows = await prisma.paymentWaiver.findMany({
+    where: {
+      waivedFor: {
+        gte: currentMonthStart,
+        lt: nextMonthStart,
+      },
+    },
+    distinct: ["playerId"],
+    select: { playerId: true },
+  });
+  const pausedCurrentMonthIds = pausedCurrentMonthRows.map((row) => row.playerId);
+
   const paidCurrentMonthRows = await prisma.paymentLog.findMany({
     where: {
       paidFor: {
@@ -176,11 +188,16 @@ async function runMonthlyStatusRollover(year: number, month: number) {
   });
 
   const paidCurrentMonthIds = new Set(paidCurrentMonthRows.map((row) => row.playerId));
+  const paidCurrentMonthIdList = Array.from(paidCurrentMonthIds);
+  const excludedFromRolloverIds = Array.from(
+    new Set([...pausedCurrentMonthIds, ...paidCurrentMonthIdList]),
+  );
 
   const forcedToPaidResult = await prisma.player.updateMany({
     where: {
       id: {
-        in: Array.from(paidCurrentMonthIds),
+        in: paidCurrentMonthIdList,
+        ...(pausedCurrentMonthIds.length > 0 ? { notIn: pausedCurrentMonthIds } : {}),
       },
       status: {
         in: ["warning", "overdue"],
@@ -193,10 +210,10 @@ async function runMonthlyStatusRollover(year: number, month: number) {
     prisma.player.findMany({
       where: {
         status: "paid",
-        ...(paidCurrentMonthIds.size > 0
+        ...(excludedFromRolloverIds.length > 0
           ? {
               id: {
-                notIn: Array.from(paidCurrentMonthIds),
+                notIn: excludedFromRolloverIds,
               },
             }
           : {}),
@@ -206,10 +223,10 @@ async function runMonthlyStatusRollover(year: number, month: number) {
     prisma.player.findMany({
       where: {
         status: "warning",
-        ...(paidCurrentMonthIds.size > 0
+        ...(excludedFromRolloverIds.length > 0
           ? {
               id: {
-                notIn: Array.from(paidCurrentMonthIds),
+                notIn: excludedFromRolloverIds,
               },
             }
           : {}),
@@ -332,6 +349,14 @@ export async function runMonthlyOverduePaymentReminder(
     prisma.player.findMany({
       where: {
         status: "overdue",
+        paymentWaivers: {
+          none: {
+            waivedFor: {
+              gte: notificationMonthStart,
+              lt: notificationMonthEnd,
+            },
+          },
+        },
       },
       select: {
         id: true,

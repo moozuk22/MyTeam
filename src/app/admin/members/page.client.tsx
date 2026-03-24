@@ -25,7 +25,7 @@ interface ReportPlayer {
   paymentLogs: ReportPaymentLog[];
 }
 
-type PlayerStatus = "paid" | "warning" | "overdue";
+type PlayerStatus = "paid" | "warning" | "overdue" | "paused";
 
 interface PaymentLog {
   id: string;
@@ -95,7 +95,7 @@ function normalizeMember(item: unknown): Member {
     : [];
   const rawStatus = raw.status;
   const status: PlayerStatus =
-    rawStatus === "paid" || rawStatus === "warning" || rawStatus === "overdue"
+    rawStatus === "paid" || rawStatus === "warning" || rawStatus === "overdue" || rawStatus === "paused"
       ? rawStatus
       : "paid";
 
@@ -187,6 +187,13 @@ const getStatusMeta = (status: PlayerStatus): StatusMeta => {
     color: "#ffd700",
     bg: "rgba(255,215,0,0.2)",
     border: "rgba(255,215,0,0.3)",
+    cls: "badge--reminder",
+  };
+  if (status === "paused") return {
+    label: "Пауза",
+    color: "#60a5fa",
+    bg: "rgba(96,165,250,0.2)",
+    border: "rgba(96,165,250,0.3)",
     cls: "badge--reminder",
   };
   return {

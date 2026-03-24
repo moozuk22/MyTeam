@@ -44,6 +44,7 @@ model Player {
   cards              Card[]
   images             Image[]
   paymentLogs        PaymentLog[]
+  paymentWaivers     PaymentWaiver[]
   playerNotification PlayerNotification[]
   club               Club                 @relation(fields: [clubId], references: [id], onDelete: Cascade)
   pushSubscriptions  PushSubscription[]
@@ -73,6 +74,21 @@ model PaymentLog {
 
   @@index([playerId])
   @@map("payment_logs")
+}
+
+model PaymentWaiver {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  playerId   String   @map("player_id") @db.Uuid
+  waivedFor  DateTime @map("waived_for") @db.Timestamptz(6)
+  reason     String?
+  createdBy  String   @default("admin") @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, waivedFor])
+  @@index([playerId])
+  @@map("payment_waivers")
 }
 
 model PushSubscription {

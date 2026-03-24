@@ -5,35 +5,10 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
 import { publishMemberUpdated } from "@/lib/memberEvents";
+import { normalizeToMonthStart, resolveStatusFromSettledMonths } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type YM = { year: number; month: number };
-
-function toYM(date: Date): YM {
-  return { year: date.getUTCFullYear(), month: date.getUTCMonth() };
-}
-
-function cmpYM(a: YM, b: YM): number {
-  if (a.year !== b.year) return a.year - b.year;
-  return a.month - b.month;
-}
-
-function addMonths(ym: YM, count: number): YM {
-  const d = new Date(Date.UTC(ym.year, ym.month + count, 1));
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
-}
-
-function resolveStatusForLatestPaidMonth(latestPaidDate: Date): "paid" | "warning" | "overdue" {
-  const latestPaidYM = toYM(latestPaidDate);
-  const currentYM = toYM(new Date());
-  const previousYM = addMonths(currentYM, -1);
-
-  if (cmpYM(latestPaidYM, currentYM) >= 0) return "paid";
-  if (cmpYM(latestPaidYM, previousYM) >= 0) return "warning";
-  return "overdue";
-}
 
 export async function POST(
   request: NextRequest,
@@ -57,7 +32,7 @@ export async function POST(
     }
 
     // Validate that paidFor is a valid date
-    const paidForDate = new Date(paidFor);
+    const paidForDate = normalizeToMonthStart(new Date(paidFor));
     if (isNaN(paidForDate.getTime())) {
       return NextResponse.json(
         { error: "paidFor must be a valid date" },
@@ -92,10 +67,24 @@ export async function POST(
         paidFor: paidForDate,
       },
     });
+    const existingWaiver = await prisma.paymentWaiver.findFirst({
+      where: {
+        playerId: id,
+        waivedFor: paidForDate,
+      },
+      select: { id: true },
+    });
 
     if (existingPayment) {
       return NextResponse.json(
         { error: `Този период (${paidForDate.toLocaleDateString("bg-BG")}) вече е платен` },
+        { status: 400 }
+      );
+    }
+
+    if (existingWaiver) {
+      return NextResponse.json(
+        { error: "Cannot record payment for a waived month. Remove pause first." },
         { status: 400 }
       );
     }
@@ -109,22 +98,26 @@ export async function POST(
       },
     });
 
-    const latestPaymentAfterInsert = await prisma.paymentLog.findFirst({
-      where: { playerId: id },
-      orderBy: { paidFor: "desc" },
-      select: { paidFor: true },
-    });
-
-    if (!latestPaymentAfterInsert) {
-      throw new Error("Latest payment could not be resolved after insert.");
-    }
+    const [allPaidDates, allWaivedDates] = await Promise.all([
+      prisma.paymentLog.findMany({
+        where: { playerId: id },
+        select: { paidFor: true },
+      }),
+      prisma.paymentWaiver.findMany({
+        where: { playerId: id },
+        select: { waivedFor: true },
+      }),
+    ]);
 
     // Update player's last payment date and status
     await prisma.player.update({
       where: { id },
       data: {
         lastPaymentDate: new Date(),
-        status: resolveStatusForLatestPaidMonth(latestPaymentAfterInsert.paidFor),
+        status: resolveStatusFromSettledMonths({
+          paidDates: allPaidDates.map((row) => row.paidFor),
+          waivedDates: allWaivedDates.map((row) => row.waivedFor),
+        }),
       },
     });
 
@@ -191,20 +184,34 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Get all payment logs for this player
-    const paymentLogs = await prisma.paymentLog.findMany({
-      where: { playerId: id },
-      orderBy: { paidAt: "desc" },
-      select: {
-        id: true,
-        paidFor: true,
-        paidAt: true,
-        recordedBy: true,
-      },
-    });
+    // Get all payment logs and waived months for this player
+    const [paymentLogs, waivedMonths] = await Promise.all([
+      prisma.paymentLog.findMany({
+        where: { playerId: id },
+        orderBy: { paidAt: "desc" },
+        select: {
+          id: true,
+          paidFor: true,
+          paidAt: true,
+          recordedBy: true,
+        },
+      }),
+      prisma.paymentWaiver.findMany({
+        where: { playerId: id },
+        orderBy: { waivedFor: "desc" },
+        select: {
+          id: true,
+          waivedFor: true,
+          reason: true,
+          createdBy: true,
+          createdAt: true,
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       payments: paymentLogs,
+      waivedMonths,
     });
 
   } catch (error) {

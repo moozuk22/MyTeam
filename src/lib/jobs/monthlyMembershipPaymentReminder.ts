@@ -87,6 +87,16 @@ export async function runMonthlyMembershipPaymentReminder(
 
   const [members, alreadySentRows] = await Promise.all([
     prisma.player.findMany({
+      where: {
+        paymentWaivers: {
+          none: {
+            waivedFor: {
+              gte: monthStart,
+              lt: monthEnd,
+            },
+          },
+        },
+      },
       select: {
         id: true,
         cards: {
