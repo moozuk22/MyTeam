@@ -1,4 +1,5 @@
 let schedulerStarted = false;
+let schedulerRunning = false;
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") {
@@ -21,11 +22,15 @@ export async function register() {
     ]);
 
   const run = async () => {
+    if (schedulerRunning) {
+      console.log("Local monthly schedulers skipped: previous run still in progress.");
+      return;
+    }
+
+    schedulerRunning = true;
     try {
-      const [membershipResult, overdueResult] = await Promise.all([
-        runMonthlyMembershipPaymentReminder(),
-        runMonthlyOverduePaymentReminder(),
-      ]);
+      const membershipResult = await runMonthlyMembershipPaymentReminder();
+      const overdueResult = await runMonthlyOverduePaymentReminder();
 
       if (!membershipResult.skipped) {
         console.log("Monthly reminder job executed:", membershipResult);
@@ -40,6 +45,8 @@ export async function register() {
       }
     } catch (error) {
       console.error("Local monthly schedulers failed:", error);
+    } finally {
+      schedulerRunning = false;
     }
   };
 

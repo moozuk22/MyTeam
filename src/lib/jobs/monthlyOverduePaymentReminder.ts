@@ -7,6 +7,7 @@ const REMINDER_TYPE = "monthly_overdue_payment_reminder" as const;
 const DEFAULT_TIME_ZONE = "Europe/Sofia";
 const STATUS_ROLLOVER_JOB = "monthly_status_rollover";
 const RUN_DAY = 23;
+const MEMBER_PROCESSING_CONCURRENCY = 2;
 
 function getDatePartsInTimeZone(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -341,8 +342,18 @@ export async function runMonthlyOverduePaymentReminder(
     };
   }
 
-  const results = await Promise.all(
-      targetMembers.map(async (member) => {
+  const results: Array<{
+    historySaved: number;
+    total: number;
+    sent: number;
+    failed: number;
+    deactivated: number;
+  }> = [];
+
+  for (let index = 0; index < targetMembers.length; index += MEMBER_PROCESSING_CONCURRENCY) {
+    const batch = targetMembers.slice(index, index + MEMBER_PROCESSING_CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(async (member) => {
         const url = member.cards[0] ? `/member/${member.cards[0].cardCode}` : "/";
         const payload = buildNotificationPayload({
           type: REMINDER_TYPE,
@@ -360,7 +371,9 @@ export async function runMonthlyOverduePaymentReminder(
           deactivated: pushResult.deactivated,
         };
       })
-  );
+    );
+    results.push(...batchResults);
+  }
 
   const historySaved = results.reduce((sum, item) => sum + item.historySaved, 0);
 
