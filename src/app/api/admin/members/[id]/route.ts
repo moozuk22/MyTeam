@@ -10,7 +10,6 @@ import {
 import {
   isCurrentMonthWaived,
   normalizeToMonthStart,
-  resolveStatusFromSettledMonths,
 } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
@@ -79,14 +78,10 @@ export async function GET(
 
     const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
     const pausedThisMonth = isCurrentMonthWaived(waivedDates);
-    const resolvedStatus = resolveStatusFromSettledMonths({
-      paidDates: player.paymentLogs.map((item) => item.paidFor),
-      waivedDates,
-    });
 
     return NextResponse.json({
       ...player,
-      status: pausedThisMonth ? "paused" : resolvedStatus,
+      status: pausedThisMonth ? "paused" : player.status,
       imageUrl: imagePath,
       avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
       imagePublicId: null,
@@ -398,42 +393,22 @@ export async function PATCH(
           });
         }
 
-        const [allPaid, allWaived] = await Promise.all([
-          tx.paymentLog.findMany({
-            where: { playerId: id },
-            select: { paidFor: true },
-          }),
-          tx.paymentWaiver.findMany({
-            where: { playerId: id },
-            select: { waivedFor: true },
-          }),
-        ]);
-
-        await tx.player.update({
-          where: { id },
-          data: {
-            status: resolveStatusFromSettledMonths({
-              paidDates: allPaid.map((row) => row.paidFor),
-              waivedDates: allWaived.map((row) => row.waivedFor),
-            }),
-          },
-        });
       }));
 
-      const [paymentWaivers, paymentLogs, cards] = await withPrismaPoolRetry(() =>
+      const [paymentWaivers, cards, player] = await withPrismaPoolRetry(() =>
         Promise.all([
           prisma.paymentWaiver.findMany({
             where: { playerId: id },
             orderBy: { waivedFor: "desc" },
           }),
-          prisma.paymentLog.findMany({
-            where: { playerId: id },
-            select: { paidFor: true },
-          }),
           prisma.card.findMany({
             where: { playerId: id, isActive: true },
             select: { cardCode: true },
             take: 1,
+          }),
+          prisma.player.findUnique({
+            where: { id },
+            select: { status: true },
           }),
         ]),
       );
@@ -446,12 +421,7 @@ export async function PATCH(
 
       return NextResponse.json({
         success: true,
-        status: pausedThisMonth
-          ? "paused"
-          : resolveStatusFromSettledMonths({
-              paidDates: paymentLogs.map((row) => row.paidFor),
-              waivedDates: paymentWaivers.map((row) => row.waivedFor),
-            }),
+        status: pausedThisMonth ? "paused" : (player?.status ?? "paid"),
         isPausedThisMonth: pausedThisMonth,
         paymentWaivers,
       });

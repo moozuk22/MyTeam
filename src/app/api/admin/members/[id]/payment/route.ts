@@ -5,7 +5,7 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
 import { publishMemberUpdated } from "@/lib/memberEvents";
-import { normalizeToMonthStart, resolveStatusFromSettledMonths } from "@/lib/paymentStatus";
+import { normalizeToMonthStart } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,26 +98,11 @@ export async function POST(
       },
     });
 
-    const [allPaidDates, allWaivedDates] = await Promise.all([
-      prisma.paymentLog.findMany({
-        where: { playerId: id },
-        select: { paidFor: true },
-      }),
-      prisma.paymentWaiver.findMany({
-        where: { playerId: id },
-        select: { waivedFor: true },
-      }),
-    ]);
-
-    // Update player's last payment date and status
+    // Update player's last payment date
     await prisma.player.update({
       where: { id },
       data: {
         lastPaymentDate: new Date(),
-        status: resolveStatusFromSettledMonths({
-          paidDates: allPaidDates.map((row) => row.paidFor),
-          waivedDates: allWaivedDates.map((row) => row.waivedFor),
-        }),
       },
     });
 

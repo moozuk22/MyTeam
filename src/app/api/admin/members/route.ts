@@ -6,10 +6,7 @@ import {
   applyCloudinaryTransformToUrl,
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
-import {
-  isCurrentMonthWaived,
-  resolveStatusFromSettledMonths,
-} from "@/lib/paymentStatus";
+import { isCurrentMonthWaived } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -257,13 +254,9 @@ export async function GET(request: NextRequest) {
       const imagePath = getPrimaryPlayerImagePath(player.images);
       const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
       const pausedThisMonth = isCurrentMonthWaived(waivedDates);
-      const resolvedStatus = resolveStatusFromSettledMonths({
-        paidDates: player.paymentLogs.map((item) => item.paidFor),
-        waivedDates,
-      });
       return {
         ...player,
-        status: pausedThisMonth ? "paused" : resolvedStatus,
+        status: pausedThisMonth ? "paused" : player.status,
         imageUrl: imagePath,
         avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
         imagePublicId: null,

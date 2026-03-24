@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { buildCloudinaryUrlFromUploadPath } from "@/lib/cloudinaryImagePath";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 function buildCloudinaryPngSquare(url: string, size: number): string {
   const marker = "/upload/";
@@ -56,7 +58,7 @@ export async function GET(
   const size = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 192;
   const url = new URL(req.url);
   const clubId = url.searchParams.get("clubId") ?? "";
-  const origin = url.origin;
+  void url.origin;
 
   try {
     const baseLogoUrl = await getClubLogoUrl(clubId);
@@ -80,16 +82,18 @@ export async function GET(
   }
 
   const fallback = size >= 512 ? "/icon-512.png" : "/icon-192.png";
-  const fallbackResponse = await fetch(`${origin}${fallback}`, { cache: "no-store" });
-  if (fallbackResponse.ok) {
-    const body = await fallbackResponse.arrayBuffer();
+  try {
+    const filePath = path.join(process.cwd(), "public", fallback.replace(/^\/+/, ""));
+    const body = await readFile(filePath);
     return new NextResponse(body, {
       status: 200,
       headers: {
-        "Content-Type": fallbackResponse.headers.get("content-type") || "image/png",
+        "Content-Type": "image/png",
         "Cache-Control": "public, max-age=300",
       },
     });
+  } catch {
+    // fall through to 404
   }
 
   return new NextResponse("Icon not found", { status: 404 });

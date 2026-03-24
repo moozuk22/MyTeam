@@ -38,7 +38,10 @@ async function handleCron(request: NextRequest) {
   }
 
   try {
-    const result = await runMonthlyMembershipPaymentReminder();
+    const forceRun = request.nextUrl.searchParams.get("force") === "1";
+    const result = await runMonthlyMembershipPaymentReminder(new Date(), {
+      ignoreSchedule: forceRun,
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error("Monthly membership reminder cron error:", error);

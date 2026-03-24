@@ -6,7 +6,7 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 const REMINDER_TYPE = "monthly_overdue_payment_reminder" as const;
 const DEFAULT_TIME_ZONE = "Europe/Sofia";
 const STATUS_ROLLOVER_JOB = "monthly_status_rollover";
-const RUN_DAY = 24;
+const RUN_DAY = 1;
 const RUN_HOUR = 10;
 const DEFAULT_LOCK_TIMEOUT_MINUTES = 180;
 const MEMBER_PROCESSING_CONCURRENCY = 2;
@@ -247,7 +247,7 @@ async function runMonthlyStatusRollover(year: number, month: number) {
           data: { status: "warning" },
         })
       : prisma.player.updateMany({
-          where: { id: "__no_match__" },
+          where: { id: { in: [] } },
           data: { status: "warning" },
         }),
     warningIds.length > 0
@@ -258,7 +258,7 @@ async function runMonthlyStatusRollover(year: number, month: number) {
           data: { status: "overdue" },
         })
       : prisma.player.updateMany({
-          where: { id: "__no_match__" },
+          where: { id: { in: [] } },
           data: { status: "overdue" },
         }),
   ]);
@@ -274,7 +274,8 @@ async function runMonthlyStatusRollover(year: number, month: number) {
 }
 
 export async function runMonthlyOverduePaymentReminder(
-    now = new Date()
+    now = new Date(),
+    options?: { ignoreSchedule?: boolean }
 ): Promise<MonthlyOverduePaymentReminderResult> {
   const timeZone = process.env.CRON_TIMEZONE?.trim() || DEFAULT_TIME_ZONE;
   const nowIso = now.toISOString();
@@ -301,7 +302,7 @@ export async function runMonthlyOverduePaymentReminder(
     };
   }
 
-  if (day !== RUN_DAY || hour !== RUN_HOUR) {
+  if (!options?.ignoreSchedule && (day !== RUN_DAY || hour !== RUN_HOUR)) {
     return {
       success: true,
       skipped: true,

@@ -5,7 +5,7 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 
 const REMINDER_TYPE = "monthly_membership_payment_reminder" as const;
 const DEFAULT_TIME_ZONE = "Europe/Sofia";
-const RUN_DAY = 24;
+const RUN_DAY = 25;
 const RUN_HOUR = 10;
 const MEMBER_PROCESSING_CONCURRENCY = 2;
 
@@ -48,7 +48,8 @@ export interface MonthlyMembershipReminderResult {
 }
 
 export async function runMonthlyMembershipPaymentReminder(
-    now = new Date()
+    now = new Date(),
+    options?: { ignoreSchedule?: boolean }
 ): Promise<MonthlyMembershipReminderResult> {
   const timeZone = process.env.CRON_TIMEZONE?.trim() || DEFAULT_TIME_ZONE;
   const nowIso = now.toISOString();
@@ -68,7 +69,7 @@ export async function runMonthlyMembershipPaymentReminder(
     };
   }
 
-  if (day !== RUN_DAY || hour !== RUN_HOUR) {
+  if (!options?.ignoreSchedule && (day !== RUN_DAY || hour !== RUN_HOUR)) {
     return {
       success: true,
       skipped: true,
@@ -88,6 +89,9 @@ export async function runMonthlyMembershipPaymentReminder(
   const [members, alreadySentRows] = await Promise.all([
     prisma.player.findMany({
       where: {
+        status: {
+          in: ["warning", "overdue"],
+        },
         paymentWaivers: {
           none: {
             waivedFor: {

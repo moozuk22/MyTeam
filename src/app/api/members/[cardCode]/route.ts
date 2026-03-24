@@ -6,10 +6,7 @@ import {
 } from "@/lib/cloudinaryImagePath";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { cloudinary } from "@/lib/cloudinary";
-import {
-  isCurrentMonthWaived,
-  resolveStatusFromSettledMonths,
-} from "@/lib/paymentStatus";
+import { isCurrentMonthWaived } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -196,10 +193,6 @@ export async function GET(
 
     const waivedDates = paymentWaivers.map((item) => item.waivedFor);
     const pausedThisMonth = isCurrentMonthWaived(waivedDates);
-    const resolvedStatus = resolveStatusFromSettledMonths({
-      paidDates: paymentLogs.map((item) => item.paidFor),
-      waivedDates,
-    });
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
     const playerImagePath = getPlayerImagePathByAudience(card.player.images, isPrivilegedViewer);
@@ -228,7 +221,7 @@ export async function GET(
         team_group: card.player.teamGroup,
         jerseyNumber: card.player.jerseyNumber,
         birthDate: card.player.birthDate,
-        status: pausedThisMonth ? "paused" : resolvedStatus,
+        status: pausedThisMonth ? "paused" : card.player.status,
         last_payment_date: card.player.lastPaymentDate,
         paymentLogs: paymentLogs.map((item) => ({
           id: item.id,

@@ -21,7 +21,12 @@ export async function register() {
       import("@/lib/jobs/monthlyOverduePaymentReminder"),
     ]);
 
-  const run = async () => {
+  const run = async (options?: {
+    forceMembership?: boolean;
+    skipMembership?: boolean;
+    forceOverdue?: boolean;
+    skipOverdue?: boolean;
+  }) => {
     if (schedulerRunning) {
       console.log("Local monthly schedulers skipped: previous run still in progress.");
       return;
@@ -29,8 +34,24 @@ export async function register() {
 
     schedulerRunning = true;
     try {
-      const membershipResult = await runMonthlyMembershipPaymentReminder();
-      const overdueResult = await runMonthlyOverduePaymentReminder();
+      const membershipResult = options?.skipMembership
+        ? {
+            success: true,
+            skipped: true,
+            reason: "Membership reminder skipped by startup configuration.",
+          }
+        : await runMonthlyMembershipPaymentReminder(new Date(), {
+            ignoreSchedule: Boolean(options?.forceMembership),
+          });
+      const overdueResult = options?.skipOverdue
+        ? {
+            success: true,
+            skipped: true,
+            reason: "Overdue reminder skipped by startup configuration.",
+          }
+        : await runMonthlyOverduePaymentReminder(new Date(), {
+            ignoreSchedule: Boolean(options?.forceOverdue),
+          });
 
       if (!membershipResult.skipped) {
         console.log("Monthly reminder job executed:", membershipResult);
@@ -50,8 +71,8 @@ export async function register() {
     }
   };
 
-  // Run once on startup, then re-check every hour.
-  void run();
+  // Run only overdue reminder once on startup, then re-check both every hour.
+  void run({ skipMembership: true, forceOverdue: true });
   setInterval(() => {
     void run();
   }, 60 * 60 * 1000);

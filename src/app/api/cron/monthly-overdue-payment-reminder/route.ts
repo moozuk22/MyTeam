@@ -38,7 +38,10 @@ async function handleCron(request: NextRequest) {
   }
 
   try {
-    const result = await runMonthlyOverduePaymentReminder();
+    const forceRun = request.nextUrl.searchParams.get("force") === "1";
+    const result = await runMonthlyOverduePaymentReminder(new Date(), {
+      ignoreSchedule: forceRun,
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error("Monthly overdue reminder cron error:", error);

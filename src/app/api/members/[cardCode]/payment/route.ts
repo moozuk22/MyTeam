@@ -8,7 +8,6 @@ import {
   addMonths,
   compareYearMonth,
   normalizeToMonthStart,
-  resolveStatusFromSettledMonths,
   toMonthKey,
   toYearMonth,
   type YearMonth,
@@ -123,26 +122,10 @@ export async function POST(
         })),
       });
 
-      const [allPaidDates, allWaivedDates] = await Promise.all([
-        tx.paymentLog.findMany({
-          where: { playerId: card.playerId },
-          select: { paidFor: true },
-        }),
-        tx.paymentWaiver.findMany({
-          where: { playerId: card.playerId },
-          select: { waivedFor: true },
-        }),
-      ]);
-
-      const waivedDates = allWaivedDates.map((row) => row.waivedFor);
       await tx.player.update({
         where: { id: card.playerId },
         data: {
           lastPaymentDate: new Date(),
-          status: resolveStatusFromSettledMonths({
-            paidDates: allPaidDates.map((row) => row.paidFor),
-            waivedDates,
-          }),
         },
       });
     });
