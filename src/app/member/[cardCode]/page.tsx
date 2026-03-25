@@ -40,6 +40,12 @@ interface MemberProfile {
   isPausedThisMonth?: boolean;
 }
 
+interface TrainingDayStatus {
+  date: string;
+  weekday: number;
+  optedOut: boolean;
+}
+
 const SPEED_LINES = [8, 16, 24, 33, 42, 54, 65, 76, 85, 93];
 
 const MONTH_NAMES_BG = [
@@ -51,6 +57,21 @@ const MONTH_NAMES_BG_FULL = [
   "Януари", "Февруари", "Март", "Април", "Май", "Юни",
   "Юли", "Август", "Септември", "Октомври", "Ноември", "Декември",
 ];
+
+const TRAINING_WEEKDAY_LABELS_BG: Record<number, string> = {
+  1: "Понеделник",
+  2: "Вторник",
+  3: "Сряда",
+  4: "Четвъртък",
+  5: "Петък",
+  6: "Събота",
+  7: "Неделя",
+};
+const TRAINING_WEEKDAY_SHORT_BG = Array.from({ length: 7 }, (_, index) =>
+  new Intl.DateTimeFormat("bg-BG", { weekday: "short" })
+    .format(new Date(Date.UTC(2024, 0, 1 + index)))
+    .replace(".", ""),
+);
 
 const STATUS_MAP = {
   paid: { label: "ТАКСА: ПЛАТЕНА", cls: "green glow" },
@@ -232,6 +253,11 @@ export default function MemberCardPage({
     paidFor: string;
     paidAt: string;
   } | null>(null);
+  const [trainingDays, setTrainingDays] = useState<TrainingDayStatus[]>([]);
+  const [trainingWindowDays, setTrainingWindowDays] = useState(30);
+  const [trainingLoading, setTrainingLoading] = useState(false);
+  const [trainingError, setTrainingError] = useState<string | null>(null);
+  const [trainingSavingDate, setTrainingSavingDate] = useState<string | null>(null);
 
   // ── Derived: paid months set ─────────────────────────
   const paidSet = new Set<string>(
@@ -256,6 +282,43 @@ export default function MemberCardPage({
   const canRemovePause = selectedPauseMonths.some(
     (item) => waivedSet.has(`${item.year}-${item.month}`),
   );
+  const trainingDaysSorted = [...trainingDays].sort((a, b) => a.date.localeCompare(b.date));
+  const trainingByDate = new Map(trainingDaysSorted.map((item) => [item.date, item]));
+  const today = new Date();
+  const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const trainingMonths = (() => {
+    const monthMap = new Map<string, { year: number; month: number }>();
+    for (const item of trainingDaysSorted) {
+      const [yearStr, monthStr] = item.date.split("-");
+      const year = Number.parseInt(yearStr ?? "", 10);
+      const month = Number.parseInt(monthStr ?? "", 10);
+      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        continue;
+      }
+      monthMap.set(`${year}-${month}`, { year, month });
+    }
+
+    return [...monthMap.values()]
+      .sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year))
+      .map(({ year, month }) => {
+        const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+        const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+        const leadingEmptyDays = (firstWeekday + 6) % 7;
+        const cells: Array<string | null> = Array.from({ length: leadingEmptyDays }, () => null);
+        for (let day = 1; day <= daysInMonth; day += 1) {
+          cells.push(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+        }
+        while (cells.length % 7 !== 0) {
+          cells.push(null);
+        }
+
+        return {
+          key: `${year}-${month}`,
+          label: `${MONTH_NAMES_BG_FULL[month - 1] ?? ""} ${year}`,
+          cells,
+        };
+      });
+  })();
 
   // Last paid month
   const lastPaidYM: { year: number; month: number } | null = (() => {
@@ -345,6 +408,85 @@ export default function MemberCardPage({
     }
   };
 
+  const fetchTrainingDays = async () => {
+    setTrainingLoading(true);
+    setTrainingError(null);
+    try {
+      const response = await fetch(`/api/members/${normalizedCardCode}/training`, { cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно зареждане на тренировките.",
+        );
+      }
+
+      const payload = await response.json();
+      const days = Array.isArray(payload?.dates)
+        ? payload.dates
+            .map((item: unknown) => {
+              const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+              return {
+                date: String(raw.date ?? ""),
+                weekday: Number(raw.weekday ?? 0),
+                optedOut: Boolean(raw.optedOut),
+              } satisfies TrainingDayStatus;
+            })
+            .filter((item: TrainingDayStatus) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+        : [];
+      const nextWindowDays = Number.parseInt(String(payload?.trainingWindowDays ?? "30"), 10);
+      setTrainingWindowDays(Number.isInteger(nextWindowDays) && nextWindowDays > 0 ? nextWindowDays : 30);
+      setTrainingDays(days);
+    } catch (error) {
+      console.error("Failed to fetch training schedule:", error);
+      setTrainingError(error instanceof Error ? error.message : "Възникна грешка.");
+      setTrainingDays([]);
+    } finally {
+      setTrainingLoading(false);
+    }
+  };
+
+  const toggleTrainingOptOut = async (item: TrainingDayStatus) => {
+    if (trainingSavingDate) {
+      return;
+    }
+
+    setTrainingSavingDate(item.date);
+    setTrainingError(null);
+    try {
+      const response = await fetch(`/api/members/${normalizedCardCode}/training`, {
+        method: item.optedOut ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trainingDate: item.date }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешна промяна на участие.",
+        );
+      }
+
+      setTrainingDays((prev) =>
+        prev.map((entry) =>
+          entry.date === item.date
+            ? {
+                ...entry,
+                optedOut: !item.optedOut,
+              }
+            : entry,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to toggle training participation:", error);
+      setTrainingError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingSavingDate(null);
+    }
+  };
+
   // Fetch member
   useEffect(() => {
     const fetchMember = async () => {
@@ -367,6 +509,10 @@ export default function MemberCardPage({
       }
     };
     void fetchMember();
+  }, [normalizedCardCode]);
+
+  useEffect(() => {
+    void fetchTrainingDays();
   }, [normalizedCardCode]);
 
   // Live updates via SSE (no polling)
@@ -1201,6 +1347,74 @@ export default function MemberCardPage({
 
             <div className="divider divider--mt" />
           </div>
+        </div>
+
+        <div className="training-section">
+          <div className="training-head">
+            <h3 className="training-title">Тренировъчни дни (следващи {trainingWindowDays} дни)</h3>
+          </div>
+          {trainingLoading ? (
+            <p className="training-empty">Зареждане...</p>
+          ) : trainingDays.length === 0 ? (
+            <p className="training-empty">Няма настроени тренировъчни дни.</p>
+          ) : (
+            <div className="training-calendar">
+              {trainingMonths.map((month) => (
+                <section key={month.key} className="training-calendar-month">
+                  <h4 className="training-calendar-month-title">{month.label}</h4>
+                  <div className="training-calendar-weekdays">
+                    {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                      <span key={`${month.key}-${weekday}`} className="training-calendar-weekday">
+                        {weekday}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="training-calendar-grid">
+                    {month.cells.map((cellDate, index) => {
+                      if (!cellDate) {
+                        return <span key={`${month.key}-empty-${index}`} className="training-calendar-cell training-calendar-cell--empty" aria-hidden="true" />;
+                      }
+
+                      const trainingItem = trainingByDate.get(cellDate);
+                      const dayNumber = cellDate.slice(8, 10);
+                      const isToday = cellDate === todayDateKey;
+                      if (!trainingItem) {
+                        return (
+                          <span
+                            key={cellDate}
+                            className={`training-calendar-cell training-calendar-cell--off${isToday ? " training-calendar-cell--today" : ""}`}
+                          >
+                            <span className="training-calendar-day-number">{dayNumber}</span>
+                          </span>
+                        );
+                      }
+
+                      const isSaving = trainingSavingDate === trainingItem.date;
+                      const dateLabel = new Date(`${trainingItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                        day: "2-digit",
+                        month: "2-digit",
+                      });
+                      return (
+                        <button
+                          key={cellDate}
+                          className={`training-calendar-cell training-calendar-cell--training${trainingItem.optedOut ? " training-calendar-cell--opted-out" : ""}${isToday ? " training-calendar-cell--today" : ""}`}
+                          onClick={() => void toggleTrainingOptOut(trainingItem)}
+                          disabled={Boolean(trainingSavingDate)}
+                          type="button"
+                          aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem.weekday] ?? "-"} ${dateLabel}`}
+                          aria-pressed={!trainingItem.optedOut}
+                        >
+                          <span className="training-calendar-day-number">{dayNumber}</span>
+                          <span className="training-calendar-mark">{isSaving ? "..." : trainingItem.optedOut ? "x" : "✓"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+          {trainingError && <p className="training-error">{trainingError}</p>}
         </div>
 
         {/* Below card buttons */}

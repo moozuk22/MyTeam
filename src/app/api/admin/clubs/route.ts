@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
           reminderDay: true,
           overdueDay: true,
           reminderHour: true,
+          trainingWeekdays: true,
+          trainingWindowDays: true,
         },
         orderBy: {
           name: "asc",
@@ -63,6 +65,8 @@ export async function GET(request: NextRequest) {
           reminderDay: true,
           overdueDay: true,
           reminderHour: true,
+          trainingWeekdays: true,
+          trainingWindowDays: true,
         },
         orderBy: {
           name: "asc",

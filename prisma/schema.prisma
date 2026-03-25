@@ -8,17 +8,21 @@ datasource db {
 }
 
 model Club {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  emblemUrl     String?  @map("emblem_url")
-  imagePublicId String?  @map("image_public_id")
-  imageUrl      String?  @map("image_url")
-  reminderDay   Int      @default(25) @map("reminder_day")
-  overdueDay    Int      @default(1) @map("overdue_day")
-  reminderHour  Int      @default(10) @map("reminder_hour")
-  reminderTz    String   @default("Europe/Sofia") @map("reminder_tz")
-  players       Player[]
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  emblemUrl          String?        @map("emblem_url")
+  imagePublicId      String?        @map("image_public_id")
+  imageUrl           String?        @map("image_url")
+  reminderDay        Int            @default(25) @map("reminder_day")
+  overdueDay         Int            @default(1) @map("overdue_day")
+  reminderHour       Int            @default(10) @map("reminder_hour")
+  reminderTz         String         @default("Europe/Sofia") @map("reminder_tz")
+  trainingWeekdays   Int[]          @default([]) @map("training_weekdays")
+  trainingDates      String[]       @default([]) @map("training_dates")
+  trainingWindowDays Int            @default(30) @map("training_window_days")
+  players            Player[]
+  trainingNotes      TrainingNote[]
 
   @@map("clubs")
 }
@@ -52,9 +56,37 @@ model Player {
   playerNotification PlayerNotification[]
   club               Club                 @relation(fields: [clubId], references: [id], onDelete: Cascade)
   pushSubscriptions  PushSubscription[]
+  trainingOptOuts    TrainingOptOut[]
 
   @@index([clubId])
   @@map("players")
+}
+
+model TrainingOptOut {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  playerId     String   @map("player_id") @db.Uuid
+  trainingDate DateTime @map("training_date") @db.Date
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  player       Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, trainingDate])
+  @@index([trainingDate])
+  @@map("training_opt_outs")
+}
+
+model TrainingNote {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId          String   @map("club_id") @db.Uuid
+  trainingDate    DateTime @map("training_date") @db.Date
+  note            String?
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  club            Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, trainingDate])
+  @@index([trainingDate])
+  @@map("training_notes")
 }
 
 model Image {
@@ -81,14 +113,14 @@ model PaymentLog {
 }
 
 model PaymentWaiver {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  playerId   String   @map("player_id") @db.Uuid
-  waivedFor  DateTime @map("waived_for") @db.Timestamptz(6)
-  reason     String?
-  createdBy  String   @default("admin") @map("created_by")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  playerId  String   @map("player_id") @db.Uuid
+  waivedFor DateTime @map("waived_for") @db.Timestamptz(6)
+  reason    String?
+  createdBy String   @default("admin") @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([playerId, waivedFor])
   @@index([playerId])

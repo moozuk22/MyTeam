@@ -9,6 +9,8 @@ import "./page.css";
 
 // Reports-related imports
 const MONTHS = ["Януари", "Февруари", "Март", "Април", "Май", "Юни", "Юли", "Август", "Септември", "Октомври", "Ноември", "Декември"];
+const TRAINING_SELECTION_WINDOW_DAYS = 30;
+const TRAINING_WEEKDAY_SHORT_BG = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type ReportKind = "monthly" | "yearly";
 
@@ -52,6 +54,9 @@ interface ClubOption {
   reminderDay?: number;
   overdueDay?: number;
   reminderHour?: number;
+  trainingDates?: string[];
+  trainingWeekdays?: number[];
+  trainingWindowDays?: number;
 }
 
 interface Member {
@@ -70,6 +75,24 @@ interface Member {
   paymentLogs: PaymentLog[];
   cards: MemberCard[];
   isActive: boolean;
+}
+
+interface TrainingAttendancePlayer {
+  id: string;
+  fullName: string;
+  teamGroup: number | null;
+  cardCode: string | null;
+  optedOut: boolean;
+}
+
+interface TrainingUpcomingDateItem {
+  date: string;
+  weekday: number;
+  stats: {
+    total: number;
+    attending: number;
+    optedOut: number;
+  };
 }
 
 function normalizeMember(item: unknown): Member {
@@ -128,6 +151,80 @@ function normalizeMember(item: unknown): Member {
     cards,
     isActive: Boolean(raw.isActive ?? true),
   };
+}
+
+function toIsoDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function getTodayIsoDate(): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Sofia",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+  return `${year}-${month}-${day}`;
+}
+
+function getNextTrainingCalendarDates(days = TRAINING_SELECTION_WINDOW_DAYS): string[] {
+  const startIso = getTodayIsoDate();
+  const start = new Date(`${startIso}T00:00:00.000Z`).getTime();
+  const result: string[] = [];
+
+  for (let offset = 0; offset < days; offset += 1) {
+    result.push(toIsoDateOnly(new Date(start + offset * 24 * 60 * 60 * 1000)));
+  }
+
+  return result;
+}
+
+function getWeekdayMondayFirstIndex(isoDate: string): number {
+  const day = new Date(`${isoDate}T12:00:00.000Z`).getUTCDay();
+  return (day + 6) % 7;
+}
+
+function buildCalendarMonths(dates: string[]) {
+  const monthKeys = Array.from(
+    new Set(
+      dates.map((date) => {
+        const [year, month] = date.split("-").map((value) => Number.parseInt(value ?? "", 10));
+        return `${year}-${month}`;
+      }),
+    ),
+  );
+
+  return monthKeys
+    .map((key) => {
+      const [year, month] = key.split("-").map((value) => Number.parseInt(value ?? "", 10));
+      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        return null;
+      }
+
+      const firstDate = `${year}-${String(month).padStart(2, "0")}-01`;
+      const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      const leadingEmpty = getWeekdayMondayFirstIndex(firstDate);
+      const cells: Array<string | null> = Array.from({ length: leadingEmpty }, () => null);
+
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        cells.push(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+      }
+      while (cells.length % 7 !== 0) {
+        cells.push(null);
+      }
+
+      return {
+        key,
+        label: `${MONTHS[month - 1] ?? ""} ${year}`,
+        cells,
+      };
+    })
+    .filter((month): month is { key: string; label: string; cells: Array<string | null> } => month !== null)
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
 interface StatusMeta {
@@ -1007,7 +1104,34 @@ function AdminMembersPageContent() {
     reminderDay: "25",
     overdueDay: "1",
     reminderHour: "10",
+    trainingDates: [] as string[],
   });
+  const [trainingAttendanceOpen, setTrainingAttendanceOpen] = useState(false);
+  const [trainingAttendanceLoading, setTrainingAttendanceLoading] = useState(false);
+  const [trainingAttendanceError, setTrainingAttendanceError] = useState("");
+  const [trainingAttendanceDate, setTrainingAttendanceDate] = useState(getTodayIsoDate());
+  const [trainingAttendancePlayers, setTrainingAttendancePlayers] = useState<TrainingAttendancePlayer[]>([]);
+  const [trainingAttendanceStats, setTrainingAttendanceStats] = useState({
+    total: 0,
+    attending: 0,
+    optedOut: 0,
+  });
+  const [trainingUpcomingDates, setTrainingUpcomingDates] = useState<TrainingUpcomingDateItem[]>([]);
+  const [trainingNote, setTrainingNote] = useState("");
+  const [trainingNoteSaving, setTrainingNoteSaving] = useState(false);
+  const [trainingNoteTargetDates, setTrainingNoteTargetDates] = useState<string[]>([]);
+  const [trainingBulkNoteOpen, setTrainingBulkNoteOpen] = useState(false);
+  const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
+  const [trainingDaysEditorOpen, setTrainingDaysEditorOpen] = useState(false);
+  const [trainingDaysEditorLoading, setTrainingDaysEditorLoading] = useState(false);
+  const [trainingDaysEditorSaving, setTrainingDaysEditorSaving] = useState(false);
+  const [trainingDaysEditorError, setTrainingDaysEditorError] = useState("");
+  const schedulerCalendarDates = getNextTrainingCalendarDates();
+  const schedulerCalendarDateSet = new Set(schedulerCalendarDates);
+  const schedulerCalendarMonths = buildCalendarMonths(schedulerCalendarDates);
+  const trainingUpcomingDateSet = new Set(trainingUpcomingDates.map((item) => item.date));
+  const trainingUpcomingByDate = new Map(trainingUpcomingDates.map((item) => [item.date, item]));
+  const trainingAttendanceCalendarMonths = buildCalendarMonths(trainingUpcomingDates.map((item) => item.date));
 
   useEffect(() => {
     if (!clubId) return;
@@ -1622,11 +1746,83 @@ function AdminMembersPageContent() {
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
         reminderHour: String(payload.reminderHour ?? 10),
+        trainingDates: Array.isArray(payload.trainingDates)
+          ? payload.trainingDates
+              .map((value: unknown) => String(value ?? "").trim())
+              .filter((value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+              .sort((a: string, b: string) => a.localeCompare(b))
+          : [],
       });
     } catch (error) {
       setSchedulerSettingsError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
       setSchedulerSettingsLoading(false);
+    }
+  };
+
+  const openTrainingDaysEditor = async () => {
+    if (!clubId) return;
+    if (trainingDaysEditorOpen) {
+      setTrainingDaysEditorOpen(false);
+      setTrainingDaysEditorError("");
+      return;
+    }
+
+    setTrainingDaysEditorError("");
+    setTrainingDaysEditorLoading(true);
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/scheduler`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Неуспешно зареждане на графика.");
+      }
+      const payload = await response.json();
+      setSchedulerForm({
+        reminderDay: String(payload.reminderDay ?? 25),
+        overdueDay: String(payload.overdueDay ?? 1),
+        reminderHour: String(payload.reminderHour ?? 10),
+        trainingDates: Array.isArray(payload.trainingDates)
+          ? payload.trainingDates
+              .map((value: unknown) => String(value ?? "").trim())
+              .filter((value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+              .sort((a: string, b: string) => a.localeCompare(b))
+          : [],
+      });
+      setTrainingDaysEditorOpen(true);
+    } catch (error) {
+      setTrainingDaysEditorError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingDaysEditorLoading(false);
+    }
+  };
+
+  const saveTrainingDaysFromTrainingModal = async () => {
+    if (!clubId || trainingDaysEditorSaving) return;
+    setTrainingDaysEditorSaving(true);
+    setTrainingDaysEditorError("");
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/scheduler`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reminderDay: Number.parseInt(schedulerForm.reminderDay, 10),
+          overdueDay: Number.parseInt(schedulerForm.overdueDay, 10),
+          reminderHour: Number.parseInt(schedulerForm.reminderHour, 10),
+          trainingDates: schedulerForm.trainingDates,
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Неуспешно запазване на тренировъчните дни.");
+      }
+      setTrainingDaysEditorOpen(false);
+      await fetchTrainingAttendance(trainingAttendanceDate);
+    } catch (error) {
+      setTrainingDaysEditorError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingDaysEditorSaving(false);
     }
   };
 
@@ -1642,6 +1838,7 @@ function AdminMembersPageContent() {
           reminderDay: Number.parseInt(schedulerForm.reminderDay, 10),
           overdueDay: Number.parseInt(schedulerForm.overdueDay, 10),
           reminderHour: Number.parseInt(schedulerForm.reminderHour, 10),
+          trainingDates: schedulerForm.trainingDates,
         }),
       });
       if (!response.ok) {
@@ -1653,6 +1850,193 @@ function AdminMembersPageContent() {
       setSchedulerSettingsError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
       setSchedulerSettingsSaving(false);
+    }
+  };
+
+  const toggleTrainingDate = (date: string) => {
+    setSchedulerForm((prev) => {
+      const hasDate = prev.trainingDates.includes(date);
+      const nextDates = hasDate
+        ? prev.trainingDates.filter((value) => value !== date)
+        : [...prev.trainingDates, date].sort((a, b) => a.localeCompare(b));
+      return {
+        ...prev,
+        trainingDates: nextDates,
+      };
+    });
+  };
+
+  const toggleTrainingNoteTargetDate = (date: string) => {
+    setTrainingNoteTargetDates((prev) => {
+      const hasDate = prev.includes(date);
+      if (hasDate) {
+        return prev.filter((value) => value !== date);
+      }
+      return [...prev, date].sort((a, b) => a.localeCompare(b));
+    });
+  };
+
+  const fetchTrainingAttendance = async (date?: string) => {
+    if (!clubId) return;
+    setTrainingAttendanceLoading(true);
+    setTrainingAttendanceError("");
+    try {
+      const query = date ? `?date=${encodeURIComponent(date)}` : "";
+      const response = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance${query}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно зареждане на присъствие.",
+        );
+      }
+
+      const payload = await response.json();
+      const players = Array.isArray(payload?.players)
+        ? payload.players.map((item: unknown) => {
+            const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+            return {
+              id: String(raw.id ?? ""),
+              fullName: String(raw.fullName ?? ""),
+              teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
+              cardCode: raw.cardCode ? String(raw.cardCode) : null,
+              optedOut: Boolean(raw.optedOut),
+            } satisfies TrainingAttendancePlayer;
+          })
+        : [];
+      const upcomingDates = Array.isArray(payload?.upcomingDates)
+        ? payload.upcomingDates
+            .map((item: unknown) => {
+              const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+              const rawStats =
+                typeof raw.stats === "object" && raw.stats !== null
+                  ? (raw.stats as Record<string, unknown>)
+                  : {};
+              return {
+                date: String(raw.date ?? ""),
+                weekday: Number(raw.weekday ?? 0),
+                stats: {
+                  total: Number(rawStats.total ?? 0),
+                  attending: Number(rawStats.attending ?? 0),
+                  optedOut: Number(rawStats.optedOut ?? 0),
+                },
+              };
+            })
+            .filter((item: TrainingUpcomingDateItem) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+        : [];
+
+      const resolvedDate = String(payload?.trainingDate ?? date ?? "");
+      setTrainingAttendanceDate(resolvedDate);
+      setTrainingAttendancePlayers(players);
+      setTrainingAttendanceStats({
+        total: Number(payload?.stats?.total ?? players.length),
+        attending: Number(
+          payload?.stats?.attending ??
+            players.filter((player: TrainingAttendancePlayer) => !player.optedOut).length,
+        ),
+        optedOut: Number(
+          payload?.stats?.optedOut ??
+            players.filter((player: TrainingAttendancePlayer) => player.optedOut).length,
+        ),
+      });
+      setTrainingUpcomingDates(upcomingDates);
+      setTrainingNote(typeof payload?.note === "string" ? payload.note : "");
+      setTrainingNoteTargetDates((prev) => {
+        const allowedSet = new Set(upcomingDates.map((item: TrainingUpcomingDateItem) => item.date));
+        const filtered = prev.filter((item) => allowedSet.has(item));
+        if (filtered.length > 0) {
+          return filtered;
+        }
+        return resolvedDate ? [resolvedDate] : [];
+      });
+    } catch (error) {
+      setTrainingAttendancePlayers([]);
+      setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
+      setTrainingUpcomingDates([]);
+      setTrainingNote("");
+      setTrainingNoteTargetDates([]);
+      setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingAttendanceLoading(false);
+    }
+  };
+
+  const openTrainingAttendance = async () => {
+    if (!clubId) return;
+    setTrainingAttendanceOpen(true);
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingNoteTargetDates([]);
+    await fetchTrainingAttendance();
+  };
+
+  const openTrainingDayDetails = async (date: string) => {
+    setTrainingAttendanceDate(date);
+    await fetchTrainingAttendance(date);
+    setTrainingDayDetailsOpen(true);
+  };
+
+  const saveTrainingNote = async () => {
+    if (!clubId || trainingNoteSaving) return;
+    setTrainingNoteSaving(true);
+    setTrainingAttendanceError("");
+    try {
+      const targetDates =
+        trainingNoteTargetDates.length > 0
+          ? trainingNoteTargetDates
+          : trainingAttendanceDate
+            ? [trainingAttendanceDate]
+            : [];
+      if (targetDates.length === 0) {
+        throw new Error("Select at least one training day for note.");
+      }
+
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trainingDate: targetDates[0],
+          note: trainingNote,
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно запазване на описание.",
+        );
+      }
+      for (const targetDate of targetDates.slice(1)) {
+        const bulkResponse = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trainingDate: targetDate,
+            note: trainingNote,
+          }),
+        });
+        if (!bulkResponse.ok) {
+          const payload = await bulkResponse.json().catch(() => ({}));
+          throw new Error(
+            typeof payload?.error === "string" && payload.error.trim()
+              ? payload.error.trim()
+              : `Failed saving note for ${targetDate}.`,
+          );
+        }
+      }
+      await fetchTrainingAttendance(trainingAttendanceDate);
+      setTrainingBulkNoteOpen(false);
+    } catch (error) {
+      setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingNoteSaving(false);
     }
   };
 
@@ -1747,6 +2131,10 @@ function AdminMembersPageContent() {
                 <CalendarIcon />
                 {"\u0413\u0440\u0430\u0444\u0438\u043a \u0438\u0437\u0432\u0435\u0441\u0442\u0438\u044f"}
               </button>
+              <button className="amp-download-links-btn amp-scheduler-settings-btn" onClick={() => void openTrainingAttendance()} type="button">
+                <UsersIcon />
+                {"Тренировки"}
+              </button>
               {isAdmin && (
                 <button className="amp-download-links-btn" onClick={() => void handleDownloadMemberLinks()} type="button">
                   <DownloadIcon />
@@ -1838,7 +2226,7 @@ function AdminMembersPageContent() {
       )}
       {memberToEdit && (
         <div className="amp-overlay" onClick={isSavingEdit ? undefined : closeEditModal}>
-          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+          <div className="amp-modal amp-modal--confirm amp-modal--scheduler-settings" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">Редактиране на играч</span>
@@ -2015,6 +2403,578 @@ function AdminMembersPageContent() {
         />
       )}
       {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} clubId={clubId} />}
+      {trainingAttendanceOpen && (
+        <div
+          className="amp-overlay"
+          onClick={() => {
+            if (!trainingNoteSaving) {
+              setTrainingAttendanceOpen(false);
+              setTrainingDayDetailsOpen(false);
+              setTrainingDaysEditorOpen(false);
+            }
+          }}
+        >
+          <div className="amp-modal amp-modal--confirm amp-modal--training-attendance" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Тренировъчно присъствие</span>
+              <button
+                className="amp-modal-close"
+                onClick={() => {
+                  setTrainingAttendanceOpen(false);
+                  setTrainingDayDetailsOpen(false);
+                  setTrainingDaysEditorOpen(false);
+                }}
+                aria-label="Затвори"
+                disabled={trainingNoteSaving}
+              >
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              <div className="amp-training-toolbar">
+                <label className="amp-edit-field">
+                  <span className="amp-lbl">Дата</span>
+                </label>
+                <div className="amp-training-stats">
+                  <span>Общо: {trainingAttendanceStats.total}</span>
+                  <span>Присъстват: {trainingAttendanceStats.attending}</span>
+                  <span>Отказали: {trainingAttendanceStats.optedOut}</span>
+                </div>
+              </div>
+              <label className="amp-edit-field">
+                <span className="amp-lbl">Описание за тренировката (по избор)</span>
+                <div className="amp-training-calendar amp-training-calendar--attendance">
+                  {trainingAttendanceCalendarMonths.map((month) => (
+                    <div key={month.key} className="amp-training-month">
+                      <div className="amp-training-month-title">{month.label}</div>
+                      <div className="amp-training-weekdays-row">
+                        {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                          <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
+                            {weekday}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="amp-training-month-grid">
+                        {month.cells.map((date, index) => {
+                          if (!date) {
+                            return (
+                              <span
+                                key={`${month.key}-empty-${index}`}
+                                className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                aria-hidden="true"
+                              />
+                            );
+                          }
+                          const dayNumber = Number.parseInt(date.slice(8, 10), 10);
+                          const dateData = trainingUpcomingByDate.get(date);
+                          if (!dateData || !trainingUpcomingDateSet.has(date)) {
+                            return (
+                              <span
+                                key={date}
+                                className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
+                                aria-hidden="true"
+                              >
+                                <span className="amp-training-day-number">{dayNumber}</span>
+                              </span>
+                            );
+                          }
+
+                          const isActive = trainingAttendanceDate === date;
+                          return (
+                            <button
+                              key={date}
+                              type="button"
+                              className={`amp-training-date-btn${isActive ? " amp-training-date-btn--active" : ""}`}
+                              onClick={() => void openTrainingDayDetails(date)}
+                              disabled={trainingAttendanceLoading || trainingNoteSaving}
+                            >
+                              <span className="amp-training-day-number">{dayNumber}</span>
+                              <span className="amp-training-day-meta">
+                                {dateData.stats.attending}/{dateData.stats.total}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {false && trainingDaysEditorOpen && (
+                  <div className="amp-training-days-editor">
+                    <div className="amp-training-days-editor-header">
+                      <span className="amp-lbl">Избери тренировъчни дни (следващи 30 дни)</span>
+                      <span className="amp-lbl">Избрани: {schedulerForm.trainingDates.length}</span>
+                    </div>
+                    <div className="amp-training-calendar">
+                      {schedulerCalendarMonths.map((month) => (
+                        <div key={month.key} className="amp-training-month">
+                          <div className="amp-training-month-title">{month.label}</div>
+                          <div className="amp-training-weekdays-row">
+                            {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                              <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
+                                {weekday}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="amp-training-month-grid">
+                            {month.cells.map((date, index) => {
+                              if (!date) {
+                                return (
+                                  <span
+                                    key={`${month.key}-empty-${index}`}
+                                    className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                    aria-hidden="true"
+                                  />
+                                );
+                              }
+                              const dayNumber = Number.parseInt(date.slice(8, 10), 10);
+                              const isSelectable = schedulerCalendarDateSet.has(date);
+                              if (!isSelectable) {
+                                return (
+                                  <span
+                                    key={date}
+                                    className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
+                                    aria-hidden="true"
+                                  >
+                                    <span className="amp-training-day-number">{dayNumber}</span>
+                                  </span>
+                                );
+                              }
+
+                              const isSelected = schedulerForm.trainingDates.includes(date);
+                              return (
+                                <button
+                                  key={date}
+                                  type="button"
+                                  className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}`}
+                                  onClick={() => toggleTrainingDate(date)}
+                                  disabled={trainingDaysEditorSaving}
+                                >
+                                  <span className="amp-training-day-number">{dayNumber}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {trainingDaysEditorError && <p className="amp-confirm-error">{trainingDaysEditorError}</p>}
+                    <div className="amp-modal-actions amp-modal-actions--end">
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--ghost"
+                        onClick={() => setTrainingDaysEditorOpen(false)}
+                        disabled={trainingDaysEditorSaving}
+                      >
+                        Отказ
+                      </button>
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--primary"
+                        onClick={() => void saveTrainingDaysFromTrainingModal()}
+                        disabled={trainingDaysEditorSaving || trainingDaysEditorLoading}
+                      >
+                        {trainingDaysEditorSaving ? "Запазване..." : "Запази дни"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="amp-training-note-targets">
+                  <button
+                    type="button"
+                    className="amp-btn amp-btn--ghost"
+                    onClick={() => toggleTrainingNoteTargetDate(trainingAttendanceDate)}
+                    disabled={trainingNoteSaving || trainingAttendanceLoading || !trainingAttendanceDate}
+                  >
+                    {trainingNoteTargetDates.includes(trainingAttendanceDate)
+                      ? "Премахни ден от избора"
+                      : "Добави ден към избора"}
+                  </button>
+                  <button
+                    type="button"
+                    className="amp-btn amp-btn--ghost"
+                    onClick={() => setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : [])}
+                    disabled={trainingNoteSaving || trainingAttendanceLoading}
+                  >
+                    Остави само текущия ден
+                  </button>
+                  <span className="amp-lbl">
+                    Избрани дни за добавяне на описание: {trainingNoteTargetDates.length}
+                  </span>
+                </div>
+                <textarea
+                  className="amp-edit-input amp-training-note"
+                  value={trainingNote}
+                  onChange={(e) => setTrainingNote(e.target.value)}
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="Добавете инструкции, сборен час, локация..."
+                  disabled={trainingNoteSaving || trainingAttendanceLoading}
+                />
+              </label>
+              <div className="amp-modal-actions amp-modal-actions--end">
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => void fetchTrainingAttendance(trainingAttendanceDate)}
+                  disabled={trainingAttendanceLoading || trainingNoteSaving}
+                >
+                  Обнови
+                </button>
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => void openTrainingDaysEditor()}
+                  disabled={trainingNoteSaving || trainingDaysEditorSaving}
+                >
+                  {trainingDaysEditorLoading
+                    ? "Зареждане..."
+                    : trainingDaysEditorOpen
+                      ? "Скрий настройка"
+                      : "Задай тренировъчни дни"}
+                </button>
+                <button
+                  className="amp-btn amp-btn--primary"
+                  onClick={() => {
+                    setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : []);
+                    setTrainingBulkNoteOpen(true);
+                  }}
+                  disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate}
+                >
+                  {trainingNoteSaving
+                    ? "Запазване..."
+                    : `Добави описание`}
+                </button>
+              </div>
+              {trainingAttendanceError && <p className="amp-confirm-error">{trainingAttendanceError}</p>}
+              <div className="amp-training-table-wrap">
+                {trainingAttendanceLoading ? (
+                  <p className="amp-empty amp-empty--modal">Зареждане...</p>
+                ) : trainingAttendancePlayers.length === 0 ? (
+                  <p className="amp-empty amp-empty--modal">Няма играчи за този отбор.</p>
+                ) : (
+                  <table className="amp-training-table">
+                    <thead>
+                      <tr>
+                        <th>Име</th>
+                        <th>Набор</th>
+                        <th>Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trainingAttendancePlayers.map((player) => (
+                        <tr key={player.id}>
+                          <td>{player.fullName}</td>
+                          <td>{player.teamGroup ?? "-"}</td>
+                          <td>
+                            <span className={player.optedOut ? "amp-training-tag amp-training-tag--out" : "amp-training-tag amp-training-tag--in"}>
+                              {player.optedOut ? "Няма да присъства" : "Ще присъства"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {trainingDaysEditorOpen && (
+        <div
+          className="amp-overlay amp-overlay--confirm"
+          onClick={() => {
+            if (!trainingDaysEditorSaving) {
+              setTrainingDaysEditorOpen(false);
+            }
+          }}
+        >
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Задай тренировъчни дни</span>
+              <button
+                className="amp-modal-close"
+                onClick={() => setTrainingDaysEditorOpen(false)}
+                aria-label="Затвори"
+                disabled={trainingDaysEditorSaving}
+              >
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              <div className="amp-training-days-editor-header">
+                <span className="amp-lbl">Избери тренировъчни дни (следващи 30 дни)</span>
+                <span className="amp-lbl">Избрани: {schedulerForm.trainingDates.length}</span>
+              </div>
+              <div className="amp-training-calendar">
+                {schedulerCalendarMonths.map((month) => (
+                  <div key={month.key} className="amp-training-month">
+                    <div className="amp-training-month-title">{month.label}</div>
+                    <div className="amp-training-weekdays-row">
+                      {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                        <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
+                          {weekday}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="amp-training-month-grid">
+                      {month.cells.map((date, index) => {
+                        if (!date) {
+                          return (
+                            <span
+                              key={`${month.key}-empty-${index}`}
+                              className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                              aria-hidden="true"
+                            />
+                          );
+                        }
+                        const dayNumber = Number.parseInt(date.slice(8, 10), 10);
+                        const isSelectable = schedulerCalendarDateSet.has(date);
+                        if (!isSelectable) {
+                          return (
+                            <span
+                              key={date}
+                              className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
+                              aria-hidden="true"
+                            >
+                              <span className="amp-training-day-number">{dayNumber}</span>
+                            </span>
+                          );
+                        }
+
+                        const isSelected = schedulerForm.trainingDates.includes(date);
+                        return (
+                          <button
+                            key={date}
+                            type="button"
+                            className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}`}
+                            onClick={() => toggleTrainingDate(date)}
+                            disabled={trainingDaysEditorSaving}
+                          >
+                            <span className="amp-training-day-number">{dayNumber}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {trainingDaysEditorError && <p className="amp-confirm-error">{trainingDaysEditorError}</p>}
+              <div className="amp-modal-actions amp-modal-actions--end">
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => setTrainingDaysEditorOpen(false)}
+                  disabled={trainingDaysEditorSaving}
+                >
+                  Отказ
+                </button>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--primary"
+                  onClick={() => void saveTrainingDaysFromTrainingModal()}
+                  disabled={trainingDaysEditorSaving || trainingDaysEditorLoading}
+                >
+                  {trainingDaysEditorSaving ? "Запазване..." : "Запази дни"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {trainingDayDetailsOpen && (
+        <div
+          className="amp-overlay amp-overlay--confirm"
+          onClick={() => {
+            if (!trainingNoteSaving) {
+              setTrainingDayDetailsOpen(false);
+            }
+          }}
+        >
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Детайли за тренировка</span>
+              <button
+                className="amp-modal-close"
+                onClick={() => setTrainingDayDetailsOpen(false)}
+                aria-label="Затвори"
+                disabled={trainingNoteSaving}
+              >
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              <div className="amp-training-stats">
+                <span>Дата: {trainingAttendanceDate || "-"}</span>
+                <span>Общо: {trainingAttendanceStats.total}</span>
+                <span>Присъстват: {trainingAttendanceStats.attending}</span>
+                <span>Отказали: {trainingAttendanceStats.optedOut}</span>
+              </div>
+              <div className="amp-edit-field">
+                <span className="amp-lbl">Бележка за деня</span>
+                {trainingNote.trim() ? (
+                  <p className="amp-val">{trainingNote}</p>
+                ) : (
+                  <p className="amp-val" style={{ color: "rgba(255,255,255,0.55)" }}>Няма бележка.</p>
+                )}
+              </div>
+              <div className="amp-modal-actions amp-modal-actions--end">
+                <button
+                  className="amp-btn amp-btn--primary"
+                  onClick={() => {
+                    setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : []);
+                    setTrainingBulkNoteOpen(true);
+                  }}
+                  disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate}
+                >
+                  Добави бележка
+                </button>
+              </div>
+              <div className="amp-training-table-wrap">
+                {trainingAttendanceLoading ? (
+                  <p className="amp-empty amp-empty--modal">Зареждане...</p>
+                ) : trainingAttendancePlayers.length === 0 ? (
+                  <p className="amp-empty amp-empty--modal">Няма играчи за този отбор.</p>
+                ) : (
+                  <table className="amp-training-table">
+                    <thead>
+                      <tr>
+                        <th>Име</th>
+                        <th>Набор</th>
+                        <th>Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trainingAttendancePlayers.map((player) => (
+                        <tr key={player.id}>
+                          <td>{player.fullName}</td>
+                          <td>{player.teamGroup ?? "-"}</td>
+                          <td>
+                            <span className={player.optedOut ? "amp-training-tag amp-training-tag--out" : "amp-training-tag amp-training-tag--in"}>
+                              {player.optedOut ? "Няма да присъства" : "Ще присъства"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {trainingBulkNoteOpen && (
+        <div className="amp-overlay amp-overlay--confirm" onClick={() => setTrainingBulkNoteOpen(false)}>
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Добави описание</span>
+              <button
+                className="amp-modal-close"
+                onClick={() => setTrainingBulkNoteOpen(false)}
+                aria-label="Затвори"
+                disabled={trainingNoteSaving}
+              >
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              <label className="amp-edit-field">
+                <span className="amp-lbl">Избери дни</span>
+                <div className="amp-training-calendar amp-training-calendar--attendance">
+                  {trainingAttendanceCalendarMonths.map((month) => (
+                    <div key={month.key} className="amp-training-month">
+                      <div className="amp-training-month-title">{month.label}</div>
+                      <div className="amp-training-weekdays-row">
+                        {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                          <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
+                            {weekday}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="amp-training-month-grid">
+                        {month.cells.map((date, index) => {
+                          if (!date) {
+                            return (
+                              <span
+                                key={`${month.key}-empty-${index}`}
+                                className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                aria-hidden="true"
+                              />
+                            );
+                          }
+                          const dayNumber = Number.parseInt(date.slice(8, 10), 10);
+                          const dateData = trainingUpcomingByDate.get(date);
+                          if (!dateData || !trainingUpcomingDateSet.has(date)) {
+                            return (
+                              <span
+                                key={date}
+                                className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
+                                aria-hidden="true"
+                              >
+                                <span className="amp-training-day-number">{dayNumber}</span>
+                              </span>
+                            );
+                          }
+
+                          const isSelected = trainingNoteTargetDates.includes(date);
+                          return (
+                            <button
+                              key={date}
+                              type="button"
+                              className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--selected" : ""}`}
+                              onClick={() => toggleTrainingNoteTargetDate(date)}
+                              disabled={trainingNoteSaving}
+                            >
+                              <span className="amp-training-day-number">{dayNumber}</span>
+                              <span className="amp-training-day-meta">
+                                {dateData.stats.attending}/{dateData.stats.total}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </label>
+              <label className="amp-edit-field">
+                <span className="amp-lbl">Описание</span>
+                <textarea
+                  className="amp-edit-input amp-training-note"
+                  value={trainingNote}
+                  onChange={(e) => setTrainingNote(e.target.value)}
+                  rows={3}
+                  maxLength={1000}
+                  placeholder="Добавете инструкции, сборен час, локация..."
+                  disabled={trainingNoteSaving}
+                />
+              </label>
+              <div className="amp-modal-actions">
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => setTrainingBulkNoteOpen(false)}
+                  disabled={trainingNoteSaving}
+                >
+                  Отказ
+                </button>
+                <button
+                  className="amp-btn amp-btn--primary"
+                  onClick={() => void saveTrainingNote()}
+                  disabled={trainingNoteSaving || trainingNoteTargetDates.length === 0}
+                >
+                  {trainingNoteSaving
+                    ? "Запазване..."
+                    : `Запази описание за ${trainingNoteTargetDates.length} ден(дни)`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {inactivePlayersOpen && (
         <InactivePlayersModal
           members={inactiveMembers}
@@ -2111,11 +3071,11 @@ function AdminMembersPageContent() {
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
-                  <label className="amp-edit-field">
-                    <span className="amp-lbl">Час (0-23)</span>
-                    <input
-                      className="amp-edit-input"
-                      inputMode="numeric"
+                    <label className="amp-edit-field">
+                      <span className="amp-lbl">Час (0-23)</span>
+                      <input
+                        className="amp-edit-input"
+                        inputMode="numeric"
                       value={schedulerForm.reminderHour}
                       onChange={(e) =>
                         setSchedulerForm((prev) => ({
@@ -2123,11 +3083,11 @@ function AdminMembersPageContent() {
                           reminderHour: e.target.value.replace(/\D/g, ""),
                         }))
                       }
-                      disabled={schedulerSettingsSaving}
-                    />
-                  </label>
-                </div>
-              )}
+                        disabled={schedulerSettingsSaving}
+                      />
+                    </label>
+                  </div>
+                )}
 
               {schedulerSettingsError && <p className="amp-confirm-error">{schedulerSettingsError}</p>}
 

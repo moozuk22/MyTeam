@@ -1,0 +1,2 @@
+ALTER TABLE "clubs"
+ADD COLUMN "training_dates" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
