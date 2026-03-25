@@ -124,6 +124,7 @@ export async function runMonthlyMembershipPaymentReminder(
       prisma.player.findMany({
         where: {
           clubId: club.id,
+          isActive: true,
           status: {
             in: ["warning", "overdue"],
           },
@@ -177,11 +178,16 @@ export async function runMonthlyMembershipPaymentReminder(
             url,
           });
 
-          await saveMemberNotificationHistory(member.id, REMINDER_TYPE, payload);
           const pushResult = await sendPushToMember(member.id, payload);
+          let historySaved = 0;
+
+          if (pushResult.sent > 0) {
+            await saveMemberNotificationHistory(member.id, REMINDER_TYPE, payload);
+            historySaved = 1;
+          }
 
           return {
-            historySaved: 1,
+            historySaved,
             total: pushResult.total,
             sent: pushResult.sent,
             failed: pushResult.failed,
