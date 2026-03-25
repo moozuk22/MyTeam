@@ -102,6 +102,7 @@ export async function POST(
     await prisma.player.update({
       where: { id },
       data: {
+        status: "paid",
         lastPaymentDate: new Date(),
       },
     });

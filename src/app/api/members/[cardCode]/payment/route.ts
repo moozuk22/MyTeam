@@ -125,6 +125,7 @@ export async function POST(
       await tx.player.update({
         where: { id: card.playerId },
         data: {
+          status: "paid",
           lastPaymentDate: new Date(),
         },
       });
