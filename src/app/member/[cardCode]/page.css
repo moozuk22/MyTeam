@@ -420,6 +420,231 @@
   color: #ff8f8f;
 }
 
+.training-notes {
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 8px;
+}
+
+.training-notes-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.training-notes-list {
+  display: grid;
+  gap: 5px;
+}
+
+.training-note-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.training-note-date {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.training-note-text {
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.76);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.member-training-modal {
+  max-width: 512px;
+  max-height: 90vh;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(50, 205, 50, 0.2) transparent;
+}
+
+.member-training-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.member-training-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.member-training-modal::-webkit-scrollbar-thumb {
+  background: rgba(50, 205, 50, 0.24);
+  border-radius: 999px;
+}
+
+.member-training-modal-tint {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(50, 205, 50, 0.05), transparent);
+  pointer-events: none;
+  border-radius: 10px;
+}
+
+.member-training-modal .member-training-modal-title-gradient {
+  display: none;
+}
+
+.member-training-modal .pm-header {
+  margin-bottom: 16px;
+}
+
+.member-training-modal .pm-title-icon {
+  display: none;
+}
+
+.member-training-modal .pm-title {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #32cd32, #2db82d, #28a428);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.member-training-modal .pm-divider {
+  display: none;
+}
+
+.member-training-modal .training-section {
+  margin: 0 !important;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.member-training-modal .training-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.member-training-modal .training-calendar {
+  display: grid;
+  gap: 12px;
+}
+
+.member-training-modal .training-calendar-month {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.member-training-modal .training-calendar-month-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.member-training-modal .training-calendar-weekdays {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.member-training-modal .training-calendar-weekday {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.member-training-modal .training-calendar-grid {
+  gap: 3px;
+}
+
+.member-training-modal .training-calendar-cell {
+  aspect-ratio: 1 / 1;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.member-training-modal .training-calendar-cell--empty {
+  border-color: transparent;
+  background: transparent;
+}
+
+.member-training-modal .training-calendar-cell--off {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.member-training-modal .training-calendar-cell--training {
+  border-color: rgba(50, 205, 50, 0.6);
+  background: rgba(50, 205, 50, 0.18);
+  color: #9eff9e;
+}
+
+.member-training-modal .training-calendar-cell--training:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.member-training-modal .training-calendar-cell--opted-out {
+  border-color: rgba(255, 107, 107, 0.45);
+  background: rgba(255, 107, 107, 0.16);
+  color: #ffd1d1;
+}
+
+.member-training-modal .training-calendar-cell--today {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.member-training-modal .training-calendar-day-number {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.member-training-modal .training-calendar-mark {
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.member-training-modal .training-notes {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 10px;
+}
+
+.member-notifications-scroll {
+  max-height: 400px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(50, 205, 50, 0.2) transparent;
+}
+
+.member-notifications-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.member-notifications-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.member-notifications-scroll::-webkit-scrollbar-thumb {
+  background: rgba(50, 205, 50, 0.24);
+  border-radius: 999px;
+}
+
 /* ── Pay button ── */
 .pay-btn {
   display: inline-flex;

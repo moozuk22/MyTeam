@@ -44,6 +44,7 @@ interface TrainingDayStatus {
   date: string;
   weekday: number;
   optedOut: boolean;
+  note: string;
 }
 
 const SPEED_LINES = [8, 16, 24, 33, 42, 54, 65, 76, 85, 93];
@@ -258,6 +259,7 @@ export default function MemberCardPage({
   const [trainingLoading, setTrainingLoading] = useState(false);
   const [trainingError, setTrainingError] = useState<string | null>(null);
   const [trainingSavingDate, setTrainingSavingDate] = useState<string | null>(null);
+  const [trainingModalOpen, setTrainingModalOpen] = useState(false);
 
   // ── Derived: paid months set ─────────────────────────
   const paidSet = new Set<string>(
@@ -283,6 +285,7 @@ export default function MemberCardPage({
     (item) => waivedSet.has(`${item.year}-${item.month}`),
   );
   const trainingDaysSorted = [...trainingDays].sort((a, b) => a.date.localeCompare(b.date));
+  const trainingDaysWithNotes = trainingDaysSorted.filter((item) => item.note.trim().length > 0);
   const trainingByDate = new Map(trainingDaysSorted.map((item) => [item.date, item]));
   const today = new Date();
   const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -431,6 +434,7 @@ export default function MemberCardPage({
                 date: String(raw.date ?? ""),
                 weekday: Number(raw.weekday ?? 0),
                 optedOut: Boolean(raw.optedOut),
+                note: String(raw.note ?? ""),
               } satisfies TrainingDayStatus;
             })
             .filter((item: TrainingDayStatus) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
@@ -1349,7 +1353,7 @@ export default function MemberCardPage({
           </div>
         </div>
 
-        <div className="training-section">
+        {false && <div className="training-section">
           <div className="training-head">
             <h3 className="training-title">Тренировъчни дни (следващи {trainingWindowDays} дни)</h3>
           </div>
@@ -1415,7 +1419,7 @@ export default function MemberCardPage({
             </div>
           )}
           {trainingError && <p className="training-error">{trainingError}</p>}
-        </div>
+        </div>}
 
         {/* Below card buttons */}
         <div className="below-card">
@@ -1437,6 +1441,10 @@ export default function MemberCardPage({
               Пауза
             </button>
           </>)}
+
+          <button className="add-btn" onClick={() => setTrainingModalOpen(true)}>
+            Тренировки
+          </button>
 
           {canPublicEdit && (
             <button
@@ -1566,6 +1574,112 @@ export default function MemberCardPage({
             </div>
           </div>
         </div>
+
+        {trainingModalOpen && (
+          <div className="pm-overlay" onClick={() => !trainingSavingDate && setTrainingModalOpen(false)}>
+            <div className="pm-modal member-training-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="member-training-modal-tint" aria-hidden="true" />
+              <button className="pm-close" onClick={() => !trainingSavingDate && setTrainingModalOpen(false)}>
+                <XIcon size={16} />
+              </button>
+
+              <div className="pm-header">
+                <span className="member-training-modal-title-gradient">Тренировки</span>
+                <div>
+                  <h2 className="pm-title">Тренировки</h2>
+                </div>
+              </div>
+
+              <div className="pm-divider" />
+
+              <div className="training-section" style={{ margin: 0 }}>
+                <div className="training-head">
+                  <h3 className="training-title">Тренировъчни дни (следващи {trainingWindowDays} дни)</h3>
+                </div>
+                {trainingLoading ? (
+                  <p className="training-empty">Зареждане...</p>
+                ) : trainingDays.length === 0 ? (
+                  <p className="training-empty">Няма настроени тренировъчни дни.</p>
+                ) : (
+                  <div className="training-calendar">
+                    {trainingMonths.map((month) => (
+                      <section key={month.key} className="training-calendar-month">
+                        <h4 className="training-calendar-month-title">{month.label}</h4>
+                        <div className="training-calendar-weekdays">
+                          {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                            <span key={`${month.key}-${weekday}`} className="training-calendar-weekday">
+                              {weekday}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="training-calendar-grid">
+                          {month.cells.map((cellDate, index) => {
+                            if (!cellDate) {
+                              return <span key={`${month.key}-empty-${index}`} className="training-calendar-cell training-calendar-cell--empty" aria-hidden="true" />;
+                            }
+
+                            const trainingItem = trainingByDate.get(cellDate);
+                            const dayNumber = cellDate.slice(8, 10);
+                            const isToday = cellDate === todayDateKey;
+                            if (!trainingItem) {
+                              return (
+                                <span
+                                  key={cellDate}
+                                  className={`training-calendar-cell training-calendar-cell--off${isToday ? " training-calendar-cell--today" : ""}`}
+                                >
+                                  <span className="training-calendar-day-number">{dayNumber}</span>
+                                </span>
+                              );
+                            }
+
+                            const isSaving = trainingSavingDate === trainingItem.date;
+                            const dateLabel = new Date(`${trainingItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            });
+                            return (
+                              <button
+                                key={cellDate}
+                                className={`training-calendar-cell training-calendar-cell--training${trainingItem.optedOut ? " training-calendar-cell--opted-out" : ""}${isToday ? " training-calendar-cell--today" : ""}`}
+                                onClick={() => void toggleTrainingOptOut(trainingItem)}
+                                disabled={Boolean(trainingSavingDate)}
+                                type="button"
+                                aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem.weekday] ?? "-"} ${dateLabel}`}
+                                aria-pressed={!trainingItem.optedOut}
+                              >
+                                <span className="training-calendar-day-number">{dayNumber}</span>
+                                <span className="training-calendar-mark">{isSaving ? "..." : trainingItem.optedOut ? "x" : "✓"}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
+                {trainingError && <p className="training-error">{trainingError}</p>}
+                {trainingDaysWithNotes.length > 0 && (
+                  <div className="training-notes">
+                    <p className="training-notes-title">Описание</p>
+                    <div className="training-notes-list">
+                      {trainingDaysWithNotes.map((item) => (
+                        <div key={`note-${item.date}`} className="training-note-row">
+                          <span className="training-note-date">
+                            {new Date(`${item.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </span>
+                          <span className="training-note-text">{item.note}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {editModalOpen && (
           <div className="pm-overlay" onClick={() => !editSaving && setEditModalOpen(false)}>
@@ -1930,7 +2044,7 @@ export default function MemberCardPage({
 
               <div className="pm-divider" />
 
-              <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+              <div className="member-notifications-scroll">
                 {loadingNotifications ? (
                   <div style={{ textAlign: "center", padding: "20px", color: "rgba(255,255,255,0.6)" }}>
                     <SpinnerIcon size={24} />

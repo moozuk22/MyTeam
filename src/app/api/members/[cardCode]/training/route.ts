@@ -89,18 +89,38 @@ export async function GET(
     });
   }
 
-  const optOutRows = await prisma.trainingOptOut.findMany({
-    where: {
-      playerId: context.playerId,
-      trainingDate: {
-        in: context.upcomingDates.map((value) => isoDateToUtcMidnight(value)),
+  const trainingDatesAsUtc = context.upcomingDates.map((value) => isoDateToUtcMidnight(value));
+  const [optOutRows, noteRows] = await Promise.all([
+    prisma.trainingOptOut.findMany({
+      where: {
+        playerId: context.playerId,
+        trainingDate: {
+          in: trainingDatesAsUtc,
+        },
       },
-    },
-    select: {
-      trainingDate: true,
-    },
-  });
+      select: {
+        trainingDate: true,
+      },
+    }),
+    prisma.trainingNote.findMany({
+      where: {
+        clubId: context.clubId,
+        trainingDate: {
+          in: trainingDatesAsUtc,
+        },
+      },
+      select: {
+        trainingDate: true,
+        note: true,
+      },
+    }),
+  ]);
   const optedOutSet = new Set(optOutRows.map((item) => utcDateToIsoDate(item.trainingDate)));
+  const noteByDate = new Map(
+    noteRows
+      .map((item) => [utcDateToIsoDate(item.trainingDate), item.note?.trim() ?? ""] as const)
+      .filter(([, note]) => note.length > 0),
+  );
 
   return NextResponse.json({
     clubId: context.clubId,
@@ -111,6 +131,7 @@ export async function GET(
       date,
       weekday: getWeekdayMondayFirst(date, FIXED_TIME_ZONE),
       optedOut: optedOutSet.has(date),
+      note: noteByDate.get(date) ?? "",
     })),
   });
 }
