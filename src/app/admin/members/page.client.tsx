@@ -2652,7 +2652,7 @@ function AdminMembersPageContent() {
                     ? "Зареждане..."
                     : trainingDaysEditorOpen
                       ? "Скрий настройка"
-                      : "Задай тренировъчни дни"}
+                      : "Задай тренировки"}
                 </button>
                 <button
                   className="amp-btn amp-btn--primary"
@@ -2711,7 +2711,7 @@ function AdminMembersPageContent() {
             }
           }}
         >
-          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+          <div className="amp-modal amp-modal--confirm amp-modal--training-days-editor" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">Задай тренировъчни дни</span>
@@ -2814,7 +2814,7 @@ function AdminMembersPageContent() {
             }
           }}
         >
-          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+          <div className="amp-modal amp-modal--confirm amp-modal--training-day-details" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">Детайли за тренировка</span>
@@ -2890,7 +2890,7 @@ function AdminMembersPageContent() {
       )}
       {trainingBulkNoteOpen && (
         <div className="amp-overlay amp-overlay--confirm" onClick={() => setTrainingBulkNoteOpen(false)}>
-          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+          <div className="amp-modal amp-modal--confirm amp-modal--training-note" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">Добави описание</span>

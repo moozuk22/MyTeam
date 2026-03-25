@@ -1580,3 +1580,92 @@
     font-size: 20px;
   }
 }
+
+@media (max-width: 520px) {
+  .pm-overlay {
+    padding: 10px;
+  }
+
+  .member-training-modal {
+    max-width: 100%;
+    max-height: calc(100vh - 20px);
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .member-training-modal .pm-close {
+    top: 10px;
+    right: 10px;
+  }
+
+  .member-training-modal .pm-header {
+    margin-bottom: 10px;
+    padding-right: 34px;
+  }
+
+  .member-training-modal .pm-title {
+    font-size: 17px;
+    line-height: 1.15;
+  }
+
+  .member-training-modal .training-head {
+    margin-bottom: 6px;
+  }
+
+  .member-training-modal .training-title {
+    font-size: 12px;
+  }
+
+  .member-training-modal .training-calendar {
+    gap: 8px;
+  }
+
+  .member-training-modal .training-calendar-month {
+    padding: 8px;
+  }
+
+  .member-training-modal .training-calendar-month-title {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+
+  .member-training-modal .training-calendar-weekdays {
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .member-training-modal .training-calendar-weekday {
+    font-size: 10px;
+  }
+
+  .member-training-modal .training-calendar-grid {
+    gap: 2px;
+  }
+
+  .member-training-modal .training-calendar-cell {
+    min-height: 20px;
+    border-radius: 5px;
+  }
+
+  .member-training-modal .training-calendar-day-number {
+    font-size: 9px;
+  }
+
+  .member-training-modal .training-calendar-mark {
+    font-size: 7px;
+  }
+}
+
+@media (max-width: 380px) {
+  .member-training-modal {
+    padding: 10px;
+  }
+
+  .member-training-modal .pm-title {
+    font-size: 15px;
+  }
+
+  .member-training-modal .training-title {
+    font-size: 11px;
+  }
+}

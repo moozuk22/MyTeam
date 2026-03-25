@@ -1696,3 +1696,113 @@
     padding: 8px 12px;
   }
 }
+
+@media (max-width: 520px) {
+  .amp-overlay {
+    padding: 10px;
+  }
+
+  .amp-modal--training-attendance,
+  .amp-modal--training-days-editor,
+  .amp-modal--training-day-details,
+  .amp-modal--training-note {
+    max-width: 100%;
+    max-height: calc(100vh - 20px);
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .amp-modal--training-attendance .amp-modal-title,
+  .amp-modal--training-days-editor .amp-modal-title,
+  .amp-modal--training-day-details .amp-modal-title,
+  .amp-modal--training-note .amp-modal-title {
+    margin-bottom: 16px;
+    font-size: 17px;
+  }
+
+  .amp-modal--training-attendance .amp-modal-body,
+  .amp-modal--training-days-editor .amp-modal-body,
+  .amp-modal--training-day-details .amp-modal-body,
+  .amp-modal--training-note .amp-modal-body {
+    gap: 10px;
+  }
+
+  .amp-modal--training-attendance .amp-training-calendar,
+  .amp-modal--training-days-editor .amp-training-calendar,
+  .amp-modal--training-day-details .amp-training-calendar,
+  .amp-modal--training-note .amp-training-calendar {
+    gap: 8px;
+  }
+
+  .amp-modal--training-attendance .amp-training-month,
+  .amp-modal--training-days-editor .amp-training-month,
+  .amp-modal--training-day-details .amp-training-month,
+  .amp-modal--training-note .amp-training-month {
+    padding: 8px;
+  }
+
+  .amp-modal--training-attendance .amp-training-weekdays-row,
+  .amp-modal--training-days-editor .amp-training-weekdays-row,
+  .amp-modal--training-day-details .amp-training-weekdays-row,
+  .amp-modal--training-note .amp-training-weekdays-row {
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .amp-modal--training-attendance .amp-training-weekday-cell,
+  .amp-modal--training-days-editor .amp-training-weekday-cell,
+  .amp-modal--training-day-details .amp-training-weekday-cell,
+  .amp-modal--training-note .amp-training-weekday-cell {
+    font-size: 10px;
+  }
+
+  .amp-modal--training-attendance .amp-training-month-grid,
+  .amp-modal--training-days-editor .amp-training-month-grid,
+  .amp-modal--training-day-details .amp-training-month-grid,
+  .amp-modal--training-note .amp-training-month-grid {
+    gap: 2px;
+  }
+
+  .amp-modal--training-attendance .amp-training-calendar-cell,
+  .amp-modal--training-days-editor .amp-training-calendar-cell,
+  .amp-modal--training-day-details .amp-training-calendar-cell,
+  .amp-modal--training-note .amp-training-calendar-cell,
+  .amp-modal--training-attendance .amp-training-date-btn,
+  .amp-modal--training-days-editor .amp-training-date-btn,
+  .amp-modal--training-day-details .amp-training-date-btn,
+  .amp-modal--training-note .amp-training-date-btn {
+    min-height: 20px;
+    border-radius: 5px;
+  }
+
+  .amp-modal--training-attendance .amp-training-day-number,
+  .amp-modal--training-days-editor .amp-training-day-number,
+  .amp-modal--training-day-details .amp-training-day-number,
+  .amp-modal--training-note .amp-training-day-number {
+    font-size: 9px;
+  }
+
+  .amp-modal--training-attendance .amp-training-day-meta,
+  .amp-modal--training-days-editor .amp-training-day-meta,
+  .amp-modal--training-day-details .amp-training-day-meta,
+  .amp-modal--training-note .amp-training-day-meta {
+    font-size: 7px;
+  }
+}
+
+@media (max-width: 380px) {
+  .amp-modal--training-attendance,
+  .amp-modal--training-days-editor,
+  .amp-modal--training-day-details,
+  .amp-modal--training-note {
+    padding: 10px;
+  }
+
+  .amp-modal--training-attendance .amp-modal-title,
+  .amp-modal--training-days-editor .amp-modal-title,
+  .amp-modal--training-day-details .amp-modal-title,
+  .amp-modal--training-note .amp-modal-title {
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+}
