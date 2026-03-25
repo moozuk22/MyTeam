@@ -264,6 +264,7 @@ export default function MemberCardPage({
   const [trainingSaveLoading, setTrainingSaveLoading] = useState(false);
   const [trainingSelectionOpen, setTrainingSelectionOpen] = useState(false);
   const [trainingDetailsDate, setTrainingDetailsDate] = useState<string | null>(null);
+  const [trainingNotePopupOpen, setTrainingNotePopupOpen] = useState(false);
 
   // ── Derived: paid months set ─────────────────────────
   const paidSet = new Set<string>(
@@ -476,6 +477,7 @@ export default function MemberCardPage({
   const openTrainingModal = async () => {
     setTrainingError(null);
     setTrainingSelectionOpen(false);
+    setTrainingNotePopupOpen(false);
     setTrainingDraftOptOutDates(getOptOutDatesFromDays(trainingDays));
     setTrainingDetailsDate(trainingDaysSorted[0]?.date ?? null);
     setTrainingModalOpen(true);
@@ -490,6 +492,7 @@ export default function MemberCardPage({
     }
     setTrainingDraftOptOutDates(getOptOutDatesFromDays(trainingDays));
     setTrainingSelectionOpen(false);
+    setTrainingNotePopupOpen(false);
     setTrainingDetailsDate(trainingDaysSorted[0]?.date ?? null);
     setTrainingModalOpen(false);
   };
@@ -1729,7 +1732,10 @@ export default function MemberCardPage({
                       <button
                         className="pm-btn pm-btn--submit training-edit-btn"
                         type="button"
-                        onClick={() => setTrainingSelectionOpen(true)}
+                        onClick={() => {
+                          setTrainingNotePopupOpen(false);
+                          setTrainingSelectionOpen(true);
+                        }}
                         disabled={trainingSaveLoading}
                       >
                         Редактирай присъствие
@@ -1783,6 +1789,8 @@ export default function MemberCardPage({
                                   setTrainingDetailsDate(trainingItem.date);
                                   if (trainingSelectionOpen) {
                                     toggleTrainingDraftSelection(trainingItem.date);
+                                  } else {
+                                    setTrainingNotePopupOpen(true);
                                   }
                                 }}
                                 disabled={trainingSaveLoading}
@@ -1799,27 +1807,6 @@ export default function MemberCardPage({
                       </section>
                     ))}
                   </div>
-                    {!trainingSelectionOpen && (
-                      <aside className="training-day-details">
-                        <h4 className="training-notes-title">Описание</h4>
-                        {trainingDetailsItem ? (
-                          <>
-                            <p className="training-note-date">
-                              {new Date(`${trainingDetailsItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                              })}
-                            </p>
-                            <p className="training-note-text">
-                              {trainingDetailsItem.note.trim() || "Няма описание за този ден."}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="training-note-text">Избери ден от календара за да видиш описание.</p>
-                        )}
-                      </aside>
-                    )}
                   </div>
                   </>
                 )}
@@ -1846,6 +1833,35 @@ export default function MemberCardPage({
                     {trainingSaveLoading ? "Запазване..." : "Запази"}
                   </button>
                 </div>
+                )}
+                {trainingNotePopupOpen && !trainingSelectionOpen && trainingDetailsItem && (
+                  <div
+                    className="pm-overlay"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTrainingNotePopupOpen(false);
+                    }}
+                  >
+                    <div className="pm-modal member-training-note-popup" onClick={(e) => e.stopPropagation()}>
+                      <button className="pm-close" onClick={() => setTrainingNotePopupOpen(false)}>
+                        <XIcon size={16} />
+                      </button>
+                      <div className="pm-header">
+                        <h2 className="pm-title">Описание</h2>
+                      </div>
+                      <div className="pm-divider" />
+                      <p className="training-note-date">
+                        {new Date(`${trainingDetailsItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </p>
+                      <p className="training-note-text">
+                        {trainingDetailsItem.note.trim() || "Няма описание за този ден."}
+                      </p>
+                    </div>
+                  </div>
                 )}
                 {false && (
                   <div className="training-notes">

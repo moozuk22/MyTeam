@@ -679,6 +679,11 @@
   content: none !important;
 }
 
+.member-training-note-popup {
+  max-width: 320px;
+  padding-top: 18px;
+}
+
 .member-notifications-scroll {
   max-height: 400px;
   overflow-y: auto;
