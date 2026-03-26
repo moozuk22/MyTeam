@@ -51,6 +51,9 @@ export async function GET(
       reminderDay: true,
       overdueDay: true,
       reminderHour: true,
+      reminderMinute: true,
+      overdueHour: true,
+      overdueMinute: true,
       trainingDates: true,
       trainingWeekdays: true,
       trainingWindowDays: true,
@@ -108,6 +111,9 @@ export async function PUT(
   const reminderDay = Number.parseInt(String((body as { reminderDay?: unknown }).reminderDay ?? ""), 10);
   const overdueDay = Number.parseInt(String((body as { overdueDay?: unknown }).overdueDay ?? ""), 10);
   const reminderHour = Number.parseInt(String((body as { reminderHour?: unknown }).reminderHour ?? ""), 10);
+  const reminderMinute = Number.parseInt(String((body as { reminderMinute?: unknown }).reminderMinute ?? ""), 10);
+  const overdueHour = Number.parseInt(String((body as { overdueHour?: unknown }).overdueHour ?? ""), 10);
+  const overdueMinute = Number.parseInt(String((body as { overdueMinute?: unknown }).overdueMinute ?? ""), 10);
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
   const rawWeekdays = (body as { trainingWeekdays?: unknown }).trainingWeekdays;
   const rawWindowDays = Number.parseInt(String((body as { trainingWindowDays?: unknown }).trainingWindowDays ?? ""), 10);
@@ -128,6 +134,15 @@ export async function PUT(
   }
   if (!Number.isInteger(reminderHour) || reminderHour < 0 || reminderHour > 23) {
     return NextResponse.json({ error: "\u0427\u0430\u0441\u044a\u0442 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0435 \u043c\u0435\u0436\u0434\u0443 0 \u0438 23." }, { status: 400 });
+  }
+  if (!Number.isInteger(reminderMinute) || reminderMinute < 0 || reminderMinute > 59) {
+    return NextResponse.json({ error: "\u041c\u0438\u043d\u0443\u0442\u0438\u0442\u0435 \u0437\u0430 \u043c\u0435\u0441\u0435\u0447\u043d\u043e \u043d\u0430\u043f\u043e\u043c\u043d\u044f\u043d\u0435 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0441\u0430 \u043c\u0435\u0436\u0434\u0443 0 \u0438 59." }, { status: 400 });
+  }
+  if (!Number.isInteger(overdueHour) || overdueHour < 0 || overdueHour > 23) {
+    return NextResponse.json({ error: "\u0427\u0430\u0441\u044a\u0442 \u0437\u0430 \u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0438\u0435 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0435 \u043c\u0435\u0436\u0434\u0443 0 \u0438 23." }, { status: 400 });
+  }
+  if (!Number.isInteger(overdueMinute) || overdueMinute < 0 || overdueMinute > 59) {
+    return NextResponse.json({ error: "\u041c\u0438\u043d\u0443\u0442\u0438\u0442\u0435 \u0437\u0430 \u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0438\u0435 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0441\u0430 \u043c\u0435\u0436\u0434\u0443 0 \u0438 59." }, { status: 400 });
   }
 
   let trainingDates: string[] = [];
@@ -181,6 +196,9 @@ export async function PUT(
       reminderDay,
       overdueDay,
       reminderHour,
+      reminderMinute,
+      overdueHour,
+      overdueMinute,
       reminderTz: FIXED_TIME_ZONE,
       ...(teamGroup === null
         ? {
@@ -196,6 +214,9 @@ export async function PUT(
       reminderDay: true,
       overdueDay: true,
       reminderHour: true,
+      reminderMinute: true,
+      overdueHour: true,
+      overdueMinute: true,
       trainingDates: true,
       trainingWeekdays: true,
       trainingWindowDays: true,

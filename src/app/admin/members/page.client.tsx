@@ -58,6 +58,9 @@ interface ClubOption {
   reminderDay?: number;
   overdueDay?: number;
   reminderHour?: number;
+  reminderMinute?: number;
+  overdueHour?: number;
+  overdueMinute?: number;
   trainingDates?: string[];
   trainingWeekdays?: number[];
   trainingWindowDays?: number;
@@ -1117,8 +1120,13 @@ function AdminMembersPageContent() {
     reminderDay: "25",
     overdueDay: "1",
     reminderHour: "10",
+    reminderMinute: "0",
+    overdueHour: "10",
+    overdueMinute: "0",
     trainingDates: [] as string[],
   });
+  const reminderTimeValue = `${schedulerForm.reminderHour.padStart(2, "0")}:${schedulerForm.reminderMinute.padStart(2, "0")}`;
+  const overdueTimeValue = `${schedulerForm.overdueHour.padStart(2, "0")}:${schedulerForm.overdueMinute.padStart(2, "0")}`;
   const [trainingAttendanceOpen, setTrainingAttendanceOpen] = useState(false);
   const [trainingAttendanceLoading, setTrainingAttendanceLoading] = useState(false);
   const [trainingAttendanceError, setTrainingAttendanceError] = useState("");
@@ -1765,6 +1773,9 @@ function AdminMembersPageContent() {
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
         reminderHour: String(payload.reminderHour ?? 10),
+        reminderMinute: String(payload.reminderMinute ?? 0),
+        overdueHour: String(payload.overdueHour ?? 10),
+        overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: Array.isArray(payload.trainingDates)
           ? payload.trainingDates
               .map((value: unknown) => String(value ?? "").trim())
@@ -1806,6 +1817,9 @@ function AdminMembersPageContent() {
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
         reminderHour: String(payload.reminderHour ?? 10),
+        reminderMinute: String(payload.reminderMinute ?? 0),
+        overdueHour: String(payload.overdueHour ?? 10),
+        overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: Array.isArray(payload.trainingDates)
           ? payload.trainingDates
               .map((value: unknown) => String(value ?? "").trim())
@@ -1833,6 +1847,9 @@ function AdminMembersPageContent() {
           reminderDay: Number.parseInt(schedulerForm.reminderDay, 10),
           overdueDay: Number.parseInt(schedulerForm.overdueDay, 10),
           reminderHour: Number.parseInt(schedulerForm.reminderHour, 10),
+          reminderMinute: Number.parseInt(schedulerForm.reminderMinute, 10),
+          overdueHour: Number.parseInt(schedulerForm.overdueHour, 10),
+          overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
           trainingDates: schedulerForm.trainingDates,
           teamGroup: selectedTeamGroup,
         }),
@@ -1862,6 +1879,9 @@ function AdminMembersPageContent() {
           reminderDay: Number.parseInt(schedulerForm.reminderDay, 10),
           overdueDay: Number.parseInt(schedulerForm.overdueDay, 10),
           reminderHour: Number.parseInt(schedulerForm.reminderHour, 10),
+          reminderMinute: Number.parseInt(schedulerForm.reminderMinute, 10),
+          overdueHour: Number.parseInt(schedulerForm.overdueHour, 10),
+          overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
           trainingDates: schedulerForm.trainingDates,
           teamGroup: selectedTeamGroup,
         }),
@@ -3155,21 +3175,42 @@ function AdminMembersPageContent() {
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
-                    <label className="amp-edit-field">
-                      <span className="amp-lbl">Час (0-23)</span>
-                      <input
-                        className="amp-edit-input"
-                        inputMode="numeric"
-                      value={schedulerForm.reminderHour}
-                      onChange={(e) =>
+                  <label className="amp-edit-field">
+                    <span className="amp-lbl">Час за месечно напомняне</span>
+                    <input
+                      className="amp-edit-input"
+                      type="time"
+                      step={60}
+                      value={reminderTimeValue}
+                      onChange={(e) => {
+                        const [hour = "0", minute = "0"] = e.target.value.split(":");
                         setSchedulerForm((prev) => ({
                           ...prev,
-                          reminderHour: e.target.value.replace(/\D/g, ""),
-                        }))
-                      }
-                        disabled={schedulerSettingsSaving}
-                      />
-                    </label>
+                          reminderHour: hour.replace(/\D/g, ""),
+                          reminderMinute: minute.replace(/\D/g, ""),
+                        }));
+                      }}
+                      disabled={schedulerSettingsSaving}
+                    />
+                  </label>
+                  <label className="amp-edit-field">
+                    <span className="amp-lbl">Час за просрочие</span>
+                    <input
+                      className="amp-edit-input"
+                      type="time"
+                      step={60}
+                      value={overdueTimeValue}
+                      onChange={(e) => {
+                        const [hour = "0", minute = "0"] = e.target.value.split(":");
+                        setSchedulerForm((prev) => ({
+                          ...prev,
+                          overdueHour: hour.replace(/\D/g, ""),
+                          overdueMinute: minute.replace(/\D/g, ""),
+                        }));
+                      }}
+                      disabled={schedulerSettingsSaving}
+                    />
+                  </label>
                   </div>
                 )}
 

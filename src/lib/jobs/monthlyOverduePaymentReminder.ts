@@ -8,6 +8,7 @@ const DEFAULT_TIME_ZONE = "Europe/Sofia";
 const STATUS_ROLLOVER_JOB = "monthly_status_rollover";
 const DEFAULT_RUN_DAY = 1;
 const DEFAULT_RUN_HOUR = 10;
+const DEFAULT_RUN_MINUTE = 0;
 const DEFAULT_LOCK_TIMEOUT_MINUTES = 180;
 const MEMBER_PROCESSING_CONCURRENCY = 2;
 
@@ -18,10 +19,11 @@ function getDatePartsInTimeZone(date: Date, timeZone: string) {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
+    minute: "2-digit",
     hour12: false,
   }).formatToParts(date);
 
-  const get = (type: "year" | "month" | "day" | "hour") =>
+  const get = (type: "year" | "month" | "day" | "hour" | "minute") =>
       Number(parts.find((part) => part.type === type)?.value);
 
   return {
@@ -29,6 +31,7 @@ function getDatePartsInTimeZone(date: Date, timeZone: string) {
     month: get("month"),
     day: get("day"),
     hour: get("hour"),
+    minute: get("minute"),
   };
 }
 
@@ -292,7 +295,8 @@ export async function runMonthlyOverduePaymentReminder(
     select: {
       id: true,
       overdueDay: true,
-      reminderHour: true,
+      overdueHour: true,
+      overdueMinute: true,
     },
   });
 
@@ -321,10 +325,11 @@ export async function runMonthlyOverduePaymentReminder(
     if (options?.ignoreSchedule) {
       return true;
     }
-    const { day, hour } = getDatePartsInTimeZone(now, schedulerTimeZone);
+    const { day, hour, minute } = getDatePartsInTimeZone(now, schedulerTimeZone);
     const runDay = Number.isInteger(club.overdueDay) ? club.overdueDay : DEFAULT_RUN_DAY;
-    const runHour = Number.isInteger(club.reminderHour) ? club.reminderHour : DEFAULT_RUN_HOUR;
-    return day === runDay && hour === runHour;
+    const runHour = Number.isInteger(club.overdueHour) ? club.overdueHour : DEFAULT_RUN_HOUR;
+    const runMinute = Number.isInteger(club.overdueMinute) ? club.overdueMinute : DEFAULT_RUN_MINUTE;
+    return day === runDay && hour === runHour && minute === runMinute;
   });
 
   if (eligibleClubs.length === 0) {
