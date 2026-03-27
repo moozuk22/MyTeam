@@ -444,16 +444,16 @@ export default function MemberCardPage({
       const payload = await response.json();
       const days = Array.isArray(payload?.dates)
         ? payload.dates
-            .map((item: unknown) => {
-              const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
-              return {
-                date: String(raw.date ?? ""),
-                weekday: Number(raw.weekday ?? 0),
-                optedOut: Boolean(raw.optedOut),
-                note: String(raw.note ?? ""),
-              } satisfies TrainingDayStatus;
-            })
-            .filter((item: TrainingDayStatus) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+          .map((item: unknown) => {
+            const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+            return {
+              date: String(raw.date ?? ""),
+              weekday: Number(raw.weekday ?? 0),
+              optedOut: Boolean(raw.optedOut),
+              note: String(raw.note ?? ""),
+            } satisfies TrainingDayStatus;
+          })
+          .filter((item: TrainingDayStatus) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
         : [];
       const nextWindowDays = Number.parseInt(String(payload?.trainingWindowDays ?? "30"), 10);
       setTrainingWindowDays(Number.isInteger(nextWindowDays) && nextWindowDays > 0 ? nextWindowDays : 30);
@@ -1190,9 +1190,9 @@ export default function MemberCardPage({
         prev.map((entry) =>
           entry.date === item.date
             ? {
-                ...entry,
-                optedOut: action === "optOut",
-              }
+              ...entry,
+              optedOut: action === "optOut",
+            }
             : entry,
         ),
       );
@@ -1506,10 +1506,10 @@ export default function MemberCardPage({
           )}
 
           {canUseNotifications && isPushEnabled && (
-              <div className="push-enabled-banner">
-                <span className="push-enabled-check" aria-hidden="true">✓</span>
-                <span>Известията са активирани</span>
-              </div>
+            <div className="push-enabled-banner">
+              <span className="push-enabled-check" aria-hidden="true">✓</span>
+              <span>Известията са активирани</span>
+            </div>
           )}
 
           {canUseNotifications && (!isIPhoneDevice || isStandaloneMode) && (
@@ -1528,37 +1528,37 @@ export default function MemberCardPage({
 
           {canUseNotifications && isIPhoneDevice && !isStandaloneMode && (
             <>
-          <button className="add-btn" onClick={() => setInstructionsOpen((v) => !v)}>
-            <ShareIcon size={16} />
-            Добавете към начален екран
-          </button>
-
-          <p className="hint-text">
-            За да активирате известията на iPhone, натиснете бутона Share и изберете &ldquo;Добавяне към начален екран&rdquo;.
-          </p>
-
-          {instructionsOpen && (
-            <div className="instr-box">
-              <button className="instr-close" onClick={() => setInstructionsOpen(false)} aria-label="Затвори">
-                <XIcon />
+              <button className="add-btn" onClick={() => setInstructionsOpen((v) => !v)}>
+                <ShareIcon size={16} />
+                Добавете към начален екран
               </button>
-              <p className="instr-heading">Как да активирате известия на iPhone:</p>
-              <ol className="instr-list">
-                <li>
-                  <span className="step-badge">1</span>
-                  <span>Натиснете бутона <ShareIcon size={14} /> <strong>Share</strong> в долната лента на Safari</span>
-                </li>
-                <li>
-                  <span className="step-badge">2</span>
-                  <span>Превъртете надолу и изберете <PlusIcon /> <strong>&ldquo;Добавяне към начален екран&rdquo;</strong></span>
-                </li>
-                <li>
-                  <span className="step-badge">3</span>
-                  <span>Отворете приложението от началния екран и натиснете <strong>&ldquo;Активиране на известия&rdquo;</strong></span>
-                </li>
-              </ol>
-            </div>
-          )}
+
+              <p className="hint-text">
+                За да активирате известията на iPhone, натиснете бутона Share и изберете &ldquo;Добавяне към начален екран&rdquo;.
+              </p>
+
+              {instructionsOpen && (
+                <div className="instr-box">
+                  <button className="instr-close" onClick={() => setInstructionsOpen(false)} aria-label="Затвори">
+                    <XIcon />
+                  </button>
+                  <p className="instr-heading">Как да активирате известия на iPhone:</p>
+                  <ol className="instr-list">
+                    <li>
+                      <span className="step-badge">1</span>
+                      <span>Натиснете бутона <ShareIcon size={14} /> <strong>Share</strong> в долната лента на Safari</span>
+                    </li>
+                    <li>
+                      <span className="step-badge">2</span>
+                      <span>Превъртете надолу и изберете <PlusIcon /> <strong>&ldquo;Добавяне към начален екран&rdquo;</strong></span>
+                    </li>
+                    <li>
+                      <span className="step-badge">3</span>
+                      <span>Отворете приложението от началния екран и натиснете <strong>&ldquo;Активиране на известия&rdquo;</strong></span>
+                    </li>
+                  </ol>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1645,66 +1645,66 @@ export default function MemberCardPage({
                   <p className="training-empty">Няма настроени тренировъчни дни.</p>
                 ) : (
                   <>
-                  <div className="training-layout">
-                  <div className="training-calendar">
-                    {trainingMonths.map((month) => (
-                      <section key={month.key} className="training-calendar-month">
-                        <h4 className="training-calendar-month-title">{month.label}</h4>
-                        <div className="training-calendar-weekdays">
-                          {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
-                            <span key={`${month.key}-${weekday}`} className="training-calendar-weekday">
-                              {weekday}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="training-calendar-grid">
-                          {month.cells.map((cellDate, index) => {
-                            if (!cellDate) {
-                              return <span key={`${month.key}-empty-${index}`} className="training-calendar-cell training-calendar-cell--empty" aria-hidden="true" />;
-                            }
-
-                            const trainingItem = trainingByDate.get(cellDate);
-                            const dayNumber = cellDate.slice(8, 10);
-                            const isToday = cellDate === todayDateKey;
-                            if (!trainingItem) {
-                              return (
-                                <span
-                                  key={cellDate}
-                                  className={`training-calendar-cell training-calendar-cell--off${isToday ? " training-calendar-cell--today" : ""}`}
-                                >
-                                  <span className="training-calendar-day-number">{dayNumber}</span>
+                    <div className="training-layout">
+                      <div className="training-calendar">
+                        {trainingMonths.map((month) => (
+                          <section key={month.key} className="training-calendar-month">
+                            <h4 className="training-calendar-month-title">{month.label}</h4>
+                            <div className="training-calendar-weekdays">
+                              {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                                <span key={`${month.key}-${weekday}`} className="training-calendar-weekday">
+                                  {weekday}
                                 </span>
-                              );
-                            }
+                              ))}
+                            </div>
+                            <div className="training-calendar-grid">
+                              {month.cells.map((cellDate, index) => {
+                                if (!cellDate) {
+                                  return <span key={`${month.key}-empty-${index}`} className="training-calendar-cell training-calendar-cell--empty" aria-hidden="true" />;
+                                }
 
-                            const isOptedOut = trainingItem.optedOut;
-                            const dateLabel = new Date(`${trainingItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
-                              day: "2-digit",
-                              month: "2-digit",
-                            });
-                            return (
-                              <button
-                                key={cellDate}
-                                className={`training-calendar-cell training-calendar-cell--training${isOptedOut ? " training-calendar-cell--opted-out" : ""}${isToday ? " training-calendar-cell--today" : ""}`}
-                                onClick={() => {
-                                  setTrainingDetailsDate(trainingItem.date);
-                                  setTrainingAttendancePopupOpen(true);
-                                }}
-                                disabled={Boolean(trainingSavingDate)}
-                                type="button"
-                                aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem.weekday] ?? "-"} ${dateLabel}`}
-                                aria-pressed={!isOptedOut}
-                              >
-                                <span className="training-calendar-day-number">{dayNumber}</span>
-                                <span className="training-calendar-mark">{isOptedOut ? "x" : "✓"}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                  </div>
+                                const trainingItem = trainingByDate.get(cellDate);
+                                const dayNumber = cellDate.slice(8, 10);
+                                const isToday = cellDate === todayDateKey;
+                                if (!trainingItem) {
+                                  return (
+                                    <span
+                                      key={cellDate}
+                                      className={`training-calendar-cell training-calendar-cell--off${isToday ? " training-calendar-cell--today" : ""}`}
+                                    >
+                                      <span className="training-calendar-day-number">{dayNumber}</span>
+                                    </span>
+                                  );
+                                }
+
+                                const isOptedOut = trainingItem.optedOut;
+                                const dateLabel = new Date(`${trainingItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                });
+                                return (
+                                  <button
+                                    key={cellDate}
+                                    className={`training-calendar-cell training-calendar-cell--training${isOptedOut ? " training-calendar-cell--opted-out" : ""}${isToday ? " training-calendar-cell--today" : ""}`}
+                                    onClick={() => {
+                                      setTrainingDetailsDate(trainingItem.date);
+                                      setTrainingAttendancePopupOpen(true);
+                                    }}
+                                    disabled={Boolean(trainingSavingDate)}
+                                    type="button"
+                                    aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem.weekday] ?? "-"} ${dateLabel}`}
+                                    aria-pressed={!isOptedOut}
+                                  >
+                                    <span className="training-calendar-day-number">{dayNumber}</span>
+                                    <span className="training-calendar-mark">{isOptedOut ? "x" : "✓"}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 )}
                 {trainingError && <p className="training-error">{trainingError}</p>}
@@ -1731,6 +1731,12 @@ export default function MemberCardPage({
                           year: "numeric",
                         })}
                       </p>
+                      {trainingDetailsItem.note?.trim() && (
+                        <div className="training-note-display" style={{ marginTop: "16px", padding: "12px", background: "rgba(255,255,255,0.05)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
+                          <p style={{ margin: "0 0 6px 0", fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>Описание</p>
+                          <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.4, color: "rgba(255,255,255,0.9)" }}>{trainingDetailsItem.note}</p>
+                        </div>
+                      )}
                       <div className="training-attendance-buttons">
                         <button
                           className="pm-btn training-attend-btn"
@@ -2031,10 +2037,10 @@ export default function MemberCardPage({
                         state === "disabled"
                           ? "Платете първо предишните месеци"
                           : state === "paid"
-                          ? "Вече платено"
-                          : state === "waived"
-                          ? "Освободен месец (пауза)"
-                          : undefined
+                            ? "Вече платено"
+                            : state === "waived"
+                              ? "Освободен месец (пауза)"
+                              : undefined
                       }
                     >
                       {name}
