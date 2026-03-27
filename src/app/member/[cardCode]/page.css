@@ -684,6 +684,104 @@
   padding-top: 18px;
 }
 
+/* Attendance popup styles */
+.member-training-attendance-popup {
+  max-width: 320px;
+  padding: 20px;
+}
+
+.member-training-attendance-popup .pm-header {
+  margin-bottom: 12px;
+}
+
+.member-training-attendance-popup .pm-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.training-attendance-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.training-attend-btn {
+  background: rgba(50, 205, 50, 0.15) !important;
+  border: 1px solid rgba(50, 205, 50, 0.4) !important;
+  color: #32cd32 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 12px 16px !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.training-attend-btn:hover:not(:disabled) {
+  background: rgba(50, 205, 50, 0.25) !important;
+  border-color: rgba(50, 205, 50, 0.6) !important;
+  transform: translateY(-1px);
+}
+
+.training-attend-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(50, 205, 50, 0.08) !important;
+  border-color: rgba(50, 205, 50, 0.2) !important;
+}
+
+.training-optout-btn {
+  background: rgba(255, 107, 107, 0.15) !important;
+  border: 1px solid rgba(255, 107, 107, 0.4) !important;
+  color: #ff6b6b !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 12px 16px !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.training-optout-btn:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.25) !important;
+  border-color: rgba(255, 107, 107, 0.6) !important;
+  transform: translateY(-1px);
+}
+
+.training-optout-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 107, 107, 0.08) !important;
+  border-color: rgba(255, 107, 107, 0.2) !important;
+}
+
+/* Confirmation modal styles */
+.member-training-confirm-modal {
+  max-width: 320px;
+  padding: 20px;
+}
+
+.training-confirm-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 16px 0;
+  text-align: center;
+}
+
+.training-confirm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.training-confirm-actions .pm-btn {
+  flex: 1;
+  font-size: 14px !important;
+  padding: 10px 16px !important;
+}
+
 .member-notifications-scroll {
   max-height: 400px;
   overflow-y: auto;
@@ -1660,7 +1758,7 @@
   }
 
   .member-training-modal .pm-header {
-    margin-bottom: 10px;
+    margin-bottom: 20px;
     padding-right: 34px;
   }
 
