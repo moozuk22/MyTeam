@@ -647,6 +647,20 @@
   scrollbar-color: rgba(50,205,50,0.2) transparent;
 }
 
+.amp-modal::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(50,205,50,0.12), #32cd32 50%, rgba(50,205,50,0.12));
+  box-shadow: 0 0 16px rgba(50,205,50,0.55);
+  pointer-events: none;
+  z-index: 2;
+}
+
 /* Green tint overlay */
 .amp-modal-tint {
   position: absolute;
