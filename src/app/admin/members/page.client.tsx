@@ -1200,6 +1200,18 @@ function AdminMembersPageContent() {
     document.cookie = `admin_last_club_id=${encodeURIComponent(clubId)}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }, [clubId]);
 
+  // Force early layout calculation for group filter dropdown
+  useEffect(() => {
+    const select = document.querySelector('.amp-content > .amp-edit-field:first-child select');
+    if (select) {
+      // Trigger a reflow to force browser to calculate dropdown position early
+      (select as HTMLSelectElement).focus();
+      setTimeout(() => {
+        (select as HTMLSelectElement).blur();
+      }, 0);
+    }
+  }, []);
+
   const closeEditModal = () => {
     setMemberToEdit(null);
     setEditAvatarFile(null);
