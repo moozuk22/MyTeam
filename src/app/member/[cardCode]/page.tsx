@@ -1284,7 +1284,7 @@ export default function MemberCardPage({
     ? new Date(member.last_payment_date).toLocaleDateString("bg-BG")
     : "Няма плащане";
   const birthDateText = member?.birthDate
-    ? new Date(member.birthDate).toLocaleDateString("bg-BG")
+    ? new Date(member.birthDate).toLocaleDateString("bg-BG").replace(/\s*г\.\s*$/, "")
     : "-";
   const canManagePayments = isAdmin || isCoach;
   const canPublicEdit = !isAdmin && !isCoach;

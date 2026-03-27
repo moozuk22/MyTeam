@@ -1687,6 +1687,7 @@ function AdminMembersPageContent() {
     members.map((m) => m.teamGroup).filter((g): g is number => g !== null)
   )].sort((a, b) => a - b);
   const selectedTeamGroup = parseSelectedTeamGroup(trainingGroupScope);
+  const activeMembersCount = members.filter((m) => m.isActive).length;
   const inactiveMembers = members.filter((m) => !m.isActive);
 
   const filtered = members.filter((m) => {
@@ -2275,7 +2276,7 @@ function AdminMembersPageContent() {
               className={`amp-pill${selectedGroup === "all" ? " amp-pill--active" : ""}`}
               onClick={() => setSelectedGroup("all")}
             >
-              Всички
+              Всички ({activeMembersCount})
             </button>
             {groupOptions.map((g) => (
               <button
