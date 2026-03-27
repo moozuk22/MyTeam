@@ -1325,12 +1325,12 @@ export default function MemberCardPage({
         {/* Top bar with back button and notification bell */}
         <div style={{
           display: "flex",
-          justifyContent: isAdmin ? "space-between" : "flex-end",
+          justifyContent: isAdmin || isCoach ? "space-between" : "flex-end",
           alignItems: "center",
           marginBottom: "12px",
           gap: "12px"
         }}>
-          {isAdmin && (
+          {(isAdmin || isCoach) && (
             <button
               className="amp-back-btn"
               onClick={() =>
