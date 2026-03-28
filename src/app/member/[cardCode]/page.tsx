@@ -1747,7 +1747,7 @@ export default function MemberCardPage({
                           }}
                           disabled={!trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
                         >
-                          {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Ще присъствам"}
+                          {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Присъствам"}
                         </button>
                         <button
                           className="pm-btn training-optout-btn"
@@ -1759,7 +1759,7 @@ export default function MemberCardPage({
                           }}
                           disabled={trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
                         >
-                          {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Няма да присъствам"}
+                          {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Отсъствам"}
                         </button>
                       </div>
                     </div>
