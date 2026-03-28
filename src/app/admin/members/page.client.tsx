@@ -3412,7 +3412,15 @@ function AdminMembersPageContent() {
                   </div>
                 </div>
               )}
-              <label className="amp-edit-field">
+              <label className="amp-edit-field" style={{ position: "relative" }}>
+                {trainingAttendanceLoading && (
+                  <div className="amp-modal-loading-overlay" style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+                    <div className="amp-loading" style={{ minHeight: 200 }}>
+                      <div className="amp-spinner" />
+                      <p style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>Зареждане...</p>
+                    </div>
+                  </div>
+                )}
                 <div className="amp-training-calendar amp-training-calendar--attendance">
                   {trainingAttendanceCalendarMonths.map((month) => (
                     <div key={month.key} className="amp-training-month">
@@ -3950,7 +3958,15 @@ function AdminMembersPageContent() {
                 <XIcon />
               </button>
             </h2>
-            <div className="amp-modal-body">
+            <div className="amp-modal-body" style={{ position: "relative" }}>
+              {trainingDaysEditorSaving && (
+                <div className="amp-modal-loading-overlay" style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(16,16,20,0.9)" }}>
+                  <div className="amp-loading" style={{ minHeight: 200 }}>
+                    <div className="amp-spinner" />
+                    <p style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>Запазване...</p>
+                  </div>
+                </div>
+              )}
               {false && !trainingDaysEditorCreateOpen && (
                 <>
                   <div className="amp-training-days-editor-header" style={{ alignItems: "flex-start", flexDirection: "column", gap: "8px" }}>
@@ -4318,7 +4334,15 @@ function AdminMembersPageContent() {
                 <XIcon />
               </button>
             </h2>
-            <div className="amp-modal-body">
+            <div className="amp-modal-body" style={{ position: "relative" }}>
+              {trainingNoteSaving && (
+                <div className="amp-modal-loading-overlay" style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(16,16,20,0.9)" }}>
+                  <div className="amp-loading" style={{ minHeight: 200 }}>
+                    <div className="amp-spinner" />
+                    <p style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>Запазване...</p>
+                  </div>
+                </div>
+              )}
               <label className="amp-edit-field">
                 <span className="amp-lbl">Избери дни</span>
                 <div className="amp-training-calendar amp-training-calendar--attendance">
