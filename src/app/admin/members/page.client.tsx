@@ -1177,6 +1177,8 @@ function AdminMembersPageContent() {
   const [trainingGroupEditOpen, setTrainingGroupEditOpen] = useState(false);
   const [trainingGroupEditSaving, setTrainingGroupEditSaving] = useState(false);
   const [trainingGroupEditError, setTrainingGroupEditError] = useState("");
+  const [trainingGroupDeleteConfirmOpen, setTrainingGroupDeleteConfirmOpen] = useState(false);
+  const [trainingGroupDeleteSaving, setTrainingGroupDeleteSaving] = useState(false);
   const [trainingGroupEditId, setTrainingGroupEditId] = useState("");
   const [trainingGroupEditName, setTrainingGroupEditName] = useState("");
   const [trainingGroupEditGroups, setTrainingGroupEditGroups] = useState<string[]>([]);
@@ -1194,6 +1196,7 @@ function AdminMembersPageContent() {
   const trainingUpcomingDateSet = new Set(trainingUpcomingDates.map((item) => item.date));
   const trainingUpcomingByDate = new Map(trainingUpcomingDates.map((item) => [item.date, item]));
   const trainingAttendanceCalendarMonths = buildCalendarMonths(trainingUpcomingDates.map((item) => item.date));
+  const todayIsoDate = getTodayIsoDate();
 
   useEffect(() => {
     if (!clubId) return;
@@ -2019,6 +2022,49 @@ function AdminMembersPageContent() {
     }
   };
 
+  const deleteSelectedTrainingGroup = async () => {
+    if (!clubId || !selectedTrainingGroupId || trainingGroupDeleteSaving) return;
+
+    setTrainingGroupDeleteSaving(true);
+    setTrainingAttendanceError("");
+    try {
+      const response = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups/${encodeURIComponent(selectedTrainingGroupId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Неуспешно изтриване на сборния отбор.");
+      }
+
+      setTrainingDayDetailsOpen(false);
+      setTrainingBulkNoteOpen(false);
+      setTrainingDaysEditorOpen(false);
+      setTrainingDaysEditorError("");
+      setTrainingNoteTargetDates([]);
+      const refreshedGroups = await loadTrainingScheduleGroups();
+      const fallbackId = refreshedGroups[0]?.id ?? "";
+      setSelectedTrainingGroupId(fallbackId);
+      if (trainingAttendanceView === "trainingGroups") {
+        if (fallbackId) {
+          await fetchTrainingAttendance(undefined, undefined, fallbackId, "trainingGroups");
+        } else {
+          setTrainingAttendancePlayers([]);
+          setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
+          setTrainingUpcomingDates([]);
+          setTrainingAttendanceDate("");
+        }
+      }
+    } catch (error) {
+      setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingGroupDeleteSaving(false);
+      setTrainingGroupDeleteConfirmOpen(false);
+    }
+  };
+
   const openTrainingDaysEditor = async (mode: "teamGroup" | "createGroup" | "trainingGroup" = "teamGroup") => {
     if (!clubId) return;
     if (trainingDaysEditorOpen) {
@@ -2043,9 +2089,13 @@ function AdminMembersPageContent() {
         if (!resolvedGroup) {
           throw new Error("Изберете сборен отбор.");
         }
+        const nextWindowDates = [...resolvedGroup.trainingDates]
+          .map((value) => String(value ?? "").trim())
+          .filter((value) => schedulerCalendarDateSet.has(value))
+          .sort((a, b) => a.localeCompare(b));
         setSchedulerForm((prev) => ({
           ...prev,
-          trainingDates: [...resolvedGroup.trainingDates].sort((a, b) => a.localeCompare(b)),
+          trainingDates: nextWindowDates,
         }));
         setTrainingDaysEditorOpen(true);
         return;
@@ -2135,13 +2185,17 @@ function AdminMembersPageContent() {
         name: group.name,
       }));
       if (trainingDaysEditorMode === "trainingGroup") {
+        const nextTrainingDates = schedulerForm.trainingDates
+          .map((value) => String(value ?? "").trim())
+          .filter((value) => schedulerCalendarDateSet.has(value))
+          .sort((a, b) => a.localeCompare(b));
         const groupResponse = await fetch(
           `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups/${encodeURIComponent(selectedTrainingGroupId)}`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              trainingDates: schedulerForm.trainingDates,
+              trainingDates: nextTrainingDates,
             }),
           },
         );
@@ -2966,6 +3020,21 @@ function AdminMembersPageContent() {
           onConfirm={handleDeleteTeam}
         />
       )}
+      {trainingGroupDeleteConfirmOpen && (
+        <ConfirmDeleteTrainingGroupModal
+          groupName={
+            trainingScheduleGroups.find((group) => group.id === selectedTrainingGroupId)?.name?.trim() ||
+            "този сборен отбор"
+          }
+          isDeleting={trainingGroupDeleteSaving}
+          onCancel={() => {
+            if (!trainingGroupDeleteSaving) {
+              setTrainingGroupDeleteConfirmOpen(false);
+            }
+          }}
+          onConfirm={() => void deleteSelectedTrainingGroup()}
+        />
+      )}
       {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} clubId={clubId} />}
       {trainingAttendanceOpen && (
         <div
@@ -3100,14 +3169,24 @@ function AdminMembersPageContent() {
                         ))}
                       </select>
                     </label>
+                    <div className="amp-training-group-actions">
                     <button
                       type="button"
                       className="amp-btn amp-btn--ghost"
                       onClick={() => openTrainingGroupEditModal(selectedTrainingGroupId)}
-                      disabled={!selectedTrainingGroupId || trainingScheduleGroupsLoading || trainingGroupEditSaving}
+                      disabled={!selectedTrainingGroupId || trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
                     >
                       {trainingGroupEditSaving ? "Отваряне..." : "Редактирай сборен отбор"}
                     </button>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--danger"
+                      onClick={() => setTrainingGroupDeleteConfirmOpen(true)}
+                      disabled={!selectedTrainingGroupId || trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
+                    >
+                      {trainingGroupDeleteSaving ? "Изтриване..." : "Изтрий сборен отбор"}
+                    </button>
+                    </div>
                     </>
                   )}
                 </div>
@@ -3157,11 +3236,12 @@ function AdminMembersPageContent() {
                           }
 
                           const isActive = trainingAttendanceDate === date;
+                          const isToday = todayIsoDate === date;
                           return (
                             <button
                               key={date}
                               type="button"
-                              className={`amp-training-date-btn${isActive ? " amp-training-date-btn--active" : ""}`}
+                              className={`amp-training-date-btn amp-training-date-btn--training${isActive ? " amp-training-date-btn--active" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
                               onClick={() => void openTrainingDayDetails(date)}
                               disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
                             >
@@ -3219,11 +3299,12 @@ function AdminMembersPageContent() {
                               }
 
                               const isSelected = schedulerForm.trainingDates.includes(date);
+                              const isToday = todayIsoDate === date;
                               return (
                                 <button
                                   key={date}
                                   type="button"
-                                  className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}`}
+                                  className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
                                   onClick={() => toggleTrainingDate(date)}
                                   disabled={trainingDaysEditorSaving}
                                 >
@@ -3842,11 +3923,12 @@ function AdminMembersPageContent() {
                         }
 
                         const isSelected = schedulerForm.trainingDates.includes(date);
+                        const isToday = todayIsoDate === date;
                         return (
                           <button
                             key={date}
                             type="button"
-                            className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}`}
+                            className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
                             onClick={() => toggleTrainingDate(date)}
                             disabled={trainingDaysEditorSaving}
                           >
@@ -4030,11 +4112,12 @@ function AdminMembersPageContent() {
                           }
 
                           const isSelected = trainingNoteTargetDates.includes(date);
+                          const isToday = todayIsoDate === date;
                           return (
                             <button
                               key={date}
                               type="button"
-                              className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--selected" : ""}`}
+                              className={`amp-training-date-btn amp-training-date-btn--training${isSelected ? " amp-training-date-btn--selected" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
                               onClick={() => toggleTrainingNoteTargetDate(date)}
                               disabled={trainingNoteSaving}
                             >
@@ -4385,6 +4468,50 @@ function ConfirmDeleteTeamModal({
             </button>
             <button className="amp-btn amp-btn--danger" onClick={onConfirm} disabled={isDeleting}>
               {isDeleting ? "Изтриване..." : "Изтрий отбора"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteTrainingGroupModal({
+  groupName,
+  isDeleting,
+  onCancel,
+  onConfirm,
+}: {
+  groupName: string;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="amp-overlay amp-overlay--confirm" onClick={isDeleting ? undefined : onCancel}>
+      <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+        <div className="amp-modal-tint" aria-hidden="true" />
+        <h2 className="amp-modal-title">
+          <span className="amp-modal-title-gradient">Потвърди изтриване на сборен отбор</span>
+          <button className="amp-modal-close" onClick={onCancel} aria-label="Затвори" disabled={isDeleting}>
+            <XIcon />
+          </button>
+        </h2>
+
+        <div className="amp-modal-body">
+          <p className="amp-confirm-text">
+            Сигурен ли си, че искаш да изтриеш <strong>{groupName}</strong>?
+          </p>
+          <p className="amp-confirm-subtext">
+            Това действие е необратимо и ще премахне сборния отбор и свързаните му тренировъчни дни.
+          </p>
+
+          <div className="amp-modal-actions">
+            <button className="amp-btn amp-btn--ghost" onClick={onCancel} disabled={isDeleting}>
+              Отказ
+            </button>
+            <button className="amp-btn amp-btn--danger" onClick={onConfirm} disabled={isDeleting}>
+              {isDeleting ? "Изтриване..." : "Изтрий сборния отбор"}
             </button>
           </div>
         </div>

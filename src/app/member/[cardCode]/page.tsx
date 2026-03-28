@@ -1471,7 +1471,6 @@ export default function MemberCardPage({
         <div className="below-card">
           {canManagePayments && (<>
             <button className="pay-btn" onClick={openPaymentModal}>
-              <PlusIcon />
               Плати
             </button>
             <button

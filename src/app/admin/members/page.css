@@ -1021,15 +1021,28 @@
   transform: translateY(-1px);
 }
 
-.amp-training-date-btn--active {
+.amp-training-date-btn--training:not(.amp-training-date-btn--today) {
+  border-color: rgba(50,205,50,0.45);
+  background: rgba(50,205,50,0.12);
+  color: #9eff9e;
+}
+
+.amp-training-date-btn--active:not(.amp-training-date-btn--today) {
   border-color: rgba(50,205,50,0.6);
   background: rgba(50,205,50,0.18);
   color: #9eff9e;
 }
 
 .amp-training-date-btn--selected:not(.amp-training-date-btn--active) {
-  border-color: rgba(80,170,255,0.65);
-  background: rgba(80,170,255,0.14);
+  border-color: rgba(50,205,50,0.6);
+  background: rgba(50,205,50,0.18);
+  color: #9eff9e;
+}
+
+.amp-training-date-btn--today {
+  border-color: rgba(80,170,255,0.7);
+  background: rgba(80,170,255,0.2);
+  color: #b8dcff;
 }
 
 .amp-training-date-btn:disabled {
@@ -1376,6 +1389,17 @@
   background: rgba(50,205,50,0.28);
   box-shadow: 0 0 20px rgba(50,205,50,0.2);
   transform: translateY(-1px);
+}
+
+.amp-training-group-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.amp-training-group-actions .amp-btn {
+  width: 100%;
 }
 
 /* ══════════════════════════════════════
@@ -1744,6 +1768,10 @@
   .rd-title {
     font-size: 16px;
     justify-content: center;
+  }
+
+  .amp-training-group-actions {
+    grid-template-columns: 1fr;
   }
 
   .rd-filters {
