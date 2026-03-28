@@ -860,7 +860,7 @@
 
 .bell-btn--disable {
   background-color: rgba(224,53,53,0.15);
-  color: #ff8f8f;
+  color: #ffffff;
   border: 1px solid rgba(224,53,53,0.35);
 }
 
@@ -891,6 +891,10 @@
 .add-btn:hover { background-color: rgba(0,122,255,0.3); }
 
 .member-action-btn {
+  color: #ffffff;
+}
+
+.member-edit-btn {
   color: #ffffff;
 }
 

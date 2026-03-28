@@ -1493,7 +1493,7 @@ export default function MemberCardPage({
 
           {canPublicEdit && (
             <button
-              className="add-btn"
+              className="add-btn member-edit-btn"
               onClick={() => {
                 setEditError("");
                 setEditImageFile(null);
