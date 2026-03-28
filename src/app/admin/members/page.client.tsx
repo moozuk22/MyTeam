@@ -376,6 +376,12 @@ const ChartColumnIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
+const PencilIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+);
+
 const UsersIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -2908,9 +2914,12 @@ function AdminMembersPageContent() {
           <div className="amp-nav-left">
             {isAdmin && (
               <div className="amp-nav-back">
-                <button className="amp-back-btn" onClick={() => router.push("/admin/players")}>
+                <button
+                  className="amp-back-btn amp-btn--compact"
+                  onClick={() => router.push("/admin/players")}
+                >
                   <ArrowLeftIcon />
-                  Назад към отбори
+                  <span>Назад</span>
                 </button>
               </div>
             )}
@@ -2920,7 +2929,7 @@ function AdminMembersPageContent() {
             </button>
             {isAdmin && (
               <button
-                className="amp-inactive-toggle-btn"
+                className="amp-inactive-toggle-btn amp-btn--compact"
                 onClick={async () => {
                   setInactiveActionError("");
                   await refreshMembersList();
@@ -2928,51 +2937,65 @@ function AdminMembersPageContent() {
                 }}
                 type="button"
               >
-                {"\u041f\u043e\u043a\u0430\u0436\u0438 \u043d\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u0438 \u0438\u0433\u0440\u0430\u0447\u0438"}
+                <UsersIcon />
+                <span>Неактивни</span>
               </button>
             )}
           </div>
           {isAdmin && clubId && (
             <div className="amp-team-actions">
               <button
-                className="amp-edit-team-btn"
+                className="amp-edit-team-btn amp-btn--compact"
                 onClick={() => router.push(`/admin/teams/${encodeURIComponent(clubId)}/edit`)}
                 disabled={isDeletingTeam}
               >
-                Редактирай отбор
+                <PencilIcon size={14} />
+                <span>Редактирай</span>
               </button>
               <button
-                className="amp-delete-team-btn"
+                className="amp-delete-team-btn amp-btn--compact"
                 onClick={() => setIsTeamDeleteConfirmOpen(true)}
                 disabled={isDeletingTeam}
                 type="button"
               >
                 <TrashIcon />
-                {isDeletingTeam ? "Изтриване..." : "Изтрий отбор"}
+                <span>Изтрий</span>
               </button>
             </div>
           )}
         </div>
 
         <div className="amp-tools-row">
-          <button className="amp-reports-btn" onClick={() => setReportsOpen(true)}>
-            <ChartColumnIcon />
-            Център за отчети
+          <button className="amp-reports-btn amp-btn--compact" onClick={() => setReportsOpen(true)}>
+            <ChartColumnIcon size={16} />
+            <span>Отчети</span>
           </button>
           {(isAdmin || isCoach) && clubId && (
             <>
-              <button className="amp-download-links-btn amp-scheduler-settings-btn" onClick={() => void openSchedulerSettings()} type="button">
+              <button
+                className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+                onClick={() => void openSchedulerSettings()}
+                type="button"
+              >
                 <CalendarIcon />
-                {"\u0413\u0440\u0430\u0444\u0438\u043a \u0438\u0437\u0432\u0435\u0441\u0442\u0438\u044f"}
+                <span>Известия</span>
               </button>
-              <button className="amp-download-links-btn amp-scheduler-settings-btn" onClick={() => void openTrainingAttendance()} type="button">
+              <button
+                className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+                onClick={() => void openTrainingAttendance()}
+                type="button"
+              >
                 <UsersIcon />
-                {"Тренировъчен график"}
+                <span>График</span>
               </button>
               {isAdmin && (
-                <button className="amp-download-links-btn" onClick={() => void handleDownloadMemberLinks()} type="button">
+                <button
+                  className="amp-download-links-btn amp-btn--compact"
+                  onClick={() => void handleDownloadMemberLinks()}
+                  type="button"
+                >
                   <DownloadIcon />
-                  Изтегли линкове
+                  <span>Линкове</span>
                 </button>
               )}
             </>

@@ -157,6 +157,24 @@
   transform: scale(1.05);
 }
 
+/* Combined with compact class - blue */
+.amp-edit-team-btn.amp-btn--compact {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+
+.amp-edit-team-btn.amp-btn--compact:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.25);
+  border-color: rgba(96, 165, 250, 0.65);
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.25);
+  transform: scale(1.05);
+}
+
 .amp-delete-team-btn {
   display: flex;
   align-items: center;
@@ -164,7 +182,7 @@
   padding: 10px 20px;
   border-radius: 12px;
   border: 1px solid rgba(255, 77, 77, 0.4);
-  background: rgba(255, 77, 77, 0.12);
+  background: #ff4d4d33;
   color: #ff7a7a;
   font-size: 14px;
   font-weight: 600;
@@ -183,6 +201,24 @@
 .amp-delete-team-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* Combined with compact class */
+.amp-delete-team-btn.amp-btn--compact {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 77, 77, 0.4);
+  background: #ff4d4d33;
+  color: #ff7a7a;
+}
+
+.amp-delete-team-btn.amp-btn--compact:hover:not(:disabled) {
+  background: rgba(255, 77, 77, 0.2);
+  border-color: rgba(255, 77, 77, 0.65);
+  box-shadow: 0 0 16px rgba(255, 77, 77, 0.22);
+  transform: scale(1.05);
 }
 
 .amp-inactive-toggle-btn {
@@ -2092,4 +2128,65 @@
 .amp-dropdown-item:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Icon-only buttons */
+.amp-btn--icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.amp-btn--icon-only:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.25);
+}
+
+.amp-btn--icon-only:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.amp-btn--icon-only svg {
+  flex-shrink: 0;
+}
+
+/* Compact buttons with icon + text */
+.amp-btn--compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.amp-btn--compact:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.25);
+}
+
+.amp-btn--compact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.amp-btn--compact svg {
+  flex-shrink: 0;
 }
