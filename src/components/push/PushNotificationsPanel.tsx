@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const normalized = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(normalized);
@@ -12,7 +12,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     output[i] = rawData.charCodeAt(i);
   }
 
-  return output.buffer as ArrayBuffer;
+  return output;
 }
 
 function detectIPhoneSafari() {

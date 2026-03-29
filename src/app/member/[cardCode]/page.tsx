@@ -175,7 +175,7 @@ function toISOMonth(ym: { year: number; month: number }) {
   return `${ym.year}-${mm}-01T00:00:00.000Z`;
 }
 
-function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const normalized = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(normalized);
@@ -185,7 +185,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     output[i] = rawData.charCodeAt(i);
   }
 
-  return output.buffer as ArrayBuffer;
+  return output;
 }
 
 export default function MemberCardPage({
@@ -798,15 +798,12 @@ export default function MemberCardPage({
       const { publicKey } = (await keyResponse.json()) as { publicKey: string };
 
       const existingSubscription = await registration.pushManager.getSubscription();
-      if (existingSubscription) {
-        // Re-subscribe with current VAPID key pair after key rotation.
-        await existingSubscription.unsubscribe();
-      }
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
+      const subscription =
+        existingSubscription ||
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        }));
 
       const saveResponse = await fetch(
         `/api/members/${encodeURIComponent(normalizedCardCode)}/push-subscriptions`,
