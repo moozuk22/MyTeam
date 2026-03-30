@@ -24,6 +24,8 @@ model Club {
   reminderTz             String                      @default("Europe/Sofia") @map("reminder_tz")
   trainingWeekdays       Int[]                       @default([]) @map("training_weekdays")
   trainingDates          String[]                    @default([]) @map("training_dates")
+  trainingTime           String?                     @map("training_time")
+  trainingDateTimes      Json?                       @map("training_date_times")
   trainingWindowDays     Int                         @default(30) @map("training_window_days")
   players                Player[]
   adminPushSubscriptions AdminPushSubscription[]
@@ -59,6 +61,8 @@ model ClubTrainingGroupSchedule {
   teamGroup          Int      @map("team_group")
   trainingWeekdays   Int[]    @default([]) @map("training_weekdays")
   trainingDates      String[] @default([]) @map("training_dates")
+  trainingTime       String?  @map("training_time")
+  trainingDateTimes  Json?    @map("training_date_times")
   trainingWindowDays Int      @default(30) @map("training_window_days")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -76,6 +80,8 @@ model ClubTrainingScheduleGroup {
   teamGroups         Int[]    @default([]) @map("team_groups")
   trainingWeekdays   Int[]    @default([]) @map("training_weekdays")
   trainingDates      String[] @default([]) @map("training_dates")
+  trainingTime       String?  @map("training_time")
+  trainingDateTimes  Json?    @map("training_date_times")
   trainingWindowDays Int      @default(30) @map("training_window_days")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -54,6 +54,24 @@ export function isIsoDate(value: string): boolean {
   return utcDateToIsoDate(parsed) === value;
 }
 
+export function isValidTrainingTime(value: string): boolean {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value.trim());
+}
+
+export function normalizeTrainingTime(raw: unknown): string | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  const value = String(raw).trim();
+  if (!value) {
+    return null;
+  }
+  if (!isValidTrainingTime(value)) {
+    throw new Error("Invalid trainingTime. Use HH:mm.");
+  }
+  return value;
+}
+
 export function getWeekdayMondayFirst(isoDate: string, timeZone: string): number {
   const probe = new Date(`${isoDate}T12:00:00.000Z`);
   const formatter = new Intl.DateTimeFormat("en-US", {

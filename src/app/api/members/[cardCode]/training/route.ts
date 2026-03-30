@@ -8,6 +8,7 @@ import {
   getWeekdayMondayFirst,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingTime,
   utcDateToIsoDate,
 } from "@/lib/training";
 
@@ -16,6 +17,34 @@ export const dynamic = "force-dynamic";
 
 const FIXED_TIME_ZONE = "Europe/Sofia";
 const TRAINING_SELECTION_WINDOW_DAYS = 30;
+
+function normalizeStoredTrainingDateTimes(raw: unknown, trainingDates: string[]): Record<string, string> {
+  if (!raw || typeof raw !== "object") {
+    return {};
+  }
+  const source = raw as Record<string, unknown>;
+  const allowedDates = new Set(trainingDates);
+  const result: Record<string, string> = {};
+  for (const [date, value] of Object.entries(source)) {
+    if (!allowedDates.has(date)) {
+      continue;
+    }
+    const time = typeof value === "string" ? value.trim() : "";
+    const normalized = normalizeTrainingTime(time);
+    if (normalized) {
+      result[date] = normalized;
+    }
+  }
+  return result;
+}
+
+function safeNormalizeTrainingTime(raw: unknown): string | null {
+  try {
+    return normalizeTrainingTime(raw);
+  } catch {
+    return null;
+  }
+}
 
 function formatBgDate(isoDate: string) {
   return new Date(`${isoDate}T00:00:00.000Z`).toLocaleDateString("bg-BG", {
@@ -71,6 +100,8 @@ async function getMemberTrainingContext(cardCode: string) {
             select: {
               id: true,
               trainingDates: true,
+              trainingDateTimes: true,
+              trainingTime: true,
               trainingWeekdays: true,
               trainingWindowDays: true,
             },
@@ -95,6 +126,8 @@ async function getMemberTrainingContext(cardCode: string) {
         },
         select: {
           trainingDates: true,
+          trainingDateTimes: true,
+          trainingTime: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -117,6 +150,8 @@ async function getMemberTrainingContext(cardCode: string) {
         },
         select: {
           trainingDates: true,
+          trainingDateTimes: true,
+          trainingTime: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -134,6 +169,18 @@ async function getMemberTrainingContext(cardCode: string) {
     timeZone: FIXED_TIME_ZONE,
     maxDays: TRAINING_SELECTION_WINDOW_DAYS,
   });
+  const scheduleDateTimes = normalizeStoredTrainingDateTimes(
+    trainingGroupOverride?.trainingDateTimes ??
+      groupSchedule?.trainingDateTimes ??
+      card.player.club.trainingDateTimes,
+    upcomingDates,
+  );
+  const scheduleFallbackTime = safeNormalizeTrainingTime(
+    trainingGroupOverride?.trainingTime ??
+    groupSchedule?.trainingTime ??
+    card.player.club.trainingTime ??
+    null,
+  );
 
   return {
     cardCode: card.cardCode,
@@ -143,6 +190,8 @@ async function getMemberTrainingContext(cardCode: string) {
     trainingWeekdays,
     trainingWindowDays,
     upcomingDates,
+    trainingDateTimes: scheduleDateTimes,
+    fallbackTrainingTime: scheduleFallbackTime,
   };
 }
 
@@ -209,6 +258,7 @@ export async function GET(
       date,
       weekday: getWeekdayMondayFirst(date, FIXED_TIME_ZONE),
       optedOut: optedOutSet.has(date),
+      trainingTime: context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
       note: noteByDate.get(date) ?? "",
     })),
   });

@@ -1361,6 +1361,18 @@
   background: rgba(255,255,255,0.02);
 }
 
+.amp-training-time-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.amp-training-time-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
 .amp-training-days-editor-header {
   display: flex;
   justify-content: space-between;
@@ -1672,6 +1684,33 @@
 
 .amp-training-group-actions .amp-btn {
   width: 100%;
+}
+
+.amp-training-view-switch {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+  margin: 0 auto 14px;
+}
+
+.amp-training-view-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.amp-training-view-btn.is-active {
+  border-color: rgba(50,205,50,0.62);
+  background: linear-gradient(135deg, rgba(50,205,50,0.24), rgba(50,205,50,0.12));
+  color: #cfffcc;
+  box-shadow: 0 0 18px rgba(50,205,50,0.2);
 }
 
 /* ══════════════════════════════════════
@@ -2219,6 +2258,25 @@
   .amp-modal--training-day-details .amp-modal-body,
   .amp-modal--training-note .amp-modal-body {
     gap: 10px;
+  }
+
+  .amp-training-view-switch {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    margin: 0 0 12px;
+  }
+
+  .amp-training-view-btn {
+    width: 100%;
+    height: 38px;
+    border-radius: 12px;
+    padding: 0 12px;
   }
 
   .amp-modal--training-attendance .amp-training-calendar,

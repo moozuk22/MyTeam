@@ -5,7 +5,8 @@ type MemberEvent = {
     | "questions-updated"
     | "notification-created"
     | "status-updated"
-    | "payment-history-updated";
+    | "payment-history-updated"
+    | "training-updated";
   cardCode: string;
   timestamp: number;
 };
@@ -45,6 +46,7 @@ export function publishMemberUpdated(
     | "notification-created"
     | "status-updated"
     | "payment-history-updated"
+    | "training-updated"
 ) {
   const set = subscribersByCardCode.get(cardCode);
   if (!set || set.size === 0) return;

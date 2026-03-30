@@ -45,6 +45,7 @@ interface TrainingDayStatus {
   date: string;
   weekday: number;
   optedOut: boolean;
+  trainingTime?: string;
   note: string;
 }
 
@@ -188,6 +189,27 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output;
 }
 
+function formatIsoDateForBgDisplay(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T12:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return isoDate;
+  }
+  return parsed.toLocaleDateString("bg-BG", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function getTrainingDateTimeMs(dateIso: string, trainingTime?: string): number {
+  const normalizedTime =
+    typeof trainingTime === "string" && /^([01]\d|2[0-3]):([0-5]\d)$/.test(trainingTime.trim())
+      ? trainingTime.trim()
+      : "00:00";
+  const parsed = new Date(`${dateIso}T${normalizedTime}:00`);
+  return parsed.getTime();
+}
+
 export default function MemberCardPage({
   params,
 }: {
@@ -266,6 +288,7 @@ export default function MemberCardPage({
   const [trainingAttendancePopupOpen, setTrainingAttendancePopupOpen] = useState(false);
   const [trainingConfirmModalOpen, setTrainingConfirmModalOpen] = useState(false);
   const [trainingConfirmAction, setTrainingConfirmAction] = useState<"attend" | "optOut" | null>(null);
+  const [countdownNowMs, setCountdownNowMs] = useState(() => Date.now());
 
   // ── Derived: paid months set ─────────────────────────
   const paidSet = new Set<string>(
@@ -328,6 +351,30 @@ export default function MemberCardPage({
           cells,
         };
       });
+  })();
+  const nextTrainingEntry =
+    trainingDaysSorted
+      .filter((item) => !item.optedOut)
+      .map((item) => ({
+        item,
+        targetMs: getTrainingDateTimeMs(item.date, item.trainingTime),
+      }))
+      .filter((entry) => Number.isFinite(entry.targetMs))
+      .sort((a, b) => a.targetMs - b.targetMs)
+      .find((entry) => entry.targetMs >= countdownNowMs) ?? null;
+  const nextTrainingDate = nextTrainingEntry?.item.date ?? null;
+  const nextTrainingTime = nextTrainingEntry?.item.trainingTime?.trim() || null;
+  const nextTrainingCountdown = (() => {
+    if (!nextTrainingEntry) {
+      return null;
+    }
+    const diffMs = Math.max(0, nextTrainingEntry.targetMs - countdownNowMs);
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / (24 * 60 * 60));
+    const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+    const seconds = totalSeconds % 60;
+    return { days, hours, minutes, seconds };
   })();
 
   // Last paid month
@@ -450,6 +497,7 @@ export default function MemberCardPage({
               date: String(raw.date ?? ""),
               weekday: Number(raw.weekday ?? 0),
               optedOut: Boolean(raw.optedOut),
+              trainingTime: String(raw.trainingTime ?? "").trim(),
               note: String(raw.note ?? ""),
             } satisfies TrainingDayStatus;
           })
@@ -512,6 +560,16 @@ export default function MemberCardPage({
     void fetchTrainingDays();
   }, [normalizedCardCode]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCountdownNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+
   // Live updates via SSE (no polling)
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -551,6 +609,10 @@ export default function MemberCardPage({
             console.error("Failed to refresh member after live update event:", error);
           }
         })();
+      }
+
+      if (type === "training-updated") {
+        void fetchTrainingDays();
       }
 
       if (type === "notification-created") {
@@ -1397,7 +1459,7 @@ export default function MemberCardPage({
           <div className="training-head">
             <h3 className="training-title">Легенда: Зелените дати са планирани тренировки, а червените са отбелязани отсъствия.</h3>
           </div>
-          {trainingLoading ? (
+          {canPublicEdit && (trainingLoading ? (
             <p className="training-empty">Зареждане...</p>
           ) : trainingDays.length === 0 ? (
             <p className="training-empty">Няма настроени тренировъчни дни.</p>
@@ -1460,7 +1522,7 @@ export default function MemberCardPage({
                 </section>
               ))}
             </div>
-          )}
+          ))}
           {trainingError && <p className="training-error">{trainingError}</p>}
         </div>}
 
@@ -1471,7 +1533,7 @@ export default function MemberCardPage({
               Плати
             </button>
             <button
-              className="add-btn member-action-btn"
+              className="add-btn member-action-btn pause-btn"
               onClick={() => {
                 setPauseError(null);
                 setSelectedPauseMonths([]);
@@ -1484,9 +1546,25 @@ export default function MemberCardPage({
             </button>
           </>)}
 
-          <button className="add-btn member-action-btn" onClick={() => void openTrainingModal()}>
+          <button className="add-btn member-action-btn training-schedule-btn" onClick={() => void openTrainingModal()}>
             Тренировъчен график
           </button>
+
+          {canPublicEdit && (trainingLoading ? (
+            <p className="training-next-hint">Зареждане на следваща тренировка...</p>
+          ) : nextTrainingDate && nextTrainingCountdown ? (
+            <div className="training-next-card">
+              <p className="training-next-title">
+                Следваща тренировка: {formatIsoDateForBgDisplay(nextTrainingDate)}
+                {nextTrainingTime ? ` ${nextTrainingTime}` : ""}
+              </p>
+              <p className="training-next-countdown">
+                {`${String(nextTrainingCountdown.days).padStart(2, "0")}:${String(nextTrainingCountdown.hours).padStart(2, "0")}:${String(nextTrainingCountdown.minutes).padStart(2, "0")}:${String(nextTrainingCountdown.seconds).padStart(2, "0")}`}
+              </p>
+            </div>
+          ) : (
+            <p className="training-next-hint">Няма предстояща тренировка.</p>
+          ))}
 
           {canPublicEdit && (
             <button
@@ -1504,7 +1582,7 @@ export default function MemberCardPage({
           {canUseNotifications && isPushEnabled && (
             <div className="push-enabled-banner">
               <span className="push-enabled-check" aria-hidden="true">✓</span>
-              <span>Известията са активирани</span>
+              <span className="push-enabled-text">Известията са активирани</span>
             </div>
           )}
 
@@ -1524,7 +1602,7 @@ export default function MemberCardPage({
 
           {canUseNotifications && isIPhoneDevice && !isStandaloneMode && (
             <>
-              <button className="add-btn" onClick={() => setInstructionsOpen((v) => !v)}>
+              <button className="add-btn add-btn--white-text" onClick={() => setInstructionsOpen((v) => !v)}>
                 <ShareIcon size={16} />
                 Добавете към начален екран
               </button>
@@ -1727,6 +1805,11 @@ export default function MemberCardPage({
                           year: "numeric",
                         })}
                       </p>
+                      {trainingDetailsItem.trainingTime?.trim() && (
+                        <p className="training-note-date training-note-time" style={{ marginTop: "6px", opacity: 0.9 }}>
+                          {`Час: ${trainingDetailsItem.trainingTime}`}
+                        </p>
+                      )}
                       {trainingDetailsItem.note?.trim() && (
                         <div className="training-note-display" style={{ marginTop: "16px", padding: "12px", background: "rgba(255,255,255,0.05)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
                           <p style={{ margin: "0 0 6px 0", fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>Описание</p>

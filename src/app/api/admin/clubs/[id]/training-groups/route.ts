@@ -6,6 +6,7 @@ import {
   getTodayIsoDateInTimeZone,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
@@ -57,6 +58,61 @@ function normalizeTrainingDates(raw: unknown): string[] {
   return Array.from(new Set(dates)).sort((a, b) => a.localeCompare(b));
 }
 
+function normalizeStoredTrainingDateTimes(raw: unknown, trainingDates: string[]): Record<string, string> {
+  if (!raw || typeof raw !== "object") {
+    return {};
+  }
+  const source = raw as Record<string, unknown>;
+  const allowedDates = new Set(trainingDates);
+  const result: Record<string, string> = {};
+  for (const [date, value] of Object.entries(source)) {
+    if (!allowedDates.has(date)) {
+      continue;
+    }
+    const time = typeof value === "string" ? value.trim() : "";
+    const normalized = normalizeTrainingTime(time);
+    if (normalized) {
+      result[date] = normalized;
+    }
+  }
+  return result;
+}
+
+function buildTrainingDateTimes(input: {
+  rawTrainingDateTimes: unknown;
+  trainingDates: string[];
+  fallbackTrainingTime: string | null;
+}) {
+  const allowedDates = new Set(input.trainingDates);
+  const result: Record<string, string> = {};
+  if (input.rawTrainingDateTimes && typeof input.rawTrainingDateTimes === "object" && !Array.isArray(input.rawTrainingDateTimes)) {
+    for (const [date, value] of Object.entries(input.rawTrainingDateTimes as Record<string, unknown>)) {
+      if (!allowedDates.has(date)) {
+        throw new Error("Training date times contain date outside selected training days.");
+      }
+      const normalized = normalizeTrainingTime(value);
+      if (!normalized) {
+        throw new Error("Training time is required for each selected day.");
+      }
+      result[date] = normalized;
+    }
+  }
+
+  if (Object.keys(result).length === 0 && input.fallbackTrainingTime) {
+    for (const date of input.trainingDates) {
+      result[date] = input.fallbackTrainingTime;
+    }
+  }
+
+  for (const date of input.trainingDates) {
+    if (!result[date]) {
+      throw new Error("Training time is required for each selected day.");
+    }
+  }
+
+  return result;
+}
+
 async function verifySession(request: NextRequest) {
   const token = request.cookies.get("admin_session")?.value;
   return token ? await verifyAdminToken(token) : null;
@@ -81,12 +137,19 @@ export async function GET(
         name: true,
         teamGroups: true,
         trainingDates: true,
+        trainingTime: true,
+        trainingDateTimes: true,
         trainingWeekdays: true,
         createdAt: true,
         updatedAt: true,
       },
     });
-    return NextResponse.json(groups);
+    return NextResponse.json(
+      groups.map((group) => ({
+        ...group,
+        trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
+      })),
+    );
   } catch (error) {
     console.error("Training groups GET error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -114,7 +177,18 @@ export async function POST(
   }
 
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
+  const rawTrainingTime = (body as { trainingTime?: unknown }).trainingTime;
+  const rawTrainingDateTimes = (body as { trainingDateTimes?: unknown }).trainingDateTimes;
   const hasExplicitTrainingDates = Array.isArray(rawTrainingDates) && rawTrainingDates.length > 0;
+  let trainingTime: string | null = null;
+  try {
+    trainingTime = normalizeTrainingTime(rawTrainingTime);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid training time." },
+      { status: 400 },
+    );
+  }
   let trainingDates: string[] = [];
   if (hasExplicitTrainingDates) {
     try {
@@ -126,6 +200,22 @@ export async function POST(
       );
     }
   }
+  let trainingDateTimes: Record<string, string> = {};
+  if (trainingDates.length > 0) {
+    try {
+      trainingDateTimes = buildTrainingDateTimes({
+        rawTrainingDateTimes,
+        trainingDates,
+        fallbackTrainingTime: trainingTime,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Invalid training date times." },
+        { status: 400 },
+      );
+    }
+  }
+  const persistedTrainingTime = trainingTime ?? Object.values(trainingDateTimes)[0] ?? null;
 
   const trainingWeekdays = Array.from(
     new Set(trainingDates.map((date) => getWeekdayMondayFirst(date, FIXED_TIME_ZONE)).filter((value) => value >= 1 && value <= 7)),
@@ -151,6 +241,8 @@ export async function POST(
           name,
           teamGroups,
           trainingDates,
+          trainingTime: persistedTrainingTime,
+          trainingDateTimes,
           trainingWeekdays,
           trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
         },
@@ -159,6 +251,8 @@ export async function POST(
           name: true,
           teamGroups: true,
           trainingDates: true,
+          trainingTime: true,
+          trainingDateTimes: true,
           trainingWeekdays: true,
           createdAt: true,
           updatedAt: true,
@@ -176,6 +270,8 @@ export async function POST(
             },
             update: {
               trainingDates,
+              trainingTime: persistedTrainingTime,
+              trainingDateTimes,
               trainingWeekdays,
               trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
             },
@@ -183,6 +279,8 @@ export async function POST(
               clubId: id,
               teamGroup,
               trainingDates,
+              trainingTime: persistedTrainingTime,
+              trainingDateTimes,
               trainingWeekdays,
               trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
             },
@@ -203,7 +301,14 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ ...group, notifications }, { status: 201 });
+    return NextResponse.json(
+      {
+        ...group,
+        trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
+        notifications,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof Error && error.message === "CLUB_NOT_FOUND") {
       return NextResponse.json({ error: "Club not found." }, { status: 404 });

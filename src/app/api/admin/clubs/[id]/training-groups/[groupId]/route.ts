@@ -6,6 +6,7 @@ import {
   getTodayIsoDateInTimeZone,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
@@ -45,6 +46,61 @@ function normalizeTrainingDates(raw: unknown): string[] {
   }
 
   return Array.from(new Set(dates)).sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeStoredTrainingDateTimes(raw: unknown, trainingDates: string[]): Record<string, string> {
+  if (!raw || typeof raw !== "object") {
+    return {};
+  }
+  const source = raw as Record<string, unknown>;
+  const allowedDates = new Set(trainingDates);
+  const result: Record<string, string> = {};
+  for (const [date, value] of Object.entries(source)) {
+    if (!allowedDates.has(date)) {
+      continue;
+    }
+    const time = typeof value === "string" ? value.trim() : "";
+    const normalized = normalizeTrainingTime(time);
+    if (normalized) {
+      result[date] = normalized;
+    }
+  }
+  return result;
+}
+
+function buildTrainingDateTimes(input: {
+  rawTrainingDateTimes: unknown;
+  trainingDates: string[];
+  fallbackTrainingTime: string | null;
+}) {
+  const allowedDates = new Set(input.trainingDates);
+  const result: Record<string, string> = {};
+  if (input.rawTrainingDateTimes && typeof input.rawTrainingDateTimes === "object" && !Array.isArray(input.rawTrainingDateTimes)) {
+    for (const [date, value] of Object.entries(input.rawTrainingDateTimes as Record<string, unknown>)) {
+      if (!allowedDates.has(date)) {
+        throw new Error("Training date times contain date outside selected training days.");
+      }
+      const normalized = normalizeTrainingTime(value);
+      if (!normalized) {
+        throw new Error("Training time is required for each selected day.");
+      }
+      result[date] = normalized;
+    }
+  }
+
+  if (Object.keys(result).length === 0 && input.fallbackTrainingTime) {
+    for (const date of input.trainingDates) {
+      result[date] = input.fallbackTrainingTime;
+    }
+  }
+
+  for (const date of input.trainingDates) {
+    if (!result[date]) {
+      throw new Error("Training time is required for each selected day.");
+    }
+  }
+
+  return result;
 }
 
 function normalizeTeamGroups(raw: unknown): number[] {
@@ -114,11 +170,19 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => ({}));
-  const payload = body as { name?: unknown; teamGroups?: unknown; trainingDates?: unknown };
+  const payload = body as {
+    name?: unknown;
+    teamGroups?: unknown;
+    trainingDates?: unknown;
+    trainingTime?: unknown;
+    trainingDateTimes?: unknown;
+  };
   const hasNameField = Object.prototype.hasOwnProperty.call(payload, "name");
   const hasTeamGroupsField = Object.prototype.hasOwnProperty.call(payload, "teamGroups");
   const hasTrainingDatesField = Object.prototype.hasOwnProperty.call(payload, "trainingDates");
-  if (!hasNameField && !hasTeamGroupsField && !hasTrainingDatesField) {
+  const hasTrainingTimeField = Object.prototype.hasOwnProperty.call(payload, "trainingTime");
+  const hasTrainingDateTimesField = Object.prototype.hasOwnProperty.call(payload, "trainingDateTimes");
+  if (!hasNameField && !hasTeamGroupsField && !hasTrainingDatesField && !hasTrainingTimeField && !hasTrainingDateTimesField) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -133,6 +197,8 @@ export async function PATCH(
         name: true,
         teamGroups: true,
         trainingDates: true,
+        trainingTime: true,
+        trainingDateTimes: true,
       },
     });
 
@@ -159,6 +225,7 @@ export async function PATCH(
 
     let nextTrainingDates: string[] | undefined;
     let nextTrainingWeekdays: number[] | undefined;
+    let nextTrainingTime: string | null | undefined;
     if (hasTrainingDatesField) {
       try {
         nextTrainingDates = normalizeTrainingDates(payload.trainingDates);
@@ -172,11 +239,42 @@ export async function PATCH(
         new Set(nextTrainingDates.map((date) => getWeekdayMondayFirst(date, FIXED_TIME_ZONE)).filter((value) => value >= 1 && value <= 7)),
       ).sort((a, b) => a - b);
     }
+    if (hasTrainingTimeField) {
+      try {
+        nextTrainingTime = normalizeTrainingTime(payload.trainingTime);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training time." },
+          { status: 400 },
+        );
+      }
+    }
+    const finalTrainingDates = hasTrainingDatesField ? (nextTrainingDates ?? []) : (group.trainingDates ?? []);
+    const fallbackTrainingTime: string | null = hasTrainingTimeField ? (nextTrainingTime ?? null) : (group.trainingTime ?? null);
+    const rawTrainingDateTimes = hasTrainingDateTimesField ? payload.trainingDateTimes : group.trainingDateTimes;
+    let finalTrainingDateTimes: Record<string, string> = {};
+    if (finalTrainingDates.length > 0) {
+      try {
+        finalTrainingDateTimes = buildTrainingDateTimes({
+          rawTrainingDateTimes,
+          trainingDates: finalTrainingDates,
+          fallbackTrainingTime,
+        });
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training date times." },
+          { status: 400 },
+        );
+      }
+    }
+    const finalTrainingTime = fallbackTrainingTime ?? Object.values(finalTrainingDateTimes)[0] ?? null;
 
     const updateData: {
       name?: string;
       teamGroups?: number[];
       trainingDates?: string[];
+      trainingTime?: string | null;
+      trainingDateTimes?: Record<string, string>;
       trainingWeekdays?: number[];
       trainingWindowDays?: number;
     } = {
@@ -188,6 +286,10 @@ export async function PATCH(
       updateData.trainingWeekdays = nextTrainingWeekdays;
       updateData.trainingWindowDays = TRAINING_SELECTION_WINDOW_DAYS;
     }
+    if (hasTrainingDatesField || hasTrainingTimeField || hasTrainingDateTimesField) {
+      updateData.trainingTime = finalTrainingTime;
+      updateData.trainingDateTimes = finalTrainingDateTimes;
+    }
 
     const updated = await prisma.clubTrainingScheduleGroup.update({
       where: { id: groupId },
@@ -197,6 +299,8 @@ export async function PATCH(
         name: true,
         teamGroups: true,
         trainingDates: true,
+        trainingTime: true,
+        trainingDateTimes: true,
         trainingWeekdays: true,
         createdAt: true,
         updatedAt: true,
@@ -216,7 +320,11 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json({ ...updated, notifications });
+    return NextResponse.json({
+      ...updated,
+      trainingDateTimes: normalizeStoredTrainingDateTimes(updated.trainingDateTimes, updated.trainingDates ?? []),
+      notifications,
+    });
   } catch (error) {
     console.error("Training groups PATCH error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

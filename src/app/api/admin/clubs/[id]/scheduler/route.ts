@@ -7,6 +7,7 @@ import {
   getWeekdayMondayFirst,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
@@ -27,6 +28,61 @@ function parseTeamGroupValue(raw: unknown): number | null {
     throw new Error("Invalid teamGroup");
   }
   return parsed;
+}
+
+function normalizeStoredTrainingDateTimes(raw: unknown, trainingDates: string[]): Record<string, string> {
+  if (!raw || typeof raw !== "object") {
+    return {};
+  }
+  const source = raw as Record<string, unknown>;
+  const allowedDates = new Set(trainingDates);
+  const result: Record<string, string> = {};
+  for (const [date, value] of Object.entries(source)) {
+    if (!allowedDates.has(date)) {
+      continue;
+    }
+    const time = typeof value === "string" ? value.trim() : "";
+    const normalized = normalizeTrainingTime(time);
+    if (normalized) {
+      result[date] = normalized;
+    }
+  }
+  return result;
+}
+
+function buildTrainingDateTimes(input: {
+  rawTrainingDateTimes: unknown;
+  trainingDates: string[];
+  fallbackTrainingTime: string | null;
+}) {
+  const allowedDates = new Set(input.trainingDates);
+  const result: Record<string, string> = {};
+  if (input.rawTrainingDateTimes && typeof input.rawTrainingDateTimes === "object" && !Array.isArray(input.rawTrainingDateTimes)) {
+    for (const [date, value] of Object.entries(input.rawTrainingDateTimes as Record<string, unknown>)) {
+      if (!allowedDates.has(date)) {
+        throw new Error("Training date times contain date outside selected training days.");
+      }
+      const normalized = normalizeTrainingTime(value);
+      if (!normalized) {
+        throw new Error("Training time is required for each selected day.");
+      }
+      result[date] = normalized;
+    }
+  }
+
+  if (Object.keys(result).length === 0 && input.fallbackTrainingTime) {
+    for (const date of input.trainingDates) {
+      result[date] = input.fallbackTrainingTime;
+    }
+  }
+
+  for (const date of input.trainingDates) {
+    if (!result[date]) {
+      throw new Error("Training time is required for each selected day.");
+    }
+  }
+
+  return result;
 }
 
 export async function GET(
@@ -59,6 +115,8 @@ export async function GET(
       overdueHour: true,
       overdueMinute: true,
       trainingDates: true,
+      trainingTime: true,
+      trainingDateTimes: true,
       trainingWeekdays: true,
       trainingWindowDays: true,
     },
@@ -79,6 +137,8 @@ export async function GET(
         },
         select: {
           trainingDates: true,
+          trainingTime: true,
+          trainingDateTimes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -101,6 +161,8 @@ export async function GET(
         },
         select: {
           trainingDates: true,
+          trainingTime: true,
+          trainingDateTimes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -118,6 +180,11 @@ export async function GET(
     ...club,
     teamGroup,
     trainingDates,
+    trainingTime: trainingGroupOverride?.trainingTime ?? groupSchedule?.trainingTime ?? club.trainingTime ?? null,
+    trainingDateTimes: normalizeStoredTrainingDateTimes(
+      trainingGroupOverride?.trainingDateTimes ?? groupSchedule?.trainingDateTimes ?? club.trainingDateTimes,
+      trainingDates,
+    ),
     trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
   });
 }
@@ -141,15 +208,19 @@ export async function PUT(
   const overdueHour = Number.parseInt(String((body as { overdueHour?: unknown }).overdueHour ?? ""), 10);
   const overdueMinute = Number.parseInt(String((body as { overdueMinute?: unknown }).overdueMinute ?? ""), 10);
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
+  const rawTrainingTime = (body as { trainingTime?: unknown }).trainingTime;
+  const rawTrainingDateTimes = (body as { trainingDateTimes?: unknown }).trainingDateTimes;
   const rawWeekdays = (body as { trainingWeekdays?: unknown }).trainingWeekdays;
   const rawWindowDays = Number.parseInt(String((body as { trainingWindowDays?: unknown }).trainingWindowDays ?? ""), 10);
   const rawTeamGroup = (body as { teamGroup?: unknown }).teamGroup;
 
   let teamGroup: number | null = null;
+  let trainingTime: string | null = null;
   try {
     teamGroup = parseTeamGroupValue(rawTeamGroup);
+    trainingTime = normalizeTrainingTime(rawTrainingTime);
   } catch {
-    return NextResponse.json({ error: "Invalid teamGroup" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid teamGroup or trainingTime" }, { status: 400 });
   }
 
   if (!Number.isInteger(reminderDay) || reminderDay < 1 || reminderDay > 28) {
@@ -211,6 +282,21 @@ export async function PUT(
       maxDays: TRAINING_SELECTION_WINDOW_DAYS,
     });
   }
+  let trainingDateTimes: Record<string, string> = {};
+  if (trainingDates.length > 0) {
+    try {
+      trainingDateTimes = buildTrainingDateTimes({
+        rawTrainingDateTimes,
+        trainingDates,
+        fallbackTrainingTime: trainingTime,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Invalid training date times." },
+        { status: 400 },
+      );
+    }
+  }
 
   const trainingWeekdays = Array.from(
     new Set(trainingDates.map((date) => getWeekdayMondayFirst(date, FIXED_TIME_ZONE)).filter((value) => value >= 1 && value <= 7)),
@@ -227,6 +313,8 @@ export async function PUT(
         },
         select: {
           trainingDates: true,
+          trainingTime: true,
+          trainingDateTimes: true,
         },
       });
 
@@ -242,9 +330,11 @@ export async function PUT(
       reminderTz: FIXED_TIME_ZONE,
       ...(teamGroup === null
         ? {
-            trainingDates,
-            trainingWeekdays,
-            trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
+      trainingDates,
+      trainingTime,
+      trainingDateTimes,
+      trainingWeekdays,
+      trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
           }
         : {}),
     },
@@ -258,6 +348,8 @@ export async function PUT(
       overdueHour: true,
       overdueMinute: true,
       trainingDates: true,
+      trainingTime: true,
+      trainingDateTimes: true,
       trainingWeekdays: true,
       trainingWindowDays: true,
     },
@@ -273,6 +365,8 @@ export async function PUT(
       },
       update: {
         trainingDates,
+        trainingTime,
+        trainingDateTimes,
         trainingWeekdays,
         trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       },
@@ -280,6 +374,8 @@ export async function PUT(
         clubId: id,
         teamGroup,
         trainingDates,
+        trainingTime,
+        trainingDateTimes,
         trainingWeekdays,
         trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       },
@@ -334,6 +430,8 @@ export async function PUT(
       ...updated,
       teamGroup,
       trainingDates,
+      trainingTime,
+      trainingDateTimes,
       trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       notifications,
     });
@@ -343,6 +441,8 @@ export async function PUT(
     ...updated,
     teamGroup,
     trainingDates,
+    trainingTime,
+    trainingDateTimes,
     trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
   });
 }

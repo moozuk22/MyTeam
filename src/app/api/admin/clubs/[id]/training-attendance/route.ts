@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { publishMemberUpdated } from "@/lib/memberEvents";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import {
   getConfiguredTrainingDates,
@@ -349,6 +350,7 @@ export async function PUT(
         },
         select: {
           id: true,
+          teamGroups: true,
           trainingDates: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
@@ -420,6 +422,30 @@ export async function PUT(
   }
 
   const trainingDateAsDate = isoDateToUtcMidnight(trainingDate);
+  const affectedPlayers = await prisma.player.findMany({
+    where: {
+      clubId: id,
+      isActive: true,
+      ...(trainingGroup ? { teamGroup: { in: trainingGroup.teamGroups } } : {}),
+      ...(teamGroup !== null ? { teamGroup } : {}),
+    },
+    select: {
+      cards: {
+        where: { isActive: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { cardCode: true },
+      },
+    },
+  });
+  const affectedCardCodes = Array.from(
+    new Set(
+      affectedPlayers
+        .map((player) => player.cards[0]?.cardCode?.trim().toUpperCase() ?? "")
+        .filter((cardCode) => cardCode.length > 0),
+    ),
+  );
+
   if (!note) {
     await prisma.trainingNote.deleteMany({
       where: {
@@ -427,6 +453,9 @@ export async function PUT(
         trainingDate: trainingDateAsDate,
       },
     });
+    for (const cardCode of affectedCardCodes) {
+      publishMemberUpdated(cardCode, "training-updated");
+    }
     return NextResponse.json({
       success: true,
       trainingDate,
@@ -461,6 +490,9 @@ export async function PUT(
       note: true,
     },
   });
+  for (const cardCode of affectedCardCodes) {
+    publishMemberUpdated(cardCode, "training-updated");
+  }
 
     return NextResponse.json({
       success: true,

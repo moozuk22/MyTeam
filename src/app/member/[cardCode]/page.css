@@ -294,6 +294,48 @@
   gap: 8px;
 }
 
+.training-next-card {
+  border: 1px solid rgba(50, 205, 50, 0.28);
+  border-radius: 10px;
+  background: rgba(50, 205, 50, 0.08);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.training-next-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: center;
+}
+
+.training-next-countdown {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #32cd32;
+  text-align: center;
+}
+
+.training-next-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.training-next-card,
+.training-next-hint {
+  order: -2;
+}
+
+.training-schedule-btn {
+  order: -1;
+}
+
 .training-section {
   margin-top: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -701,6 +743,16 @@
   margin: 0;
 }
 
+.member-training-attendance-popup .training-note-date {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.member-training-attendance-popup .training-note-time {
+  font-size: 16px;
+  font-weight: 800;
+}
+
 .training-attendance-buttons {
   display: flex;
   flex-direction: column;
@@ -890,8 +942,20 @@
 
 .add-btn:hover { background-color: rgba(0,122,255,0.3); }
 
+.add-btn--white-text {
+  color: #ffffff;
+}
+
 .member-action-btn {
   color: #ffffff;
+}
+
+.below-card .pause-btn {
+  order: 9;
+}
+
+.below-card .pay-btn {
+  order: 10;
 }
 
 .member-edit-btn {
@@ -901,7 +965,7 @@
 /* ── Hint ── */
 .hint-text {
   font-size: 12px;
-  color: rgba(255,255,255,0.4);
+  color: #ffffff;
   text-align: center;
   line-height: 1.5;
   margin: 0;
@@ -926,6 +990,10 @@
 }
 
 .push-enabled-check {
+  color: #ffffff;
+}
+
+.push-enabled-text {
   color: #ffffff;
 }
 
