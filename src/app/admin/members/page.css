@@ -2340,6 +2340,43 @@
   .amp-modal--training-note .amp-training-day-meta {
     font-size: 7px;
   }
+
+  .amp-modal--training-days-editor .amp-training-time-mode-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .amp-modal--training-days-editor .amp-training-time-mode-buttons .amp-pill {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.2;
+    text-align: center;
+    transform: none;
+  }
+
+  .amp-modal--training-days-editor .amp-training-time-mode-buttons .amp-pill:hover,
+  .amp-modal--training-days-editor .amp-training-time-mode-buttons .amp-pill--active {
+    transform: none;
+  }
+
+  .amp-modal--training-days-editor .amp-training-time-mode-buttons .amp-pill:nth-child(3) {
+    grid-column: auto;
+  }
+
+  .amp-modal--training-days-editor .amp-training-time-list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .amp-modal--training-days-editor .amp-training-time-list .amp-edit-input {
+    height: 40px;
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 380px) {

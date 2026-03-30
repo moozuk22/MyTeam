@@ -5378,7 +5378,7 @@ function AdminMembersPageContent() {
                 </span>
               </div>
               {trainingDaysEditorMode !== "createGroup" && (
-                <label className="amp-edit-field" style={{ marginTop: "8px", display: trainingTimeMode === "all" ? undefined : "none" }}>
+                <label className="amp-edit-field" style={{ marginTop: "8px", display: "none" }}>
                   <span className="amp-lbl">Час на тренировка (HH:mm)</span>
                   <input
                     className="amp-edit-input"
@@ -5394,7 +5394,7 @@ function AdminMembersPageContent() {
               {trainingDaysEditorMode !== "createGroup" && (
                 <div className="amp-training-time-panel" style={{ marginTop: "8px" }}>
                   <span className="amp-lbl">{"\u0417\u0430\u0434\u0430\u0439 \u0447\u0430\u0441 \u0437\u0430:"}</span>
-                  <div className="amp-pills">
+                  <div className="amp-pills amp-training-time-mode-buttons">
                     <button
                       type="button"
                       className={`amp-pill${trainingTimeMode === "all" ? " amp-pill--active" : ""}`}
@@ -5421,6 +5421,20 @@ function AdminMembersPageContent() {
                     </button>
                   </div>
                 </div>
+              )}
+              {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "all" && (
+                <label className="amp-edit-field" style={{ marginTop: "8px" }}>
+                  <span className="amp-lbl">Р§Р°СЃ РЅР° С‚СЂРµРЅРёСЂРѕРІРєР° (HH:mm)</span>
+                  <input
+                    className="amp-edit-input"
+                    type="time"
+                    step={60}
+                    value={schedulerForm.trainingTime}
+                    onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
+                    required
+                    disabled={trainingDaysEditorSaving}
+                  />
+                </label>
               )}
               {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "perDay" && (
                 <div className="amp-training-time-list" style={{ marginTop: "8px" }}>
