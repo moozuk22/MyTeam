@@ -109,6 +109,20 @@ interface TrainingScheduleGroup {
   trainingDates: string[];
 }
 
+interface MemberNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  sentAt: string;
+  readAt: string | null;
+  teamGroup?: number | null;
+  trainingGroups?: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
 function normalizeMember(item: unknown): Member {
   const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
   const fullName = String(raw.fullName ?? "").trim();
@@ -229,6 +243,19 @@ function parseSelectedTeamGroup(selectedGroup: string): number | null {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const normalized = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(normalized);
+  const output = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; i += 1) {
+    output[i] = rawData.charCodeAt(i);
+  }
+
+  return output;
+}
+
 function buildCalendarMonths(dates: string[]) {
   const monthKeys = Array.from(
     new Set(
@@ -310,6 +337,13 @@ const TrashIcon = () => (
 );
 
 /* ── Status helpers ── */
+const BellIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+    <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+  </svg>
+);
+
 const getStatusMeta = (status: PlayerStatus): StatusMeta => {
   if (status === "paid") return {
     label: "Платено",
@@ -791,7 +825,7 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
 }
 
 /* ── Member Detail Modal ── */
-function MemberDetailModal({
+function MemberDetailModalLegacy({
   member,
   onClose,
   onRequestDelete,
@@ -814,11 +848,21 @@ function MemberDetailModal({
 }) {
   const s = getStatusMeta(member.status);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<MemberNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const paymentHistory = [...(member.paymentLogs ?? [])].sort(
     (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
   );
   const lastPayment = paymentHistory[0];
+  const memberCardCode =
+    member.cards.find((card) => card.isActive)?.cardCode ||
+    member.nfcTagId ||
+    "";
+  const memberClubId = member.club?.id ?? "";
+  const memberId = member.id;
   const activeCardCode =
     member.cards.find((card) => card.isActive)?.cardCode ||
     member.nfcTagId ||
@@ -844,7 +888,6 @@ function MemberDetailModal({
           {/* Info card — 2-col grid */}
           <div className="amp-info-card">
 
-            {/* Row 1 col 1: Име */}
             <div className="amp-info-cell">
               <UserIcon />
               <div>
@@ -890,7 +933,7 @@ function MemberDetailModal({
           {/* Accordion */}
           <div className="amp-acc">
             <button className="amp-acc-trigger" onClick={() => setHistoryOpen(v => !v)}>
-              <span>История на плащанията</span>
+              <span>стория на плащанията</span>
               <span className={`amp-acc-chevron${historyOpen ? " open" : ""}`}><ChevronDownIcon /></span>
             </button>
             <div className={`amp-acc-body${historyOpen ? " open" : ""}`}>
@@ -957,6 +1000,312 @@ function MemberDetailModal({
 }
 
 /* ── Confirm Delete Modal ── */
+function MemberDetailModal({
+  member,
+  onClose,
+  onRequestDelete,
+  onRequestEdit,
+  actionMode = "active",
+  onRequestReactivate,
+  onRequestPermanentDelete,
+  isReactivating = false,
+  isDeletingPermanent = false,
+}: {
+  member: Member;
+  onClose: () => void;
+  onRequestDelete: (member: Member) => void;
+  onRequestEdit: (member: Member) => void;
+  actionMode?: "active" | "inactive";
+  onRequestReactivate?: (member: Member) => void;
+  onRequestPermanentDelete?: (member: Member) => void;
+  isReactivating?: boolean;
+  isDeletingPermanent?: boolean;
+}) {
+  const s = getStatusMeta(member.status);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notifications, setNotifications] = useState<MemberNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const paymentHistory = [...(member.paymentLogs ?? [])].sort(
+    (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
+  );
+  const lastPayment = paymentHistory[0];
+  const memberCardCode =
+    member.cards.find((card) => card.isActive)?.cardCode ||
+    member.nfcTagId ||
+    "";
+  const activeCardCode = memberCardCode || "Няма активна карта";
+  const memberClubId = member.club?.id ?? "";
+  const memberId = member.id;
+
+  const fetchNotifications = async () => {
+    if (!memberClubId || !memberId) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    setNotificationsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(memberClubId)}/notifications?playerId=${encodeURIComponent(memberId)}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        return;
+      }
+      const payload = await response.json();
+      setNotifications(Array.isArray(payload.notifications) ? payload.notifications : []);
+      setUnreadCount(Number(payload.unreadCount ?? 0));
+    } catch (error) {
+      console.error("Failed to fetch member notifications:", error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const markNotificationsRead = async () => {
+    if (!memberClubId || !memberId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(memberClubId)}/notifications/read`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ playerId: memberId }),
+      });
+      if (!response.ok) {
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      setNotifications((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? nowIso })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error("Failed to mark member notifications as read:", error);
+    }
+  };
+
+  const handleOpenNotificationsPanel = async () => {
+    setNotificationsPanelOpen(true);
+    await fetchNotifications();
+    await markNotificationsRead();
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchUnread = async () => {
+      if (!memberClubId || !memberId) {
+        setUnreadCount(0);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(memberClubId)}/notifications?playerId=${encodeURIComponent(memberId)}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok || cancelled) {
+          return;
+        }
+        const payload = await response.json();
+        setUnreadCount(Number(payload.unreadCount ?? 0));
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to fetch member unread notifications:", error);
+        }
+      }
+    };
+
+    void fetchUnread();
+    return () => {
+      cancelled = true;
+    };
+  }, [memberClubId, memberId]);
+
+  return (
+    <div className="amp-overlay" onClick={onClose}>
+      <div className="amp-modal" onClick={e => e.stopPropagation()}>
+        <div className="amp-modal-tint" aria-hidden="true" />
+
+        <h2 className="amp-modal-title">
+          <span className="amp-modal-title-gradient">{member.fullName} - Статистика</span>
+          <div className="amp-modal-title-actions">
+            <button
+              className="amp-member-bell-btn"
+              onClick={() => void handleOpenNotificationsPanel()}
+              aria-label="Известия"
+              disabled={!memberClubId || !memberId}
+            >
+              <BellIcon />
+              {unreadCount > 0 ? (
+                <span className="amp-member-bell-dot">{unreadCount > 99 ? "99+" : unreadCount}</span>
+              ) : null}
+            </button>
+            <button className="amp-modal-close" onClick={onClose} aria-label="Затвори">
+              <XIcon />
+            </button>
+          </div>
+        </h2>
+
+        <div className="amp-modal-body">
+          <div className="amp-info-card">
+            <div className="amp-info-cell">
+              <UserIcon />
+              <div>
+                <p className="amp-lbl">Име</p>
+                <p className="amp-val">{member.fullName}</p>
+              </div>
+            </div>
+
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Набор:</span>
+              <span className="amp-val">{member.teamGroup ?? "-"}</span>
+            </div>
+
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Статус:</span>
+              <span className="amp-badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
+                {s.label}
+              </span>
+            </div>
+
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Активна карта:</span>
+              <span className="amp-val">{activeCardCode}</span>
+            </div>
+
+            <div className="amp-info-cell amp-info-cell--full">
+              <CalendarIcon />
+              <div>
+                <p className="amp-lbl">Последно плащане</p>
+                <p className="amp-val">
+                  {lastPayment
+                    ? new Date(lastPayment.paidAt).toLocaleDateString("bg-BG") + " г."
+                    : "Няма плащания"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="amp-acc">
+            <button className="amp-acc-trigger" onClick={() => setHistoryOpen((v) => !v)}>
+              <span>стория на плащанията</span>
+              <span className={`amp-acc-chevron${historyOpen ? " open" : ""}`}><ChevronDownIcon /></span>
+            </button>
+            <div className={`amp-acc-body${historyOpen ? " open" : ""}`}>
+              <div className="amp-acc-inner">
+                {paymentHistory.length === 0 ? (
+                  <div className="amp-acc-empty">
+                    <ReceiptIcon />
+                    <p>Все още няма регистрирани плащания</p>
+                  </div>
+                ) : (
+                  <div className="amp-acc-list">
+                    {paymentHistory.map((p) => (
+                      <div key={p.id} className="amp-acc-row">
+                        <span className="amp-acc-period">{p.paidFor}</span>
+                        <span className="amp-acc-date">{new Date(p.paidAt).toLocaleDateString("bg-BG")}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="amp-modal-actions amp-modal-actions--end">
+            {actionMode === "active" ? (
+              <>
+                <button className="amp-btn amp-btn--ghost" onClick={() => onRequestEdit(member)}>
+                  Редактирай
+                </button>
+                <button className="amp-btn amp-btn--danger" onClick={() => onRequestDelete(member)}>
+                  Премахни играч
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => onRequestReactivate?.(member)}
+                  disabled={isReactivating || isDeletingPermanent}
+                >
+                  {isReactivating ? "Възстановяване..." : "Възстанови"}
+                </button>
+                <button
+                  className="amp-btn amp-btn--danger"
+                  onClick={() => onRequestPermanentDelete?.(member)}
+                  disabled={isReactivating || isDeletingPermanent}
+                >
+                  {isDeletingPermanent ? "Изтриване..." : "Изтрий"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {notificationsPanelOpen ? (
+        <div className="amp-overlay amp-overlay--member-notifications" onClick={() => setNotificationsPanelOpen(false)}>
+          <div className="amp-modal amp-modal--member-notifications" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Известия</span>
+              <button className="amp-modal-close" onClick={() => setNotificationsPanelOpen(false)} aria-label="Затвори">
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              {notificationsLoading ? (
+                <p className="amp-empty amp-empty--modal">Зареждане...</p>
+              ) : notifications.length === 0 ? (
+                <p className="amp-empty amp-empty--modal">Няма известия</p>
+              ) : (
+                <div className="amp-member-notifications-list">
+                  {notifications.map((notif) => (
+                    <article
+                      key={notif.id}
+                      className={`amp-member-notification-item${notif.readAt ? "" : " amp-member-notification-item--unread"}`}
+                    >
+                      <div className="amp-member-notification-head">
+                        <h3>{notif.title}</h3>
+                        {!notif.readAt ? <span className="amp-member-notification-new" aria-label="Ново" /> : null}
+                      </div>
+                      <p>{notif.body}</p>
+                      <div className="amp-member-notification-meta">
+                        {typeof notif.teamGroup === "number" ? <span>Набор: {notif.teamGroup}</span> : null}
+                        {Array.isArray(notif.trainingGroups) && notif.trainingGroups.length > 0 ? (
+                          <span>Сборен отбор: {notif.trainingGroups.map((group) => group.name).join(", ")}</span>
+                        ) : null}
+                      </div>
+                      <time dateTime={notif.sentAt}>
+                        {new Date(notif.sentAt).toLocaleDateString("bg-BG", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ConfirmDeleteModal({
   member,
   onCancel,
@@ -986,7 +1335,7 @@ function ConfirmDeleteModal({
             Сигурен ли си, че искаш да премахнеш <strong>{member.fullName}</strong>?
           </p>
           <p className="amp-confirm-subtext">
-            Играчът ще бъде маркиран като неактивен.
+            грачът ще бъде маркиран като неактивен.
           </p>
 
           {error && <p className="amp-confirm-error">{error}</p>}
@@ -1087,6 +1436,19 @@ function AdminMembersPageContent() {
   const [members, setMembers] = useState<Member[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCoach, setIsCoach] = useState(false);
+  const [isClubPushSupported, setIsClubPushSupported] = useState(true);
+  const [isClubPushSubscribed, setIsClubPushSubscribed] = useState(false);
+  const [clubPushBusy, setClubPushBusy] = useState(false);
+  const [clubPushStatusMessage, setClubPushStatusMessage] = useState("");
+  const [clubPushErrorMessage, setClubPushErrorMessage] = useState("");
+  const [clubNotificationsPanelOpen, setClubNotificationsPanelOpen] = useState(false);
+  const [clubNotificationsLoading, setClubNotificationsLoading] = useState(false);
+  const [clubNotifications, setClubNotifications] = useState<MemberNotification[]>([]);
+  const [clubNotificationsUnreadCount, setClubNotificationsUnreadCount] = useState(0);
+  const [clubNotificationsDateFilter, setClubNotificationsDateFilter] = useState("");
+  const [clubNotificationsScopeType, setClubNotificationsScopeType] = useState<"team" | "trainingGroup">("team");
+  const [clubNotificationsScopeValue, setClubNotificationsScopeValue] = useState("all");
+  const [lastHandledCoachPushOpenTs, setLastHandledCoachPushOpenTs] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGroup, setSelectedGroup] = useState("all");
@@ -1210,6 +1572,45 @@ function AdminMembersPageContent() {
   const trainingUpcomingByDate = new Map(trainingUpcomingDates.map((item) => [item.date, item]));
   const trainingAttendanceCalendarMonths = buildCalendarMonths(trainingUpcomingDates.map((item) => item.date));
   const todayIsoDate = getTodayIsoDate();
+  const clubNotificationTeamGroups = Array.from(
+    new Set(
+      clubNotifications
+        .map((item) => (typeof item.teamGroup === "number" ? item.teamGroup : null))
+        .filter((value): value is number => typeof value === "number"),
+    ),
+  ).sort((a, b) => a - b);
+  const clubNotificationTrainingGroups = Array.from(
+    new Map(
+      clubNotifications
+        .flatMap((item) =>
+          Array.isArray(item.trainingGroups)
+            ? item.trainingGroups.map((group) => [group.id, group] as const)
+            : [],
+        ),
+    ).values(),
+  );
+  const filteredClubNotifications = clubNotifications.filter((item) => {
+    const notifDate = new Date(item.sentAt).toLocaleDateString("en-CA", { timeZone: "Europe/Sofia" });
+    if (clubNotificationsDateFilter && notifDate !== clubNotificationsDateFilter) {
+      return false;
+    }
+    if (clubNotificationsScopeValue !== "all") {
+      if (clubNotificationsScopeType === "team") {
+        const selectedGroup = Number.parseInt(clubNotificationsScopeValue, 10);
+        if (!Number.isInteger(selectedGroup) || item.teamGroup !== selectedGroup) {
+          return false;
+        }
+      } else {
+        const hasTrainingGroup = Array.isArray(item.trainingGroups)
+          ? item.trainingGroups.some((group) => group.id === clubNotificationsScopeValue)
+          : false;
+        if (!hasTrainingGroup) {
+          return false;
+        }
+      }
+    }
+    return true;
+  });
   const trainingNoteTeamGroupFilter = parseSelectedTeamGroup(trainingGroupScope);
   const trainingNoteScopeKey =
     trainingAttendanceView === "trainingGroups"
@@ -1236,6 +1637,55 @@ function AdminMembersPageContent() {
     document.cookie = `admin_last_club_id=${encodeURIComponent(clubId)}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }, [clubId]);
 
+  useEffect(() => {
+    if (!clubId) {
+      setClubNotifications([]);
+      setClubNotificationsUnreadCount(0);
+      setClubNotificationsDateFilter("");
+      setClubNotificationsScopeType("team");
+      setClubNotificationsScopeValue("all");
+      return;
+    }
+    void fetchClubNotifications();
+  }, [clubId]);
+
+  useEffect(() => {
+    if (!clubId) {
+      return;
+    }
+
+    const streamUrl = `/api/admin/clubs/${encodeURIComponent(clubId)}/notifications/events`;
+    const source = new EventSource(streamUrl, { withCredentials: true });
+
+    source.onmessage = (event) => {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      if (!payload || typeof payload !== "object") {
+        return;
+      }
+
+      const type = "type" in payload ? String((payload as { type?: unknown }).type ?? "") : "";
+      if (type !== "notification-created") {
+        return;
+      }
+
+      void fetchClubNotifications();
+    };
+
+    source.onerror = () => {
+      // Let browser auto-reconnect.
+    };
+
+    return () => {
+      source.close();
+    };
+  }, [clubId]);
+
   // Force early layout calculation for group filter dropdown
   useEffect(() => {
     const select = document.querySelector('.amp-content > .amp-edit-field:first-child select');
@@ -1253,6 +1703,189 @@ function AdminMembersPageContent() {
     setEditAvatarFile(null);
     setEditAvatarPreviewUrl("");
   };
+
+  const handleEnableClubNotifications = async () => {
+    setClubPushStatusMessage("");
+    setClubPushErrorMessage("");
+
+    if (!clubId || !isClubPushSupported) {
+      setClubPushErrorMessage("Този браузър не поддържа push известия или липсва HTTPS.");
+      return;
+    }
+
+    setClubPushBusy(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setClubPushErrorMessage("Достъпът до известия е отказан от браузъра.");
+        setIsClubPushSubscribed(false);
+        return;
+      }
+
+      await navigator.serviceWorker.register("/sw.js");
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        const publicKeyResponse = await fetch("/api/push/public-key", { cache: "no-store" });
+        if (!publicKeyResponse.ok) {
+          const payload = await publicKeyResponse.json().catch(() => ({ error: "Missing VAPID configuration" }));
+          throw new Error(String(payload.error ?? "Failed to get VAPID public key"));
+        }
+        const { publicKey } = (await publicKeyResponse.json()) as { publicKey: string };
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
+        });
+      }
+
+      const saveResponse = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/push-subscriptions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subscription: subscription.toJSON(),
+        }),
+      });
+
+      if (!saveResponse.ok) {
+        const payload = await saveResponse.json().catch(() => ({ error: "Failed to save subscription" }));
+        throw new Error(String(payload.error ?? "Failed to save subscription"));
+      }
+
+      setIsClubPushSubscribed(true);
+      setClubPushStatusMessage("звестията за треньори са активирани за този отбор.");
+    } catch (error) {
+      console.error("Enable club notifications error:", error);
+      setClubPushErrorMessage(error instanceof Error ? error.message : "Неуспешно активиране на известията.");
+    } finally {
+      setClubPushBusy(false);
+    }
+  };
+
+  const handleDisableClubNotifications = async () => {
+    setClubPushStatusMessage("");
+    setClubPushErrorMessage("");
+
+    if (!clubId) {
+      return;
+    }
+
+    setClubPushBusy(true);
+    try {
+      await navigator.serviceWorker.register("/sw.js");
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        setIsClubPushSubscribed(false);
+        return;
+      }
+
+      const endpoint = subscription.endpoint;
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/push-subscriptions`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ endpoint }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: "Failed to disable subscription" }));
+        throw new Error(String(payload.error ?? "Failed to disable subscription"));
+      }
+
+      setIsClubPushSubscribed(false);
+      setClubPushStatusMessage("звестията за треньори са изключени за този отбор.");
+    } catch (error) {
+      console.error("Disable club notifications error:", error);
+      setClubPushErrorMessage(error instanceof Error ? error.message : "Неуспешно изключване на известията.");
+    } finally {
+      setClubPushBusy(false);
+    }
+  };
+
+  const fetchClubNotifications = async () => {
+    if (!clubId) {
+      setClubNotifications([]);
+      setClubNotificationsUnreadCount(0);
+      return;
+    }
+
+    setClubNotificationsLoading(true);
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/notifications`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        return;
+      }
+      const payload = await response.json();
+      setClubNotifications(Array.isArray(payload.notifications) ? payload.notifications : []);
+      setClubNotificationsUnreadCount(Number(payload.unreadCount ?? 0));
+    } catch (error) {
+      console.error("Failed to fetch club notifications:", error);
+    } finally {
+      setClubNotificationsLoading(false);
+    }
+  };
+
+  const markClubNotificationsRead = async () => {
+    if (!clubId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/notifications/read`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) {
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      setClubNotifications((prev) => prev.map((item) => ({ ...item, readAt: item.readAt ?? nowIso })));
+      setClubNotificationsUnreadCount(0);
+    } catch (error) {
+      console.error("Failed to mark club notifications as read:", error);
+    }
+  };
+
+  const handleOpenClubNotificationsPanel = async () => {
+    setClubNotificationsPanelOpen(true);
+    await fetchClubNotifications();
+    await markClubNotificationsRead();
+  };
+
+  useEffect(() => {
+    const pushOpenTs = searchParams.get("pushOpenTs");
+    const shouldOpenFromPush =
+      searchParams.get("fromPush") === "1" &&
+      searchParams.get("openCoachNotifications") === "1" &&
+      Boolean(pushOpenTs);
+
+    if (!shouldOpenFromPush || !pushOpenTs || pushOpenTs === lastHandledCoachPushOpenTs) {
+      return;
+    }
+
+    setLastHandledCoachPushOpenTs(pushOpenTs);
+    void handleOpenClubNotificationsPanel();
+
+    const cleanedParams = new URLSearchParams(searchParams.toString());
+    cleanedParams.delete("fromPush");
+    cleanedParams.delete("openBell");
+    cleanedParams.delete("openCoachNotifications");
+    cleanedParams.delete("pushOpenTs");
+    const cleanedQuery = cleanedParams.toString();
+    const cleanPath = "/admin/members";
+    router.replace(cleanedQuery ? `${cleanPath}?${cleanedQuery}` : cleanPath, { scroll: false });
+  }, [lastHandledCoachPushOpenTs, router, searchParams]);
 
   const handleDeleteMember = async () => {
     if (!memberToDelete || isDeletingMember) return;
@@ -1633,6 +2266,82 @@ function AdminMembersPageContent() {
 
     void fetchSession();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncClubPushState = async () => {
+      setClubPushErrorMessage("");
+      setClubPushStatusMessage("");
+
+      if (!clubId || typeof window === "undefined") {
+        if (!cancelled) {
+          setIsClubPushSubscribed(false);
+        }
+        return;
+      }
+
+      const supportsPush =
+        window.isSecureContext &&
+        "serviceWorker" in navigator &&
+        "PushManager" in window &&
+        "Notification" in window;
+
+      if (!supportsPush) {
+        if (!cancelled) {
+          setIsClubPushSupported(false);
+          setIsClubPushSubscribed(false);
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setIsClubPushSupported(true);
+      }
+
+      try {
+        await navigator.serviceWorker.register("/sw.js");
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+
+        if (!subscription) {
+          if (!cancelled) {
+            setIsClubPushSubscribed(false);
+          }
+          return;
+        }
+
+        const endpoint = subscription.endpoint.trim();
+        const response = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/push-subscriptions?endpoint=${encodeURIComponent(endpoint)}`,
+          { cache: "no-store" },
+        );
+
+        if (!response.ok) {
+          if (!cancelled) {
+            setIsClubPushSubscribed(false);
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as { isActive?: unknown };
+        if (!cancelled) {
+          setIsClubPushSubscribed(Boolean(payload.isActive));
+        }
+      } catch (error) {
+        console.error("Club push state sync error:", error);
+        if (!cancelled) {
+          setIsClubPushSubscribed(false);
+        }
+      }
+    };
+
+    void syncClubPushState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clubId]);
 
   useEffect(() => {
     if (!clubId) {
@@ -2966,6 +3675,37 @@ function AdminMembersPageContent() {
         </div>
 
         <div className="amp-tools-row">
+          {clubId && (
+            <button
+              className="amp-download-links-btn amp-btn--compact"
+              onClick={() =>
+                void (isClubPushSubscribed
+                  ? handleDisableClubNotifications()
+                  : handleEnableClubNotifications())
+              }
+              type="button"
+              disabled={!isClubPushSupported || clubPushBusy}
+              title={!isClubPushSupported ? "Push известията не се поддържат в този браузър." : undefined}
+            >
+              <span>{clubPushBusy ? "..." : isClubPushSubscribed ? "🔔" : "🔕"}</span>
+              <span>{isClubPushSubscribed ? "Coach Push On" : "Coach Push Off"}</span>
+            </button>
+          )}
+          {clubId && (
+            <button
+              className="amp-member-bell-btn"
+              type="button"
+              onClick={() => void handleOpenClubNotificationsPanel()}
+              aria-label="All coach notifications"
+            >
+              <BellIcon />
+              {clubNotificationsUnreadCount > 0 ? (
+                <span className="amp-member-bell-dot">
+                  {clubNotificationsUnreadCount > 99 ? "99+" : clubNotificationsUnreadCount}
+                </span>
+              ) : null}
+            </button>
+          )}
           <button className="amp-reports-btn amp-btn--compact" onClick={() => setReportsOpen(true)}>
             <ChartColumnIcon size={16} />
             <span>Отчети</span>
@@ -3003,6 +3743,13 @@ function AdminMembersPageContent() {
         </div>
 
         {/* ── Content ── */}
+        {clubPushStatusMessage && (
+          <p className="amp-lbl" style={{ marginTop: "8px" }}>
+            {clubPushStatusMessage}
+          </p>
+        )}
+        {clubPushErrorMessage && <p className="amp-confirm-error">{clubPushErrorMessage}</p>}
+
         <div className="amp-content">
 
           {/* Group filter dropdown */}
@@ -3057,6 +3804,130 @@ function AdminMembersPageContent() {
 
         </div>
       </div>
+
+      {clubNotificationsPanelOpen ? (
+        <div className="amp-overlay amp-overlay--member-notifications" onClick={() => setClubNotificationsPanelOpen(false)}>
+          <div className="amp-modal amp-modal--member-notifications" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">{"\u0418\u0437\u0432\u0435\u0441\u0442\u0438\u044f \u0437\u0430 \u0442\u0440\u0435\u043d\u044c\u043e\u0440\u0438"}</span>
+              <button className="amp-modal-close" onClick={() => setClubNotificationsPanelOpen(false)} aria-label={"\u0417\u0430\u0442\u0432\u043e\u0440\u0438"}>
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              {clubNotificationsLoading ? (
+                <p className="amp-empty amp-empty--modal">{"\u0417\u0430\u0440\u0435\u0436\u0434\u0430\u043d\u0435..."}</p>
+              ) : clubNotifications.length === 0 ? (
+                <p className="amp-empty amp-empty--modal">{"\u041d\u044f\u043c\u0430 \u0438\u0437\u0432\u0435\u0441\u0442\u0438\u044f"}</p>
+              ) : (
+                <>
+                  <div className="amp-notification-filters">
+                    <label className="amp-notification-filter">
+                      <span>{"\u0414\u0430\u0442\u0430"}</span>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost"
+                          style={{
+                            padding: "8px 10px",
+                            fontSize: "12px",
+                            borderColor: clubNotificationsDateFilter ? "rgba(255,255,255,0.2)" : "rgba(50,205,50,0.6)",
+                            color: clubNotificationsDateFilter ? "rgba(255,255,255,0.85)" : "#32cd32",
+                          }}
+                          onClick={() => setClubNotificationsDateFilter("")}
+                        >
+                          {"\u0412\u0441\u0438\u0447\u043a\u0438"}
+                        </button>
+                        <input
+                          type="date"
+                          className="amp-edit-input"
+                          value={clubNotificationsDateFilter}
+                          max={todayIsoDate}
+                          onChange={(event) => setClubNotificationsDateFilter(event.target.value)}
+                        />
+                      </div>
+                    </label>
+                    <label className="amp-notification-filter">
+                      <span>{"\u0424\u0438\u043b\u0442\u044a\u0440 \u043f\u043e"}</span>
+                      <select
+                        className="amp-edit-input"
+                        value={clubNotificationsScopeType}
+                        onChange={(event) => {
+                          const nextType = event.target.value === "trainingGroup" ? "trainingGroup" : "team";
+                          setClubNotificationsScopeType(nextType);
+                          setClubNotificationsScopeValue("all");
+                        }}
+                      >
+                        <option value="team">{"\u041e\u0442\u0431\u043e\u0440"}</option>
+                        <option value="trainingGroup">{"\u0421\u0431\u043e\u0440\u0435\u043d \u043e\u0442\u0431\u043e\u0440"}</option>
+                      </select>
+                    </label>
+                    <label className="amp-notification-filter">
+                      <span>
+                        {clubNotificationsScopeType === "team"
+                          ? "\u0418\u0437\u0431\u0435\u0440\u0438 \u043e\u0442\u0431\u043e\u0440"
+                          : "\u0418\u0437\u0431\u0435\u0440\u0438 \u0441\u0431\u043e\u0440\u0435\u043d \u043e\u0442\u0431\u043e\u0440"}
+                      </span>
+                      <select
+                        className="amp-edit-input"
+                        value={clubNotificationsScopeValue}
+                        onChange={(event) => setClubNotificationsScopeValue(event.target.value)}
+                      >
+                        <option value="all">{"\u0412\u0441\u0438\u0447\u043a\u0438"}</option>
+                        {clubNotificationsScopeType === "team"
+                          ? clubNotificationTeamGroups.map((group) => (
+                              <option key={group} value={String(group)}>
+                                {group}
+                              </option>
+                            ))
+                          : clubNotificationTrainingGroups.map((group) => (
+                              <option key={group.id} value={group.id}>
+                                {group.name}
+                              </option>
+                            ))}
+                      </select>
+                    </label>
+                  </div>
+                  {filteredClubNotifications.length === 0 ? (
+                    <p className="amp-empty amp-empty--modal">{"\u041d\u044f\u043c\u0430 \u0438\u0437\u0432\u0435\u0441\u0442\u0438\u044f \u0437\u0430 \u0438\u0437\u0431\u0440\u0430\u043d\u0438\u0442\u0435 \u0444\u0438\u043b\u0442\u0440\u0438"}</p>
+                  ) : (
+                    <div className="amp-member-notifications-list">
+                      {filteredClubNotifications.map((notif) => (
+                        <article
+                          key={notif.id}
+                          className={`amp-member-notification-item${notif.readAt ? "" : " amp-member-notification-item--unread"}`}
+                        >
+                          <div className="amp-member-notification-head">
+                            <h3>{notif.title}</h3>
+                            {!notif.readAt ? <span className="amp-member-notification-new" aria-label={"\u041d\u043e\u0432\u043e"} /> : null}
+                          </div>
+                          <p>{notif.body}</p>
+                          <div className="amp-member-notification-meta">
+                            {typeof notif.teamGroup === "number" ? <span>{"\u041e\u0442\u0431\u043e\u0440: "}{notif.teamGroup}</span> : null}
+                            {Array.isArray(notif.trainingGroups) && notif.trainingGroups.length > 0 ? (
+                              <span>{"\u0421\u0431\u043e\u0440\u0435\u043d \u043e\u0442\u0431\u043e\u0440: "}{notif.trainingGroups.map((group) => group.name).join(", ")}</span>
+                            ) : null}
+                          </div>
+                          <time dateTime={notif.sentAt}>
+                            {new Date(notif.sentAt).toLocaleDateString("bg-BG", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </time>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Detail modal */}
       {selectedMember && (
@@ -3504,8 +4375,8 @@ function AdminMembersPageContent() {
                 {false && trainingDaysEditorOpen && (
                   <div className="amp-training-days-editor">
                     <div className="amp-training-days-editor-header">
-                      <span className="amp-lbl">Избери тренировъчни дни (следващи 30 дни)</span>
-                      <span className="amp-lbl">Избрани: {schedulerForm.trainingDates.length}</span>
+                      <span className="amp-lbl">збери тренировъчни дни (следващи 30 дни)</span>
+                      <span className="amp-lbl">збрани: {schedulerForm.trainingDates.length}</span>
                     </div>
                     <div className="amp-training-calendar">
                       {schedulerCalendarMonths.map((month) => (
@@ -3602,7 +4473,7 @@ function AdminMembersPageContent() {
                     Остави само текущия ден
                   </button>
                   <span className="amp-lbl">
-                    Избрани дни за добавяне на описание: {trainingNoteTargetDates.length}
+                    збрани дни за добавяне на описание: {trainingNoteTargetDates.length}
                   </span>
                 </div>
                 <textarea
@@ -3736,7 +4607,7 @@ function AdminMembersPageContent() {
             </h2>
             <div className="amp-modal-body">
               <p className="amp-lbl" style={{ whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }}>
-                {`Искате ли да направите промени по сборен отбор ${postTeamGroupSavePromptGroupName}?`}
+                {`скате ли да направите промени по сборен отбор ${postTeamGroupSavePromptGroupName}?`}
               </p>
               <div className="amp-modal-actions amp-modal-actions--end">
                 <button
@@ -4041,10 +4912,10 @@ function AdminMembersPageContent() {
                     ? "Създай сборен отбор"
                     : trainingDaysEditorMode === "trainingGroup"
                       ? "Задай тренировъчни дни за сборен отбор"
-                    : "Избери тренировъчни дни (следващи 30 дни)"}
+                    : "збери тренировъчни дни (следващи 30 дни)"}
                 </span>
                 {trainingDaysEditorMode !== "createGroup" && (
-                  <span className="amp-lbl">Избрани: {schedulerForm.trainingDates.length}</span>
+                  <span className="amp-lbl">збрани: {schedulerForm.trainingDates.length}</span>
                 )}
               </div>
               <div className="amp-training-days-editor-header" style={{ marginTop: "8px", justifyContent: "space-between", gap: "10px" }}>
@@ -4239,7 +5110,7 @@ function AdminMembersPageContent() {
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">Изпратено</span>
+              <span className="amp-modal-title-gradient">зпратено</span>
               <button
                 className="amp-modal-close"
                 onClick={() => setTrainingDaysSuccessOpen(false)}
@@ -4367,7 +5238,7 @@ function AdminMembersPageContent() {
                 </div>
               )}
               <label className="amp-edit-field">
-                <span className="amp-lbl">Избери дни</span>
+                <span className="amp-lbl">збери дни</span>
                 <div className="amp-training-calendar amp-training-calendar--attendance">
                   {trainingAttendanceCalendarMonths.map((month) => (
                     <div key={month.key} className="amp-training-month">
@@ -4474,7 +5345,7 @@ function AdminMembersPageContent() {
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">Изпратено</span>
+              <span className="amp-modal-title-gradient">зпратено</span>
               <button
                 className="amp-modal-close"
                 onClick={() => setTrainingNoteSuccessOpen(false)}

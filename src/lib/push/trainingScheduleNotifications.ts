@@ -12,6 +12,12 @@ export interface TrainingScheduleNotificationSummary {
   failed: number;
   deactivated: number;
   historySaved: number;
+  coachPush: {
+    total: number;
+    sent: number;
+    failed: number;
+    deactivated: number;
+  };
 }
 
 function areSameDates(left: string[], right: string[]) {
@@ -46,6 +52,7 @@ export async function sendTrainingScheduleNotifications(input: {
       failed: 0,
       deactivated: 0,
       historySaved: 0,
+      coachPush: { total: 0, sent: 0, failed: 0, deactivated: 0 },
     };
   }
 
@@ -76,6 +83,7 @@ export async function sendTrainingScheduleNotifications(input: {
     failed: 0,
     deactivated: 0,
     historySaved: 0,
+    coachPush: { total: 0, sent: 0, failed: 0, deactivated: 0 },
   };
 
   if (members.length === 0) {

@@ -26,11 +26,31 @@ model Club {
   trainingDates          String[]                    @default([]) @map("training_dates")
   trainingWindowDays     Int                         @default(30) @map("training_window_days")
   players                Player[]
+  adminPushSubscriptions AdminPushSubscription[]
+  adminNotifications     AdminNotification[]
   trainingNotes          TrainingNote[]
   trainingGroupSchedules ClubTrainingGroupSchedule[]
   trainingScheduleGroups ClubTrainingScheduleGroup[]
 
   @@map("clubs")
+}
+
+model AdminPushSubscription {
+  id        String   @id @default(uuid())
+  clubId    String   @map("club_id") @db.Uuid
+  endpoint  String
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  device    String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, endpoint])
+  @@index([clubId, isActive])
+  @@map("admin_push_subscriptions")
 }
 
 model ClubTrainingGroupSchedule {
@@ -92,6 +112,7 @@ model Player {
   paymentLogs        PaymentLog[]
   paymentWaivers     PaymentWaiver[]
   playerNotification PlayerNotification[]
+  adminNotifications AdminNotification[]
   club               Club                 @relation(fields: [clubId], references: [id], onDelete: Cascade)
   pushSubscriptions  PushSubscription[]
   trainingOptOuts    TrainingOptOut[]
@@ -196,6 +217,25 @@ model PlayerNotification {
   @@index([playerId, sentAt])
   @@index([playerId, readAt])
   @@map("player_notifications")
+}
+
+model AdminNotification {
+  id       String    @id @default(uuid())
+  clubId   String    @map("club_id") @db.Uuid
+  playerId String?   @map("player_id") @db.Uuid
+  type     String
+  title    String
+  body     String
+  url      String?
+  sentAt   DateTime  @default(now()) @map("sent_at")
+  readAt   DateTime? @map("read_at")
+  club     Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  player   Player?   @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([clubId, sentAt])
+  @@index([clubId, readAt])
+  @@index([clubId, playerId])
+  @@map("admin_notifications")
 }
 
 model Card {

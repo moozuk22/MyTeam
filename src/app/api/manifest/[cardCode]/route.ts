@@ -39,7 +39,7 @@ export async function GET(
   const encodedCardCode = encodeURIComponent(cardCode.trim().toUpperCase());
 
   return NextResponse.json({
-    id: "/app",
+    id: `/app/member/${encodedCardCode}`,
     name: playerName,
     short_name: playerName,
     start_url: `/member/${encodedCardCode}`,

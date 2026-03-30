@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { sendPushToClubAdmins } from "@/lib/push/adminService";
+import { saveAdminNotificationHistory } from "@/lib/push/adminHistory";
+import type { PushNotificationPayload } from "@/lib/push/types";
 import {
   getConfiguredTrainingDates,
   getWeekdayMondayFirst,
@@ -14,6 +17,40 @@ export const dynamic = "force-dynamic";
 const FIXED_TIME_ZONE = "Europe/Sofia";
 const TRAINING_SELECTION_WINDOW_DAYS = 30;
 
+function formatBgDate(isoDate: string) {
+  return new Date(`${isoDate}T00:00:00.000Z`).toLocaleDateString("bg-BG", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function buildCoachAttendancePayload(input: {
+  clubId: string;
+  playerName: string;
+  trainingDate: string;
+  optedOut: boolean;
+}): PushNotificationPayload {
+  const formattedDate = formatBgDate(input.trainingDate);
+  return {
+    title: "Промяна в присъствието",
+    body: input.optedOut
+      ? `${input.playerName} отбеляза отсъствие за тренировка на ${formattedDate}.`
+      : `${input.playerName} потвърди присъствие за тренировка на ${formattedDate}.`,
+    url: `/admin/members?clubId=${encodeURIComponent(input.clubId)}`,
+    icon: "/logo.png",
+    badge: "/logo.png",
+    tag: "training-attendance-updated",
+    data: {
+      type: "training_reminder",
+      clubId: input.clubId,
+      trainingDate: input.trainingDate,
+      optedOut: input.optedOut,
+    },
+  };
+}
+
 async function getMemberTrainingContext(cardCode: string) {
   const normalizedCardCode = cardCode.trim().toUpperCase();
   const card = await prisma.card.findFirst({
@@ -27,6 +64,7 @@ async function getMemberTrainingContext(cardCode: string) {
       player: {
         select: {
           id: true,
+          fullName: true,
           clubId: true,
           teamGroup: true,
           club: {
@@ -100,6 +138,7 @@ async function getMemberTrainingContext(cardCode: string) {
   return {
     cardCode: card.cardCode,
     playerId: card.playerId,
+    playerName: card.player.fullName,
     clubId: card.player.clubId,
     trainingWeekdays,
     trainingWindowDays,
@@ -210,7 +249,32 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ success: true, trainingDate, optedOut: true });
+  let coachPush = { total: 0, sent: 0, failed: 0, deactivated: 0 };
+  const coachPayload = buildCoachAttendancePayload({
+    clubId: context.clubId,
+    playerName: context.playerName,
+    trainingDate,
+    optedOut: true,
+  });
+
+  try {
+    await saveAdminNotificationHistory({
+      clubId: context.clubId,
+      playerId: context.playerId,
+      type: "training_attendance",
+      payload: coachPayload,
+    });
+  } catch (error) {
+    console.error("Coach attendance history save error (opt-out):", error);
+  }
+
+  try {
+    coachPush = await sendPushToClubAdmins(context.clubId, coachPayload);
+  } catch (error) {
+    console.error("Coach attendance push send error (opt-out):", error);
+  }
+
+  return NextResponse.json({ success: true, trainingDate, optedOut: true, coachPush });
 }
 
 export async function DELETE(
@@ -238,5 +302,30 @@ export async function DELETE(
     },
   });
 
-  return NextResponse.json({ success: true, trainingDate, optedOut: false });
+  let coachPush = { total: 0, sent: 0, failed: 0, deactivated: 0 };
+  const coachPayload = buildCoachAttendancePayload({
+    clubId: context.clubId,
+    playerName: context.playerName,
+    trainingDate,
+    optedOut: false,
+  });
+
+  try {
+    await saveAdminNotificationHistory({
+      clubId: context.clubId,
+      playerId: context.playerId,
+      type: "training_attendance",
+      payload: coachPayload,
+    });
+  } catch (error) {
+    console.error("Coach attendance history save error (opt-in):", error);
+  }
+
+  try {
+    coachPush = await sendPushToClubAdmins(context.clubId, coachPayload);
+  } catch (error) {
+    console.error("Coach attendance push send error (opt-in):", error);
+  }
+
+  return NextResponse.json({ success: true, trainingDate, optedOut: false, coachPush });
 }

@@ -29,9 +29,19 @@ self.addEventListener("push", (event) => {
     typeof data.cardCode === "string" && data.cardCode.trim()
       ? data.cardCode.trim()
       : null;
+  const clubId =
+    typeof data.clubId === "string" && data.clubId.trim()
+      ? data.clubId.trim()
+      : data.data &&
+        typeof data.data.clubId === "string" &&
+        data.data.clubId.trim()
+      ? data.data.clubId.trim()
+      : null;
   const url =
     typeof data.url === "string" && data.url.trim()
       ? data.url.trim()
+      : clubId
+      ? `/admin/members?clubId=${encodeURIComponent(clubId)}`
       : cardCode
       ? `/member/${encodeURIComponent(cardCode)}`
       : "/";
@@ -69,18 +79,25 @@ self.addEventListener("notificationclick", (event) => {
     typeof event.notification.data.url === "string" &&
     event.notification.data.url.trim()
       ? event.notification.data.url.trim()
+      : event.notification?.data &&
+        typeof event.notification.data.clubId === "string" &&
+        event.notification.data.clubId.trim()
+      ? `/admin/members?clubId=${encodeURIComponent(event.notification.data.clubId.trim())}`
       : cardCode
       ? `/member/${encodeURIComponent(cardCode)}`
       : "/";
-  const targetPath =
-    requestedPath === "/admin" || requestedPath.startsWith("/admin/")
-      ? cardCode
-        ? `/member/${encodeURIComponent(cardCode)}`
-        : "/"
-      : requestedPath;
+  const targetPath = requestedPath;
   const destinationUrl = new URL(targetPath, self.location.origin);
+  const isAdminTarget =
+    destinationUrl.pathname === "/admin" ||
+    destinationUrl.pathname.startsWith("/admin/");
+
   destinationUrl.searchParams.set("fromPush", "1");
-  destinationUrl.searchParams.set("openBell", "1");
+  if (isAdminTarget) {
+    destinationUrl.searchParams.set("openCoachNotifications", "1");
+  } else {
+    destinationUrl.searchParams.set("openBell", "1");
+  }
   destinationUrl.searchParams.set("pushOpenTs", String(Date.now()));
   const destination = destinationUrl.toString();
 
