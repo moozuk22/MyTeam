@@ -802,7 +802,7 @@ export default function MemberCardPage({
         existingSubscription ||
         (await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
+          applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
         }));
 
       const saveResponse = await fetch(

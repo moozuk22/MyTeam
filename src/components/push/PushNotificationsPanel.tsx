@@ -209,7 +209,7 @@ export function PushNotificationsPanel({ cardCode }: PushNotificationsPanelProps
         try {
           subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(publicKey),
+            applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
           });
         } catch (subscribeError) {
           const diagnostics = await getPushSubscribeDiagnostics(registration, publicKey);
