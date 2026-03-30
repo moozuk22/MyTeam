@@ -4191,7 +4191,7 @@ function AdminMembersPageContent() {
             </>
           )}
         </div>
-        {isClubPushSupported && clubId && (isAdmin || isCoach) && (
+        {(isClubPushSupported || (isClubIPhone && !isClubStandalone)) && clubId && (
           <>
             {isClubPushSubscribed && (
               <div className="push-enabled-banner">
