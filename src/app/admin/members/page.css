@@ -2589,7 +2589,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  margin-bottom: 10px;
   width: 100%;
   min-height: 42px;
   padding: 10px 14px;
