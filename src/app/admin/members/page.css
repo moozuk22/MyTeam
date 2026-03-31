@@ -2676,14 +2676,13 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  /* margin-bottom: 24px; */
   width: 100%;
-  padding: 9px 12px;
+  padding: 0 16px;
   height: 36px;
   background-color: rgba(255, 255, 255, 0.1);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -2753,10 +2752,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   margin-bottom: 10px;
   width: 100%;
-  min-height: 42px;
-  padding: 10px 14px;
+  height: 36px;
+  padding: 0 16px;
   margin-top: 2px;
   border-radius: 8px;
   border: 1px solid rgba(50, 205, 50, 0.35);
@@ -2764,6 +2764,7 @@
   color: #d7ffd7;
   font-size: 14px;
   font-weight: 600;
+  box-sizing: border-box;
 }
 
 .amp-btn--compact svg {
