@@ -4269,7 +4269,7 @@ function AdminMembersPageContent() {
         <div className="amp-content">
 
           {/* Group filter dropdown */}
-          <label className="amp-edit-field" style={{ marginBottom: "10px", maxWidth: "320px" }}>
+          <label className="amp-edit-field" style={{ marginBottom: "10px" }}>
             <span className="amp-lbl">Набор</span>
             <select
               className="amp-edit-input"

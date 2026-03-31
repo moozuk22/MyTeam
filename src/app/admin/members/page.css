@@ -305,7 +305,7 @@
 /* Team group filter (top control in content) */
 .amp-content>.amp-edit-field:first-child {
   position: relative;
-  max-width: 320px;
+  /* max-width: 320px; */
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -2133,6 +2133,11 @@
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 24px;
+}
+
+.amp-tools-row > button {
+  flex: 1 1 calc(33.333% - 7px);
+  justify-content: center;
 }
 
 /* Reports button */
