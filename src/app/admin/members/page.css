@@ -75,7 +75,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  flex: 1;
+  width: 100%;
 }
 
 .amp-nav-back {
