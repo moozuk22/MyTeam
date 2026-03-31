@@ -14,7 +14,7 @@ export async function GET() {
     });
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
-    const clubLogoTransform = "w_160,h_160,c_limit,dpr_auto,f_auto,q_auto:good";
+    const clubLogoTransform = "w_96,h_96,c_limit,f_auto,q_auto:eco";
     const normalizedTeams = teams.map((team) => {
       if (team.imageUrl && cloudName && !team.imageUrl.startsWith("http")) {
         return {

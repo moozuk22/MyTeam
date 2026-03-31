@@ -13,7 +13,7 @@ function buildCloudinaryPngSquare(url: string, size: number): string {
 
   const prefix = url.slice(0, idx + marker.length);
   const suffix = url.slice(idx + marker.length);
-  return `${prefix}c_fill,w_${size},h_${size},q_auto,f_png/${suffix}`;
+  return `${prefix}c_pad,w_${size},h_${size},b_black,q_auto:good,f_png/${suffix}`;
 }
 
 export async function GET(
@@ -58,7 +58,7 @@ export async function GET(
 
     if (baseLogoUrl) {
       const iconUrl = buildCloudinaryPngSquare(baseLogoUrl, size);
-      const upstream = await fetch(iconUrl, { cache: "no-store" });
+      const upstream = await fetch(iconUrl, { next: { revalidate: 86400 } });
       if (upstream.ok) {
         const contentType = upstream.headers.get("content-type") || "image/png";
         const body = await upstream.arrayBuffer();
@@ -66,7 +66,7 @@ export async function GET(
           status: 200,
           headers: {
             "Content-Type": contentType,
-            "Cache-Control": "public, max-age=300",
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
           },
         });
       }
@@ -83,7 +83,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
       },
     });
   } catch {

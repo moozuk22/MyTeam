@@ -39,11 +39,10 @@ function getUploadOptions(type: UploadType, name: string): UploadApiOptions {
     format: "webp",
     transformation: [
       {
-        width: 80,
-        height: 80,
-        crop: "fill",
-        gravity: "auto",
-        quality: "auto",
+        width: 768,
+        height: 768,
+        crop: "limit",
+        quality: "auto:good",
       },
     ],
   };
