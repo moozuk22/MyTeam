@@ -1055,7 +1055,7 @@ function MemberDetailModalLegacy({
           {/* Accordion */}
           <div className="amp-acc">
             <button className="amp-acc-trigger" onClick={() => setHistoryOpen(v => !v)}>
-              <span>стория на плащанията</span>
+              <span>История на плащанията</span>
               <span className={`amp-acc-chevron${historyOpen ? " open" : ""}`}><ChevronDownIcon /></span>
             </button>
             <div className={`amp-acc-body${historyOpen ? " open" : ""}`}>
@@ -1318,7 +1318,7 @@ function MemberDetailModal({
 
           <div className="amp-acc">
             <button className="amp-acc-trigger" onClick={() => setHistoryOpen((v) => !v)}>
-              <span>стория на плащанията</span>
+              <span>История на плащанията</span>
               <span className={`amp-acc-chevron${historyOpen ? " open" : ""}`}><ChevronDownIcon /></span>
             </button>
             <div className={`amp-acc-body${historyOpen ? " open" : ""}`}>
