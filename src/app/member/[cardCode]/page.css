@@ -928,12 +928,12 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 9px 12px;
+  padding: 0 16px;
   height: 36px;
-  background-color: rgba(255,255,255,0.1);
+  background-color: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -955,6 +955,7 @@
   background-color: rgba(224,53,53,0.15);
   color: #ffffff;
   border: 1px solid rgba(224,53,53,0.35);
+  margin-bottom: 2px;
 }
 
 .bell-btn--disable:hover {
@@ -1016,18 +1017,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  min-height: 42px;
-  padding: 10px 14px;
-  margin-top: 2px;
-  border-radius: 9px;
-  border: 1px solid rgba(0, 120, 20, 0.6);
-  background: linear-gradient(180deg, rgba(0, 45, 10, 0.95) 0%, rgba(0, 35, 8, 0.95) 100%);
-  color: #17a534;
+  height: 36px;
+  padding: 0 16px;
+  margin: 2px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(50, 205, 50, 0.35);
+  background: rgba(50, 205, 50, 0.12);
+  color: #d7ffd7;
   font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
+  font-weight: 600;
+  box-sizing: border-box;
 }
 
 .push-enabled-check {

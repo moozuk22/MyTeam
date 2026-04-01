@@ -1246,7 +1246,7 @@ export default function MemberCardPage({
     trainingConfirmAction !== "optOut"
       ? true
       : trainingOptOutReasonCode !== "" &&
-        (trainingOptOutReasonCode !== "other" || trainingOptOutReasonText.trim().length > 0);
+      (trainingOptOutReasonCode !== "other" || trainingOptOutReasonText.trim().length > 0);
 
   const handleTrainingAttendanceConfirm = async (
     action: "attend" | "optOut",
@@ -1265,10 +1265,10 @@ export default function MemberCardPage({
       const requestBody =
         action === "optOut"
           ? {
-              trainingDate: item.date,
-              reasonCode: reason?.reasonCode ?? "",
-              reasonText: reason?.reasonText ?? "",
-            }
+            trainingDate: item.date,
+            reasonCode: reason?.reasonCode ?? "",
+            reasonText: reason?.reasonText ?? "",
+          }
           : { trainingDate: item.date };
       const response = await fetch(`/api/members/${normalizedCardCode}/training`, {
         method: action === "optOut" ? "POST" : "DELETE",
@@ -2004,12 +2004,12 @@ export default function MemberCardPage({
                       trainingDetailsItem,
                       trainingConfirmAction === "optOut" && trainingOptOutReasonCode
                         ? {
-                            reasonCode: trainingOptOutReasonCode,
-                            reasonText:
-                              trainingOptOutReasonCode === "other"
-                                ? trainingOptOutReasonText.trim()
-                                : null,
-                          }
+                          reasonCode: trainingOptOutReasonCode,
+                          reasonText:
+                            trainingOptOutReasonCode === "other"
+                              ? trainingOptOutReasonText.trim()
+                              : null,
+                        }
                         : undefined,
                     );
                     setTrainingConfirmAction(null);
