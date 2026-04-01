@@ -205,6 +205,21 @@ function formatIsoDateForBgDisplay(isoDate: string): string {
   });
 }
 
+function formatMonthYearInBgUtc(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  const text = parsed.toLocaleDateString("bg-BG", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function getTrainingDateTimeMs(dateIso: string, trainingTime?: string): number {
   const normalizedTime =
     typeof trainingTime === "string" && /^([01]\d|2[0-3]):([0-5]\d)$/.test(trainingTime.trim())
@@ -1124,13 +1139,7 @@ export default function MemberCardPage({
     }
   };
 
-  const formatReceiptPeriod = (value: string) => {
-    const text = new Date(value).toLocaleDateString("bg-BG", {
-      month: "long",
-      year: "numeric",
-    });
-    return text.charAt(0).toUpperCase() + text.slice(1);
-  };
+  const formatReceiptPeriod = (value: string) => formatMonthYearInBgUtc(value);
 
   const escapeHtml = (value: string) =>
     value
@@ -1703,10 +1712,7 @@ export default function MemberCardPage({
                       <div className="payment-row" key={item.id}>
                         <div className="payment-info">
                           <p className="p-month">
-                            {new Date(item.paidFor).toLocaleDateString("bg-BG", {
-                              month: "long",
-                              year: "numeric",
-                            })}
+                            {formatMonthYearInBgUtc(item.paidFor)}
                           </p>
                           <p className="p-date">{new Date(item.paidAt).toLocaleDateString("bg-BG")}</p>
                         </div>

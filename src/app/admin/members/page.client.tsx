@@ -30,6 +30,7 @@ interface ReportPlayer {
   fullName: string;
   teamGroup: number | null;
   paymentLogs: ReportPaymentLog[];
+  isActive?: boolean;
 }
 
 type PlayerStatus = "paid" | "warning" | "overdue" | "paused";
@@ -598,8 +599,32 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
           setPlayers([]);
           return;
         }
-        const data = (await response.json()) as ReportPlayer[];
-        setPlayers(Array.isArray(data) ? data : []);
+        const data = await response.json();
+        const normalizedPlayers: ReportPlayer[] = Array.isArray(data)
+          ? data.map((item) => {
+            const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+            const paymentLogs = Array.isArray(raw.paymentLogs)
+              ? raw.paymentLogs.map((log) => {
+                const logRaw =
+                  typeof log === "object" && log !== null ? (log as Record<string, unknown>) : {};
+                return {
+                  id: String(logRaw.id ?? ""),
+                  paidFor: String(logRaw.paidFor ?? ""),
+                  paidAt: String(logRaw.paidAt ?? ""),
+                };
+              })
+              : [];
+
+            return {
+              id: String(raw.id ?? ""),
+              fullName: String(raw.fullName ?? ""),
+              teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
+              paymentLogs,
+              isActive: raw.isActive === false ? false : true,
+            };
+          })
+          : [];
+        setPlayers(normalizedPlayers);
       } catch (error) {
         console.error("Error fetching report players:", error);
         setPlayers([]);
@@ -680,6 +705,7 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
       group: player.teamGroup,
       date: paidDate ?? "—",
       paid: Boolean(paidDate),
+      isActive: player.isActive !== false,
     };
   });
 
@@ -691,11 +717,13 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
       group: player.teamGroup,
       date: paidDate ?? "—",
       paid: Boolean(paidDate),
+      isActive: player.isActive !== false,
     };
   });
 
-  const paidCount = rows.filter((row) => row.paid).length;
-  const total = rows.length;
+  const statsRows = rows.filter((row) => row.isActive);
+  const paidCount = statsRows.filter((row) => row.paid).length;
+  const total = statsRows.length;
   const pct = total > 0 ? Math.round((paidCount / total) * 100) : 0;
   const missing = total - paidCount;
 
