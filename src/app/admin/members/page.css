@@ -59,38 +59,16 @@
   border-radius: 9999px;
 }
 
-/* ── Nav row ── */
-.amp-nav-row {
+/* ── Buttons grid (unified) ── */
+.amp-buttons-grid {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.amp-nav-left {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  width: 100%;
+  margin-bottom: 24px;
 }
 
-.amp-nav-back {
-  flex-basis: 100%;
-}
-
-.amp-team-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
-
-.amp-team-actions>button {
-  flex: 1;
+.amp-buttons-grid > button {
+  flex: 1 1 calc(50% - 4px);
   justify-content: center;
 }
 
@@ -2159,19 +2137,6 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* Tools row */
-.amp-tools-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
-}
-
-.amp-tools-row>button {
-  flex: 1 1 calc(50% - 7px);
-  justify-content: center;
-}
 
 /* Reports button */
 .amp-reports-btn {

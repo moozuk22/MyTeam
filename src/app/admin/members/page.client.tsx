@@ -4139,52 +4139,26 @@ function AdminMembersPageContent() {
           )}
         </div>
 
-        {/* ── Nav row ── */}
-        <div className="amp-nav-row">
-          <div className="amp-nav-left">
-            <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}`)}>
-              <PlusIcon />
-              Добави играч
+        {/* ── Buttons grid ── */}
+        <div className="amp-buttons-grid">
+          <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}`)}>
+            <PlusIcon />
+            Добави играч
+          </button>
+          {isAdmin && (
+            <button
+              className="amp-inactive-toggle-btn amp-btn--compact"
+              onClick={async () => {
+                setInactiveActionError("");
+                await refreshMembersList();
+                setInactivePlayersOpen(true);
+              }}
+              type="button"
+            >
+              <UsersIcon />
+              <span>Неактивни</span>
             </button>
-            {isAdmin && (
-              <button
-                className="amp-inactive-toggle-btn amp-btn--compact"
-                onClick={async () => {
-                  setInactiveActionError("");
-                  await refreshMembersList();
-                  setInactivePlayersOpen(true);
-                }}
-                type="button"
-              >
-                <UsersIcon />
-                <span>Неактивни</span>
-              </button>
-            )}
-          </div>
-          {isAdmin && clubId && (
-            <div className="amp-team-actions">
-              <button
-                className="amp-edit-team-btn amp-btn--compact"
-                onClick={() => router.push(`/admin/teams/${encodeURIComponent(clubId)}/edit`)}
-                disabled={isDeletingTeam}
-              >
-                <PencilIcon size={14} />
-                <span>Редактирай</span>
-              </button>
-              <button
-                className="amp-delete-team-btn amp-btn--compact"
-                onClick={() => setIsTeamDeleteConfirmOpen(true)}
-                disabled={isDeletingTeam}
-                type="button"
-              >
-                <TrashIcon />
-                <span>Изтрий</span>
-              </button>
-            </div>
           )}
-        </div>
-
-        <div className="amp-tools-row">
           <button className="amp-reports-btn amp-btn--compact" onClick={() => setReportsOpen(true)}>
             <ChartColumnIcon size={16} />
             <span>Отчети</span>
@@ -4217,6 +4191,27 @@ function AdminMembersPageContent() {
                   <span>Линкове</span>
                 </button>
               )}
+            </>
+          )}
+          {isAdmin && clubId && (
+            <>
+              <button
+                className="amp-edit-team-btn amp-btn--compact"
+                onClick={() => router.push(`/admin/teams/${encodeURIComponent(clubId)}/edit`)}
+                disabled={isDeletingTeam}
+              >
+                <PencilIcon size={14} />
+                <span>Редактирай</span>
+              </button>
+              <button
+                className="amp-delete-team-btn amp-btn--compact"
+                onClick={() => setIsTeamDeleteConfirmOpen(true)}
+                disabled={isDeletingTeam}
+                type="button"
+              >
+                <TrashIcon />
+                <span>Изтрий</span>
+              </button>
             </>
           )}
         </div>
