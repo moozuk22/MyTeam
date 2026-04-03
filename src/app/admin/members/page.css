@@ -1223,6 +1223,63 @@
   grid-column: 1 / -1;
 }
 
+.amp-scheduler-section-title {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.amp-scheduler-section-title .amp-lbl {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.amp-edit-grid > .amp-scheduler-section-title:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.amp-scheduler-primary-day {
+  order: 10;
+}
+
+.amp-scheduler-primary-time {
+  order: 11;
+}
+
+.amp-scheduler-section-title--second {
+  order: 20;
+}
+
+.amp-scheduler-second-toggle {
+  order: 21;
+}
+
+.amp-scheduler-second-day {
+  order: 22;
+}
+
+.amp-scheduler-second-time {
+  order: 23;
+}
+
+.amp-scheduler-second-remove {
+  order: 24;
+}
+
+.amp-scheduler-section-title--overdue {
+  order: 30;
+}
+
+.amp-scheduler-overdue-day {
+  order: 31;
+}
+
+.amp-scheduler-overdue-time {
+  order: 32;
+}
+
 .amp-training-calendar {
   display: grid;
   gap: 12px;

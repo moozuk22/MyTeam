@@ -11,6 +11,12 @@ const DEFAULT_RUN_MINUTE = 0;
 const DEFAULT_SCHEDULE_GRACE_MINUTES = 10;
 const MEMBER_PROCESSING_CONCURRENCY = 2;
 
+interface ReminderSchedule {
+  day: number;
+  hour: number;
+  minute: number;
+}
+
 function getDatePartsInTimeZone(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -53,6 +59,65 @@ function shouldRunAtScheduledTime(
   return minuteDelta >= 0 && minuteDelta <= DEFAULT_SCHEDULE_GRACE_MINUTES;
 }
 
+function getClubReminderSchedules(club: {
+  reminderDay: number;
+  reminderHour: number;
+  reminderMinute: number;
+  secondReminderDay: number | null;
+  secondReminderHour: number | null;
+  secondReminderMinute: number | null;
+}): ReminderSchedule[] {
+  const primary: ReminderSchedule = {
+    day: Number.isInteger(club.reminderDay) ? club.reminderDay : DEFAULT_RUN_DAY,
+    hour: Number.isInteger(club.reminderHour) ? club.reminderHour : DEFAULT_RUN_HOUR,
+    minute: Number.isInteger(club.reminderMinute) ? club.reminderMinute : DEFAULT_RUN_MINUTE,
+  };
+
+  const schedules: ReminderSchedule[] = [primary];
+  if (
+    Number.isInteger(club.secondReminderDay) &&
+    Number.isInteger(club.secondReminderHour) &&
+    Number.isInteger(club.secondReminderMinute)
+  ) {
+    const secondary: ReminderSchedule = {
+      day: club.secondReminderDay as number,
+      hour: club.secondReminderHour as number,
+      minute: club.secondReminderMinute as number,
+    };
+    if (
+      secondary.day >= 1 &&
+      secondary.day <= 28 &&
+      secondary.hour >= 0 &&
+      secondary.hour <= 23 &&
+      secondary.minute >= 0 &&
+      secondary.minute <= 59 &&
+      secondary.day !== primary.day
+    ) {
+      schedules.push(secondary);
+    }
+  }
+
+  return schedules;
+}
+
+function findMatchingSchedule(
+  schedules: ReminderSchedule[],
+  nowParts: { day: number; hour: number; minute: number },
+): ReminderSchedule | null {
+  return (
+    schedules.find((schedule) =>
+      shouldRunAtScheduledTime(
+        nowParts.day,
+        nowParts.hour,
+        nowParts.minute,
+        schedule.day,
+        schedule.hour,
+        schedule.minute,
+      ),
+    ) ?? null
+  );
+}
+
 export interface MonthlyMembershipReminderResult {
   success: boolean;
   skipped: boolean;
@@ -82,6 +147,9 @@ export async function runMonthlyMembershipPaymentReminder(
       reminderDay: true,
       reminderHour: true,
       reminderMinute: true,
+      secondReminderDay: true,
+      secondReminderHour: true,
+      secondReminderMinute: true,
     },
   });
 
@@ -99,15 +167,13 @@ export async function runMonthlyMembershipPaymentReminder(
     };
   }
 
+  const nowParts = getDatePartsInTimeZone(now, schedulerTimeZone);
   const eligibleClubs = clubs.filter((club) => {
     if (options?.ignoreSchedule) {
       return true;
     }
-    const { day, hour, minute } = getDatePartsInTimeZone(now, schedulerTimeZone);
-    const runDay = Number.isInteger(club.reminderDay) ? club.reminderDay : DEFAULT_RUN_DAY;
-    const runHour = Number.isInteger(club.reminderHour) ? club.reminderHour : DEFAULT_RUN_HOUR;
-    const runMinute = Number.isInteger(club.reminderMinute) ? club.reminderMinute : DEFAULT_RUN_MINUTE;
-    return shouldRunAtScheduledTime(day, hour, minute, runDay, runHour, runMinute);
+    const schedules = getClubReminderSchedules(club);
+    return findMatchingSchedule(schedules, nowParts) !== null;
   });
 
   if (eligibleClubs.length === 0) {
@@ -138,9 +204,14 @@ export async function runMonthlyMembershipPaymentReminder(
     const dateParts = getDatePartsInTimeZone(now, schedulerTimeZone);
     const year = dateParts.year;
     const month = dateParts.month;
+    const day = dateParts.day;
     if (!year || !month) {
       continue;
     }
+    if (!options?.ignoreSchedule && !day) {
+      continue;
+    }
+    const currentLocalDate = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day ?? 1).padStart(2, "0")}`;
 
     const monthStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
     const monthEnd = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
@@ -183,12 +254,17 @@ export async function runMonthlyMembershipPaymentReminder(
             clubId: club.id,
           },
         },
-        distinct: ["playerId"],
-        select: { playerId: true },
+        select: { playerId: true, sentAt: true },
       }),
     ]);
 
-    const alreadySentMemberIds = new Set(alreadySentRows.map((row) => row.playerId));
+    const alreadySentMemberIds = new Set(
+      alreadySentRows
+        .filter(
+          (row) => new Date(row.sentAt).toLocaleDateString("en-CA", { timeZone: schedulerTimeZone }) === currentLocalDate,
+        )
+        .map((row) => row.playerId),
+    );
     const targetMembers = members.filter((member) => !alreadySentMemberIds.has(member.id));
     targetMemberCount += targetMembers.length;
     alreadyNotifiedCount += alreadySentMemberIds.size;

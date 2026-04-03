@@ -61,6 +61,9 @@ interface ClubOption {
   overdueDay?: number;
   reminderHour?: number;
   reminderMinute?: number;
+  secondReminderDay?: number | null;
+  secondReminderHour?: number | null;
+  secondReminderMinute?: number | null;
   overdueHour?: number;
   overdueMinute?: number;
   trainingDates?: string[];
@@ -1654,11 +1657,15 @@ function AdminMembersPageContent() {
   const [schedulerSettingsLoading, setSchedulerSettingsLoading] = useState(false);
   const [schedulerSettingsSaving, setSchedulerSettingsSaving] = useState(false);
   const [schedulerSettingsError, setSchedulerSettingsError] = useState("");
+  const [secondReminderEnabled, setSecondReminderEnabled] = useState(false);
   const [schedulerForm, setSchedulerForm] = useState({
     reminderDay: "25",
     overdueDay: "1",
     reminderHour: "10",
     reminderMinute: "0",
+    secondReminderDay: "",
+    secondReminderHour: "10",
+    secondReminderMinute: "0",
     overdueHour: "10",
     overdueMinute: "0",
     trainingDates: [] as string[],
@@ -1668,6 +1675,7 @@ function AdminMembersPageContent() {
   const [trainingDaysInitialDateTimes, setTrainingDaysInitialDateTimes] = useState<Record<string, string>>({});
   const [trainingTimeMode, setTrainingTimeMode] = useState<TrainingTimeMode>("all");
   const reminderTimeValue = `${schedulerForm.reminderHour.padStart(2, "0")}:${schedulerForm.reminderMinute.padStart(2, "0")}`;
+  const secondReminderTimeValue = `${schedulerForm.secondReminderHour.padStart(2, "0")}:${schedulerForm.secondReminderMinute.padStart(2, "0")}`;
   const overdueTimeValue = `${schedulerForm.overdueHour.padStart(2, "0")}:${schedulerForm.overdueMinute.padStart(2, "0")}`;
   const [trainingAttendanceOpen, setTrainingAttendanceOpen] = useState(false);
   const [trainingAttendanceView, setTrainingAttendanceView] = useState<"teamGroup" | "trainingGroups" | "today">("teamGroup");
@@ -2835,6 +2843,32 @@ function AdminMembersPageContent() {
     URL.revokeObjectURL(url);
   };
 
+  const enableSecondReminder = () => {
+    setSecondReminderEnabled(true);
+    setSchedulerForm((prev) => {
+      const primaryDay = Number.parseInt(prev.reminderDay, 10);
+      const fallbackDay = Number.isInteger(primaryDay)
+        ? Math.min(28, Math.max(1, primaryDay < 28 ? primaryDay + 1 : primaryDay - 1))
+        : 26;
+      return {
+        ...prev,
+        secondReminderDay: prev.secondReminderDay || String(fallbackDay),
+        secondReminderHour: prev.secondReminderHour || "10",
+        secondReminderMinute: prev.secondReminderMinute || "0",
+      };
+    });
+  };
+
+  const disableSecondReminder = () => {
+    setSecondReminderEnabled(false);
+    setSchedulerForm((prev) => ({
+      ...prev,
+      secondReminderDay: "",
+      secondReminderHour: "10",
+      secondReminderMinute: "0",
+    }));
+  };
+
   const openSchedulerSettings = async () => {
     if (!clubId) return;
     setSchedulerSettingsError("");
@@ -2872,16 +2906,24 @@ function AdminMembersPageContent() {
         (typeof payload.trainingTime === "string" && TRAINING_TIME_REGEX.test(payload.trainingTime.trim())
           ? payload.trainingTime.trim()
           : "");
+      const hasSecondReminder =
+        Number.isInteger(payload.secondReminderDay) &&
+        Number.isInteger(payload.secondReminderHour) &&
+        Number.isInteger(payload.secondReminderMinute);
       setSchedulerForm({
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
         reminderHour: String(payload.reminderHour ?? 10),
         reminderMinute: String(payload.reminderMinute ?? 0),
+        secondReminderDay: hasSecondReminder ? String(payload.secondReminderDay) : "",
+        secondReminderHour: hasSecondReminder ? String(payload.secondReminderHour) : "10",
+        secondReminderMinute: hasSecondReminder ? String(payload.secondReminderMinute) : "0",
         overdueHour: String(payload.overdueHour ?? 10),
         overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: resolvedTrainingDates,
         trainingTime: resolvedUniformTime,
       });
+      setSecondReminderEnabled(hasSecondReminder);
       setTrainingDateTimes(resolvedDateTimes);
       setTrainingTimeMode(inferTrainingTimeMode(resolvedTrainingDates, resolvedDateTimes));
     } catch (error) {
@@ -3184,16 +3226,24 @@ function AdminMembersPageContent() {
           typeof payload.trainingTime === "string" ? payload.trainingTime : null,
         );
       const resolvedUniformTime = getUniformTrainingTime(resolvedTrainingDates, resolvedDateTimes);
+      const hasSecondReminder =
+        Number.isInteger(payload.secondReminderDay) &&
+        Number.isInteger(payload.secondReminderHour) &&
+        Number.isInteger(payload.secondReminderMinute);
       setSchedulerForm({
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
         reminderHour: String(payload.reminderHour ?? 10),
         reminderMinute: String(payload.reminderMinute ?? 0),
+        secondReminderDay: hasSecondReminder ? String(payload.secondReminderDay) : "",
+        secondReminderHour: hasSecondReminder ? String(payload.secondReminderHour) : "10",
+        secondReminderMinute: hasSecondReminder ? String(payload.secondReminderMinute) : "0",
         overdueHour: String(payload.overdueHour ?? 10),
         overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: resolvedTrainingDates,
         trainingTime: resolvedUniformTime,
       });
+      setSecondReminderEnabled(hasSecondReminder);
       setTrainingDaysInitialDates(resolvedTrainingDates);
       setTrainingDateTimes(resolvedDateTimes);
       setTrainingDaysInitialDateTimes(resolvedDateTimes);
@@ -3219,6 +3269,9 @@ function AdminMembersPageContent() {
         overdueDay: Number.parseInt(schedulerForm.overdueDay, 10),
         reminderHour: Number.parseInt(schedulerForm.reminderHour, 10),
         reminderMinute: Number.parseInt(schedulerForm.reminderMinute, 10),
+        secondReminderDay: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderDay, 10) : null,
+        secondReminderHour: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderHour, 10) : null,
+        secondReminderMinute: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderMinute, 10) : null,
         overdueHour: Number.parseInt(schedulerForm.overdueHour, 10),
         overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
         trainingDates: schedulerForm.trainingDates,
@@ -3387,9 +3440,6 @@ function AdminMembersPageContent() {
     setSchedulerSettingsError("");
     try {
       const normalizedTrainingTime = schedulerForm.trainingTime.trim();
-      if (hasMissingTrainingTime) {
-        throw new Error("Въведете валиден час на тренировка (HH:mm).");
-      }
       const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/scheduler`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -3398,6 +3448,9 @@ function AdminMembersPageContent() {
           overdueDay: Number.parseInt(schedulerForm.overdueDay, 10),
           reminderHour: Number.parseInt(schedulerForm.reminderHour, 10),
           reminderMinute: Number.parseInt(schedulerForm.reminderMinute, 10),
+          secondReminderDay: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderDay, 10) : null,
+          secondReminderHour: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderHour, 10) : null,
+          secondReminderMinute: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderMinute, 10) : null,
           overdueHour: Number.parseInt(schedulerForm.overdueHour, 10),
           overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
           trainingDates: schedulerForm.trainingDates,
@@ -6101,7 +6154,10 @@ function AdminMembersPageContent() {
                 <p className="amp-empty amp-empty--modal">Зареждане...</p>
               ) : (
                 <div className="amp-edit-grid">
-                  <label className="amp-edit-field">
+                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title">
+                    <span className="amp-lbl">Месечно напомняне</span>
+                  </div>
+                  <label className="amp-edit-field amp-scheduler-primary-day">
                     <span className="amp-lbl">Ден месечно напомняне (1-28)</span>
                     <input
                       className="amp-edit-input"
@@ -6116,7 +6172,7 @@ function AdminMembersPageContent() {
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
-                  <label className="amp-edit-field">
+                  <label className="amp-edit-field amp-scheduler-overdue-day">
                     <span className="amp-lbl">Ден за начало на платежния месец</span>
                     <input
                       className="amp-edit-input"
@@ -6131,7 +6187,7 @@ function AdminMembersPageContent() {
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
-                  <label className="amp-edit-field">
+                  <label className="amp-edit-field amp-scheduler-primary-time">
                     <span className="amp-lbl">Час за месечно напомняне</span>
                     <input
                       className="amp-edit-input"
@@ -6149,7 +6205,73 @@ function AdminMembersPageContent() {
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
-                  <label className="amp-edit-field">
+                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--second">
+                    <span className="amp-lbl">Второ напомняне (по избор)</span>
+                  </div>
+                  {!secondReminderEnabled ? (
+                    <div className="amp-edit-field amp-edit-field--full amp-scheduler-second-toggle">
+                      <span className="amp-lbl">Второ месечно напомняне</span>
+                      <button
+                        className="amp-btn amp-btn--ghost amp-btn--compact"
+                        type="button"
+                        onClick={enableSecondReminder}
+                        disabled={schedulerSettingsSaving}
+                      >
+                        Добави второ напомняне
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="amp-edit-field amp-scheduler-second-day">
+                        <span className="amp-lbl">Ден второ месечно напомняне (1-28)</span>
+                        <input
+                          className="amp-edit-input"
+                          inputMode="numeric"
+                          value={schedulerForm.secondReminderDay}
+                          onChange={(e) =>
+                            setSchedulerForm((prev) => ({
+                              ...prev,
+                              secondReminderDay: e.target.value.replace(/\D/g, ""),
+                            }))
+                          }
+                          disabled={schedulerSettingsSaving}
+                        />
+                      </label>
+                      <label className="amp-edit-field amp-scheduler-second-time">
+                        <span className="amp-lbl">Час за второ месечно напомняне</span>
+                        <input
+                          className="amp-edit-input"
+                          type="time"
+                          step={60}
+                          value={secondReminderTimeValue}
+                          onChange={(e) => {
+                            const [hour = "0", minute = "0"] = e.target.value.split(":");
+                            setSchedulerForm((prev) => ({
+                              ...prev,
+                              secondReminderHour: hour.replace(/\D/g, ""),
+                              secondReminderMinute: minute.replace(/\D/g, ""),
+                            }));
+                          }}
+                          disabled={schedulerSettingsSaving}
+                        />
+                      </label>
+                      <div className="amp-edit-field amp-edit-field--full amp-scheduler-second-remove">
+                        <span className="amp-lbl">Опция</span>
+                        <button
+                          className="amp-btn amp-btn--ghost amp-btn--compact"
+                          type="button"
+                          onClick={disableSecondReminder}
+                          disabled={schedulerSettingsSaving}
+                        >
+                          Премахни второто напомняне
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--overdue">
+                    <span className="amp-lbl">Просрочие</span>
+                  </div>
+                  <label className="amp-edit-field amp-scheduler-overdue-time">
                     <span className="amp-lbl">Час за просрочие</span>
                     <input
                       className="amp-edit-input"
@@ -6164,18 +6286,6 @@ function AdminMembersPageContent() {
                           overdueMinute: minute.replace(/\D/g, ""),
                         }));
                       }}
-                      disabled={schedulerSettingsSaving}
-                    />
-                  </label>
-                  <label className="amp-edit-field">
-                    <span className="amp-lbl">Час на тренировка (HH:mm)</span>
-                    <input
-                      className="amp-edit-input"
-                      type="time"
-                      step={60}
-                      value={schedulerForm.trainingTime}
-                      onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
-                      required
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
@@ -6197,8 +6307,7 @@ function AdminMembersPageContent() {
                   onClick={() => void saveSchedulerSettings()}
                   disabled={
                     schedulerSettingsSaving ||
-                    schedulerSettingsLoading ||
-                    hasMissingTrainingTime
+                    schedulerSettingsLoading
                   }
                 >
                   {schedulerSettingsSaving ? "Запазване..." : "Запази"}

@@ -112,6 +112,9 @@ export async function GET(
       overdueDay: true,
       reminderHour: true,
       reminderMinute: true,
+      secondReminderDay: true,
+      secondReminderHour: true,
+      secondReminderMinute: true,
       overdueHour: true,
       overdueMinute: true,
       trainingDates: true,
@@ -205,6 +208,9 @@ export async function PUT(
   const overdueDay = Number.parseInt(String((body as { overdueDay?: unknown }).overdueDay ?? ""), 10);
   const reminderHour = Number.parseInt(String((body as { reminderHour?: unknown }).reminderHour ?? ""), 10);
   const reminderMinute = Number.parseInt(String((body as { reminderMinute?: unknown }).reminderMinute ?? ""), 10);
+  const secondReminderDayRaw = (body as { secondReminderDay?: unknown }).secondReminderDay;
+  const secondReminderHourRaw = (body as { secondReminderHour?: unknown }).secondReminderHour;
+  const secondReminderMinuteRaw = (body as { secondReminderMinute?: unknown }).secondReminderMinute;
   const overdueHour = Number.parseInt(String((body as { overdueHour?: unknown }).overdueHour ?? ""), 10);
   const overdueMinute = Number.parseInt(String((body as { overdueMinute?: unknown }).overdueMinute ?? ""), 10);
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
@@ -234,6 +240,30 @@ export async function PUT(
   }
   if (!Number.isInteger(reminderMinute) || reminderMinute < 0 || reminderMinute > 59) {
     return NextResponse.json({ error: "\u041c\u0438\u043d\u0443\u0442\u0438\u0442\u0435 \u0437\u0430 \u043c\u0435\u0441\u0435\u0447\u043d\u043e \u043d\u0430\u043f\u043e\u043c\u043d\u044f\u043d\u0435 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0441\u0430 \u043c\u0435\u0436\u0434\u0443 0 \u0438 59." }, { status: 400 });
+  }
+  const hasSecondReminder =
+    (secondReminderDayRaw !== undefined && secondReminderDayRaw !== null && String(secondReminderDayRaw).trim() !== "") ||
+    (secondReminderHourRaw !== undefined && secondReminderHourRaw !== null && String(secondReminderHourRaw).trim() !== "") ||
+    (secondReminderMinuteRaw !== undefined && secondReminderMinuteRaw !== null && String(secondReminderMinuteRaw).trim() !== "");
+  let secondReminderDay: number | null = null;
+  let secondReminderHour: number | null = null;
+  let secondReminderMinute: number | null = null;
+  if (hasSecondReminder) {
+    secondReminderDay = Number.parseInt(String(secondReminderDayRaw ?? ""), 10);
+    secondReminderHour = Number.parseInt(String(secondReminderHourRaw ?? ""), 10);
+    secondReminderMinute = Number.parseInt(String(secondReminderMinuteRaw ?? ""), 10);
+    if (!Number.isInteger(secondReminderDay) || secondReminderDay < 1 || secondReminderDay > 28) {
+      return NextResponse.json({ error: "\u0412\u0442\u043e\u0440\u0438\u044f\u0442 \u0434\u0435\u043d \u0437\u0430 \u043c\u0435\u0441\u0435\u0447\u043d\u043e \u043d\u0430\u043f\u043e\u043c\u043d\u044f\u043d\u0435 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0435 \u043c\u0435\u0436\u0434\u0443 1 \u0438 28." }, { status: 400 });
+    }
+    if (secondReminderDay === reminderDay) {
+      return NextResponse.json({ error: "\u0412\u0442\u043e\u0440\u0438\u044f\u0442 \u0434\u0435\u043d \u0437\u0430 \u043d\u0430\u043f\u043e\u043c\u043d\u044f\u043d\u0435 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0435 \u0440\u0430\u0437\u043b\u0438\u0447\u0435\u043d \u043e\u0442 \u043f\u044a\u0440\u0432\u0438\u044f." }, { status: 400 });
+    }
+    if (!Number.isInteger(secondReminderHour) || secondReminderHour < 0 || secondReminderHour > 23) {
+      return NextResponse.json({ error: "\u0412\u0442\u043e\u0440\u0438\u044f\u0442 \u0447\u0430\u0441 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0435 \u043c\u0435\u0436\u0434\u0443 0 \u0438 23." }, { status: 400 });
+    }
+    if (!Number.isInteger(secondReminderMinute) || secondReminderMinute < 0 || secondReminderMinute > 59) {
+      return NextResponse.json({ error: "\u0412\u0442\u043e\u0440\u0438\u0442\u0435 \u043c\u0438\u043d\u0443\u0442\u0438 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0441\u0430 \u043c\u0435\u0436\u0434\u0443 0 \u0438 59." }, { status: 400 });
+    }
   }
   if (!Number.isInteger(overdueHour) || overdueHour < 0 || overdueHour > 23) {
     return NextResponse.json({ error: "\u0427\u0430\u0441\u044a\u0442 \u0437\u0430 \u043f\u0440\u043e\u0441\u0440\u043e\u0447\u0438\u0435 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0435 \u043c\u0435\u0436\u0434\u0443 0 \u0438 23." }, { status: 400 });
@@ -325,6 +355,9 @@ export async function PUT(
       overdueDay,
       reminderHour,
       reminderMinute,
+      secondReminderDay,
+      secondReminderHour,
+      secondReminderMinute,
       overdueHour,
       overdueMinute,
       reminderTz: FIXED_TIME_ZONE,
@@ -345,6 +378,9 @@ export async function PUT(
       overdueDay: true,
       reminderHour: true,
       reminderMinute: true,
+      secondReminderDay: true,
+      secondReminderHour: true,
+      secondReminderMinute: true,
       overdueHour: true,
       overdueMinute: true,
       trainingDates: true,
