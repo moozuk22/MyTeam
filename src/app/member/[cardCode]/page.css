@@ -2003,11 +2003,21 @@
   font-size: 14px;
   font-weight: 700;
   color: #ffffff;
+  text-align: center;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: center;
 }
+
+@media (max-width: 400px) {
+  .sd-discount-label {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
 
 .sd-discount-badge {
   flex-shrink: 0;
