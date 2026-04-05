@@ -5600,7 +5600,7 @@ function AdminMembersPageContent() {
                   )}
                   {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "all" && (
                     <label className="amp-edit-field" style={{ marginTop: "8px" }}>
-                      <span className="amp-lbl">Р§Р°СЃ РЅР° С‚СЂРµРЅРёСЂРѕРІРєР° (HH:mm)</span>
+                      <span className="amp-lbl">Час на тренировка (HH:mm)</span>
                       <input
                         className="amp-edit-input"
                         type="time"
