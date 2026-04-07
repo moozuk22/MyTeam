@@ -1513,7 +1513,9 @@ export default function MemberCardPage({
                   type="button"
                   aria-label="Absolute Teamsport отстъпка"
                 >
-                  <img src="/sd-logo.png" alt="Absolute Teamsport" className="sd-discount-logo" />
+                  <div className="sd-discount-logo-wrap">
+                    <img src="/sd-logo.png" alt="Sport Depot" className="sd-discount-logo" />
+                  </div>
                   <span className="sd-discount-label">Sport Depot</span>
                   <span className="sd-discount-badge">-10%</span>
                 </button>
@@ -1525,7 +1527,9 @@ export default function MemberCardPage({
                   type="button"
                   aria-label="Innline Dragon Body отстъпка"
                 >
-                  <img src="/idb-logo.svg" alt="Innline Dragon Body" className="sd-discount-logo" />
+                  <div className="sd-discount-logo-wrap">
+                    <img src="/idb-logo.svg" alt="Innline Dragon Body" className="sd-discount-logo idb-logo-fix" />
+                  </div>
                   <span className="sd-discount-label">Innline Dragon Body</span>
                   <span className="sd-discount-badge">-10%</span>
                 </button>
@@ -1537,7 +1541,9 @@ export default function MemberCardPage({
                   type="button"
                   aria-label="Mebeli Niko отстъпка"
                 >
-                  <img src="/niko-logo.png" alt="Mebeli Niko" className="sd-discount-logo" />
+                  <div className="sd-discount-logo-wrap">
+                    <img src="/niko-logo.png" alt="Mebeli Niko" className="sd-discount-logo niko-logo-fix" />
+                  </div>
                   <span className="sd-discount-label">Мебели Нико</span>
                   <span className="sd-discount-badge">-10%</span>
                 </button>
