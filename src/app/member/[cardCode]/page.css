@@ -1981,6 +1981,26 @@
   50%       { box-shadow: 0 0 30px rgba(224, 53, 53, 0.45), inset 0 1px 0 rgba(255, 100, 100, 0.1); }
 }
 
+@keyframes idb-btn-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(234, 177, 38, 0.1), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
+  50%       { box-shadow: 0 0 32px rgba(234, 177, 38, 0.35), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
+}
+
+@keyframes niko-btn-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(0, 84, 166, 0.12), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
+  50%       { box-shadow: 0 0 32px rgba(0, 84, 166, 0.4), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
+}
+
+@keyframes idb-btn-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(234, 177, 38, 0.1), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
+  50%       { box-shadow: 0 0 32px rgba(234, 177, 38, 0.35), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
+}
+
+@keyframes niko-btn-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(0, 84, 166, 0.12), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
+  50%       { box-shadow: 0 0 32px rgba(0, 84, 166, 0.4), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
+}
+
 .sd-discount-btn:hover {
   background: linear-gradient(135deg, rgba(224, 53, 53, 0.28), rgba(30, 0, 0, 0.3));
   border-color: rgba(244, 67, 54, 0.8);
@@ -2369,6 +2389,15 @@
   transition: all 0.2s ease;
   text-align: left;
   box-shadow: 0 0 16px rgba(234, 177, 38, 0.1), inset 0 1px 0 rgba(234, 177, 38, 0.15);
+  animation: idb-btn-pulse 3.2s ease-in-out infinite;
+}
+
+.idb-discount-btn:hover {
+  background: linear-gradient(135deg, rgba(234, 177, 38, 0.28), rgba(0, 0, 0, 0.5));
+  border-color: rgba(234, 177, 38, 0.8);
+  box-shadow: 0 0 32px rgba(234, 177, 38, 0.42);
+  transform: scale(1.02);
+  animation: none;
 }
 
 .idb-discount-btn .sd-discount-logo {
@@ -2378,12 +2407,6 @@
   margin-right: 6px;
 }
 
-.idb-discount-btn:hover {
-  background: linear-gradient(135deg, rgba(234, 177, 38, 0.28), rgba(0, 0, 0, 0.5));
-  border-color: rgba(234, 177, 38, 0.8);
-  box-shadow: 0 0 24px rgba(234, 177, 38, 0.2);
-  transform: translateY(-2px);
-}
 
 .idb-discount-badge {
   flex-shrink: 0;
@@ -2461,13 +2484,15 @@
   transition: all 0.2s ease;
   text-align: left;
   box-shadow: 0 0 16px rgba(0, 84, 166, 0.1), inset 0 1px 0 rgba(100, 180, 255, 0.1);
+  animation: niko-btn-pulse 3.4s ease-in-out infinite;
 }
 
 .niko-discount-btn:hover {
   background: linear-gradient(135deg, rgba(0, 84, 166, 0.28), rgba(0, 30, 60, 0.3));
   border-color: rgba(0, 120, 215, 0.8);
-  box-shadow: 0 0 24px rgba(0, 84, 166, 0.3);
-  transform: translateY(-2px);
+  box-shadow: 0 0 32px rgba(0, 84, 166, 0.45);
+  transform: scale(1.02);
+  animation: none;
 }
 
 .niko-discount-badge {

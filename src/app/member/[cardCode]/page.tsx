@@ -1909,7 +1909,7 @@ export default function MemberCardPage({
               <p className="sd-validity">Валиден: 2026</p>
 
               <div className="sd-qr-wrap">
-                <p className="sd-qr-hint">Посетете ни онлайн на{" "}<a href="https://innlinedragonbody.com" target="_blank" rel="noopener noreferrer" className="sd-store-link" style={{ color: "#eab126" }}>innlinedragonbody.com</a></p>
+                <p className="sd-qr-hint">Посетете ги онлайн на{" "}<a href="https://innlinedragonbody.com" target="_blank" rel="noopener noreferrer" className="sd-store-link" style={{ color: "#eab126" }}>innlinedragonbody.com</a></p>
               </div>
             </div>
           </div>
@@ -1960,7 +1960,7 @@ export default function MemberCardPage({
               <p className="sd-validity">Валиден: 2026</p>
 
               <div className="sd-qr-wrap">
-                <p className="sd-qr-hint">Разгледайте каталога ни на{" "}<a href="https://mebeliniko.bg" target="_blank" rel="noopener noreferrer" className="niko-store-link">mebeliniko.bg</a></p>
+                <p className="sd-qr-hint">Разгледайте каталога им на{" "}<a href="https://mebeliniko.bg" target="_blank" rel="noopener noreferrer" className="niko-store-link">mebeliniko.bg</a></p>
               </div>
             </div>
           </div>
