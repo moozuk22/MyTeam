@@ -1962,7 +1962,7 @@
 
 .rd-select {
   appearance: none;
-  padding: 8px 0;
+  padding: 8px 28px;
   height: 36px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1973,6 +1973,7 @@
   outline: none;
   transition: border-color 0.15s;
   text-align: center;
+  text-align-last: center;
 }
 
 .rd-select:focus {
@@ -2011,6 +2012,9 @@
 }
 
 .rd-seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 500;
@@ -2020,6 +2024,7 @@
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
   white-space: nowrap;
+  text-align: center;
 }
 
 .rd-seg-btn:hover {
