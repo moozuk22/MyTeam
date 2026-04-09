@@ -132,6 +132,18 @@ interface TrainingTodaySessionItem {
   };
 }
 
+interface AttendanceReportPlayer {
+  id: string;
+  fullName: string;
+  teamGroup: number | null;
+  attendance: Record<string, { present: boolean; reasonCode: string | null }>;
+}
+
+interface AttendanceReportData {
+  trainingDates: string[];
+  players: AttendanceReportPlayer[];
+}
+
 interface MemberNotification {
   id: string;
   type: string;
@@ -581,6 +593,377 @@ const DownloadIcon = () => (
     <path d="M5 21h14" />
   </svg>
 );
+
+const ClipboardListIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    <path d="M12 11h4" />
+    <path d="M12 16h4" />
+    <path d="M8 11h.01" />
+    <path d="M8 16h.01" />
+  </svg>
+);
+
+// Attendance Coach Dashboard Component
+function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId: string }) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const defaultFrom = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
+
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(todayIso);
+  const [scopeType, setScopeType] = useState<"teamGroup" | "trainingGroup">("teamGroup");
+  const [teamGroup, setTeamGroup] = useState("all");
+  const [trainingGroupId, setTrainingGroupId] = useState("");
+  const [data, setData] = useState<AttendanceReportData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [availableGroups, setAvailableGroups] = useState<number[]>([]);
+  const [scheduleGroups, setScheduleGroups] = useState<TrainingScheduleGroup[]>([]);
+
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const membersUrl = clubId
+          ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
+          : "/api/admin/members";
+        const groupsUrl = `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups`;
+
+        const [membersRes, groupsRes] = await Promise.all([
+          fetch(membersUrl, { cache: "no-store" }),
+          fetch(groupsUrl, { cache: "no-store" }),
+        ]);
+
+        if (membersRes.ok) {
+          const raw: unknown = await membersRes.json();
+          const items = Array.isArray(raw) ? raw : [];
+          const groups = Array.from(
+            new Set(
+              items
+                .map((item: unknown) => {
+                  const r =
+                    typeof item === "object" && item !== null
+                      ? (item as Record<string, unknown>)
+                      : {};
+                  return typeof r.teamGroup === "number" ? r.teamGroup : null;
+                })
+                .filter((g): g is number => g !== null),
+            ),
+          ).sort((a, b) => a - b);
+          setAvailableGroups(groups);
+        }
+
+        if (groupsRes.ok) {
+          const payload: unknown = await groupsRes.json();
+          const groups: TrainingScheduleGroup[] = Array.isArray(payload)
+            ? payload
+                .map((item) => {
+                  const raw =
+                    typeof item === "object" && item !== null
+                      ? (item as Record<string, unknown>)
+                      : {};
+                  const tg = Array.isArray(raw.teamGroups)
+                    ? raw.teamGroups
+                        .map((v) => Number.parseInt(String(v), 10))
+                        .filter((v) => Number.isInteger(v))
+                        .sort((a, b) => a - b)
+                    : [];
+                  const td = Array.isArray(raw.trainingDates)
+                    ? raw.trainingDates
+                        .map((v) => String(v ?? "").trim())
+                        .filter((v) => /^\d{4}-\d{2}-\d{2}$/.test(v))
+                    : [];
+                  return {
+                    id: String(raw.id ?? ""),
+                    name: String(raw.name ?? "").trim(),
+                    teamGroups: tg,
+                    trainingDates: td,
+                    trainingTime: typeof raw.trainingTime === "string" ? raw.trainingTime.trim() : null,
+                    trainingDateTimes: null,
+                  } satisfies TrainingScheduleGroup;
+                })
+                .filter((g) => g.id && g.teamGroups.length >= 2)
+            : [];
+          setScheduleGroups(groups);
+          if (groups.length > 0 && !trainingGroupId) {
+            setTrainingGroupId(groups[0]?.id ?? "");
+          }
+        }
+      } catch {
+        // silent
+      }
+    };
+    void fetchOptions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubId]);
+
+  useEffect(() => {
+    if (!from || !to || from > to) return;
+    if (scopeType === "trainingGroup" && !trainingGroupId) return;
+
+    const controller = new AbortController();
+
+    const doFetch = async () => {
+      setLoading(true);
+      setError("");
+      setData(null);
+      try {
+        const search = new URLSearchParams({ from, to });
+        if (scopeType === "trainingGroup") {
+          search.set("trainingGroupId", trainingGroupId);
+        } else if (teamGroup !== "all") {
+          search.set("teamGroup", teamGroup);
+        }
+        const res = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/report?${search.toString()}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (!res.ok) {
+          const payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+          throw new Error(
+            typeof payload?.error === "string" ? payload.error : "Грешка при зареждане.",
+          );
+        }
+        const payload = (await res.json()) as AttendanceReportData;
+        setData(payload);
+      } catch (e) {
+        if ((e as { name?: string }).name !== "AbortError") {
+          setError(e instanceof Error ? e.message : "Грешка при зареждане.");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const timer = setTimeout(() => { void doFetch(); }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from, to, scopeType, teamGroup, trainingGroupId, clubId]);
+
+  const formatDateHeader = (iso: string): string => {
+    const parts = iso.split("-");
+    const month = parts[1] ?? "01";
+    const day = parts[2] ?? "01";
+    const monthIdx = parseInt(month, 10) - 1;
+    const shortMonths = ["Ян", "Фев", "Мар", "Апр", "Май", "Юни", "Юли", "Авг", "Сеп", "Окт", "Ное", "Дек"];
+    return `${day}\n${shortMonths[monthIdx] ?? ""}`;
+  };
+
+  const emptyLabel =
+    scopeType === "trainingGroup" ? "Няма играчи в избраната група." : "Няма играчи в избрания набор.";
+
+  return (
+    <div className="rd-overlay" onClick={onClose}>
+      <div className="rd-dialog acd-dialog" onClick={(e) => e.stopPropagation()}>
+        <button className="rd-close" onClick={onClose} aria-label="Затвори">
+          <XIcon />
+        </button>
+
+        <div className="rd-header">
+          <h2 className="rd-title">
+            <ClipboardListIcon size={20} />
+            Присъствия на тренировки
+          </h2>
+        </div>
+
+        <div className="rd-filters">
+          <div className="rd-field">
+            <label className="rd-label">От</label>
+            <input
+              type="date"
+              className="rd-date-input"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+          <div className="rd-field">
+            <label className="rd-label">До</label>
+            <input
+              type="date"
+              className="rd-date-input"
+              value={to}
+              min={from}
+              max={todayIso}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+          <div className="rd-field">
+            <label className="rd-label">Вид</label>
+            <div className="rd-select-wrap">
+              <select
+                className="rd-select"
+                value={scopeType}
+                onChange={(e) => {
+                  setScopeType(e.target.value as "teamGroup" | "trainingGroup");
+                }}
+              >
+                <option value="teamGroup">Отбор</option>
+                {scheduleGroups.length > 0 && (
+                  <option value="trainingGroup">Сборен отбор</option>
+                )}
+              </select>
+              <ChevronDownIcon />
+            </div>
+          </div>
+          {scopeType === "teamGroup" ? (
+            <div className="rd-field">
+              <label className="rd-label">Отбор</label>
+              <div className="rd-select-wrap">
+                <select
+                  className="rd-select"
+                  value={teamGroup}
+                  onChange={(e) => setTeamGroup(e.target.value)}
+                >
+                  <option value="all">Всички</option>
+                  {availableGroups.map((g) => (
+                    <option key={g} value={String(g)}>
+                      Набор {g}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon />
+              </div>
+            </div>
+          ) : (
+            <div className="rd-field">
+              <label className="rd-label">Група</label>
+              <div className="rd-select-wrap">
+                <select
+                  className="rd-select"
+                  value={trainingGroupId}
+                  onChange={(e) => setTrainingGroupId(e.target.value)}
+                >
+                  {scheduleGroups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon />
+              </div>
+            </div>
+          )}
+          {loading && (
+            <div className="acd-inline-spinner">
+              <SpinnerIcon size={16} />
+            </div>
+          )}
+        </div>
+
+        {error && <p className="acd-error">{error}</p>}
+
+        {data && (
+          <>
+            {data.trainingDates.length === 0 ? (
+              <p className="acd-empty">Няма тренировки в избрания период.</p>
+            ) : data.players.length === 0 ? (
+              <p className="acd-empty">{emptyLabel}</p>
+            ) : (
+              <div className="acd-table-wrap">
+                <table className="acd-table">
+                  <thead>
+                    <tr>
+                      <th className="acd-th-name">Играч</th>
+                      {data.trainingDates.map((d) => (
+                        <th key={d} className="acd-th-date" title={d}>
+                          <span className="acd-date-label">{formatDateHeader(d)}</span>
+                        </th>
+                      ))}
+                      <th className="acd-th-pct">%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.players.map((player) => {
+                      const presentCount = data.trainingDates.filter(
+                        (d) => player.attendance[d]?.present ?? true,
+                      ).length;
+                      const pct =
+                        data.trainingDates.length > 0
+                          ? Math.round((presentCount / data.trainingDates.length) * 100)
+                          : 0;
+                      return (
+                        <tr key={player.id}>
+                          <td className="acd-td-name">{player.fullName}</td>
+                          {data.trainingDates.map((d) => {
+                            const cell = player.attendance[d];
+                            if (!cell) {
+                              return (
+                                <td key={d} className="acd-cell acd-cell--na">
+                                  –
+                                </td>
+                              );
+                            }
+                            return cell.present ? (
+                              <td key={d} className="acd-cell acd-cell--present" title="Присъства">
+                                ✓
+                              </td>
+                            ) : (
+                              <td
+                                key={d}
+                                className="acd-cell acd-cell--absent"
+                                title={
+                                  cell.reasonCode === "injury" ? "Контузия" :
+                                  cell.reasonCode === "sick" ? "Болен" :
+                                  cell.reasonCode === "other" ? "Друга причина" :
+                                  cell.reasonCode ? `Причина: ${cell.reasonCode}` : "Отказал се"
+                                }
+                              >
+                                {cell.reasonCode === "injury" ? "Конт" :
+                                 cell.reasonCode === "sick" ? "Болен" :
+                                 cell.reasonCode === "other" ? "Друго" :
+                                 cell.reasonCode ? cell.reasonCode.slice(0, 4) : "✗"}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className={`acd-td-pct ${pct >= 75 ? "acd-pct--good" : pct >= 50 ? "acd-pct--warn" : "acd-pct--low"}`}
+                          >
+                            {pct}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="acd-summary-row">
+                      <td className="acd-td-name acd-summary-label">Средно</td>
+                      {data.trainingDates.map((d) => {
+                        const presentOnDate = data.players.filter(
+                          (p) => p.attendance[d]?.present ?? true,
+                        ).length;
+                        const pct =
+                          data.players.length > 0
+                            ? Math.round((presentOnDate / data.players.length) * 100)
+                            : 0;
+                        return (
+                          <td
+                            key={d}
+                            className={`acd-cell ${pct >= 75 ? "acd-pct--good" : pct >= 50 ? "acd-pct--warn" : "acd-pct--low"}`}
+                          >
+                            {pct}%
+                          </td>
+                        );
+                      })}
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {!data && !loading && !error && (
+          <p className="acd-empty">Няма данни за избрания период.</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Reports Dialog Component
 function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: string }) {
@@ -1633,6 +2016,7 @@ function AdminMembersPageContent() {
   const [clubName, setClubName] = useState("Всички отбори");
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [attendanceDashboardOpen, setAttendanceDashboardOpen] = useState(false);
   const [editingClub, setEditingClub] = useState<ClubOption | null>(null);
   const [clubEditForm, setClubEditForm] = useState({
     name: "",
@@ -4234,6 +4618,14 @@ function AdminMembersPageContent() {
                 <UsersIcon />
                 <span>График</span>
               </button>
+              <button
+                className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+                onClick={() => setAttendanceDashboardOpen(true)}
+                type="button"
+              >
+                <ClipboardListIcon />
+                <span>Присъствия</span>
+              </button>
               {isAdmin && (
                 <button
                   className="amp-download-links-btn amp-btn--compact"
@@ -4741,6 +5133,12 @@ function AdminMembersPageContent() {
         />
       )}
       {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} clubId={clubId} />}
+      {attendanceDashboardOpen && clubId && (
+        <AttendanceDashboard
+          onClose={() => setAttendanceDashboardOpen(false)}
+          clubId={clubId}
+        />
+      )}
       {trainingAttendanceOpen && (
         <div
           className="amp-overlay"

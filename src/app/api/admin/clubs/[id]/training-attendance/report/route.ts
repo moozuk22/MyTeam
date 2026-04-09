@@ -1,0 +1,254 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { verifyAdminToken } from "@/lib/adminAuth";
+import {
+  getWeekdayMondayFirst,
+  isIsoDate,
+  isoDateToUtcMidnight,
+  utcDateToIsoDate,
+} from "@/lib/training";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const FIXED_TIME_ZONE = "Europe/Sofia";
+const MAX_RANGE_DAYS = 180;
+
+function isTransientPrismaConnectionError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const maybeError = error as { code?: unknown };
+  const code = typeof maybeError.code === "string" ? maybeError.code : "";
+  return code === "P1001" || code === "P2024";
+}
+
+function parseOptionalTeamGroup(raw: unknown): number | null {
+  if (raw === null || raw === undefined || String(raw).trim() === "") {
+    return null;
+  }
+  const parsed = Number.parseInt(String(raw).trim(), 10);
+  if (!Number.isInteger(parsed)) {
+    throw new Error("Invalid teamGroup");
+  }
+  return parsed;
+}
+
+function parseOptionalTrainingGroupId(raw: unknown): string | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  const value = String(raw).trim();
+  return value ? value : null;
+}
+
+function getTrainingDatesInRange({
+  from,
+  to,
+  trainingDates,
+  trainingWeekdays,
+}: {
+  from: string;
+  to: string;
+  trainingDates: string[];
+  trainingWeekdays: number[];
+}): string[] {
+  const result: string[] = [];
+  const fromMs = isoDateToUtcMidnight(from).getTime();
+  const toMs = isoDateToUtcMidnight(to).getTime();
+  const MS_PER_DAY = 86_400_000;
+
+  if (trainingDates.length > 0) {
+    const rangeSet = new Set<string>();
+    for (let ms = fromMs; ms <= toMs; ms += MS_PER_DAY) {
+      rangeSet.add(utcDateToIsoDate(new Date(ms)));
+    }
+    for (const d of trainingDates) {
+      if (rangeSet.has(d)) result.push(d);
+    }
+    return result.sort();
+  }
+
+  const weekdaySet = new Set(trainingWeekdays);
+  for (let ms = fromMs; ms <= toMs; ms += MS_PER_DAY) {
+    const iso = utcDateToIsoDate(new Date(ms));
+    if (weekdaySet.has(getWeekdayMondayFirst(iso, FIXED_TIME_ZONE))) {
+      result.push(iso);
+    }
+  }
+  return result;
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const token = request.cookies.get("admin_session")?.value;
+  const session = token ? await verifyAdminToken(token) : null;
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const from = request.nextUrl.searchParams.get("from")?.trim() ?? "";
+  const to = request.nextUrl.searchParams.get("to")?.trim() ?? "";
+
+  if (!isIsoDate(from) || !isIsoDate(to)) {
+    return NextResponse.json({ error: "Invalid from or to date parameters" }, { status: 400 });
+  }
+
+  const fromMs = isoDateToUtcMidnight(from).getTime();
+  const toMs = isoDateToUtcMidnight(to).getTime();
+
+  if (fromMs > toMs) {
+    return NextResponse.json({ error: "'from' must not be after 'to'" }, { status: 400 });
+  }
+  if (toMs - fromMs > MAX_RANGE_DAYS * 86_400_000) {
+    return NextResponse.json({ error: `Date range cannot exceed ${MAX_RANGE_DAYS} days` }, { status: 400 });
+  }
+
+  let teamGroup: number | null = null;
+  let trainingGroupId: string | null = null;
+  try {
+    teamGroup = parseOptionalTeamGroup(request.nextUrl.searchParams.get("teamGroup"));
+    trainingGroupId = parseOptionalTrainingGroupId(request.nextUrl.searchParams.get("trainingGroupId"));
+  } catch {
+    return NextResponse.json({ error: "Invalid teamGroup or trainingGroupId query parameter" }, { status: 400 });
+  }
+  if (teamGroup !== null && trainingGroupId) {
+    return NextResponse.json({ error: "Use either teamGroup or trainingGroupId." }, { status: 400 });
+  }
+
+  try {
+    const club = await prisma.club.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        trainingDates: true,
+        trainingWeekdays: true,
+      },
+    });
+    if (!club) {
+      return NextResponse.json({ error: "Club not found" }, { status: 404 });
+    }
+
+    const trainingGroup = trainingGroupId
+      ? await prisma.clubTrainingScheduleGroup.findFirst({
+          where: { id: trainingGroupId, clubId: id },
+          select: {
+            id: true,
+            teamGroups: true,
+            trainingDates: true,
+            trainingWeekdays: true,
+          },
+        })
+      : null;
+    if (trainingGroupId && !trainingGroup) {
+      return NextResponse.json({ error: "Training group not found" }, { status: 404 });
+    }
+
+    const groupSchedule =
+      teamGroup === null
+        ? null
+        : await prisma.clubTrainingGroupSchedule.findUnique({
+            where: { clubId_teamGroup: { clubId: id, teamGroup } },
+            select: { trainingDates: true, trainingWeekdays: true },
+          });
+
+    const trainingGroupOverride =
+      !trainingGroup && teamGroup !== null
+        ? await prisma.clubTrainingScheduleGroup.findFirst({
+            where: {
+              clubId: id,
+              teamGroups: { has: teamGroup },
+              trainingDates: { isEmpty: false },
+            },
+            orderBy: { updatedAt: "desc" },
+            select: { trainingDates: true, trainingWeekdays: true },
+          })
+        : null;
+
+    const effectiveDates: string[] =
+      trainingGroup?.trainingDates ??
+      trainingGroupOverride?.trainingDates ??
+      groupSchedule?.trainingDates ??
+      club.trainingDates ??
+      [];
+    const effectiveWeekdays: number[] =
+      trainingGroup?.trainingWeekdays ??
+      trainingGroupOverride?.trainingWeekdays ??
+      groupSchedule?.trainingWeekdays ??
+      club.trainingWeekdays ??
+      [];
+
+    const trainingDates = getTrainingDatesInRange({
+      from,
+      to,
+      trainingDates: effectiveDates,
+      trainingWeekdays: effectiveWeekdays,
+    });
+
+    const players = await prisma.player.findMany({
+      where: {
+        clubId: id,
+        isActive: true,
+        ...(trainingGroup ? { teamGroup: { in: trainingGroup.teamGroups } } : {}),
+        ...(teamGroup !== null ? { teamGroup } : {}),
+      },
+      select: { id: true, fullName: true, teamGroup: true },
+      orderBy: { fullName: "asc" },
+    });
+
+    const fromDate = isoDateToUtcMidnight(from);
+    const toDate = isoDateToUtcMidnight(to);
+
+    const optOuts =
+      players.length > 0 && trainingDates.length > 0
+        ? await prisma.trainingOptOut.findMany({
+            where: {
+              playerId: { in: players.map((p) => p.id) },
+              trainingDate: { gte: fromDate, lte: toDate },
+            },
+            select: { playerId: true, trainingDate: true, reasonCode: true },
+          })
+        : [];
+
+    const optOutMap = new Map<string, Map<string, string | null>>();
+    for (const o of optOuts) {
+      const iso = utcDateToIsoDate(o.trainingDate);
+      if (!optOutMap.has(o.playerId)) optOutMap.set(o.playerId, new Map());
+      optOutMap.get(o.playerId)!.set(iso, o.reasonCode ?? null);
+    }
+
+    return NextResponse.json({
+      trainingDates,
+      players: players.map((p) => ({
+        id: p.id,
+        fullName: p.fullName,
+        teamGroup: p.teamGroup,
+        attendance: Object.fromEntries(
+          trainingDates.map((d) => {
+            const byDate = optOutMap.get(p.id);
+            const optedOut = byDate?.has(d) ?? false;
+            return [
+              d,
+              {
+                present: !optedOut,
+                reasonCode: optedOut ? (byDate?.get(d) ?? null) : null,
+              },
+            ];
+          }),
+        ),
+      })),
+    });
+  } catch (error) {
+    console.error("Training attendance report GET error:", error);
+    if (isTransientPrismaConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please retry in a few seconds." },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
