@@ -3098,6 +3098,12 @@ function AdminMembersPageContent() {
     : (groupOptions[0] ? String(groupOptions[0]) : "");
   const selectedTeamGroup = parseSelectedTeamGroup(resolvedTrainingGroupScope);
   const selectedTrainingGroup = trainingScheduleGroups.find((group) => group.id === selectedTrainingGroupId) ?? null;
+  const trainingGroupTeamGroupSet = new Set(trainingScheduleGroups.flatMap((g) => g.teamGroups));
+  const standaloneTeamGroups = groupOptions.filter((g) => !trainingGroupTeamGroupSet.has(g));
+  const unifiedGroupScopeValue =
+    trainingAttendanceView === "trainingGroups"
+      ? (selectedTrainingGroupId || "")
+      : `year:${resolvedTrainingGroupScope}`;
   const selectedTeamGroupLinkedTrainingGroups =
     selectedTeamGroup === null
       ? []
@@ -4200,23 +4206,40 @@ function AdminMembersPageContent() {
 
   const openTrainingAttendance = async () => {
     if (!clubId) return;
-    const scopeForOpen = resolvedTrainingGroupScope;
-    if (scopeForOpen !== trainingGroupScope) {
-      setTrainingGroupScope(scopeForOpen);
-    }
     setTrainingAttendanceOpen(true);
     setPostTeamGroupSavePromptOpen(false);
-    setTrainingAttendanceView("teamGroup");
-    setSelectedTrainingGroupId("");
+    setTrainingAttendanceView("trainingGroups");
     setTrainingDayDetailsOpen(false);
     setTrainingBulkNoteOpen(false);
     setTrainingDaysEditorOpen(false);
     setTrainingDaysEditorError("");
     setTrainingNoteTargetDates([]);
-    await Promise.all([
-      fetchTrainingAttendance(undefined, scopeForOpen),
-      loadTrainingScheduleGroups(),
-    ]);
+    const groups = await loadTrainingScheduleGroups();
+    const resolvedGroupId =
+      selectedTrainingGroupId && groups.some((g) => g.id === selectedTrainingGroupId)
+        ? selectedTrainingGroupId
+        : (groups[0]?.id ?? "");
+    setSelectedTrainingGroupId(resolvedGroupId);
+    if (resolvedGroupId) {
+      await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
+    } else {
+      // No training groups — fall back to first standalone team group
+      const firstStandalone = standaloneTeamGroups[0];
+      if (firstStandalone !== undefined) {
+        const yearStr = String(firstStandalone);
+        setTrainingAttendanceView("teamGroup");
+        setTrainingGroupScope(yearStr);
+        await fetchTrainingAttendance(undefined, yearStr, undefined, "teamGroup");
+      } else if (resolvedTrainingGroupScope) {
+        setTrainingAttendanceView("teamGroup");
+        await fetchTrainingAttendance(undefined, resolvedTrainingGroupScope, undefined, "teamGroup");
+      } else {
+        setTrainingAttendancePlayers([]);
+        setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
+        setTrainingUpcomingDates([]);
+        setTrainingAttendanceDate("");
+      }
+    }
   };
 
   const handleTrainingGroupScopeChange = async (nextScope: string) => {
@@ -4251,6 +4274,7 @@ function AdminMembersPageContent() {
     }
 
     if (nextView === "teamGroup") {
+      // Internally kept for standalone team group selections
       await fetchTrainingAttendance(undefined, resolvedTrainingGroupScope, undefined, "teamGroup");
       return;
     }
@@ -4283,6 +4307,29 @@ function AdminMembersPageContent() {
     setTrainingAttendanceError("");
     setTrainingNoteTargetDates([]);
     await fetchTrainingAttendance(undefined, undefined, nextGroupId, "trainingGroups");
+  };
+
+  const handleUnifiedGroupChange = async (value: string) => {
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingAttendanceError("");
+    setTrainingNoteTargetDates([]);
+    if (value.startsWith("year:")) {
+      const yearStr = value.slice(5);
+      setTrainingAttendanceView("teamGroup");
+      setTrainingGroupScope(yearStr);
+      if (trainingAttendanceOpen) {
+        await fetchTrainingAttendance(undefined, yearStr, undefined, "teamGroup");
+      }
+    } else {
+      setTrainingAttendanceView("trainingGroups");
+      setSelectedTrainingGroupId(value);
+      if (trainingAttendanceOpen && value) {
+        await fetchTrainingAttendance(undefined, undefined, value, "trainingGroups");
+      }
+    }
   };
 
   const openTrainingDaysEditorForCurrentScope = async () => {
@@ -5228,15 +5275,7 @@ function AdminMembersPageContent() {
               <div className="amp-training-view-switch">
                 <button
                   type="button"
-                  className={`amp-btn amp-btn--ghost amp-training-view-btn${trainingAttendanceView === "teamGroup" ? " is-active" : ""}`}
-                  onClick={() => void handleTrainingAttendanceViewChange("teamGroup")}
-                  disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving}
-                >
-                  Отбор
-                </button>
-                <button
-                  type="button"
-                  className={`amp-btn amp-btn--ghost amp-training-view-btn${trainingAttendanceView === "trainingGroups" ? " is-active" : ""}`}
+                  className={`amp-btn amp-btn--ghost amp-training-view-btn${trainingAttendanceView !== "today" ? " is-active" : ""}`}
                   onClick={() => void handleTrainingAttendanceViewChange("trainingGroups")}
                   disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving}
                 >
@@ -5286,63 +5325,50 @@ function AdminMembersPageContent() {
                 </div>
               ) : (
                 <>
-                  {trainingAttendanceView === "teamGroup" ? (
-                    <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
-                      <span className="amp-lbl">Набор</span>
-                      <select
-                        className="amp-edit-input"
-                        value={resolvedTrainingGroupScope}
-                        onChange={(e) => void handleTrainingGroupScopeChange(e.target.value)}
-                        disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving}
+                  <div style={{ marginBottom: "12px" }}>
+                    <div style={{ marginBottom: "10px" }}>
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--primary"
+                        onClick={openTrainingGroupCreateModal}
+                        disabled={trainingNoteSaving || trainingGroupCreateSaving}
                       >
-                        <option value="all">Всички набори</option>
-                        {groupOptions.map((group) => (
-                          <option key={`training-scope-${group}`} value={String(group)}>
-                            Набор {group}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : (
-                    <div style={{ marginBottom: "12px" }}>
-                      <span className="amp-lbl">Сборни отбори</span>
-                      <div style={{ marginTop: "8px", marginBottom: "10px" }}>
-                        <button
-                          type="button"
-                          className="amp-btn amp-btn--primary"
-                          onClick={openTrainingGroupCreateModal}
-                          disabled={trainingNoteSaving || trainingGroupCreateSaving}
-                        >
-                          {trainingGroupCreateSaving ? "Запазване..." : "Създай сборен отбор"}
-                        </button>
-                      </div>
-                      {trainingScheduleGroupsLoading ? (
-                        <p className="amp-empty amp-empty--modal">Зареждане...</p>
-                      ) : trainingScheduleGroups.length === 0 ? (
-                        <p className="amp-empty amp-empty--modal">Няма създадени сборни отбори</p>
-                      ) : (
-                        <>
-                          <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
-                            <span className="amp-lbl">Сборен отбор</span>
-                            <select
-                              className="amp-edit-input"
-                              value={selectedTrainingGroupId}
-                              onChange={(e) => void handleSelectedTrainingGroupChange(e.target.value)}
-                              disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving || trainingScheduleGroupsLoading}
-                            >
-                              {trainingScheduleGroups.map((group) => (
-                                <option key={`training-group-option-${group.id}`} value={group.id}>
-                                  {group.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
+                        {trainingGroupCreateSaving ? "Запазване..." : "Създай сборен отбор"}
+                      </button>
+                    </div>
+                    {trainingScheduleGroupsLoading ? (
+                      <p className="amp-empty amp-empty--modal">Зареждане...</p>
+                    ) : (trainingScheduleGroups.length === 0 && standaloneTeamGroups.length === 0) ? (
+                      <p className="amp-empty amp-empty--modal">Няма групи.</p>
+                    ) : (
+                      <>
+                        <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
+                          <span className="amp-lbl">Група</span>
+                          <select
+                            className="amp-edit-input"
+                            value={unifiedGroupScopeValue}
+                            onChange={(e) => void handleUnifiedGroupChange(e.target.value)}
+                            disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving || trainingScheduleGroupsLoading}
+                          >
+                            {trainingScheduleGroups.map((group) => (
+                              <option key={group.id} value={group.id}>
+                                {group.name}
+                              </option>
+                            ))}
+                            {standaloneTeamGroups.map((g) => (
+                              <option key={g} value={`year:${g}`}>
+                                Набор {g}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId && (
                           <div className="amp-training-group-actions">
                             <button
                               type="button"
                               className="amp-btn amp-btn--ghost"
                               onClick={() => openTrainingGroupEditModal(selectedTrainingGroupId)}
-                              disabled={!selectedTrainingGroupId || trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
+                              disabled={trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
                             >
                               {trainingGroupEditSaving ? "Отваряне..." : "Редактирай сборен отбор"}
                             </button>
@@ -5350,15 +5376,15 @@ function AdminMembersPageContent() {
                               type="button"
                               className="amp-btn amp-btn--danger"
                               onClick={() => setTrainingGroupDeleteConfirmOpen(true)}
-                              disabled={!selectedTrainingGroupId || trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
+                              disabled={trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
                             >
                               {trainingGroupDeleteSaving ? "Изтриване..." : "Изтрий сборен отбор"}
                             </button>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </>
+                    )}
+                  </div>
                   {trainingDayDetailsOpening && (
                     <div className="amp-modal-loading-overlay">
                       <div className="amp-loading" style={{ minHeight: 120 }}>
