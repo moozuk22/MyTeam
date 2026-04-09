@@ -2159,7 +2159,6 @@ function AdminMembersPageContent() {
   const [trainingGroupCreateSaving, setTrainingGroupCreateSaving] = useState(false);
   const [trainingGroupCreateError, setTrainingGroupCreateError] = useState("");
   const [trainingGroupCreateGroups, setTrainingGroupCreateGroups] = useState<string[]>([]);
-  const [trainingGroupCreateName, setTrainingGroupCreateName] = useState("");
   const [trainingGroupEditOpen, setTrainingGroupEditOpen] = useState(false);
   const [trainingGroupEditSaving, setTrainingGroupEditSaving] = useState(false);
   const [trainingGroupEditError, setTrainingGroupEditError] = useState("");
@@ -2242,6 +2241,19 @@ function AdminMembersPageContent() {
     effectiveTrainingNoteTargetDates.every(
       (date) => (trainingNotesByDate[`${trainingNoteScopeKey}|${date}`] ?? "").trim() === trainingNote.trim(),
     );
+
+  useEffect(() => {
+    if (!trainingGroupEditOpen) {
+      return;
+    }
+    const generatedName = trainingGroupEditGroups
+      .map((value) => Number.parseInt(value, 10))
+      .filter((value) => Number.isInteger(value))
+      .sort((a, b) => a - b)
+      .map((value) => String(value))
+      .join("/");
+    setTrainingGroupEditName(generatedName);
+  }, [trainingGroupEditGroups, trainingGroupEditOpen]);
 
   useEffect(() => {
     if (!clubId) return;
@@ -3442,7 +3454,6 @@ function AdminMembersPageContent() {
 
   const openTrainingGroupCreateModal = () => {
     setTrainingGroupCreateError("");
-    setTrainingGroupCreateName("");
     setTrainingGroupCreateGroups([]);
     setTrainingGroupCreateOpen(true);
   };
@@ -3453,10 +3464,11 @@ function AdminMembersPageContent() {
       setTrainingAttendanceError("Сборният отбор не е намерен.");
       return;
     }
+    const initialGroups = group.teamGroups.map((value) => String(value));
     setTrainingGroupEditError("");
     setTrainingGroupEditId(group.id);
-    setTrainingGroupEditName(group.name);
-    setTrainingGroupEditGroups(group.teamGroups.map((value) => String(value)));
+    setTrainingGroupEditGroups(initialGroups);
+    setTrainingGroupEditName(initialGroups.slice().sort((a, b) => Number(a) - Number(b)).join("/"));
     setTrainingGroupEditOpen(true);
   };
 
@@ -3477,7 +3489,7 @@ function AdminMembersPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: trainingGroupCreateName.trim() || defaultName,
+          name: defaultName,
           teamGroups: selectedGroups,
         }),
       });
@@ -3507,13 +3519,19 @@ function AdminMembersPageContent() {
         throw new Error("Изберете поне 2 набора.");
       }
 
+      const generatedName = selectedGroups
+        .slice()
+        .sort((a, b) => a - b)
+        .map((value) => String(value))
+        .join("/");
+
       const response = await fetch(
         `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups/${encodeURIComponent(trainingGroupEditId)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: trainingGroupEditName.trim(),
+            name: generatedName,
             teamGroups: selectedGroups,
           }),
         },
@@ -5750,8 +5768,8 @@ function AdminMembersPageContent() {
                 <input
                   className="amp-edit-input"
                   value={trainingGroupEditName}
-                  onChange={(e) => setTrainingGroupEditName(e.target.value)}
                   placeholder={trainingGroupEditGroups.length > 0 ? trainingGroupEditGroups.join("/") : "2012/2013"}
+                  readOnly
                   disabled={trainingGroupEditSaving}
                 />
               </label>
@@ -5845,17 +5863,7 @@ function AdminMembersPageContent() {
               </button>
             </h2>
             <div className="amp-modal-body">
-              <label className="amp-edit-field">
-                <span className="amp-lbl">Име на група (по избор)</span>
-                <input
-                  className="amp-edit-input"
-                  value={trainingGroupCreateName}
-                  onChange={(e) => setTrainingGroupCreateName(e.target.value)}
-                  placeholder={trainingGroupCreateGroups.length > 0 ? trainingGroupCreateGroups.join("/") : "2012/2013"}
-                  disabled={trainingGroupCreateSaving}
-                />
-              </label>
-              <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
+              <div className="amp-training-days-editor-header amp-training-days-editor-header--stack">
                 <span className="amp-lbl">Набори за групата (минимум 2):</span>
                 <div className="amp-group-check-grid">
                   {groupOptions.map((group) => {
@@ -5889,7 +5897,7 @@ function AdminMembersPageContent() {
                 <span className="amp-lbl amp-group-check-hint">
                   {trainingGroupCreateGroups.length === 0
                     ? "Изберете поне 2 набора."
-                    : `Избрани набори: ${trainingGroupCreateGroups.join(", ")}`}
+                    : `Избрани набори: ${trainingGroupCreateGroups.join(", ")} — Името ще бъде: ${trainingGroupCreateGroups.join("/")}`}
                 </span>
               </div>
               {trainingGroupCreateError && <p className="amp-confirm-error">{trainingGroupCreateError}</p>}
