@@ -42,6 +42,14 @@ function parseOptionalTrainingGroupId(raw: unknown): string | null {
   return value ? value : null;
 }
 
+function parseOptionalPlayerId(raw: unknown): string | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  const value = String(raw).trim();
+  return value ? value : null;
+}
+
 function getTrainingDatesInRange({
   from,
   to,
@@ -109,14 +117,19 @@ export async function GET(
 
   let teamGroup: number | null = null;
   let trainingGroupId: string | null = null;
+  let playerId: string | null = null;
   try {
     teamGroup = parseOptionalTeamGroup(request.nextUrl.searchParams.get("teamGroup"));
     trainingGroupId = parseOptionalTrainingGroupId(request.nextUrl.searchParams.get("trainingGroupId"));
+    playerId = parseOptionalPlayerId(request.nextUrl.searchParams.get("playerId"));
   } catch {
-    return NextResponse.json({ error: "Invalid teamGroup or trainingGroupId query parameter" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid query parameter" }, { status: 400 });
   }
   if (teamGroup !== null && trainingGroupId) {
     return NextResponse.json({ error: "Use either teamGroup or trainingGroupId." }, { status: 400 });
+  }
+  if (playerId && (teamGroup !== null || trainingGroupId)) {
+    return NextResponse.json({ error: "Use either playerId or teamGroup/trainingGroupId." }, { status: 400 });
   }
 
   try {
@@ -130,6 +143,19 @@ export async function GET(
     });
     if (!club) {
       return NextResponse.json({ error: "Club not found" }, { status: 404 });
+    }
+
+    // If playerId is given, resolve player and use their teamGroup for schedule lookup
+    let targetPlayer: { id: string; fullName: string; teamGroup: number | null } | null = null;
+    if (playerId) {
+      targetPlayer = await prisma.player.findFirst({
+        where: { id: playerId, clubId: id, isActive: true },
+        select: { id: true, fullName: true, teamGroup: true },
+      });
+      if (!targetPlayer) {
+        return NextResponse.json({ error: "Player not found" }, { status: 404 });
+      }
+      teamGroup = targetPlayer.teamGroup;
     }
 
     const trainingGroup = trainingGroupId
@@ -188,16 +214,18 @@ export async function GET(
       trainingWeekdays: effectiveWeekdays,
     });
 
-    const players = await prisma.player.findMany({
-      where: {
-        clubId: id,
-        isActive: true,
-        ...(trainingGroup ? { teamGroup: { in: trainingGroup.teamGroups } } : {}),
-        ...(teamGroup !== null ? { teamGroup } : {}),
-      },
-      select: { id: true, fullName: true, teamGroup: true },
-      orderBy: { fullName: "asc" },
-    });
+    const players = targetPlayer
+      ? [targetPlayer]
+      : await prisma.player.findMany({
+          where: {
+            clubId: id,
+            isActive: true,
+            ...(trainingGroup ? { teamGroup: { in: trainingGroup.teamGroups } } : {}),
+            ...(teamGroup !== null ? { teamGroup } : {}),
+          },
+          select: { id: true, fullName: true, teamGroup: true },
+          orderBy: { fullName: "asc" },
+        });
 
     const fromDate = isoDateToUtcMidnight(from);
     const toDate = isoDateToUtcMidnight(to);
