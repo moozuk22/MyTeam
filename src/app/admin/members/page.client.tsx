@@ -5297,7 +5297,7 @@ function AdminMembersPageContent() {
                   onClick={() => void handleTrainingAttendanceViewChange("trainingGroups")}
                   disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving}
                 >
-                  Сборни отбори
+                  Отбори
                 </button>
                 <button
                   type="button"
