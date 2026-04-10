@@ -1041,7 +1041,11 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
           <div className="rd-footer" style={{ marginTop: "4px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
             <button
               className="rd-footer-btn"
-              onClick={() => window.print()}
+              onClick={() => {
+                setTimeout(() => {
+                  window.print();
+                }, 150);
+              }}
             >
               <PrinterIcon /> Отпечатай
             </button>
