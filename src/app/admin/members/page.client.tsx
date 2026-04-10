@@ -787,6 +787,118 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
     ).slice(0, 10)
     : [];
 
+  const printAttendance = () => {
+    if (!data || typeof window === "undefined" || typeof document === "undefined") return;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
+    if (!doc || !win) {
+      document.body.removeChild(iframe);
+      return;
+    }
+
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const tHeadHtml = `
+      <tr>
+        <th style="padding: 6px; text-align: left; border-bottom: 2px solid #ccc; white-space: nowrap;">Име</th>
+        ${data.trainingDates.map(d => `<th style="padding: 6px; border-bottom: 2px solid #ccc; text-align: center;">${d.split('-')[2]}.${d.split('-')[1]}</th>`).join('')}
+        <th style="padding: 6px; border-bottom: 2px solid #ccc; text-align: center;">%</th>
+      </tr>
+    `;
+
+    const tbodyHtml = data.players.map((player) => {
+      const presentCount = data.trainingDates.filter(d => player.attendance[d]?.present ?? true).length;
+      const pct = data.trainingDates.length > 0 ? Math.round((presentCount / data.trainingDates.length) * 100) : 0;
+      
+      const cellsHtml = data.trainingDates.map((d) => {
+        const cell = player.attendance[d];
+        if (!cell) return `<td style="padding: 4px; text-align: center; color: #999;">–</td>`;
+        return cell.present 
+          ? `<td style="padding: 4px; text-align: center; color: #16a34a; font-weight: bold;">&#x2713;</td>`
+          : `<td style="padding: 4px; text-align: center; color: #dc2626;">&#x2717;</td>`;
+      }).join('');
+
+      return `
+        <tr>
+          <td style="padding: 4px; border-bottom: 1px solid #eee; white-space: nowrap;">${escapeHtml(player.fullName)}</td>
+          ${cellsHtml}
+          <td style="padding: 4px; border-bottom: 1px solid #eee; text-align: center; font-weight: bold;">${pct}%</td>
+        </tr>
+      `;
+    }).join("");
+
+    let tfootHtml = "";
+    if (scopeType === "group") {
+      const footerCellsHtml = data.trainingDates.map((d) => {
+        const presentOnDate = data.players.filter(p => p.attendance[d]?.present ?? true).length;
+        const pct = data.players.length > 0 ? Math.round((presentOnDate / data.players.length) * 100) : 0;
+        return `<td style="padding: 6px; text-align: center; font-weight: bold;">${pct}%</td>`;
+      }).join("");
+
+      tfootHtml = `
+        <tr style="background: #f9fafb;">
+          <td style="padding: 6px; text-align: right; font-weight: bold;">Средно</td>
+          ${footerCellsHtml}
+          <td style="padding: 6px;"></td>
+        </tr>
+      `;
+    }
+
+    doc.open();
+    doc.write(`<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Присъствия</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
+    .page { padding: 20px; }
+    h1 { margin: 0 0 16px; font-size: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    @page { size: landscape; margin: 10mm; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Отчет присъствия (${from} до ${to})</h1>
+    <table>
+      <thead>${tHeadHtml}</thead>
+      <tbody>${tbodyHtml}</tbody>
+      ${tfootHtml ? `<tfoot>${tfootHtml}</tfoot>` : ""}
+    </table>
+  </div>
+</body>
+</html>`);
+    doc.close();
+
+    window.setTimeout(() => {
+      win.focus();
+      win.print();
+      window.setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 1000);
+    }, 80);
+  };
+
   return (
     <div className="rd-overlay" onClick={onClose}>
       <div className="rd-dialog acd-dialog" onClick={(e) => e.stopPropagation()}>
@@ -1041,11 +1153,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
           <div className="rd-footer" style={{ marginTop: "4px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
             <button
               className="rd-footer-btn"
-              onClick={() => {
-                setTimeout(() => {
-                  window.print();
-                }, 150);
-              }}
+              onClick={printAttendance}
             >
               <PrinterIcon /> Отпечатай
             </button>
