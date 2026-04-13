@@ -443,6 +443,13 @@
   font-weight: 700;
 }
 
+.training-calendar-time {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.84);
+}
+
 .training-calendar-mark {
   font-size: 10px;
   font-weight: 700;
@@ -622,13 +629,13 @@
 
 .member-training-modal .training-calendar-cell {
   aspect-ratio: 1 / 1;
-  min-height: 22px;
-  padding: 0;
+  min-height: 30px;
+  padding: 2px 1px;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   flex-direction: column;
   gap: 1px;
 }
@@ -667,6 +674,10 @@
 .member-training-modal .training-calendar-day-number {
   font-size: 10px;
   font-weight: 700;
+}
+
+.member-training-modal .training-calendar-time {
+  font-size: 7px;
 }
 
 .member-training-modal .training-calendar-mark {
@@ -1929,12 +1940,16 @@
   }
 
   .member-training-modal .training-calendar-cell {
-    min-height: 20px;
+    min-height: 26px;
     border-radius: 5px;
   }
 
   .member-training-modal .training-calendar-day-number {
     font-size: 9px;
+  }
+
+  .member-training-modal .training-calendar-time {
+    font-size: 6px;
   }
 
   .member-training-modal .training-calendar-mark {
