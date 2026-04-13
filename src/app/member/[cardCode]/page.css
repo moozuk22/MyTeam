@@ -2559,3 +2559,99 @@
   text-decoration: underline;
   font-weight: 600;
 }
+
+/* ══════════════════════════════════════
+   DALIDA DANCE (Gold/Black)
+   ══════════════════════════════════════ */
+@keyframes dalida-btn-pulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(212, 175, 55, 0.1); }
+  50%       { box-shadow: 0 0 32px rgba(212, 175, 55, 0.4), inset 0 1px 0 rgba(212, 175, 55, 0.1); }
+}
+
+.dalida-discount-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  margin-top: 10px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(40, 20, 0, 0.3));
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 12px;
+  cursor: pointer;
+  animation: dalida-btn-pulse 3.5s ease-in-out infinite;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.dalida-discount-btn:hover {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(60, 30, 0, 0.4));
+  border-color: rgba(212, 175, 55, 0.8);
+  box-shadow: 0 0 32px rgba(212, 175, 55, 0.5);
+  transform: scale(1.02);
+  animation: none;
+}
+
+.dalida-discount-badge {
+  background: #d4af37;
+  color: #000;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 5px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.04em;
+}
+
+.dalida-modal {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: linear-gradient(160deg, #18140a, #302505);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 16px;
+  padding: 24px 20px 28px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 40px rgba(212, 175, 55, 0.08);
+}
+
+.dalida-modal::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 20px; right: 20px; height: 2px;
+  background: linear-gradient(90deg, transparent, #d4af37 50%, transparent);
+}
+
+.dalida-highlight {
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 12px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.dalida-highlight-value {
+  color: #d4af37;
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.dalida-code {
+  color: #d4af37;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  font-family: monospace;
+}
+
+.dalida-logo-fix {
+  transform: scale(0.95);
+}

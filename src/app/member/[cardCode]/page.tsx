@@ -257,6 +257,8 @@ export default function MemberCardPage({
   const [idbCodeCopied, setIdbCodeCopied] = useState(false);
   const [nikoModalOpen, setNikoModalOpen] = useState(false);
   const [nikoCodeCopied, setNikoCodeCopied] = useState(false);
+  const [dalidaModalOpen, setDalidaModalOpen] = useState(false);
+  const [dalidaCodeCopied, setDalidaCodeCopied] = useState(false);
   const [isIPhoneDevice, setIsIPhoneDevice] = useState(false);
   const [isStandaloneMode, setIsStandaloneMode] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -1512,8 +1514,23 @@ export default function MemberCardPage({
             <div className="divider divider--mt" />
 
             {/* ── Partner discount buttons — admin/coach preview only ── */}
-            {(!isAdmin && !isCoach) && (
+            {(isAdmin || isCoach) && (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "14px" }}>
+                {/* Dalida Dance */}
+                <button
+                  className="dalida-discount-btn"
+                  style={{ marginTop: 0 }}
+                  onClick={() => setDalidaModalOpen(true)}
+                  type="button"
+                  aria-label="Dalida Dance отстъпка"
+                >
+                  <div className="sd-discount-logo-wrap">
+                    <img src="/logo-dalida.png" alt="Dalida Dance" className="sd-discount-logo dalida-logo-fix" />
+                  </div>
+                  <span className="sd-discount-label">Dalida Dance</span>
+                  <span className="sd-discount-badge dalida-discount-badge">10-30%</span>
+                </button>
+
                 {/* Sport Depot */}
                 <button
                   className="sd-discount-btn"
@@ -1970,6 +1987,70 @@ export default function MemberCardPage({
 
               <div className="sd-qr-wrap">
                 <p className="sd-qr-hint">Разгледайте каталога им на{" "}<a href="https://mebeliniko.bg" target="_blank" rel="noopener noreferrer" className="niko-store-link">mebeliniko.bg</a></p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dalida Dance discount modal */}
+        {dalidaModalOpen && (
+          <div className="pm-overlay sd-overlay" onClick={() => setDalidaModalOpen(false)}>
+            <div className="dalida-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="pm-close sd-modal-close" onClick={() => setDalidaModalOpen(false)} aria-label="Затвори">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+
+              <div className="sd-modal-header" style={{ marginBottom: "16px" }}>
+                <img src="/logo-dalida.png" alt="Dalida Dance" className="sd-modal-logo" style={{ transform: "scale(1.2)" }} />
+                <div className="sd-modal-title-wrap">
+                  <p className="sd-modal-eyebrow" style={{ color: "#d4af37" }}>Партньорска програма</p>
+                  <h2 className="sd-modal-title">Dalida Dance</h2>
+                </div>
+              </div>
+
+              <div className="sd-modal-divider" style={{ background: "linear-gradient(to right, transparent, #d4af37, transparent)", opacity: 0.3 }} />
+
+              <div className="sd-highlights">
+                <div className="dalida-highlight" style={{ width: '100%', padding: '24px 16px' }}>
+                  <span className="dalida-highlight-value" style={{ fontSize: '32px' }}>10% – 30%</span>
+                  <span className="sd-highlight-label" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
+                    отстъпка за шоу програми и събития
+                  </span>
+                </div>
+              </div>
+
+              <button
+                className={`sd-code-row${dalidaCodeCopied ? " sd-code-row--copied" : ""}`}
+                style={dalidaCodeCopied ? { borderColor: "#d4af37", background: "rgba(212, 175, 55, 0.12)" } : {}}
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText("DALIDA_MYTEAM").then(() => {
+                    setDalidaCodeCopied(true);
+                    setTimeout(() => setDalidaCodeCopied(false), 2000);
+                  });
+                }}
+              >
+                <span className="sd-code-lbl" style={dalidaCodeCopied ? { color: "#d4af37" } : {}}>{dalidaCodeCopied ? "Копирано!" : "Код:"}</span>
+                <span className="dalida-code" style={{ color: "#d4af37" }}>{dalidaCodeCopied ? "✓" : "DALIDA_MYTEAM"}</span>
+                {!dalidaCodeCopied && (
+                  <svg className="sd-copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                )}
+              </button>
+              <p className="sd-validity">Валиден: 2026</p>
+
+              <div className="sd-qr-wrap">
+                <p className="sd-qr-hint">Посетете ги онлайн на{" "}<a href="https://dalidadance.com" target="_blank" rel="noopener noreferrer" className="sd-store-link" style={{ color: "#d4af37" }}>dalidadance.com</a></p>
+              </div>
+
+              <div className="sd-modal-divider" style={{ background: "linear-gradient(to right, transparent, #d4af37, transparent)", opacity: 0.3 }} />
+
+              <div className="sd-terms">
+                <p className="sd-terms-title">Условия</p>
+                <ul className="sd-terms-list">
+                  <li>Отстъпката важи за всички <strong>шоу програми</strong></li>
+                  <li>Необходима е предварителна резервация</li>
+                  <li>Важи при представяне на промоционалния код</li>
+                </ul>
               </div>
             </div>
           </div>
