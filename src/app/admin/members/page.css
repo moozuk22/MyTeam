@@ -1722,7 +1722,44 @@
   color-scheme: dark;
 }
 
-.amp-edit-input:focus {
+.amp-inner-time-input {
+  width: 160px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: inherit;
+  outline: none !important;
+  text-align: center;
+  color-scheme: dark;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.amp-inner-time-input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.amp-inner-time-input::-webkit-datetime-edit {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.amp-inner-time-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: brightness(0%) invert(100%) !important;
+  opacity: 0.9 !important;
+  transition: opacity 0.2s;
+}
+
+.amp-inner-time-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.amp-edit-input:focus,
+.amp-edit-input:focus-within {
   border-color: rgba(50, 205, 50, 0.5);
   box-shadow: 0 0 12px rgba(50, 205, 50, 0.18);
 }

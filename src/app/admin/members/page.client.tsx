@@ -16,6 +16,10 @@ const TRAINING_WEEKDAY_SHORT_BG = Array.from({ length: 7 }, (_, index) =>
     .format(new Date(Date.UTC(2024, 0, index + 1)))
     .replace(".", ""),
 );
+const TRAINING_WEEKDAY_LONG_BG = Array.from({ length: 7 }, (_, index) => {
+  const day = new Intl.DateTimeFormat("bg-BG", { weekday: "long" }).format(new Date(Date.UTC(2024, 0, index + 1)));
+  return day.charAt(0).toUpperCase() + day.slice(1);
+});
 
 type ReportKind = "monthly" | "yearly";
 
@@ -5540,10 +5544,11 @@ function AdminMembersPageContent() {
                       <p className="amp-empty amp-empty--modal">Няма групи.</p>
                     ) : (
                       <>
-                        <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
-                          <span className="amp-lbl">Група</span>
+                        <label className="amp-edit-field" style={{ marginBottom: "12px", textAlign: "center" }}>
+                          <span className="amp-lbl" style={{ textAlign: "center" }}>Група</span>
                           <select
                             className="amp-edit-input"
+                            style={{ textAlign: "center", textAlignLast: "center", paddingLeft: "28px" }}
                             value={unifiedGroupScopeValue}
                             onChange={(e) => void handleUnifiedGroupChange(e.target.value)}
                             disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving || trainingScheduleGroupsLoading}
@@ -6186,8 +6191,8 @@ function AdminMembersPageContent() {
               )}
               {trainingDaysEditorCreateOpen && (
                 <>
-                  <div className="amp-training-days-editor-header">
-                    <span className="amp-lbl">
+                  <div className="amp-training-days-editor-header" style={{ flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>
                       {trainingDaysEditorMode === "createGroup"
                         ? "Създай сборен отбор"
                         : trainingDaysEditorMode === "trainingGroup"
@@ -6195,21 +6200,24 @@ function AdminMembersPageContent() {
                           : "Избери тренировъчни дни (следващи 30 дни)"}
                     </span>
                     {trainingDaysEditorMode !== "createGroup" && (
-                      <span className="amp-lbl">Избрани: {schedulerForm.trainingDates.length}</span>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Избрани: {schedulerForm.trainingDates.length}</span>
                     )}
                   </div>
-                  <div className="amp-training-days-editor-header" style={{ marginTop: "8px", justifyContent: "space-between", gap: "10px" }}>
+                  <div className="amp-training-days-editor-header" style={{ marginTop: "8px", flexDirection: "column", alignItems: "center", gap: "10px", textAlign: "center" }}>
                     <span
                       className="amp-lbl"
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
+                        justifyContent: "center",
                         padding: "6px 10px",
                         borderRadius: "999px",
                         border: "1px solid rgba(50,205,50,0.45)",
                         background: "rgba(50,205,50,0.16)",
                         color: "#d7ffd7",
                         fontWeight: 700,
+                        textAlign: "center",
+                        width: "100%"
                       }}
                     >
                       {trainingDaysEditorMode === "trainingGroup"
@@ -6218,7 +6226,7 @@ function AdminMembersPageContent() {
                           ? "Набор: Всички"
                           : `Набор: ${selectedTeamGroup}`}
                     </span>
-                    <span>
+                    <span style={{ textAlign: "center" }}>
                       {trainingDaysEditorMode === "trainingGroup"
                         ? `Тези промени ще се запазят за сборен отбор ${selectedTrainingGroup?.name ?? "-"}.`
                         : selectedTeamGroup === null
@@ -6227,30 +6235,32 @@ function AdminMembersPageContent() {
                     </span>
                   </div>
                   {trainingDaysEditorMode !== "createGroup" && (
-                    <label className="amp-edit-field" style={{ marginTop: "8px", display: "none" }}>
-                      <span className="amp-lbl">Час на тренировка (HH:mm)</span>
-                      <input
-                        className="amp-edit-input"
-                        type="time"
-                        step={60}
-                        value={schedulerForm.trainingTime}
-                        onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
-                        required
-                        disabled={trainingDaysEditorSaving}
-                      />
+                    <label className="amp-edit-field" style={{ marginTop: "8px", display: "none", textAlign: "center" }}>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Час на тренировка (HH:mm)</span>
+                      <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                        <input
+                          className="amp-inner-time-input"
+                          type="time"
+                          step={60}
+                          value={schedulerForm.trainingTime}
+                          onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
+                          required
+                          disabled={trainingDaysEditorSaving}
+                        />
+                      </div>
                     </label>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && (
-                    <div className="amp-training-time-panel" style={{ marginTop: "8px" }}>
-                      <span className="amp-lbl">{"\u0417\u0430\u0434\u0430\u0439 \u0447\u0430\u0441 \u0437\u0430:"}</span>
-                      <div className="amp-pills amp-training-time-mode-buttons">
+                    <div className="amp-training-time-panel" style={{ marginTop: "8px", textAlign: "center" }}>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Задай час за:</span>
+                      <div className="amp-pills amp-training-time-mode-buttons" style={{ justifyContent: "center" }}>
                         <button
                           type="button"
                           className={`amp-pill${trainingTimeMode === "all" ? " amp-pill--active" : ""}`}
                           onClick={() => handleTrainingTimeModeChange("all")}
                           disabled={trainingDaysEditorSaving}
                         >
-                          {"\u0412\u0441\u0438\u0447\u043a\u0438"}
+                          Всички тренировки
                         </button>
                         <button
                           type="button"
@@ -6258,7 +6268,7 @@ function AdminMembersPageContent() {
                           onClick={() => handleTrainingTimeModeChange("perDay")}
                           disabled={trainingDaysEditorSaving}
                         >
-                          {"\u0415\u0434\u0438\u043d \u043f\u043e \u0435\u0434\u0438\u043d"}
+                          По една тренировка
                         </button>
                         <button
                           type="button"
@@ -6266,44 +6276,48 @@ function AdminMembersPageContent() {
                           onClick={() => handleTrainingTimeModeChange("byWeekday")}
                           disabled={trainingDaysEditorSaving}
                         >
-                          {"\u041f\u043e \u0441\u0435\u0434\u043c\u0438\u0446\u0438"}
+                          За седмица
                         </button>
                       </div>
                     </div>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "all" && (
-                    <label className="amp-edit-field" style={{ marginTop: "8px" }}>
-                      <span className="amp-lbl">Час на тренировка (HH:mm)</span>
-                      <input
-                        className="amp-edit-input"
-                        type="time"
-                        step={60}
-                        value={schedulerForm.trainingTime}
-                        onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
-                        required
-                        disabled={trainingDaysEditorSaving}
-                      />
+                    <label className="amp-edit-field" style={{ marginTop: "8px", textAlign: "center" }}>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Час на тренировка (HH:mm)</span>
+                      <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                        <input
+                          className="amp-inner-time-input"
+                          type="time"
+                          step={60}
+                          value={schedulerForm.trainingTime}
+                          onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
+                          required
+                          disabled={trainingDaysEditorSaving}
+                        />
+                      </div>
                     </label>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "perDay" && (
                     <div className="amp-training-time-list" style={{ marginTop: "8px" }}>
                       {normalizedTrainingDaysSelection.length === 0 ? (
-                        <span className="amp-lbl" style={{ opacity: 0.78 }}>
+                        <span className="amp-lbl" style={{ opacity: 0.78, textAlign: "center", display: "block" }}>
                           {"\u041f\u044a\u0440\u0432\u043e \u0438\u0437\u0431\u0435\u0440\u0435\u0442\u0435 \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u044a\u0447\u043d\u0438 \u0434\u0430\u0442\u0438."}
                         </span>
                       ) : (
                         normalizedTrainingDaysSelection.map((date) => (
-                          <label key={`per-day-time-${date}`} className="amp-edit-field">
-                            <span className="amp-lbl">{formatIsoDateForDisplay(date)}</span>
-                            <input
-                              className="amp-edit-input"
-                              type="time"
-                              step={60}
-                              value={trainingDateTimes[date] ?? ""}
-                              onChange={(e) => handleTrainingDateTimeChange(date, e.target.value)}
-                              required
-                              disabled={trainingDaysEditorSaving}
-                            />
+                          <label key={`per-day-time-${date}`} className="amp-edit-field" style={{ textAlign: "center" }}>
+                            <span className="amp-lbl" style={{ textAlign: "center" }}>{formatIsoDateForDisplay(date)}</span>
+                            <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                              <input
+                                className="amp-inner-time-input"
+                                type="time"
+                                step={60}
+                                value={trainingDateTimes[date] ?? ""}
+                                onChange={(e) => handleTrainingDateTimeChange(date, e.target.value)}
+                                required
+                                disabled={trainingDaysEditorSaving}
+                              />
+                            </div>
                           </label>
                         ))
                       )}
@@ -6312,7 +6326,7 @@ function AdminMembersPageContent() {
                   {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "byWeekday" && (
                     <div className="amp-training-time-list" style={{ marginTop: "8px" }}>
                       {trainingWeekdayBuckets.length === 0 ? (
-                        <span className="amp-lbl" style={{ opacity: 0.78 }}>
+                        <span className="amp-lbl" style={{ opacity: 0.78, textAlign: "center", display: "block" }}>
                           {"\u041f\u044a\u0440\u0432\u043e \u0438\u0437\u0431\u0435\u0440\u0435\u0442\u0435 \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u044a\u0447\u043d\u0438 \u0434\u0430\u0442\u0438."}
                         </span>
                       ) : (
@@ -6324,17 +6338,19 @@ function AdminMembersPageContent() {
                             (weekdayDate ? trainingDateTimes[weekdayDate] : "") ??
                             schedulerForm.trainingTime;
                           return (
-                            <label key={`weekday-time-${weekdayIndex}`} className="amp-edit-field">
-                              <span className="amp-lbl">{TRAINING_WEEKDAY_SHORT_BG[weekdayIndex] ?? `#${weekdayIndex + 1}`}</span>
-                              <input
-                                className="amp-edit-input"
-                                type="time"
-                                step={60}
-                                value={weekdayTime ?? ""}
-                                onChange={(e) => handleTrainingWeekdayTimeChange(weekdayIndex, e.target.value)}
-                                required
-                                disabled={trainingDaysEditorSaving}
-                              />
+                            <label key={`weekday-time-${weekdayIndex}`} className="amp-edit-field" style={{ textAlign: "center" }}>
+                              <span className="amp-lbl" style={{ textAlign: "center" }}>{TRAINING_WEEKDAY_LONG_BG[weekdayIndex] ?? `#${weekdayIndex + 1}`}</span>
+                                <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                                <input
+                                  className="amp-inner-time-input"
+                                  type="time"
+                                  step={60}
+                                  value={weekdayTime ?? ""}
+                                  onChange={(e) => handleTrainingWeekdayTimeChange(weekdayIndex, e.target.value)}
+                                  required
+                                  disabled={trainingDaysEditorSaving}
+                                />
+                              </div>
                             </label>
                           );
                         })
@@ -6342,15 +6358,16 @@ function AdminMembersPageContent() {
                     </div>
                   )}
                   {trainingDaysEditorMode === "teamGroup" && selectedTeamGroupLinkedTrainingGroups.length > 0 && (
-                    <p className="amp-confirm-error" style={{ marginTop: "8px" }}>
+                    <p className="amp-confirm-error" style={{ marginTop: "8px", textAlign: "center" }}>
                       {`Внимание: набор ${selectedTeamGroup} участва в сборни отбори (${selectedTeamGroupLinkedTrainingGroups.map((group) => group.name).join(", ")}). При запазване ще бъде премахнат от тях и може да се наложи преименуване на групите.`}
                     </p>
                   )}
                   {trainingDaysEditorMode === "createGroup" && (
                     <>
-                      <label className="amp-edit-field" style={{ marginTop: "8px" }}>
-                        <span className="amp-lbl">Име на група (по избор)</span>
+                      <label className="amp-edit-field" style={{ marginTop: "8px", textAlign: "center" }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Име на група (по избор)</span>
                         <input
+                          style={{ textAlign: "center" }}
                           className="amp-edit-input"
                           value={trainingDaysEditorGroupName}
                           onChange={(e) => setTrainingDaysEditorGroupName(e.target.value)}
@@ -6358,9 +6375,9 @@ function AdminMembersPageContent() {
                           disabled={trainingDaysEditorSaving}
                         />
                       </label>
-                      <div className="amp-training-days-editor-header" style={{ marginTop: "8px", alignItems: "flex-start", flexDirection: "column", gap: "8px" }}>
-                        <span className="amp-lbl">Набори за прилагане (може повече от един):</span>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      <div className="amp-training-days-editor-header" style={{ marginTop: "8px", alignItems: "center", flexDirection: "column", gap: "8px", textAlign: "center" }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Набори за прилагане (може повече от един):</span>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
                           {groupOptions.map((group) => {
                             const value = String(group);
                             const isChecked = trainingDaysEditorGroups.includes(value);
@@ -6370,12 +6387,14 @@ function AdminMembersPageContent() {
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "center",
+                                  justifyContent: "center",
                                   gap: "6px",
                                   padding: "6px 10px",
                                   borderRadius: "999px",
                                   border: "1px solid rgba(255,255,255,0.22)",
                                   background: isChecked ? "rgba(50,205,50,0.16)" : "rgba(255,255,255,0.06)",
                                   cursor: trainingDaysEditorSaving ? "default" : "pointer",
+                                  textAlign: "center"
                                 }}
                               >
                                 <input
@@ -6396,7 +6415,7 @@ function AdminMembersPageContent() {
                             );
                           })}
                         </div>
-                        <span className="amp-lbl" style={{ opacity: 0.8 }}>
+                        <span className="amp-lbl" style={{ opacity: 0.8, textAlign: "center" }}>
                           {trainingDaysEditorGroups.length === 0
                             ? "Изберете поне 2 набора."
                             : `Избрани набори: ${trainingDaysEditorGroups.join(", ")}`}
@@ -6459,11 +6478,11 @@ function AdminMembersPageContent() {
                       ))}
                     </div>
                   )}
-                  {trainingDaysEditorError && <p className="amp-confirm-error">{trainingDaysEditorError}</p>}
+                  {trainingDaysEditorError && <p className="amp-confirm-error" style={{ textAlign: "center" }}>{trainingDaysEditorError}</p>}
                   {isTrainingDaysScheduleUnchanged && !trainingDaysEditorError && (
-                    <p className="amp-confirm-error">Графикът е същият като предишния.</p>
+                    <p className="amp-confirm-error" style={{ textAlign: "center" }}>Графикът е същият като предишния.</p>
                   )}
-                  <div className="amp-modal-actions amp-modal-actions--end">
+                  <div className="amp-modal-actions" style={{ justifyContent: "center" }}>
                     <button
                       type="button"
                       className="amp-btn amp-btn--ghost"
@@ -6815,7 +6834,7 @@ function AdminMembersPageContent() {
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">Настройки на график</span>
+              <span className="amp-modal-title-gradient" style={{ flex: 1, textAlign: "center", paddingLeft: "32px" }}>Настройки на график</span>
               <button
                 className="amp-modal-close"
                 onClick={() => setSchedulerSettingsOpen(false)}
@@ -6831,13 +6850,14 @@ function AdminMembersPageContent() {
                 <p className="amp-empty amp-empty--modal">Зареждане...</p>
               ) : (
                 <div className="amp-edit-grid">
-                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title">
-                    <span className="amp-lbl">Месечно напомняне</span>
+                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title" style={{ textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>Месечно напомняне</span>
                   </div>
-                  <label className="amp-edit-field amp-scheduler-primary-day">
-                    <span className="amp-lbl">Ден месечно напомняне (1-28)</span>
+                  <label className="amp-edit-field amp-scheduler-primary-day" style={{ textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>Ден месечно напомняне (1-28)</span>
                     <input
                       className="amp-edit-input"
+                      style={{ textAlign: "center" }}
                       inputMode="numeric"
                       value={schedulerForm.reminderDay}
                       onChange={(e) =>
@@ -6849,10 +6869,11 @@ function AdminMembersPageContent() {
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
-                  <label className="amp-edit-field amp-scheduler-overdue-day">
-                    <span className="amp-lbl">Ден за начало на платежния месец</span>
+                  <label className="amp-edit-field amp-scheduler-overdue-day" style={{ textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>Ден за начало на платежния месец</span>
                     <input
                       className="amp-edit-input"
+                      style={{ textAlign: "center" }}
                       inputMode="numeric"
                       value={schedulerForm.overdueDay}
                       onChange={(e) =>
@@ -6864,32 +6885,35 @@ function AdminMembersPageContent() {
                       disabled={schedulerSettingsSaving}
                     />
                   </label>
-                  <label className="amp-edit-field amp-scheduler-primary-time">
-                    <span className="amp-lbl">Час за месечно напомняне</span>
-                    <input
-                      className="amp-edit-input"
-                      type="time"
-                      step={60}
-                      value={reminderTimeValue}
-                      onChange={(e) => {
-                        const [hour = "0", minute = "0"] = e.target.value.split(":");
-                        setSchedulerForm((prev) => ({
-                          ...prev,
-                          reminderHour: hour.replace(/\D/g, ""),
-                          reminderMinute: minute.replace(/\D/g, ""),
-                        }));
-                      }}
-                      disabled={schedulerSettingsSaving}
-                    />
+                  <label className="amp-edit-field amp-scheduler-primary-time" style={{ textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>Час за месечно напомняне</span>
+                    <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                      <input
+                        className="amp-inner-time-input"
+                        type="time"
+                        step={60}
+                        value={reminderTimeValue}
+                        onChange={(e) => {
+                          const [hour = "0", minute = "0"] = e.target.value.split(":");
+                          setSchedulerForm((prev) => ({
+                            ...prev,
+                            reminderHour: hour.replace(/\D/g, ""),
+                            reminderMinute: minute.replace(/\D/g, ""),
+                          }));
+                        }}
+                        disabled={schedulerSettingsSaving}
+                      />
+                    </div>
                   </label>
-                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--second">
-                    <span className="amp-lbl">Второ напомняне (по избор)</span>
+                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--second" style={{ textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>Второ напомняне (по избор)</span>
                   </div>
                   {!secondReminderEnabled ? (
-                    <div className="amp-edit-field amp-edit-field--full amp-scheduler-second-toggle">
-                      <span className="amp-lbl">Второ месечно напомняне</span>
+                    <div className="amp-edit-field amp-edit-field--full amp-scheduler-second-toggle" style={{ textAlign: "center" }}>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Второ месечно напомняне</span>
                       <button
                         className="amp-btn amp-btn--ghost amp-btn--compact"
+                        style={{ width: "100%", justifyContent: "center" }}
                         type="button"
                         onClick={enableSecondReminder}
                         disabled={schedulerSettingsSaving}
@@ -6899,10 +6923,11 @@ function AdminMembersPageContent() {
                     </div>
                   ) : (
                     <>
-                      <label className="amp-edit-field amp-scheduler-second-day">
-                        <span className="amp-lbl">Ден второ месечно напомняне (1-28)</span>
+                      <label className="amp-edit-field amp-scheduler-second-day" style={{ textAlign: "center" }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Ден второ месечно напомняне (1-28)</span>
                         <input
                           className="amp-edit-input"
+                          style={{ textAlign: "center" }}
                           inputMode="numeric"
                           value={schedulerForm.secondReminderDay}
                           onChange={(e) =>
@@ -6914,28 +6939,31 @@ function AdminMembersPageContent() {
                           disabled={schedulerSettingsSaving}
                         />
                       </label>
-                      <label className="amp-edit-field amp-scheduler-second-time">
-                        <span className="amp-lbl">Час за второ месечно напомняне</span>
-                        <input
-                          className="amp-edit-input"
-                          type="time"
-                          step={60}
-                          value={secondReminderTimeValue}
-                          onChange={(e) => {
-                            const [hour = "0", minute = "0"] = e.target.value.split(":");
-                            setSchedulerForm((prev) => ({
-                              ...prev,
-                              secondReminderHour: hour.replace(/\D/g, ""),
-                              secondReminderMinute: minute.replace(/\D/g, ""),
-                            }));
-                          }}
-                          disabled={schedulerSettingsSaving}
-                        />
+                      <label className="amp-edit-field amp-scheduler-second-time" style={{ textAlign: "center" }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Час за второ месечно напомняне</span>
+                        <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                          <input
+                            className="amp-inner-time-input"
+                            type="time"
+                            step={60}
+                            value={secondReminderTimeValue}
+                            onChange={(e) => {
+                              const [hour = "0", minute = "0"] = e.target.value.split(":");
+                              setSchedulerForm((prev) => ({
+                                ...prev,
+                                secondReminderHour: hour.replace(/\D/g, ""),
+                                secondReminderMinute: minute.replace(/\D/g, ""),
+                              }));
+                            }}
+                            disabled={schedulerSettingsSaving}
+                          />
+                        </div>
                       </label>
-                      <div className="amp-edit-field amp-edit-field--full amp-scheduler-second-remove">
-                        <span className="amp-lbl">Опция</span>
+                      <div className="amp-edit-field amp-edit-field--full amp-scheduler-second-remove" style={{ textAlign: "center" }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Опция</span>
                         <button
                           className="amp-btn amp-btn--ghost amp-btn--compact"
+                          style={{ width: "100%", justifyContent: "center" }}
                           type="button"
                           onClick={disableSecondReminder}
                           disabled={schedulerSettingsSaving}
@@ -6945,33 +6973,35 @@ function AdminMembersPageContent() {
                       </div>
                     </>
                   )}
-                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--overdue">
-                    <span className="amp-lbl">Просрочие</span>
+                  <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--overdue" style={{ textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>Просрочие</span>
                   </div>
-                  <label className="amp-edit-field amp-scheduler-overdue-time">
-                    <span className="amp-lbl">Час за просрочие</span>
-                    <input
-                      className="amp-edit-input"
-                      type="time"
-                      step={60}
-                      value={overdueTimeValue}
-                      onChange={(e) => {
-                        const [hour = "0", minute = "0"] = e.target.value.split(":");
-                        setSchedulerForm((prev) => ({
-                          ...prev,
-                          overdueHour: hour.replace(/\D/g, ""),
-                          overdueMinute: minute.replace(/\D/g, ""),
-                        }));
-                      }}
-                      disabled={schedulerSettingsSaving}
-                    />
+                  <label className="amp-edit-field amp-scheduler-overdue-time" style={{ textAlign: "center" }}>
+                    <span className="amp-lbl" style={{ textAlign: "center" }}>Час за просрочие</span>
+                    <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                      <input
+                        className="amp-inner-time-input"
+                        type="time"
+                        step={60}
+                        value={overdueTimeValue}
+                        onChange={(e) => {
+                          const [hour = "0", minute = "0"] = e.target.value.split(":");
+                          setSchedulerForm((prev) => ({
+                            ...prev,
+                            overdueHour: hour.replace(/\D/g, ""),
+                            overdueMinute: minute.replace(/\D/g, ""),
+                          }));
+                        }}
+                        disabled={schedulerSettingsSaving}
+                      />
+                    </div>
                   </label>
                 </div>
               )}
 
-              {schedulerSettingsError && <p className="amp-confirm-error">{schedulerSettingsError}</p>}
+              {schedulerSettingsError && <p className="amp-confirm-error" style={{ textAlign: "center" }}>{schedulerSettingsError}</p>}
 
-              <div className="amp-modal-actions">
+              <div className="amp-modal-actions" style={{ justifyContent: "center" }}>
                 <button
                   className="amp-btn amp-btn--ghost"
                   onClick={() => setSchedulerSettingsOpen(false)}

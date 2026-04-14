@@ -344,7 +344,7 @@ export default function AdminPlayersPage() {
               </button>
             )}
           </div>
-          <h2 className="mp-teams-title">Изберете отбор</h2>
+          <h2 className="mp-teams-title" style={{ textAlign: "center" }}>Изберете отбор:</h2>
           <div className="mp-teams-grid">
             {clubsLoading && (
               <div className="mp-team-empty">Зареждане на отборите...</div>
