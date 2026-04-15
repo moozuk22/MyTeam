@@ -98,6 +98,15 @@ export async function sendPushToMember(
   payload: PushNotificationPayload,
   notificationType?: NotificationTemplateType
 ): Promise<SendPushResult> {
+  // Always save to notification history when a type is given, regardless of push subscription status
+  if (notificationType) {
+    try {
+      await saveMemberNotificationHistory(memberId, notificationType, payload);
+    } catch (error) {
+      console.error("Failed to save notification history:", error);
+    }
+  }
+
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
       playerId: memberId,
@@ -158,15 +167,6 @@ export async function sendPushToMember(
       }
     })
   );
-
-  // Save notification to history if type is provided
-  if (notificationType) {
-    try {
-      await saveMemberNotificationHistory(memberId, notificationType, payload);
-    } catch (error) {
-      console.error("Failed to save notification history:", error);
-    }
-  }
 
   return {
     total: subscriptions.length,
