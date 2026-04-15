@@ -1488,7 +1488,7 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
     const totalRows = baseRows.length;
     const percent = totalRows > 0 ? Math.round((paid / totalRows) * 100) : 0;
     const unpaid = totalRows - paid;
-    const periodTitle = kind === "monthly" ? `${month} ${year}` : `Year ${year}`;
+    const periodTitle = kind === "monthly" ? `${month} ${year}` : `Година ${year}`;
 
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
@@ -1516,11 +1516,11 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
               <td>${escapeHtml(row.name)}</td>
               <td>${row.group ?? "—"}</td>
               <td>${escapeHtml(row.date)}</td>
-              <td>${row.paid ? "Paid" : "Unpaid"}</td>
+              <td>${row.paid ? "Платено" : "Неплатено"}</td>
             </tr>
           `)
         .join("")
-      : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">No data for selected filters.</td></tr>`;
+      : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
 
     doc.open();
     doc.write(`<!doctype html>
@@ -1528,7 +1528,7 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${kind === "monthly" ? "Monthly report" : "Yearly report"}</title>
+  <title>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</title>
   <style>
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
     .page { padding: 24px; }
@@ -1544,21 +1544,21 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
 </head>
 <body>
   <div class="page">
-    <h1>${kind === "monthly" ? "Monthly report" : "Yearly report"}</h1>
-    <p class="sub">Period: ${escapeHtml(periodTitle)}</p>
+    <h1>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</h1>
+    <p class="sub">Период: ${escapeHtml(periodTitle)}</p>
     <div class="stats">
-      <div class="stat">Paid: <strong>${paid}</strong> / ${totalRows}</div>
-      <div class="stat">Collection rate: <strong>${percent}%</strong></div>
-      <div class="stat">Unpaid: <strong>${unpaid}</strong></div>
+      <div class="stat">Платили: <strong>${paid}</strong> / ${totalRows}</div>
+      <div class="stat">Събираемост: <strong>${percent}%</strong></div>
+      <div class="stat">Неплатили: <strong>${unpaid}</strong></div>
     </div>
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>Name</th>
-          <th>Group</th>
-          <th>Payment date</th>
-          <th>Status</th>
+          <th>Име</th>
+          <th>Набор</th>
+          <th>Дата на плащане</th>
+          <th>Статус</th>
         </tr>
       </thead>
       <tbody>${tableRowsHtml}</tbody>
