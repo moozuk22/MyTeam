@@ -1,14 +1,13 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import "./page.css";
 
 function AdminLoginPageContent() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next") ?? "";
   const safeNextPath =
@@ -31,7 +30,8 @@ function AdminLoginPageContent() {
       });
 
       if (response.ok) {
-        router.push(safeNextPath || "/admin/login");
+        const destination = safeNextPath || "/admin/login";
+        window.location.assign(destination);
       } else {
         const data = await response.json();
         setError(data.error || "Login failed");
