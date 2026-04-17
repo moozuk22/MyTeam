@@ -259,9 +259,8 @@ export async function POST(request: NextRequest) {
       }
 
       await prisma.$transaction([
-        prisma.image.updateMany({
+        prisma.image.deleteMany({
           where: { playerId: player.id, isAdminView: true },
-          data: { isAdminView: false },
         }),
         prisma.image.create({
           data: {
@@ -271,6 +270,14 @@ export async function POST(request: NextRequest) {
           },
         }),
       ]);
+
+      if (currentAdminImage) {
+        try {
+          await cloudinary.uploader.destroy(currentAdminImage, { resource_type: "image", invalidate: true });
+        } catch {
+          // non-fatal: image replaced in DB regardless
+        }
+      }
 
       updated += 1;
       updatedPlayers.push({
