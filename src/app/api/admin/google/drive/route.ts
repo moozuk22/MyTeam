@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const mode = searchParams.get("mode");
   const fileTypeFilter =
     mode === "photos"
-      ? "mimeType='application/vnd.google-apps.folder'"
+      ? "(mimeType='application/vnd.google-apps.folder' or mimeType contains 'image/')"
       : "(mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.folder')";
   const query =
     folderId === "root"
@@ -73,5 +73,9 @@ export async function GET(request: NextRequest) {
     .filter((f) => f.mimeType === "application/vnd.google-apps.spreadsheet")
     .sort((a, b) => a.name.localeCompare(b.name, "bg"));
 
-  return NextResponse.json({ folders, sheets });
+  const images = files
+    .filter((f) => f.mimeType.startsWith("image/"))
+    .sort((a, b) => a.name.localeCompare(b.name, "bg"));
+
+  return NextResponse.json({ folders, sheets, images });
 }

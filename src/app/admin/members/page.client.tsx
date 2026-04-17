@@ -7704,7 +7704,7 @@ function ImportPhotosFromDriveModal({
 }) {
   const [step, setStep] = useState<PhotoImportStep>("browse");
   const [folderStack, setFolderStack] = useState<Array<{ id: string; name: string }>>([]);
-  const [driveItems, setDriveItems] = useState<{ folders: DriveItem[]; sheets: DriveItem[] } | null>(null);
+  const [driveItems, setDriveItems] = useState<{ folders: DriveItem[]; sheets: DriveItem[]; images: DriveItem[] } | null>(null);
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveError, setDriveError] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string } | null>(null);
@@ -7723,12 +7723,12 @@ function ImportPhotosFromDriveModal({
     setDriveError("");
     try {
       const res = await fetch(`/api/admin/google/drive?folderId=${encodeURIComponent(folderId)}&mode=photos`);
-      const data = (await res.json().catch(() => ({}))) as { folders?: DriveItem[]; sheets?: DriveItem[]; error?: string };
+      const data = (await res.json().catch(() => ({}))) as { folders?: DriveItem[]; sheets?: DriveItem[]; images?: DriveItem[]; error?: string };
       if (!res.ok) {
         setDriveError(data.error ?? "Грешка при зареждане на Drive.");
         return;
       }
-      setDriveItems({ folders: data.folders ?? [], sheets: [] });
+      setDriveItems({ folders: data.folders ?? [], sheets: [], images: data.images ?? [] });
     } catch {
       setDriveError("Грешка при свързване.");
     } finally {
@@ -7827,8 +7827,8 @@ function ImportPhotosFromDriveModal({
                 </div>
               ) : (
                 <div className="amp-drive-list">
-                  {(!driveItems || driveItems.folders.length === 0) && (
-                    <p className="amp-empty" style={{ padding: "16px 0" }}>Няма папки тук.</p>
+                  {(!driveItems || (driveItems.folders.length === 0 && driveItems.images.length === 0)) && (
+                    <p className="amp-empty" style={{ padding: "16px 0" }}>Няма папки или снимки тук.</p>
                   )}
                   {driveItems?.folders.map((folder) => (
                     <button
@@ -7840,6 +7840,15 @@ function ImportPhotosFromDriveModal({
                       <FolderIcon />
                       <span>{folder.name}</span>
                     </button>
+                  ))}
+                  {driveItems?.images.map((img) => (
+                    <div
+                      key={img.id}
+                      className="amp-drive-item amp-drive-item--file"
+                    >
+                      <PhotoImportIcon size={14} />
+                      <span>{img.name}</span>
+                    </div>
                   ))}
                 </div>
               )}

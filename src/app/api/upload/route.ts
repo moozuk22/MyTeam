@@ -27,7 +27,8 @@ function getUploadOptions(type: UploadType, name: string): UploadApiOptions {
         {
           width: 640,
           height: 800,
-          crop: "limit",
+          crop: "fill",
+          gravity: "face",
           quality: "auto:good",
         },
       ],

@@ -78,7 +78,8 @@ async function uploadPlayerImageToCloudinary(buffer: Buffer, playerName: string)
           {
             width: 640,
             height: 800,
-            crop: "limit",
+            crop: "fill",
+            gravity: "face",
             quality: "auto:good",
           },
         ],
