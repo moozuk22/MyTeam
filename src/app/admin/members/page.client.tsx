@@ -2333,7 +2333,7 @@ function AdminMembersPageContent() {
   const [clubNotifications, setClubNotifications] = useState<MemberNotification[]>([]);
   const [clubNotificationsUnreadCount, setClubNotificationsUnreadCount] = useState(0);
   const [clubNotificationsDateFilter, setClubNotificationsDateFilter] = useState("");
-  const [clubNotificationsScopeType, setClubNotificationsScopeType] = useState<"team" | "trainingGroup">("team");
+  const [clubNotificationsScopeType, setClubNotificationsScopeType] = useState<"team" | "trainingGroup" | "admin">("team");
   const [clubNotificationsScopeValue, setClubNotificationsScopeValue] = useState("all");
   const [lastHandledCoachPushOpenTs, setLastHandledCoachPushOpenTs] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2496,6 +2496,9 @@ function AdminMembersPageContent() {
     const notifDate = new Date(item.sentAt).toLocaleDateString("en-CA", { timeZone: "Europe/Sofia" });
     if (clubNotificationsDateFilter && notifDate !== clubNotificationsDateFilter) {
       return false;
+    }
+    if (clubNotificationsScopeType === "admin") {
+      return item.type === "admin_message";
     }
     if (clubNotificationsScopeValue !== "all") {
       if (clubNotificationsScopeType === "team") {
@@ -5274,40 +5277,44 @@ function AdminMembersPageContent() {
                         className="amp-edit-input"
                         value={clubNotificationsScopeType}
                         onChange={(event) => {
-                          const nextType = event.target.value === "trainingGroup" ? "trainingGroup" : "team";
+                          const val = event.target.value;
+                          const nextType = val === "trainingGroup" ? "trainingGroup" : val === "admin" ? "admin" : "team";
                           setClubNotificationsScopeType(nextType);
                           setClubNotificationsScopeValue("all");
                         }}
                       >
                         <option value="team">{"\u041e\u0442\u0431\u043e\u0440"}</option>
                         <option value="trainingGroup">{"\u0421\u0431\u043e\u0440\u0435\u043d \u043e\u0442\u0431\u043e\u0440"}</option>
+                        <option value="admin">{"\u0410\u0434\u043c\u0438\u043d"}</option>
                       </select>
                     </label>
-                    <label className="amp-notification-filter">
-                      <span>
-                        {clubNotificationsScopeType === "team"
-                          ? "\u0418\u0437\u0431\u0435\u0440\u0438 \u043e\u0442\u0431\u043e\u0440"
-                          : "\u0418\u0437\u0431\u0435\u0440\u0438 \u0441\u0431\u043e\u0440\u0435\u043d \u043e\u0442\u0431\u043e\u0440"}
-                      </span>
-                      <select
-                        className="amp-edit-input"
-                        value={clubNotificationsScopeValue}
-                        onChange={(event) => setClubNotificationsScopeValue(event.target.value)}
-                      >
-                        <option value="all">{"\u0412\u0441\u0438\u0447\u043a\u0438"}</option>
-                        {clubNotificationsScopeType === "team"
-                          ? clubNotificationTeamGroups.map((group) => (
-                            <option key={group} value={String(group)}>
-                              {group}
-                            </option>
-                          ))
-                          : clubNotificationTrainingGroups.map((group) => (
-                            <option key={group.id} value={group.id}>
-                              {group.name}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
+                    {clubNotificationsScopeType !== "admin" && (
+                      <label className="amp-notification-filter">
+                        <span>
+                          {clubNotificationsScopeType === "team"
+                            ? "\u0418\u0437\u0431\u0435\u0440\u0438 \u043e\u0442\u0431\u043e\u0440"
+                            : "\u0418\u0437\u0431\u0435\u0440\u0438 \u0441\u0431\u043e\u0440\u0435\u043d \u043e\u0442\u0431\u043e\u0440"}
+                        </span>
+                        <select
+                          className="amp-edit-input"
+                          value={clubNotificationsScopeValue}
+                          onChange={(event) => setClubNotificationsScopeValue(event.target.value)}
+                        >
+                          <option value="all">{"\u0412\u0441\u0438\u0447\u043a\u0438"}</option>
+                          {clubNotificationsScopeType === "team"
+                            ? clubNotificationTeamGroups.map((group) => (
+                              <option key={group} value={String(group)}>
+                                {group}
+                              </option>
+                            ))
+                            : clubNotificationTrainingGroups.map((group) => (
+                              <option key={group.id} value={group.id}>
+                                {group.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    )}
                   </div>
                   {filteredClubNotifications.length === 0 ? (
                     <p className="amp-empty amp-empty--modal">{"\u041d\u044f\u043c\u0430 \u0438\u0437\u0432\u0435\u0441\u0442\u0438\u044f \u0437\u0430 \u0438\u0437\u0431\u0440\u0430\u043d\u0438\u0442\u0435 \u0444\u0438\u043b\u0442\u0440\u0438"}</p>
