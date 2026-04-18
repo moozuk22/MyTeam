@@ -7,7 +7,7 @@ import {
   Fingerprint, LayoutGrid, BadgePercent, CreditCard,
   Users, ShieldCheck, X, ChevronRight, Play,
   Zap, Trophy, ArrowRight,
-  Phone, Mail, MessageSquare, User,
+  Phone, Mail, MessageSquare, MessageCircle, User,
   Wifi, WifiOff, Menu, Calendar,
   MapPin, TrendingUp, Activity, Globe, Lock,
   Check, X as CloseX, PhoneCall
@@ -60,8 +60,8 @@ const FEATURES = [
   {
     id: 3, icon: BadgePercent, color: G,
     title: "Партньорска Мрежа",
-    short: "Ексклузивни отстъпки в Sport Depot, Dalida и други.",
-    details: "Вашият клуб получава достъп до -10% отстъпка при лидери като Sport Depot, Dalida Dance, Innline Dragon Body и Мебели Нико.",
+    short: "Ексклузивни отстъпки в Sport Depot и други.",
+    details: "Вашият клуб получава достъп до преференциални условия при лидери като Sport Depot и други подбрани брандове.",
     benefits: ["Директна отстъпка от -10%", "Широка мрежа от физически обекти", "Смарт карта за лесна идентификация", "Ползи за родителите и атлетите"],
     requiresSub: true
   },
@@ -112,16 +112,13 @@ const COMPARISON = {
     "Цялостно дигитално управление",
     "Автоматично проследяване на такси",
     "Смарт карти за достъп и контрол",
-    "Отстъпки в Sport Depot, Dalida, IDB, Нико",
+    "Отстъпки в Sport Depot и други",
     "Интелигентен тренировъчен график"
   ]
 };
 
 const PARTNERS = [
-  { name: "Sport Depot", abbr: "SD", color: "#FF6B00", disc: "-10%", logo: "/sd-logo.png" },
-  { name: "Dalida Dance", abbr: "DD", color: "#E91E63", disc: "-10%", logo: "/logo-dalida.png" },
-  { name: "Innline Dragon Body", abbr: "IDB", color: "#00D4FF", disc: "-10%", logo: "/idb-logo.svg" },
-  { name: "Мебели Нико", abbr: "MN", color: "#C8102E", disc: "-10%", logo: "/niko-logo.png" },
+  { name: "Sport Depot", abbr: "SD", color: "#FF6B00", disc: "-10%", logo: "/sd-logo.png" }
 ];
 
 /* ══════════════════════════════════════════════
@@ -1237,14 +1234,14 @@ function NavBar({ menuOpen, setMenuOpen }) {
         <button onClick={() => setMenuOpen(false)} style={{ position: "absolute", top: 30, right: 30, background: "none", border: "none", color: "#fff" }}>
           <X size={36} />
         </button>
-        
+
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 32 }}>
           <div className="logo-brand" style={{ fontSize: 32, marginBottom: 40 }}>MyTeam</div>
           {["Функции", "Клубове", "Въпроси"].map(item => (
             <a key={item} href={`#${item}`} onClick={() => setMenuOpen(false)} className="mobile-nav-link" style={{ fontSize: 28, border: "none" }}>{item}</a>
           ))}
           <a href="#Контакт" onClick={() => setMenuOpen(false)} className="mobile-demo-btn" style={{ width: "80%", fontSize: 18 }}>ЗАЯВИ КОНСУЛТАЦИЯ</a>
-          
+
           <div style={{ marginTop: 40, textAlign: "center" }}>
             <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 14, marginBottom: 15 }}>СВЪРЖЕТЕ СЕ С НАС</div>
             <a href="tel:0895919545" style={{ color: "var(--neon-green)", fontSize: 22, fontWeight: 700, textDecoration: "none" }}>0895 919 545</a>
@@ -1487,6 +1484,21 @@ function LeadForm() {
   );
 }
 
+function InfiniteCarousel() {
+  const items = Array.from({ length: 8 });
+  return (
+    <div className="carousel-container">
+      <div className="carousel-track">
+        {[...items, ...items].map((_, i) => (
+          <div key={i} className="carousel-item">
+            MYTEAM GALLERY
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RevealSection({ children }) {
   const ref = useRef(null);
   const [active, setActive] = useState(false);
@@ -1534,14 +1546,14 @@ export default function Home() {
             </div>
 
             <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 64, width: "100%" }} className="hero-split">
-              <div className="hero-text-col" style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column" }}>
+              <div className="hero-text-col" style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <h1 className="hero-title">
                   Спри да губиш време в <span className="hero-title-highlight">таблици.</span><br />
                   Управлявай своя клуб професионално.
                 </h1>
 
-                <p className="hero-description" style={{ margin: "0 0 48px 0", maxWidth: 600 }}>
-                  Дигитална нервна система за Вашия спортен клуб — автоматизиран контрол, финансова дисциплина и специални отстъпки за родителите.
+                <p className="hero-description" style={{ margin: "0 0 48px 0", maxWidth: 600, textAlign: "center" }}>
+                  MyTeam е интелигентна платформа за управление на спортни клубове – Проследявайте плащанията, използвайте онлайн график и се възползвайте от специални отстъпки.
                 </p>
 
                 <div className="hero-actions" style={{ marginTop: 10 }}>
@@ -1566,40 +1578,115 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-
-              <div className="hero-image-col" style={{ flex: 1, minWidth: 320, maxWidth: "540px", position: "relative" }}>
-                <div style={{ 
-                  borderRadius: 32, 
-                  overflow: "hidden", 
-                  boxShadow: "0 40px 100px rgba(0,0,0,0.8), 0 0 40px rgba(57, 255, 20, 0.15)",
-                  border: "1px solid rgba(255,255,255,0.1)"
-                }}>
-                  <img 
-                    src="/images/hero_coach_green.png" 
-                    alt="MyTeam Football Management"
-                    style={{ width: "100%", display: "block" }}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         </section>
       </RevealSection>
 
       <RevealSection>
-        <section className="problem-section">
-          <div className="problem-header">
-            <div className="problem-tag">ПРОБЛЕМЪТ</div>
-            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Твоите ежедневни главоболия.</h2>
+        <section className="system-section">
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div className="section-tag-light" style={{ color: "var(--neon-green)" }}>ИНТЕРФЕЙС</div>
+            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Системата, която работи.</h2>
           </div>
-          <div className="problem-grid">
-            {PROBLEMS.map((p, i) => (
-              <div key={i} className="problem-card">
-                <div className="problem-icon">{p.icon}</div>
-                <h3 className="problem-card-title">{p.title}</h3>
-                <p className="problem-card-desc">{p.desc}</p>
+          <InfiniteCarousel />
+        </section>
+      </RevealSection>
+
+      <RevealSection>
+        <section style={{ padding: "100px 24px", background: "#070C14", textAlign: "center" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            <div className="section-tag-light">ПРОБЛЕМЪТ</div>
+            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)", marginBottom: 64, textAlign: "center" }}>Все още ли управляваш клуба „на ръка“?</h2>
+            
+            <div className="problem-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32 }}>
+              {[
+                { icon: "📅", title: "Хаос с тефтери", desc: "Различни списъци и Excel-и водят до грешки и загубено време.", color: "#FFB000" },
+                { icon: "💸", title: "Нередовни плащания", desc: "Родителите забравят или закъсняват с таксите.", color: "var(--neon-green)" },
+                { icon: "📉", title: "Липса на контрол", desc: "Нямаш ясна представа кой е платил и кой не.", color: "#0080FF" }
+              ].map((p, i) => (
+                <div key={i} style={{ 
+                  background: "rgba(255,255,255,0.03)", 
+                  padding: 40, 
+                  borderRadius: 20, 
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  transition: "all 0.3s ease",
+                  textAlign: "center"
+                }}>
+                  <div style={{ 
+                    fontSize: 40, 
+                    marginBottom: 20, 
+                    display: "flex", 
+                    justifyContent: "center",
+                    filter: `drop-shadow(0 0 10px ${p.color}44)` 
+                  }}>{p.icon}</div>
+                  <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 15 }}>{p.title}</h3>
+                  <p style={{ color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>{p.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </RevealSection>
+
+      <RevealSection>
+        <section style={{ padding: "100px 24px", background: "#05080F", textAlign: "center" }}>
+          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+            <div className="section-tag-light">РЕШЕНИЕТО</div>
+            <h2 className="section-title" style={{ marginBottom: 48, fontFamily: "var(--serif-font)", textAlign: "center" }}>MyTeam – цялостно решение за управление на клуб</h2>
+            
+            <div style={{ display: "inline-block", textAlign: "left", marginBottom: 60, maxWidth: "100%" }}>
+              {[
+                "Управление на деца, групи и треньори",
+                "Автоматично проследяване на плащания",
+                "Смарт карти за достъп и контрол",
+                "Отчети в реално време"
+              ].map((item, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, fontSize: 18 }}>
+                  <div style={{ color: "var(--neon-green)", fontWeight: 900 }}>✓</div>
+                  <span style={{ fontWeight: 500 }}>{item}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div className="ai-highlight-box">
+              <div className="ai-box-header" style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center" }}>
+                <div style={{ fontSize: 28 }}>🧠</div>
+                <h3 style={{ fontSize: 24, fontWeight: 800 }}>Интелигентен тренировъчен график</h3>
               </div>
-            ))}
+              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 18, lineHeight: 1.6 }}>Автоматично разпределение на групи и оптимизация без грешки.</p>
+            </div>
+          </div>
+        </section>
+      </RevealSection>
+
+      <RevealSection>
+        <section style={{ padding: "100px 24px", background: "#070C14", textAlign: "center" }}>
+          <div style={{ maxWidth: 800, margin: "0 auto" }}>
+            <div className="section-tag-light">ПОЛЗИТЕ</div>
+            <h2 className="section-title" style={{ marginBottom: 64, fontFamily: "var(--serif-font)", textAlign: "center" }}>Ползи за родителите</h2>
+            <div style={{ textAlign: "left", display: "inline-block", maxWidth: "100%" }}>
+              {[
+                { icon: "🎁", text: "Отстъпки в различни търговски вериги (Sport Depot и други)" },
+                { icon: "📱", text: "Проследяване на тренировки и плащания в реално време" },
+                { icon: "💳", text: "Смарт карта, която се изплаща сама чрез спестени средства" }
+              ].map((item, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
+                  <div style={{ 
+                    fontSize: 28, 
+                    width: 60, 
+                    height: 60, 
+                    background: "rgba(255,255,255,0.03)", 
+                    borderRadius: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0
+                  }}>{item.icon}</div>
+                  <span style={{ fontSize: 18, fontWeight: 500 }}>{item.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       </RevealSection>
@@ -1637,7 +1724,7 @@ export default function Home() {
         </section>
       </RevealSection>
 
-      <RevealSection>
+      {/* <RevealSection>
         <section id="Функции" className="features-section">
           <div className="features-container">
             <div className="section-header">
@@ -1672,11 +1759,11 @@ export default function Home() {
             </div>
           </div>
         </section>
-      </RevealSection>
+      </RevealSection> */}
 
-      <RevealSection>
+      {/* <RevealSection>
         <TrustedNetwork contactRef={contactRef} />
-      </RevealSection>
+      </RevealSection> */}
 
       <RevealSection>
         <section className="pricing-section">
@@ -1704,12 +1791,12 @@ export default function Home() {
                   <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Партньорска мрежа</span></div>
                   <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span style={{ fontWeight: 700, color: "var(--neon-green)" }}>3 месеца гратисен период</span></div>
                 </div>
-                <a href="#Контакт" className="nav-demo-btn" style={{ 
-                  width: "100%", 
-                  background: plan.popular ? "var(--neon-green)" : "none", 
-                  color: plan.popular ? "#000" : "#fff", 
-                  border: plan.popular ? "none" : "1px solid rgba(255,255,255,0.2)", 
-                  textDecoration: "none", 
+                <a href="#Контакт" className="nav-demo-btn" style={{
+                  width: "100%",
+                  background: plan.popular ? "var(--neon-green)" : "none",
+                  color: plan.popular ? "#000" : "#fff",
+                  border: plan.popular ? "none" : "1px solid rgba(255,255,255,0.2)",
+                  textDecoration: "none",
                   textAlign: "center",
                   display: "inline-block"
                 }}>
@@ -1722,30 +1809,27 @@ export default function Home() {
       </RevealSection>
 
       <RevealSection>
-        <section id="Партньори" style={{ padding: "100px 24px", background: "rgba(255,255,255,0.02)" }}>
+        <section id="Партньори" style={{ padding: "100px 24px", background: "rgba(255,255,255,0.01)" }}>
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 60 }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
               <div className="section-tag-light">МРЕЖА ОТ ПАРТНЬОРИ</div>
               <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Добавена стойност за всеки член.</h2>
               <p style={{ color: "rgba(255,255,255,0.4)" }}>Вашият клуб получава достъп до преференциални условия при подбрани брандове.</p>
             </div>
 
-            <div className="partners-grid">
+            <div className="partners-list-modern">
               {PARTNERS.map(p => (
-                <div key={p.name} className="partner-card" style={{ height: "100%", display: "flex", flexDirection: "column", padding: "32px 20px" }}>
-                  <div style={{ 
-                    height: 54,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 12
-                  }}>
-                    <img src={p.logo} alt={p.name} style={{ maxHeight: "100%", maxWidth: "80%", objectFit: "contain", filter: "brightness(1.1)" }} />
+                <div key={p.name} className="partner-item-minimal">
+                  <div className="partner-logo-wrapper">
+                    <img src={p.logo} alt={p.name} className="partner-logo-large" />
                   </div>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 8px", marginBottom: 10 }}>
-                    <div style={{ color: "#fff", fontWeight: 700, fontSize: 12, lineHeight: 1.2, textTransform: "uppercase", letterSpacing: 0.5 }}>{p.name}</div>
+                  <div className="partner-info-minimal">
+                    <div className="partner-name-minimal">{p.name}</div>
+                    <div className="partner-disc-minimal">{p.disc} ОТСТЪПКА</div>
+                    <div style={{ marginTop: 20, color: "rgba(255,255,255,0.2)", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}>
+                      + специални условия в широка мрежа от партньори
+                    </div>
                   </div>
-                  <div style={{ color: "var(--neon-green)", fontSize: 10, fontWeight: 900, letterSpacing: 1 }}>{p.disc} ОТСТЪПКА</div>
                 </div>
               ))}
             </div>
@@ -1800,8 +1884,8 @@ export default function Home() {
       </footer>
 
       <div className="sticky-actions">
-        <a href="https://wa.me/359895919545" target="_blank" rel="noopener noreferrer" className="action-btn action-whatsapp" title="WhatsApp">
-          <MessageSquare size={24} />
+        <a href="viber://chat?number=%2B359895919545" className="action-btn action-viber" title="Viber">
+          <img src="/viber.png" alt="Viber" style={{ width: 50, height: 50, objectFit: "contain" }} />
         </a>
         <a href="tel:0895919545" className="action-btn action-phone" title="Call Us">
           <PhoneCall size={24} />
