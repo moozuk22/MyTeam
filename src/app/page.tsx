@@ -1843,12 +1843,22 @@ export default function Home() {
           display: "flex", 
           justifyContent: "center", 
           gap: 32, 
+          marginBottom: 16, 
+        }}>
+          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ЗАЩИТА НА ЛИЧНИ ДАННИ</a>
+          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ОБЩИ УСЛОВИЯ</a>
+        </div>
+
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "center", 
+          gap: 32, 
           marginBottom: 32, 
           paddingBottom: 32, 
           borderBottom: "1px solid rgba(255,255,255,0.03)" 
         }}>
-          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ЗАЩИТА НА ЛИЧНИ ДАННИ</a>
-          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ОБЩИ УСЛОВИЯ</a>
+          <a href="tel:0896495254" style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, fontWeight: 600, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.4)"}>0896 495 254</a>
+          <a href="mailto:officemyteam7@gmail.com" style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, fontWeight: 600, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.4)"}>officemyteam7@gmail.com</a>
         </div>
 
         <div className="footer-container">
