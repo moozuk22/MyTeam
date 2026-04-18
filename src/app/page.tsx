@@ -102,17 +102,15 @@ const PROBLEMS = [
 
 const COMPARISON = {
   before: [
-    "Управление 'на ръка' с тефтери",
-    "Ръчно следене на плащания в Excel",
-    "Постоянни спорове за посещаемост",
+    "Управление с хартиени списъци",
+    "Ръчно проследяване на такси",
     "Никакви ползи за родителите",
-    "Липса на прозрачни отчети"
+    "Тренировъчен график във Viber/WhatsApp"
   ],
   after: [
     "Цялостно дигитално управление",
     "Автоматично проследяване на такси",
-    "Смарт карти за достъп и контрол",
-    "Отстъпки в Sport Depot и други",
+    "Информация в реално време",
     "Интелигентен тренировъчен график"
   ]
 };
@@ -1190,7 +1188,7 @@ function TrustedNetwork({ contactRef }) {
   );
 }
 
-function NavBar({ menuOpen, setMenuOpen }) {
+function NavBar() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -1200,164 +1198,19 @@ function NavBar({ menuOpen, setMenuOpen }) {
   }, []);
 
   return (
-    <>
-      <nav className={`navbar ${scrolled ? "navbar-scrolled" : ""}`}>
-        <div className="navbar-container">
-          <div className="navbar-logo">
-            <div className="logo-text-wrapper">
-              <div className="logo-brand" style={{ fontFamily: "var(--serif-font)", fontSize: 24 }}>MyTeam</div>
-            </div>
-          </div>
-
-          <div className="desk-nav">
-            {["Функции", "Клубове", "Въпроси"].map(item => (
-              <a key={item} href={`#${item}`} className="nav-link">{item}</a>
-            ))}
-            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <a href="tel:0895919545" className="nav-link" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <PhoneCall size={16} color="var(--neon-green)" />
-                0895 919 545
-              </a>
-              <a href="#Контакт" className="nav-demo-btn">БЕЗПЛАТНА КОНСУЛТАЦИЯ</a>
-            </div>
-          </div>
-
-          <button onClick={() => setMenuOpen(!menuOpen)} className="mobile-toggle">
-            <Menu size={28} />
-          </button>
+    <nav className={`navbar ${scrolled ? "navbar-scrolled" : ""}`}>
+      <div className="navbar-container">
+        <div className="navbar-logo">
+          <img src="/myteam-logo.png" alt="MyTeam Logo" className="nav-logo-img" />
         </div>
-      </nav>
 
-      {/* Mobile Sidebar */}
-      {menuOpen && <div className="menu-overlay" onClick={() => setMenuOpen(false)} />}
-      <div className={`mobile-menu ${menuOpen ? "mobile-menu-open" : ""}`}>
-        <button onClick={() => setMenuOpen(false)} style={{ position: "absolute", top: 30, right: 30, background: "none", border: "none", color: "#fff" }}>
-          <X size={36} />
-        </button>
-
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 32 }}>
-          <div className="logo-brand" style={{ fontSize: 32, marginBottom: 40 }}>MyTeam</div>
-          {["Функции", "Клубове", "Въпроси"].map(item => (
-            <a key={item} href={`#${item}`} onClick={() => setMenuOpen(false)} className="mobile-nav-link" style={{ fontSize: 28, border: "none" }}>{item}</a>
-          ))}
-          <a href="#Контакт" onClick={() => setMenuOpen(false)} className="mobile-demo-btn" style={{ width: "80%", fontSize: 18 }}>ЗАЯВИ КОНСУЛТАЦИЯ</a>
-
-          <div style={{ marginTop: 40, textAlign: "center" }}>
-            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 14, marginBottom: 15 }}>СВЪРЖЕТЕ СЕ С НАС</div>
-            <a href="tel:0895919545" style={{ color: "var(--neon-green)", fontSize: 22, fontWeight: 700, textDecoration: "none" }}>0895 919 545</a>
-          </div>
+        <div className="nav-actions">
+          <a href="#Контакт" className="nav-demo-btn">БЕЗПЛАТНА КОНСУЛТАЦИЯ</a>
         </div>
       </div>
-    </>
+    </nav>
   );
 }
-
-function VideoModal({ onClose }) {
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        background: "rgba(0,0,0,.92)",
-        backdropFilter: "blur(10px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        animation: "fadeIn .3s ease"
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: "min(860px,94vw)",
-          background: CARD,
-          border: `1px solid rgba(57,255,20,.2)`,
-          borderRadius: 20,
-          overflow: "hidden",
-          boxShadow: `0 0 80px rgba(57,255,20,.15)`,
-          animation: "slideUp .35s cubic-bezier(.16,1,.3,1)"
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 28px", borderBottom: `1px solid rgba(255,255,255,.06)` }}>
-          <div style={{ fontFamily: "'Exo 2',sans-serif", fontWeight: 700, color: "#fff", fontSize: 16 }}>
-            <span style={{ color: G }}>My</span>Team — Как работи
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.5)", cursor: "pointer" }}>
-            <X size={22} />
-          </button>
-        </div>
-
-        <div
-          style={{
-            aspectRatio: "16/9",
-            background: "linear-gradient(135deg,#0a1628,#0d2040)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 20,
-            position: "relative",
-            overflow: "hidden"
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              opacity: 0.05,
-              backgroundImage: `linear-gradient(${G} 1px,transparent 1px),linear-gradient(90deg,${G} 1px,transparent 1px)`,
-              backgroundSize: "40px 40px"
-            }}
-          />
-          <div
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: "50%",
-              border: `2px solid ${G}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: `0 0 40px rgba(57,255,20,.4)`,
-              cursor: "pointer",
-              animation: "slowPulse 2s infinite",
-              background: "rgba(57,255,20,.08)",
-              position: "relative",
-              zIndex: 1
-            }}
-          >
-            <Play size={28} color={G} fill={G} style={{ marginLeft: 4 }} />
-          </div>
-          <div style={{ fontFamily: "'Exo 2',sans-serif", color: "rgba(255,255,255,.4)", fontSize: 13, position: "relative", zIndex: 1 }}>
-            Видео демонстрация — скоро
-          </div>
-        </div>
-
-        <div style={{ padding: "20px 28px", display: "flex", justifyContent: "center" }}>
-          <a
-            href="#Контакт"
-            onClick={onClose}
-            style={{
-              background: `linear-gradient(135deg,${G},#20C020)`,
-              color: "#000",
-              padding: "12px 32px",
-              borderRadius: 8,
-              fontFamily: "'Exo 2',sans-serif",
-              fontWeight: 700,
-              fontSize: 14,
-              textDecoration: "none"
-            }}
-          >
-            ЗАЯВЕТЕ LIVE ДЕМО →
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function FeatureCard({ feature, active, onClick }) {
   const isSub = feature.requiresSub;
@@ -1425,8 +1278,8 @@ function FeaturePopup({ feature, onClose }) {
   );
 }
 
-function LeadForm() {
-  const [form, setForm] = useState({ club: "", name: "", phone: "", kids: "" });
+function LeadForm({ onSuccess }) {
+  const [form, setForm] = useState({ club: "", name: "", email: "", phone: "", kids: "" });
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState("");
 
@@ -1435,8 +1288,8 @@ function LeadForm() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 1500));
     setLoading(false);
-    alert("Заявката е изпратена успешно!");
-    setForm({ club: "", name: "", phone: "", kids: "" });
+    onSuccess();
+    setForm({ club: "", name: "", email: "", phone: "", kids: "" });
   };
 
   const inp = (f) => ({
@@ -1451,13 +1304,14 @@ function LeadForm() {
         {[
           { id: "club", label: "Име на спортен клуб", icon: Trophy, ph: "Име на вашия клуб" },
           { id: "name", label: "Вашето име", icon: User, ph: "Вашите три имена" },
+          { id: "email", label: "Имейл адрес", icon: Mail, ph: "example@mail.com" },
           { id: "phone", label: "Телефон за връзка", icon: Phone, ph: "0XXXXXXXXX" },
           { id: "kids", label: "Приблизителен брой деца", icon: Users, ph: "пр. 150" }
         ].map(i => (
           <div key={i.id} className="form-group">
             <label className="form-label"><i.icon size={12} /> {i.label}</label>
             <input
-              type="text"
+              type={i.id === "email" ? "email" : "text"}
               placeholder={i.ph}
               value={form[i.id]}
               onChange={e => setForm({ ...form, [i.id]: e.target.value })}
@@ -1479,7 +1333,58 @@ function LeadForm() {
         )}
       </button>
 
-      <div className="form-footer-note">🔒 Данните Ви са защитени. Получавате 3 месеца гратисен период.</div>
+      <div className="form-footer-note">🔒 Данните Ви са защитени. Получавате 7 дена гратисен период.</div>
+    </div>
+  );
+}
+
+function SuccessModal({ onClose }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = "auto"; };
+  }, []);
+
+  return (
+    <div className="popup-overlay" style={{ zIndex: 10000, position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div className="popup-card success-popup" onClick={e => e.stopPropagation()} style={{ 
+        textAlign: "center", 
+        padding: "60px 40px",
+        border: "1px solid rgba(57, 255, 20, 0.2)",
+        boxShadow: "0 0 100px rgba(57, 255, 20, 0.15)",
+        maxWidth: 450
+      }}>
+        <div style={{ marginBottom: 48 }}>
+          <img src="/myteam-logo.png" alt="MyTeam Logo" className="nav-logo-img" style={{ height: 80, margin: "0 auto" }} />
+        </div>
+
+        <h2 className="popup-title" style={{ fontSize: 32, marginBottom: 16, fontFamily: "var(--serif-font)" }}>Заявката е приета!</h2>
+        
+        <p className="popup-desc" style={{ 
+          fontSize: 18, 
+          lineHeight: 1.6, 
+          color: "rgba(255,255,255,0.7)", 
+          marginBottom: 40,
+          maxWidth: 340,
+          margin: "0 auto 40px"
+        }}>
+          Вашата заявка е получена успешно. <br/>
+          Представител на MyTeam ще се свърже с вас до 24 часа.
+        </p>
+
+        <button onClick={onClose} className="popup-action-btn" style={{ 
+          width: "100%", 
+          height: 60,
+          fontSize: 16,
+          fontWeight: 800,
+          background: "var(--neon-green)",
+          backgroundImage: "linear-gradient(135deg, var(--neon-green), #20C020)",
+          color: "#000",
+          borderRadius: 14,
+          boxShadow: "0 10px 30px rgba(57, 255, 20, 0.3)"
+        }}>
+          РАЗБРАХ
+        </button>
+      </div>
     </div>
   );
 }
@@ -1524,56 +1429,52 @@ function RevealSection({ children }) {
 }
 
 export default function Home() {
-  const [videoOpen, setVideoOpen] = useState(false);
   const [subActive, setSubActive] = useState(false);
+  const [withSchedule, setWithSchedule] = useState(false);
   const [popup, setPopup] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [benefitsOpen, setBenefitsOpen] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const contactRef = useRef(null);
 
   return (
     <>
-      <NavBar menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-      {videoOpen && <VideoModal onClose={() => setVideoOpen(false)} />}
+      <NavBar />
       {popup && <FeaturePopup feature={popup} onClose={() => setPopup(null)} />}
+      {showSuccess && <SuccessModal onClose={() => setShowSuccess(false)} />}
 
       <RevealSection>
         <section className="hero-section" style={{ minHeight: "100vh", display: "flex", alignItems: "center" }}>
           <div className="hero-grid-bg" />
-          <div className="hero-content" style={{ maxWidth: 1280, margin: "0 auto", padding: "120px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div className="hero-tag" style={{ margin: "0 auto 48px auto", display: "flex", width: "fit-content" }}>
-              <div className="tag-pulse" />
-              <span className="tag-text">Powered by moozuk22</span>
-            </div>
+          <div className="hero-content" style={{ maxWidth: 1280, margin: "0 auto", padding: "80px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
 
             <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 64, width: "100%" }} className="hero-split">
               <div className="hero-text-col" style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <h1 className="hero-title">
-                  Спри да губиш време в <span className="hero-title-highlight">таблици.</span><br />
-                  Управлявай своя клуб професионално.
+                  <span className="hero-title-highlight">MyTeam</span> – интелигентна платформа за управление на клубове.
                 </h1>
 
-                <p className="hero-description" style={{ margin: "0 0 48px 0", maxWidth: 600, textAlign: "center" }}>
-                  MyTeam е интелигентна платформа за управление на спортни клубове – Проследявайте плащанията, използвайте онлайн график и се възползвайте от специални отстъпки.
+                <p className="hero-description" style={{ margin: "0 0 48px 0", maxWidth: 700, textAlign: "center" }}>
+                  Проследявайте плащанията, използвайте онлайн график и се възползвайте от специални отстъпки – всичко на едно място.
                 </p>
 
                 <div className="hero-actions" style={{ marginTop: 10 }}>
                   <a href="#Контакт" className="hero-btn-primary" style={{ background: "var(--neon-green)", boxShadow: "0 0 30px rgba(57, 255, 20, 0.4)", textDecoration: "none", display: "flex", alignItems: "center", gap: 10, color: "#000", padding: "16px 36px" }}>
-                    КОНСУЛТАЦИЯ →
+                    БЕЗПЛАТНА КОНСУЛТАЦИЯ →
                   </a>
-                  <button onClick={() => setVideoOpen(true)} className="hero-btn-secondary" style={{ padding: "16px 28px" }}>
+                  <a href="#Интерфейс" className="hero-btn-secondary" style={{ padding: "16px 28px", textDecoration: "none" }}>
                     ВИЖ КАК РАБОТИ ↓
-                  </button>
+                  </a>
                 </div>
 
-                <div className="stats-row" style={{ marginTop: 60, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", background: "none", border: "none", gap: 32 }}>
+                <div className="stats-row" style={{ marginTop: 60, background: "none", border: "none" }}>
                   {[
-                    { v: "10 мин.", l: "за пълна настройка" },
-                    { v: "70%", l: "по-малко просрочени такси" },
-                    { v: "3 мес.", l: "безплатен период" }
+                    { v: "10 мин.", l: "за настройка" },
+                    { v: "100%", l: "платени такси" },
+                    { v: "7 дни", l: "безплатен период" }
                   ].map((s, i) => (
-                    <div key={i} style={{ padding: 0 }}>
-                      <div className="stat-v-hero" style={{ fontFamily: "var(--serif-font)", fontSize: 32, color: "#fff" }}>{s.v}</div>
-                      <div className="stat-l-hero" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{s.l}</div>
+                    <div key={i} className="stat-col">
+                      <div className="stat-v-hero" style={{ fontFamily: "var(--serif-font)" }}>{s.v}</div>
+                      <div className="stat-l-hero">{s.l}</div>
                     </div>
                   ))}
                 </div>
@@ -1584,9 +1485,8 @@ export default function Home() {
       </RevealSection>
 
       <RevealSection>
-        <section className="system-section">
+        <section id="Интерфейс" className="system-section">
           <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <div className="section-tag-light" style={{ color: "var(--neon-green)" }}>ИНТЕРФЕЙС</div>
             <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Системата, която работи.</h2>
           </div>
           <InfiniteCarousel />
@@ -1594,31 +1494,34 @@ export default function Home() {
       </RevealSection>
 
       <RevealSection>
-        <section style={{ padding: "100px 24px", background: "#070C14", textAlign: "center" }}>
+        <section style={{ padding: "40px 24px", background: "#070C14", textAlign: "center" }}>
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-            <div className="section-tag-light">ПРОБЛЕМЪТ</div>
-            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)", marginBottom: 64, textAlign: "center" }}>Все още ли управляваш клуба „на ръка“?</h2>
-            
-            <div className="problem-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 32 }}>
+
+            <div className="problem-grid" style={{ 
+              display: "grid", 
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", 
+              gap: 24 
+            }}>
               {[
-                { icon: "📅", title: "Хаос с тефтери", desc: "Различни списъци и Excel-и водят до грешки и загубено време.", color: "#FFB000" },
-                { icon: "💸", title: "Нередовни плащания", desc: "Родителите забравят или закъсняват с таксите.", color: "var(--neon-green)" },
-                { icon: "📉", title: "Липса на контрол", desc: "Нямаш ясна представа кой е платил и кой не.", color: "#0080FF" }
+                { icon: "📅", title: "Административен хаос", desc: "Списъжите и Excel таблиците водят до системни грешки и загуба на време.", color: "#FFB000" },
+                { icon: "💸", title: "Нередовни такси", desc: "Липсата на автоматизирано следене принуждава „гоненето“ на родителите.", color: "var(--neon-green)" },
+                { icon: "📊", title: "Липса на контрол", desc: "Неясно присъствие на децата, което често води до спорове с родителите.", color: "#0080FF" },
+                { icon: "📢", title: "Комуникационен шум", desc: "Чат групите са пълни с излишни съобщения, а важната информация се губи.", color: "#FF3E3E" }
               ].map((p, i) => (
-                <div key={i} style={{ 
-                  background: "rgba(255,255,255,0.03)", 
-                  padding: 40, 
-                  borderRadius: 20, 
+                <div key={i} style={{
+                  background: "rgba(255,255,255,0.03)",
+                  padding: "28px 20px",
+                  borderRadius: 20,
                   border: "1px solid rgba(255,255,255,0.05)",
                   transition: "all 0.3s ease",
                   textAlign: "center"
                 }}>
-                  <div style={{ 
-                    fontSize: 40, 
-                    marginBottom: 20, 
-                    display: "flex", 
+                  <div style={{
+                    fontSize: 40,
+                    marginBottom: 20,
+                    display: "flex",
                     justifyContent: "center",
-                    filter: `drop-shadow(0 0 10px ${p.color}44)` 
+                    filter: `drop-shadow(0 0 10px ${p.color}44)`
                   }}>{p.icon}</div>
                   <h3 style={{ fontSize: 24, fontWeight: 700, marginBottom: 15 }}>{p.title}</h3>
                   <p style={{ color: "rgba(255,255,255,0.6)", lineHeight: 1.6 }}>{p.desc}</p>
@@ -1630,11 +1533,41 @@ export default function Home() {
       </RevealSection>
 
       <RevealSection>
-        <section style={{ padding: "100px 24px", background: "#05080F", textAlign: "center" }}>
+        <section className="comparison-section">
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Настояще / Бъдеще</h2>
+          </div>
+          <div className="comparison-grid">
+            <div className="comparison-col col-before">
+              <div className="comp-list">
+                {COMPARISON.before.map((item, i) => (
+                  <div key={i} className="comp-item">
+                    <CloseX size={18} className="comp-icon-x" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="comparison-col col-after">
+              <div className="comp-list">
+                {COMPARISON.after.map((item, i) => (
+                  <div key={i} className="comp-item">
+                    <Check size={18} className="comp-icon-v" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </RevealSection>
+
+      <RevealSection>
+        <section style={{ padding: "40px 24px", background: "#05080F", textAlign: "center" }}>
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             <div className="section-tag-light">РЕШЕНИЕТО</div>
-            <h2 className="section-title" style={{ marginBottom: 48, fontFamily: "var(--serif-font)", textAlign: "center" }}>MyTeam – цялостно решение за управление на клуб</h2>
-            
+            <h2 className="section-title" style={{ marginBottom: 32, fontFamily: "var(--serif-font)", textAlign: "center" }}>MyTeam – цялостно решение за управление на клуб</h2>
+
             <div style={{ display: "inline-block", textAlign: "left", marginBottom: 60, maxWidth: "100%" }}>
               {[
                 "Управление на деца, групи и треньори",
@@ -1648,7 +1581,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            
+
             <div className="ai-highlight-box">
               <div className="ai-box-header" style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center" }}>
                 <div style={{ fontSize: 28 }}>🧠</div>
@@ -1661,61 +1594,76 @@ export default function Home() {
       </RevealSection>
 
       <RevealSection>
-        <section style={{ padding: "100px 24px", background: "#070C14", textAlign: "center" }}>
+        <section style={{ padding: "40px 24px", background: "radial-gradient(circle at center, #0B1628 0%, #070C14 100%)", textAlign: "center" }}>
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
-            <div className="section-tag-light">ПОЛЗИТЕ</div>
-            <h2 className="section-title" style={{ marginBottom: 64, fontFamily: "var(--serif-font)", textAlign: "center" }}>Ползи за родителите</h2>
-            <div style={{ textAlign: "left", display: "inline-block", maxWidth: "100%" }}>
-              {[
-                { icon: "🎁", text: "Отстъпки в различни търговски вериги (Sport Depot и други)" },
-                { icon: "📱", text: "Проследяване на тренировки и плащания в реално време" },
-                { icon: "💳", text: "Смарт карта, която се изплаща сама чрез спестени средства" }
-              ].map((item, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-                  <div style={{ 
-                    fontSize: 28, 
-                    width: 60, 
-                    height: 60, 
-                    background: "rgba(255,255,255,0.03)", 
-                    borderRadius: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0
-                  }}>{item.icon}</div>
-                  <span style={{ fontSize: 18, fontWeight: 500 }}>{item.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </RevealSection>
-
-      <RevealSection>
-        <section className="comparison-section">
-          <div style={{ textAlign: "center", marginBottom: 64 }}>
-            <div className="section-tag-light" style={{ color: "var(--neon-green)" }}>ТРАНСФОРМАЦИЯТА</div>
-            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Животът преди и след MyTeam.</h2>
-          </div>
-          <div className="comparison-grid">
-            <div className="comparison-col col-before">
-              <h3 className="comp-title" style={{ color: "#ff4d4d" }}>Преди</h3>
-              <div className="comp-list">
-                {COMPARISON.before.map((item, i) => (
-                  <div key={i} className="comp-item">
-                    <CloseX size={18} className="comp-icon-x" />
-                    <span>{item}</span>
-                  </div>
-                ))}
+            
+            <div 
+              onClick={() => setBenefitsOpen(!benefitsOpen)}
+              style={{
+                cursor: "pointer",
+                display: "inline-flex",
+                flexDirection: "column",
+                alignItems: "center",
+                userSelect: "none",
+                transition: "all 0.3s ease"
+              }}
+              className="benefits-dropdown-trigger"
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                <h2 className="section-title" style={{ 
+                  marginBottom: 0, 
+                  fontFamily: "var(--serif-font)", 
+                  color: benefitsOpen ? "var(--neon-green)" : "#fff",
+                  transition: "color 0.4s ease"
+                }}>Ползи за родителите</h2>
+                <div style={{ 
+                  fontSize: 28, 
+                  color: "var(--neon-green)",
+                  transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                  transform: benefitsOpen ? "rotate(180deg)" : "rotate(0deg)"
+                }}>▾</div>
               </div>
+              <div style={{ 
+                width: benefitsOpen ? "100%" : "60px", 
+                height: "2px", 
+                background: "linear-gradient(90deg, transparent, var(--neon-green), transparent)", 
+                marginTop: 15,
+                transition: "width 0.6s ease",
+                opacity: benefitsOpen ? 1 : 0.3
+              }} />
             </div>
-            <div className="comparison-col col-after">
-              <h3 className="comp-title" style={{ color: "var(--neon-green)" }}>След MyTeam</h3>
-              <div className="comp-list">
-                {COMPARISON.after.map((item, i) => (
-                  <div key={i} className="comp-item">
-                    <Check size={18} className="comp-icon-v" />
-                    <span>{item}</span>
+
+            <div style={{ 
+              maxHeight: benefitsOpen ? "2000px" : "0", 
+              opacity: benefitsOpen ? 1 : 0,
+              overflow: "hidden",
+              transition: "all 1s cubic-bezier(0.4, 0, 0.2, 1)",
+              textAlign: "left",
+              marginTop: benefitsOpen ? 60 : 0
+            }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 32, paddingBottom: 40 }}>
+                {[
+                  { icon: "🎁", text: "Отстъпки в различни търговски вериги (Sport Depot и други)", desc: "Спестявайте от спортна екипировка, обувки и аксесоари чрез партньорската ни мрежа." },
+                  { icon: "📱", text: "Проследяване на тренировки и плащания в реално време", desc: "Пълен контрол през вашето мобилно устройство без нужда от излишни обаждания." },
+                  { icon: "💳", text: "Смарт карта, която се изплаща сама чрез спестени средства", desc: "Уникална дигитална карта, която ви носи реална добавена стойност всеки месец." }
+                ].map((item, i) => (
+                  <div key={i} className="benefit-card">
+                    <div style={{
+                      fontSize: 32,
+                      width: 64,
+                      height: 64,
+                      background: "rgba(57, 255, 20, 0.05)",
+                      borderRadius: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      border: "1px solid rgba(57, 255, 20, 0.1)"
+                    }}>{item.icon}</div>
+                    <div className="benefit-card-content">
+                      <h4 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: "var(--neon-green)" }}>{item.text}</h4>
+                      <p style={{ color: "rgba(255,255,255,0.5)", lineHeight: 1.6, fontSize: 16 }}>{item.desc}</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1766,11 +1714,11 @@ export default function Home() {
       </RevealSection> */}
 
       <RevealSection>
-        <section className="pricing-section">
-          <div style={{ textAlign: "center", marginBottom: 64 }}>
+        <section id="Цени" className="pricing-section">
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div className="section-tag-light" style={{ color: "var(--neon-green)" }}>ПРОЗРАЧНИ ЦЕНИ</div>
             <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Избери правилния път за развитие.</h2>
-            <p style={{ color: "var(--neon-green)", fontWeight: 700, marginTop: 10 }}>* 3 месеца гратисен период за нови клубове!</p>
+            <p style={{ color: "var(--neon-green)", fontWeight: 700, marginTop: 10 }}>* 7 дни безплатен период за нови клубове!</p>
           </div>
           <div className="pricing-grid">
             {[
@@ -1782,15 +1730,56 @@ export default function Home() {
                 {plan.popular && <div className="pricing-badge">НАЙ-ПРЕДПОЧИТАН</div>}
                 <h3 className="comp-title">{plan.count}</h3>
                 <div className="price-box">
-                  <span className="price-val">{plan.price}</span>
+                  <span className="price-val" style={{ filter: "blur(12px)", userSelect: "none", transition: "all 0.4s ease" }}>
+                    {i === 0 ? "??€" : i === 1 ? "??€" : "???€"}{withSchedule ? " + ??€" : ""}
+                  </span>
                   <span className="price-unit">/ месец</span>
                 </div>
-                <div className="comp-list" style={{ marginBottom: 40 }}>
-                  <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Всички модули и Pro функции</span></div>
+                <div className="comp-list" style={{ marginBottom: 24 }}>
+                  <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Обучение и интеграция</span></div>
                   <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Смарт карти за достъп</span></div>
-                  <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Партньорска мрежа</span></div>
-                  <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span style={{ fontWeight: 700, color: "var(--neon-green)" }}>3 месеца гратисен период</span></div>
+                  <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Партньорски отстъпки</span></div>
                 </div>
+
+                <div 
+                  onClick={() => setWithSchedule(!withSchedule)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 16px",
+                    background: withSchedule ? "rgba(57, 255, 20, 0.1)" : "rgba(255,255,255,0.03)",
+                    borderRadius: 12,
+                    cursor: "pointer",
+                    border: `1px solid ${withSchedule ? "rgba(57, 255, 20, 0.3)" : "rgba(255,255,255,0.05)"}`,
+                    marginBottom: 32,
+                    transition: "all 0.3s ease"
+                  }}
+                >
+                  <div style={{
+                    width: 36,
+                    height: 20,
+                    background: withSchedule ? "var(--neon-green)" : "rgba(255,255,255,0.1)",
+                    borderRadius: 20,
+                    position: "relative",
+                    transition: "all 0.3s ease"
+                  }}>
+                    <div style={{
+                      width: 14,
+                      height: 14,
+                      background: withSchedule ? "#000" : "#fff",
+                      borderRadius: "50%",
+                      position: "absolute",
+                      top: 3,
+                      left: withSchedule ? 19 : 3,
+                      transition: "all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: withSchedule ? "var(--neon-green)" : "rgba(255,255,255,0.5)" }}>
+                    ТРЕНИРОВЪЧЕН ГРАФИК
+                  </span>
+                </div>
+
                 <a href="#Контакт" className="nav-demo-btn" style={{
                   width: "100%",
                   background: plan.popular ? "var(--neon-green)" : "none",
@@ -1800,7 +1789,7 @@ export default function Home() {
                   textAlign: "center",
                   display: "inline-block"
                 }}>
-                  {plan.popular ? "3 МЕСЕЦА БЕЗ ТАКСА" : "ЗАПОЧНИ СЕГА"}
+                  {plan.popular ? "7 ДНИ БЕЗ ТАКСА" : "ЗАПОЧНИ СЕГА"}
                 </a>
               </div>
             ))}
@@ -1809,7 +1798,7 @@ export default function Home() {
       </RevealSection>
 
       <RevealSection>
-        <section id="Партньори" style={{ padding: "100px 24px", background: "rgba(255,255,255,0.01)" }}>
+        <section id="Партньори" style={{ padding: "40px 24px", background: "rgba(255,255,255,0.01)" }}>
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
               <div className="section-tag-light">МРЕЖА ОТ ПАРТНЬОРИ</div>
@@ -1836,58 +1825,65 @@ export default function Home() {
           </div>
         </section>
       </RevealSection>
-
+      
       <RevealSection>
-        <section id="Въпроси" style={{ padding: "80px 24px", background: "#05080F" }}>
-          <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Още се колебаеш?</h2>
-            <p style={{ color: "rgba(255,255,255,0.5)", marginBottom: 40 }}>Можем да ти помогнем да дигитализираш клуба си за по-малко от седмица.</p>
-            <a href="tel:0895919545" style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 12,
-              fontSize: 24,
-              color: "var(--neon-green)",
-              textDecoration: "none",
-              fontFamily: "var(--serif-font)"
-            }}>
-              <PhoneCall size={24} /> 0895 919 545
-            </a>
-          </div>
-        </section>
-      </RevealSection>
-
-      <RevealSection>
-        <section id="Контакт" ref={contactRef} style={{ padding: "90px 24px", background: `linear-gradient(180deg,#09101C 0%,${BG} 100%)` }}>
+        <section id="Контакт" ref={contactRef} style={{ padding: "40px 24px", background: `linear-gradient(180deg,#09101C 0%,${BG} 100%)` }}>
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 48 }}>
-              <div className="section-tag-light">◆ ЗАЯВЕТЕ ДЕМО И 3 МЕСЕЦА БЕЗ ТАКСА</div>
-              <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Готови ли сте за следващото ниво?</h2>
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <div className="section-tag-light">◆ ЗАЯВЕТЕ ДЕМО И 7 ДНИ БЕЗ ТАКСА</div>
+              <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Получете детайлна оферта до 24 часа.</h2>
             </div>
-            <LeadForm />
+            <LeadForm onSuccess={() => setShowSuccess(true)} />
           </div>
         </section>
       </RevealSection>
 
       <footer className="main-footer">
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "center", 
+          gap: 32, 
+          marginBottom: 32, 
+          paddingBottom: 32, 
+          borderBottom: "1px solid rgba(255,255,255,0.03)" 
+        }}>
+          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ЗАЩИТА НА ЛИЧНИ ДАННИ</a>
+          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ОБЩИ УСЛОВИЯ</a>
+        </div>
+
         <div className="footer-container">
           <div className="footer-logo">
-            <div className="footer-brand" style={{ fontFamily: "var(--serif-font)", fontSize: 24 }}>MyTeam</div>
+            <img src="/myteam-logo.png" alt="MyTeam Logo" style={{ height: 50, width: "auto" }} />
           </div>
-          <div className="footer-copyright">© 2026 MyTeam. Всички права запазени.</div>
+          <div className="footer-copyright">
+            © 2026 MyTeam. Всички права запазени.
+          </div>
           <div className="footer-dots">
             {[G, B, G].map((c, i) => (
               <div key={i} className="footer-dot" style={{ background: c, animationDelay: `${i * 0.3}s` }} />
             ))}
           </div>
         </div>
+
+        <div style={{
+          marginTop: 40,
+          textAlign: "center",
+          fontSize: 10,
+          color: "rgba(255,255,255,0.1)",
+          textTransform: "uppercase",
+          letterSpacing: 2,
+          borderTop: "1px solid rgba(255,255,255,0.03)",
+          paddingTop: 20
+        }}>
+          ◆ Powered by moozuk22 ◆
+        </div>
       </footer>
 
       <div className="sticky-actions">
-        <a href="viber://chat?number=%2B359895919545" className="action-btn action-viber" title="Viber">
+        <a href="viber://chat?number=%2B359896495254" className="action-btn action-viber" title="Viber">
           <img src="/viber.png" alt="Viber" style={{ width: 50, height: 50, objectFit: "contain" }} />
         </a>
-        <a href="tel:0895919545" className="action-btn action-phone" title="Call Us">
+        <a href="tel:0896495254" className="action-btn action-phone" title="Call Us">
           <PhoneCall size={24} />
         </a>
       </div>
