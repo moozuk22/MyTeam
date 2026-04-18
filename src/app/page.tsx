@@ -1562,7 +1562,7 @@ export default function Home() {
         </section>
       </RevealSection>
 
-      <RevealSection>
+      {/* <RevealSection>
         <section style={{ padding: "40px 24px", background: "#05080F", textAlign: "center" }}>
           <div style={{ maxWidth: 900, margin: "0 auto" }}>
             <div className="section-tag-light">РЕШЕНИЕТО</div>
@@ -1591,7 +1591,7 @@ export default function Home() {
             </div>
           </div>
         </section>
-      </RevealSection>
+      </RevealSection> */}
 
       <RevealSection>
         <section style={{ padding: "40px 24px", background: "radial-gradient(circle at center, #0B1628 0%, #070C14 100%)", textAlign: "center" }}>
@@ -1717,7 +1717,7 @@ export default function Home() {
         <section id="Цени" className="pricing-section">
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div className="section-tag-light" style={{ color: "var(--neon-green)" }}>ПРОЗРАЧНИ ЦЕНИ</div>
-            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Избери правилния път за развитие.</h2>
+            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Преференциални условия за първи потребители.</h2>
             <p style={{ color: "var(--neon-green)", fontWeight: 700, marginTop: 10 }}>* 7 дни безплатен период за нови клубове!</p>
           </div>
           <div className="pricing-grid">
@@ -1796,6 +1796,18 @@ export default function Home() {
           </div>
         </section>
       </RevealSection>
+      
+      <RevealSection>
+        <section id="Контакт" ref={contactRef} style={{ padding: "40px 24px", background: `linear-gradient(180deg,#09101C 0%,${BG} 100%)` }}>
+          <div style={{ maxWidth: 800, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <div className="section-tag-light">◆ ЗАЯВЕТЕ ДЕМО И 7 ДНИ БЕЗ ТАКСА</div>
+              <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Получете детайлна оферта до 24 часа.</h2>
+            </div>
+            <LeadForm onSuccess={() => setShowSuccess(true)} />
+          </div>
+        </section>
+      </RevealSection>
 
       <RevealSection>
         <section id="Партньори" style={{ padding: "40px 24px", background: "rgba(255,255,255,0.01)" }}>
@@ -1822,18 +1834,6 @@ export default function Home() {
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-      </RevealSection>
-      
-      <RevealSection>
-        <section id="Контакт" ref={contactRef} style={{ padding: "40px 24px", background: `linear-gradient(180deg,#09101C 0%,${BG} 100%)` }}>
-          <div style={{ maxWidth: 800, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <div className="section-tag-light">◆ ЗАЯВЕТЕ ДЕМО И 7 ДНИ БЕЗ ТАКСА</div>
-              <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Получете детайлна оферта до 24 часа.</h2>
-            </div>
-            <LeadForm onSuccess={() => setShowSuccess(true)} />
           </div>
         </section>
       </RevealSection>
