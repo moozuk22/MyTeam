@@ -1534,7 +1534,7 @@ export default function Home() {
       <RevealSection>
         <section id="Интерфейс" className="system-section">
           <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Системата, която работи.</h2>
+            <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Системата, която работи!</h2>
           </div>
           <InfiniteCarousel />
         </section>
