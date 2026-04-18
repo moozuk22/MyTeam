@@ -1282,14 +1282,45 @@ function LeadForm({ onSuccess }) {
   const [form, setForm] = useState({ club: "", name: "", email: "", phone: "", kids: "" });
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState("");
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    
+    // Basic validation: ensure all fields are filled
+    if (!form.club || !form.name || !form.email || !form.phone || !form.kids) {
+      setError("Моля попълнете абсолютно всички полета.");
+      return;
+    }
+
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setLoading(false);
-    onSuccess();
-    setForm({ club: "", name: "", email: "", phone: "", kids: "" });
+
+    try {
+      const response = await fetch("https://formspree.io/f/mpqkrzqb", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          "Име на клуб": form.club,
+          "Лице за контакт": form.name,
+          "Имейл": form.email,
+          "Телефон": form.phone,
+          "Брой деца": form.kids,
+          _subject: `НОВО ЗАПИТВАНЕ: ${form.club}`
+        })
+      });
+
+      if (response.ok) {
+        onSuccess();
+        setForm({ club: "", name: "", email: "", phone: "", kids: "" });
+      } else {
+        setError("Възникна грешка. Моля опитайте отново по-късно.");
+      }
+    } catch (err) {
+      setError("Проблем с връзката. Моля проверете интернета си.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inp = (f) => ({
@@ -1320,6 +1351,22 @@ function LeadForm({ onSuccess }) {
           </div>
         ))}
       </div>
+
+      {error && (
+        <div style={{ 
+          color: "#FF3E3E", 
+          fontSize: 13, 
+          fontWeight: 600, 
+          marginTop: 20, 
+          textAlign: "center",
+          background: "rgba(255, 62, 62, 0.1)",
+          padding: "10px 16px",
+          borderRadius: 10,
+          border: "1px solid rgba(255, 62, 62, 0.2)"
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
 
       <button onClick={handleSubmit} disabled={loading} className={`form-submit-btn ${loading ? "btn-loading" : ""}`} style={{ marginTop: 24 }}>
         {loading ? (
