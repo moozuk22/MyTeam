@@ -1529,7 +1529,14 @@ function InfiniteCarousel({ onExpand }) {
     const ro = new ResizeObserver(update);
     ro.observe(container);
     update();
-    return () => ro.disconnect();
+
+    // Safety fallback
+    const fallback = setTimeout(update, 1000);
+
+    return () => {
+      ro.disconnect();
+      clearTimeout(fallback);
+    };
   }, []);
 
   useEffect(() => {
@@ -1602,7 +1609,7 @@ function InfiniteCarousel({ onExpand }) {
       onTouchStart={handleDragStart}
       onTouchEnd={() => setIsMouseDown(false)}
       onTouchMove={handleDragMove}
-      style={{ cursor: isMouseDown ? 'grabbing' : 'grab', opacity: isReady ? 1 : 0 }}
+      style={{ cursor: isMouseDown ? 'grabbing' : 'grab' }}
     >
       <div className="carousel-track" ref={trackRef}>
         {allItems.map((item, i) =>
