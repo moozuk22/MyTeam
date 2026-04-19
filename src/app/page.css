@@ -151,6 +151,17 @@ img {
   display: flex !important;
   width: max-content;
   gap: 40px;
+  animation: scrollInfinite 30s linear infinite;
+  will-change: transform;
+}
+
+@keyframes scrollInfinite {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.carousel-container:hover .carousel-track {
+  animation-play-state: paused;
 }
 
 .carousel-item {
