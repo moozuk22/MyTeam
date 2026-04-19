@@ -1437,15 +1437,41 @@ function SuccessModal({ onClose }) {
 }
 
 const CAROUSEL_IMAGES = [
-  { src: "/reports-screen.png", alt: "Център за отчети" },
+  { src: "/1.png", alt: "MyTeam Interface — Dashboard" },
+  { src: "/2.png", alt: "MyTeam Interface — Players Management" },
+  { src: "/3.png", alt: "MyTeam Interface — Reports & Analytics" },
+  { src: "/4.png", alt: "MyTeam Interface — Schedule" },
+  { src: "/5.png", alt: "MyTeam Interface — Smart Access" },
 ];
 
-function InfiniteCarousel() {
-  const placeholderCount = 7;
+function Lightbox({ image, onClose }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = "auto"; };
+  }, []);
+
+  return (
+    <div className="lightbox-overlay" onClick={onClose}>
+      <div className="lightbox-content" onClick={e => e.stopPropagation()}>
+        <button className="lightbox-close" onClick={onClose}>
+          <X size={24} />
+        </button>
+        <img src={image.src} alt={image.alt} className="lightbox-img" />
+      </div>
+    </div>
+  );
+}
+
+function InfiniteCarousel({ onExpand }) {
+  const placeholderCount = 1;
   const placeholders = Array.from({ length: placeholderCount });
 
   const imageItems = CAROUSEL_IMAGES.map((img, i) => (
-    <div key={`img-${i}`} className="carousel-item carousel-item-image">
+    <div 
+      key={`img-${i}`} 
+      className="carousel-item carousel-item-image"
+      onClick={() => onExpand(img)}
+    >
       <img src={img.src} alt={img.alt} className="carousel-img" />
     </div>
   ));
@@ -1495,6 +1521,7 @@ export default function Home() {
   const [subActive, setSubActive] = useState(false);
   const [withSchedule, setWithSchedule] = useState(false);
   const [popup, setPopup] = useState(null);
+  const [expandedImage, setExpandedImage] = useState(null);
   const [benefitsOpen, setBenefitsOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const contactRef = useRef(null);
@@ -1503,6 +1530,7 @@ export default function Home() {
     <>
       <NavBar />
       {popup && <FeaturePopup feature={popup} onClose={() => setPopup(null)} />}
+      {expandedImage && <Lightbox image={expandedImage} onClose={() => setExpandedImage(null)} />}
       {showSuccess && <SuccessModal onClose={() => setShowSuccess(false)} />}
 
       <RevealSection>
@@ -1513,7 +1541,7 @@ export default function Home() {
             <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 64, width: "100%" }} className="hero-split">
               <div className="hero-text-col" style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <h1 className="hero-title">
-                  <span className="hero-title-highlight">MyTeam</span> – интелигентна платформа за управление на Вашия клуб!
+                  <span className="hero-title-highlight">MyTeam</span> – интелигентна платформа за управление на Вашия клуб.
                 </h1>
 
                 <p className="hero-description" style={{ margin: "0 0 48px 0", maxWidth: 700, textAlign: "center" }}>
@@ -1552,7 +1580,7 @@ export default function Home() {
           <div style={{ textAlign: "center", marginBottom: 20 }}>
             <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Системата, която работи!</h2>
           </div>
-          <InfiniteCarousel />
+          <InfiniteCarousel onExpand={setExpandedImage} />
         </section>
       </RevealSection>
 
