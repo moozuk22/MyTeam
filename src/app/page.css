@@ -123,7 +123,7 @@ img {
 /* ── INFINITE CAROUSEL ── */
 /* ── INFINITE CAROUSEL ── */
 .system-section {
-  padding: 0 0 100px 0;
+  padding: 0 0 0 0;
   overflow: hidden;
   background: var(--bg-dark);
 }
@@ -134,6 +134,11 @@ img {
   position: relative;
   margin-top: 40px;
   padding: 40px 0;
+  cursor: grab;
+}
+
+.carousel-container.dragging {
+  cursor: grabbing;
 }
 
 .reveal-hidden {
@@ -151,17 +156,6 @@ img {
   display: flex !important;
   width: max-content;
   gap: 40px;
-  animation: scrollInfinite 30s linear infinite;
-  will-change: transform;
-}
-
-@keyframes scrollInfinite {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.carousel-container:hover .carousel-track {
-  animation-play-state: paused;
 }
 
 .carousel-item {
@@ -207,15 +201,6 @@ img {
   border-radius: 24px;
 }
 
-@keyframes scrollInfinite {
-  0% {
-    transform: translateX(0);
-  }
-
-  100% {
-    transform: translateX(-50%);
-  }
-}
 
 /* ── IMAGE MODAL / LIGHTBOX ── */
 .lightbox-overlay {
