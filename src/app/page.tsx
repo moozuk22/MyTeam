@@ -1741,7 +1741,7 @@ export default function Home() {
             <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 64, width: "100%" }} className="hero-split">
               <div className="hero-text-col" style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <h1 className="hero-title">
-                  <span className="hero-title-highlight"><span style={{ color: "#fff" }}>My</span>Team</span> – интелигентна платформа за управление на Вашия клуб.
+                  <span className="hero-title-highlight"><span style={{ color: "#fff" }}>My</span>Team</span> – интелигентна платформа за управление на Вашия клуб
                 </h1>
 
                 <p className="hero-description" style={{ margin: "0 0 48px 0", maxWidth: 700, textAlign: "center" }}>
@@ -1813,8 +1813,8 @@ export default function Home() {
             }}>
               {[
                 { icon: "📅", title: "Административен хаос", desc: "Хартиените списъци и Excel таблиците водят до системни грешки и загуба на време.", color: "#FFB000" },
-                { icon: "💸", title: "Нередовни такси", desc: "Липсата на автоматизирано следене принуждава „гоненето“ на родителите.", color: "var(--neon-green)" },
-                { icon: "📊", title: "Липса на контрол", desc: "Неясно присъствие на децата, което често води до спорове с родителите.", color: "#0080FF" },
+                { icon: "💸", title: "Нередовни такси", desc: "Липсата на автоматизация при плащанията, води до неприятни разговори с родителите.", color: "var(--neon-green)" },
+                { icon: "📊", title: "Липса на контрол", desc: "Край на нерегламентираните отсъствия от тренировъчния процес.", color: "#0080FF" },
                 { icon: "📢", title: "Комуникационен шум", desc: "Чат групите са пълни с излишни съобщения, а важната информация се губи.", color: "#FF3E3E" }
               ].map((p, i) => (
                 <div key={i} style={{
@@ -1903,87 +1903,6 @@ export default function Home() {
           </div>
         </section>
       </RevealSection> */}
-
-      <RevealSection>
-        <section style={{ padding: "40px 24px", background: "radial-gradient(circle at center, #0B1628 0%, #070C14 100%)", textAlign: "center" }}>
-          <div style={{ maxWidth: 800, margin: "0 auto" }}>
-
-            <div
-              onClick={() => setBenefitsOpen(!benefitsOpen)}
-              style={{
-                cursor: "pointer",
-                display: "inline-flex",
-                flexDirection: "column",
-                alignItems: "center",
-                userSelect: "none",
-                transition: "all 0.3s ease"
-              }}
-              className="benefits-dropdown-trigger"
-            >
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                <h2 className="section-title" style={{
-                  marginBottom: 0,
-                  fontFamily: "var(--serif-font)",
-                  color: benefitsOpen ? "var(--neon-green)" : "#fff",
-                  transition: "color 0.4s ease",
-                  textAlign: "center"
-                }}>Ползи за родителите</h2>
-                <div style={{
-                  fontSize: 32,
-                  lineHeight: 1,
-                  color: "var(--neon-green)",
-                  transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-                  transform: benefitsOpen ? "rotate(180deg)" : "rotate(0deg)"
-                }}>▾</div>
-              </div>
-              <div style={{
-                width: benefitsOpen ? "100%" : "60px",
-                height: "2px",
-                background: "linear-gradient(90deg, transparent, var(--neon-green), transparent)",
-                marginTop: 15,
-                transition: "width 0.6s ease",
-                opacity: benefitsOpen ? 1 : 0.3
-              }} />
-            </div>
-
-            <div style={{
-              maxHeight: benefitsOpen ? "2000px" : "0",
-              opacity: benefitsOpen ? 1 : 0,
-              overflow: "hidden",
-              transition: "all 1s cubic-bezier(0.4, 0, 0.2, 1)",
-              textAlign: "left",
-              marginTop: benefitsOpen ? 60 : 0
-            }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 32, paddingBottom: 40 }}>
-                {[
-                  { icon: "🎁", text: "Отстъпки в различни търговски вериги (Sport Depot и други)", desc: "Спестявайте от спортна екипировка, обувки и аксесоари чрез партньорската ни мрежа." },
-                  { icon: "📱", text: "Проследяване на тренировки и плащания в реално време", desc: "Пълен контрол през вашето мобилно устройство без нужда от излишни обаждания." },
-                  { icon: "💳", text: "Смарт карта, която се изплаща сама чрез спестени средства", desc: "Уникална дигитална карта, която ви носи реална добавена стойност всеки месец." }
-                ].map((item, i) => (
-                  <div key={i} className="benefit-card">
-                    <div style={{
-                      fontSize: 32,
-                      width: 64,
-                      height: 64,
-                      background: "rgba(57, 255, 20, 0.05)",
-                      borderRadius: 16,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      border: "1px solid rgba(57, 255, 20, 0.1)"
-                    }}>{item.icon}</div>
-                    <div className="benefit-card-content">
-                      <h4 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: "var(--neon-green)" }}>{item.text}</h4>
-                      <p style={{ color: "rgba(255,255,255,0.5)", lineHeight: 1.6, fontSize: 16 }}>{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      </RevealSection>
 
       {/* <RevealSection>
         <section id="Функции" className="features-section">
@@ -2118,6 +2037,83 @@ export default function Home() {
               <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Получете детайлна оферта до 24 часа.</h2>
             </div>
             <LeadForm onSuccess={() => setShowSuccess(true)} />
+          </div>
+        </section>
+      </RevealSection>
+
+      <RevealSection>
+        <section style={{ padding: "40px 24px", background: "radial-gradient(circle at center, #0B1628 0%, #070C14 100%)", textAlign: "center" }}>
+          <div style={{ maxWidth: 800, margin: "0 auto" }}>
+
+            <button
+                onClick={() => setBenefitsOpen(!benefitsOpen)}
+                className="benefits-toggle-btn"
+                style={{
+                  background: "linear-gradient(135deg, var(--neon-green), #20C020)",
+                  color: "#000",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "16px 36px",
+                  fontFamily: "'Exo 2', sans-serif",
+                  fontWeight: 800,
+                  fontSize: 15,
+                  letterSpacing: 1,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 10,
+                  boxShadow: benefitsOpen
+                    ? "0 0 55px rgba(57, 255, 20, 0.7)"
+                    : "0 0 30px rgba(57, 255, 20, 0.4)",
+                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                  userSelect: "none"
+                }}
+            >
+              ПОЛЗИ ЗА РОДИТЕЛИТЕ
+              <span style={{
+                fontSize: 20,
+                lineHeight: 1,
+                transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                transform: benefitsOpen ? "rotate(180deg)" : "rotate(0deg)",
+                display: "inline-block"
+              }}>▾</span>
+            </button>
+
+            <div style={{
+              maxHeight: benefitsOpen ? "2000px" : "0",
+              opacity: benefitsOpen ? 1 : 0,
+              overflow: "hidden",
+              transition: "all 1s cubic-bezier(0.4, 0, 0.2, 1)",
+              textAlign: "left",
+              marginTop: benefitsOpen ? 60 : 0
+            }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 32, paddingBottom: 40 }}>
+                {[
+                  { icon: "🎁", text: "Отстъпки в различни търговски вериги (Sport Depot и други)", desc: "Спестявайте от спортна екипировка, обувки и аксесоари чрез партньорската ни мрежа." },
+                  { icon: "📱", text: "Проследяване на тренировки и плащания в реално време", desc: "Пълен контрол през вашето мобилно устройство без нужда от излишни обаждания." },
+                  { icon: "💳", text: "Смарт карта, която се изплаща сама чрез спестени средства", desc: "Уникална дигитална карта, която ви носи реална добавена стойност всеки месец." }
+                ].map((item, i) => (
+                    <div key={i} className="benefit-card">
+                      <div style={{
+                        fontSize: 32,
+                        width: 64,
+                        height: 64,
+                        background: "rgba(57, 255, 20, 0.05)",
+                        borderRadius: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        border: "1px solid rgba(57, 255, 20, 0.1)"
+                      }}>{item.icon}</div>
+                      <div className="benefit-card-content">
+                        <h4 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: "var(--neon-green)" }}>{item.text}</h4>
+                        <p style={{ color: "rgba(255,255,255,0.5)", lineHeight: 1.6, fontSize: 16 }}>{item.desc}</p>
+                      </div>
+                    </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
       </RevealSection>
