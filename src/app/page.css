@@ -129,26 +129,22 @@ img {
 }
 
 .carousel-container {
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  overflow: hidden;
   width: 100%;
   position: relative;
   margin-top: 40px;
   padding: 40px 0;
-  cursor: grab;
-}
-
-.carousel-container::-webkit-scrollbar {
-  display: none;
 }
 
 .carousel-track {
   display: flex !important;
   width: max-content;
+  animation: scrollInfinite 60s linear infinite;
   gap: 24px;
-  will-change: scroll-position;
+}
+
+.carousel-container:hover .carousel-track {
+  animation-play-state: paused;
 }
 
 .carousel-item {

@@ -1504,12 +1504,6 @@ function Lightbox({ image, onClose }) {
 }
 
 function InfiniteCarousel({ onExpand }) {
-  const containerRef = useRef(null);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [startX, setStartX] = useState(0);
-
-
   const imageItems = CAROUSEL_IMAGES.map((img, i) => (
     <div
       key={`img-${i}`}
@@ -1528,127 +1522,12 @@ function InfiniteCarousel({ onExpand }) {
     </div>
   ));
 
-  const allItems = [...imageItems];
-
-  const handleMouseDown = (e) => {
-    setIsMouseDown(true);
-    setStartX(e.pageX - containerRef.current.offsetLeft);
-  };
-
-  const handleMouseLeave = () => {
-    setIsMouseDown(false);
-    setIsHovered(false);
-  };
-
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-  };
-
-  const handleMouseUp = () => {
-    setIsMouseDown(false);
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isMouseDown) return;
-    e.preventDefault();
-    const x = e.pageX - containerRef.current.offsetLeft;
-    const delta = (x - startX) * 2;
-    setStartX(x);
-
-    const container = containerRef.current;
-    if (!container) return;
-    
-    const segmentWidth = container.scrollWidth / 3;
-    container.scrollLeft -= delta;
-
-    // Seamless loop teleport
-    if (container.scrollLeft <= 0) {
-      container.scrollLeft += segmentWidth;
-    } else if (container.scrollLeft >= segmentWidth * 2) {
-      container.scrollLeft -= segmentWidth;
-    }
-  };
-
-  const handleTouchStart = (e) => {
-    setIsMouseDown(true);
-    setIsHovered(true);
-    setStartX(e.touches[0].pageX - containerRef.current.offsetLeft);
-  };
-
-  const handleTouchEnd = () => {
-    setIsMouseDown(false);
-    setIsHovered(false);
-  };
-
-  const handleTouchMove = (e) => {
-    if (!isMouseDown) return;
-    // Don't preventDefault here to allow vertical page scroll (touchAction: pan-y handles it)
-    const x = e.touches[0].pageX - containerRef.current.offsetLeft;
-    const delta = (x - startX) * 1.5;
-    setStartX(x);
-
-    const container = containerRef.current;
-    if (!container) return;
-
-    const segmentWidth = container.scrollWidth / 3;
-    container.scrollLeft -= delta;
-
-    // Seamless loop teleport
-    if (container.scrollLeft <= 0) {
-      container.scrollLeft += segmentWidth;
-    } else if (container.scrollLeft >= segmentWidth * 2) {
-      container.scrollLeft -= segmentWidth;
-    }
-  };
-
-  useEffect(() => {
-    let animationId;
-    const speed = 0.8;
-    const container = containerRef.current;
-    if (!container) return;
-
-    const run = () => {
-      if (!isMouseDown && !isHovered) {
-        const seg = container.scrollWidth / 3;
-        if (seg > 0) {
-          container.scrollLeft += speed;
-          if (container.scrollLeft >= seg * 2) {
-            container.scrollLeft -= seg;
-          }
-        }
-      }
-      animationId = requestAnimationFrame(run);
-    };
-
-    // Center it immediately if we can, or wait for content
-    const init = () => {
-      if (container.scrollWidth > 500) {
-        container.scrollLeft = container.scrollWidth / 3;
-      } else {
-        setTimeout(init, 100);
-      }
-    };
-    init();
-
-    animationId = requestAnimationFrame(run);
-    return () => cancelAnimationFrame(animationId);
-  }, [isMouseDown, isHovered]);
+  const allItems = [...imageItems, ...imageItems, ...imageItems];
 
   return (
-    <div 
-      className="carousel-container" 
-      ref={containerRef}
-      onMouseDown={handleMouseDown}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => { setIsMouseDown(false); setIsHovered(false); }}
-      onMouseUp={() => setIsMouseDown(false)}
-      onMouseMove={handleMouseMove}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchMove={handleTouchMove}
-    >
+    <div className="carousel-container">
       <div className="carousel-track">
-        {[...allItems, ...allItems, ...allItems].map((item, i) =>
+        {allItems.map((item, i) =>
           React.cloneElement(item, { key: `clone-${i}` })
         )}
       </div>
