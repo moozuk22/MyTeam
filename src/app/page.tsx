@@ -1215,7 +1215,7 @@ function NavBar() {
         </div>
 
         <div className={`nav-actions ${showBtn ? "nav-actions-visible" : "nav-actions-hidden"}`}>
-          <a href="#Контакт" className="nav-demo-btn">БЕЗПЛАТНА <span style={{ color: "#FF3E3E", fontWeight: "900" }}>ВИДЕО</span> КОНСУЛТАЦИЯ</a>
+          <a href="#Контакт" className="nav-demo-btn">БЕЗПЛАТНА <span style={{ color: "#000", fontWeight: "900" }}>ВИДЕО</span> КОНСУЛТАЦИЯ</a>
         </div>
       </div>
     </nav>
@@ -1592,7 +1592,7 @@ export default function Home() {
                   <a href="#Контакт" className="hero-btn-primary hero-btn-cta">
                     <div className="hero-btn-stack">
                       <div className="hero-line-1">
-                        БЕЗПЛАТНА <span style={{ color: "#FF3E3E", fontWeight: "900" }}>ВИДЕО</span>
+                        БЕЗПЛАТНА <span style={{ color: "#000", fontWeight: "900" }}>ВИДЕО</span>
                       </div>
                       <div className="hero-line-2">
                         КОНСУЛТАЦИЯ <ArrowRight size={20} style={{ marginLeft: 8 }} />
