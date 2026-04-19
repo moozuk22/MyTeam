@@ -1516,7 +1516,6 @@ function InfiniteCarousel({ onExpand }) {
   const handleMouseDown = (e) => {
     setIsMouseDown(true);
     setStartX(e.pageX - containerRef.current.offsetLeft);
-    setScrollLeft(containerRef.current.scrollLeft);
   };
 
   const handleMouseLeave = () => {
@@ -1585,6 +1584,42 @@ function InfiniteCarousel({ onExpand }) {
     }
   };
 
+  useEffect(() => {
+    let animationId;
+    const scrollSpeed = 0.8; // pixels per frame
+
+    const animate = () => {
+      if (!isMouseDown && !isHovered && containerRef.current) {
+        const container = containerRef.current;
+        if (container.scrollWidth > 0) {
+          const segmentWidth = container.scrollWidth / 3;
+          container.scrollLeft += scrollSpeed;
+          
+          if (container.scrollLeft >= segmentWidth * 2) {
+            container.scrollLeft -= segmentWidth;
+          }
+        }
+      }
+      animationId = requestAnimationFrame(animate);
+    };
+
+    // Initial center if not already moved
+    if (containerRef.current) {
+      const container = containerRef.current;
+      const setInitial = () => {
+        if (container.scrollWidth > 0) {
+          container.scrollLeft = container.scrollWidth / 3;
+        } else {
+          setTimeout(setInitial, 50);
+        }
+      };
+      setInitial();
+    }
+
+    animationId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationId);
+  }, [isMouseDown, isHovered]);
+
   return (
     <div 
       className="carousel-container" 
@@ -1607,8 +1642,9 @@ function InfiniteCarousel({ onExpand }) {
       <div 
         className="carousel-track" 
         style={{ 
-          animation: "scrollInfinite 60s linear infinite",
-          animationPlayState: (isMouseDown || isHovered) ? "paused" : "running"
+          display: "flex",
+          width: "max-content",
+          gap: "24px"
         }}
       >
         {[...allItems, ...allItems, ...allItems].map((item, i) =>
