@@ -290,6 +290,14 @@ model PartnerDiscountUsage {
   @@map("partner_discount_usage")
 }
 
+model PageClick {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clickedAt DateTime @default(now()) @map("clicked_at") @db.Timestamptz(6)
+
+  @@index([clickedAt])
+  @@map("page_clicks")
+}
+
 enum PlayerStatus {
   paid
   warning

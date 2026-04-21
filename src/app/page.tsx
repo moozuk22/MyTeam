@@ -1726,6 +1726,18 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    let lastClick = 0;
+    const handleClick = () => {
+      const now = Date.now();
+      if (now - lastClick < 500) return;
+      lastClick = now;
+      void fetch("/api/page-clicks", { method: "POST" });
+    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
+
   return (
     <>
       <NavBar />
