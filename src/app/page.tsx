@@ -1406,7 +1406,7 @@ function LeadForm({ onSuccess }) {
         )}
       </button>
 
-      <div className="form-footer-note">🔒 Данните Ви са защитени. Получавате 7 дена гратисен период.</div>
+      <div className="form-footer-note">🔒 Данните Ви са защитени. Получавате 30 дена гратисен период.</div>
     </div>
   );
 }
@@ -1778,7 +1778,7 @@ export default function Home() {
                   {[
                     { v: "10 мин.", l: "за настройка" },
                     { v: "100%", l: "платени такси" },
-                    { v: "7 дни", l: "безплатен период" }
+                    { v: "30 дни", l: "безплатен период" }
                   ].map((s, i) => (
                     <div key={i} className="stat-col">
                       <div className="stat-v-hero" style={{ fontFamily: "var(--serif-font)" }}>{s.v}</div>
@@ -2020,7 +2020,7 @@ export default function Home() {
                   textAlign: "center",
                   display: "inline-block"
                 }}>
-                  {plan.popular ? "7 ДНИ БЕЗ ТАКСА" : "ЗАПОЧНИ СЕГА"}
+                  {plan.popular ? "30 ДНИ БЕЗ ТАКСА" : "ЗАПОЧНИ СЕГА"}
                 </a>
               </div>
             ))}
@@ -2032,7 +2032,7 @@ export default function Home() {
         <section id="Контакт" ref={contactRef} style={{ padding: "40px 24px", background: `linear-gradient(180deg,#09101C 0%,${BG} 100%)` }}>
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
             <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <div className="section-tag-light" style={{ marginBottom: 8 }}>◆ ЗАЯВЕТЕ ДЕМО И 7 ДНИ БЕЗ ТАКСА</div>
+              <div className="section-tag-light" style={{ marginBottom: 8 }}>◆ ЗАЯВЕТЕ ДЕМО И 30 ДНИ БЕЗ ТАКСА</div>
               <div style={{ color: "#FF3E3E", fontSize: 12, fontWeight: 800, letterSpacing: 2, marginBottom: 24, textTransform: "uppercase", display: "flex", justifyContent: "center" }}>БЕЗ ОБВЪРЗВАНЕ</div>
               <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>Получете детайлна оферта до 24 часа.</h2>
             </div>
