@@ -747,7 +747,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
     if (!from || !to || from > to) return;
     if (scopeType === "player" && !selectedPlayerId) return;
 
-    const controller = new AbortController();
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
 
     const doFetch = async () => {
       setLoading(true);
@@ -765,9 +765,11 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
         } else if (groupScope.startsWith("year:")) {
           search.set("teamGroup", groupScope.slice(5));
         }
+        const requestInit: RequestInit = { cache: "no-store" };
+        if (controller) requestInit.signal = controller.signal;
         const res = await fetch(
           `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/report?${search.toString()}`,
-          { cache: "no-store", signal: controller.signal },
+          requestInit,
         );
         if (!res.ok) {
           const payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -789,7 +791,9 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
     const timer = setTimeout(() => { void doFetch(); }, 300);
     return () => {
       clearTimeout(timer);
-      controller.abort();
+      if (controller && !controller.signal.aborted) {
+        controller.abort();
+      }
     };
      
   }, [from, to, scopeType, groupScope, selectedPlayerId, clubId]);
