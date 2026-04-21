@@ -2996,6 +2996,7 @@
 
 .acd-th-name,
 .acd-td-name {
+  width: 160px;
   min-width: 140px;
   max-width: 200px;
   white-space: nowrap;
