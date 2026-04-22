@@ -12,6 +12,7 @@ import {
   MapPin, TrendingUp, Activity, Globe, Lock,
   Check, X as CloseX, PhoneCall
 } from "lucide-react";
+import ChatBot from "@/components/ChatBot";
 
 /* ── TOKENS ── */
 const G = "#39FF14";
@@ -2209,12 +2210,21 @@ export default function Home() {
         </div>
       </footer>
 
-      <div className="sticky-actions">
-        <a href="viber://chat?number=%2B359896495254" className="action-btn action-viber" title="Viber">
-          <img src="/viber.png" alt="Viber" style={{ width: 50, height: 50, objectFit: "contain" }} />
+      <div className="dock-container">
+        <a href="tel:0896495254" className="action-btn action-phone dock-item" title="Call Us">
+          <div className="dock-icon-wrapper call-wrapper">
+            <PhoneCall size={20} color="#000" />
+          </div>
+          <span className="dock-text">Обаждане</span>
         </a>
-        <a href="tel:0896495254" className="action-btn action-phone" title="Call Us">
-          <PhoneCall size={24} />
+
+        <ChatBot scrollToContact={() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })} />
+
+        <a href="viber://chat?number=%2B359896495254" className="action-btn action-viber dock-item" title="Viber">
+          <div className="dock-icon-wrapper viber-wrapper">
+            <img src="/viber.png" alt="Viber" style={{ width: 34, height: 34, objectFit: "contain" }} />
+          </div>
+          <span className="dock-text">Viber</span>
         </a>
       </div>
     </>
