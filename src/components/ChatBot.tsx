@@ -57,6 +57,12 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
     setMessages([{ sender: "bot", text: "Здравейте! 👋 My Team е тук, за да направи управлението на Вашия клуб по-лесно. Кое от изброените е най-голямото Ви предизвикателство в момента?", id: 1 }]);
   }, []);
 
+  const handleRestartChat = () => {
+    setStage(CHAT_STAGES.HOOK);
+    setMessages([{ sender: "bot", text: "Здравейте! 👋 My Team е тук, за да направи управлението на Вашия клуб по-лесно. Кое от изброените е най-голямото Ви предизвикателство в момента?", id: 1 }]);
+    setSelectedOption(null);
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -88,23 +94,18 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
     setTimeout(() => {
       setIsTyping(false);
       setMessages(prev => [...prev, { sender: "bot", text: selected.reply, id: prev.length + 1 }]);
-      
-      if (optionId === "other") {
-        setStage(CHAT_STAGES.CUSTOM_INPUT);
-      } else {
+      setTimeout(() => {
+        setIsTyping(true);
         setTimeout(() => {
-          setIsTyping(true);
-          setTimeout(() => {
-            setIsTyping(false);
-            setMessages(prev => [...prev, { 
-              sender: "bot", 
-              text: "Искате ли да видите как My Team ще реши това за Вас? В момента имаме само 5 свободни места за 30-дневен гратисен период!",
-              id: prev.length + 1
-            }]);
-            setStage(CHAT_STAGES.CTA);
-          }, 1500);
+          setIsTyping(false);
+          setMessages(prev => [...prev, { 
+            sender: "bot", 
+            text: "Искате ли да видите как My Team ще реши това за Вас? В момента имаме само 5 свободни места за 30-дневен гратисен период!",
+            id: prev.length + 1
+          }]);
+          setStage(CHAT_STAGES.CTA);
         }, 1500);
-      }
+      }, 1500);
     }, 1500);
   };
 
@@ -207,52 +208,19 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
           </div>
         )}
 
-        {stage === CHAT_STAGES.CUSTOM_INPUT && !isTyping && (
-          <form className="chat-custom-form" onSubmit={handleCustomSubmit}>
-            <div className="custom-input-group">
-              <label>Какво търсите?</label>
-              <textarea 
-                value={customForm.needs}
-                onChange={e => setCustomForm({...customForm, needs: e.target.value})}
-                placeholder="Опишете накратко вашите нужди..."
-                required
-              />
-            </div>
-            <div className="custom-form-row">
-              <div className="custom-input-group">
-                <label>Име</label>
-                <input 
-                  type="text"
-                  value={customForm.name}
-                  onChange={e => setCustomForm({...customForm, name: e.target.value})}
-                  placeholder="Вашето име"
-                  required
-                />
-              </div>
-              <div className="custom-input-group">
-                <label>Телефон</label>
-                <input 
-                  type="tel"
-                  value={customForm.phone}
-                  onChange={e => setCustomForm({...customForm, phone: e.target.value})}
-                  placeholder="08..."
-                  required
-                />
-              </div>
-            </div>
-            <button type="submit" className="custom-submit-btn">
-              Изпрати <ArrowRight size={16} />
-            </button>
-          </form>
-        )}
-
         {stage === CHAT_STAGES.CTA && !isTyping && (
           <div className="chat-cta-actions">
             <a href="tel:0896495254" className="chat-btn-primary">
               📞 Обади се за бърза консултация
             </a>
-            <button onClick={scrollToContact} className="chat-btn-secondary">
+            <button onClick={() => {
+              setIsOpen(false);
+              scrollToContact();
+            }} className="chat-btn-secondary">
               📝 Попълни формата за демо
+            </button>
+            <button onClick={handleRestartChat} className="chat-btn-secondary">
+              🔄 Започни отначало
             </button>
           </div>
         )}
