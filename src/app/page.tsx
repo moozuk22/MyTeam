@@ -1320,7 +1320,14 @@ function LeadForm({ onSuccess }) {
     setLoading(true);
 
     try {
-      const response = await fetch("https://formspree.io/f/mpqkrzqb", {
+      const formId = process.env.NEXT_PUBLIC_FORMSPREE_ID;
+      if (!formId) {
+        setError("Конфигурационна грешка: Липсва ID за контактната форма.");
+        return;
+      }
+      const response = await fetch(`https://formspree.io/f/${formId}`, {
+
+
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
