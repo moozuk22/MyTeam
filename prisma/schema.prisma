@@ -292,9 +292,11 @@ model PartnerDiscountUsage {
 
 model PageClick {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action    String   @default("unknown")
   clickedAt DateTime @default(now()) @map("clicked_at") @db.Timestamptz(6)
 
   @@index([clickedAt])
+  @@index([action])
   @@map("page_clicks")
 }
 
