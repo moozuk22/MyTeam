@@ -1522,8 +1522,8 @@ export default function MemberCardPage({
 
             <div className="divider divider--mt" />
 
-            {/* ── Partner discount buttons — admin/coach preview only ── */}
-            {(!isAdmin && !isCoach) && (
+            {/* ── Partner discount buttons — visible for admins/coaches ── */}
+            {(isAdmin || isCoach) && (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "14px" }}>
                 {/* Sport Depot — always visible */}
                 <button
