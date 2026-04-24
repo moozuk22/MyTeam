@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { HelpCircle, Crown, Cpu, Tag, MessageSquare, X as CloseX } from "lucide-react";
+import { Home, HelpCircle, Crown, Cpu, Tag, MessageSquare, X as CloseX } from "lucide-react";
 
 export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
@@ -36,11 +36,10 @@ export default function NavBar() {
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   const navItems = [
-    { id: "Защо",    href: "/zashto",   text: "Защо MyTeam", icon: HelpCircle,   index: "01" },
-    { id: "VIP",     href: "/vip",      text: "VIP CLUB",    icon: Crown,        index: "02" },
-    { id: "Функции", href: "/funkcii",  text: "Функции",     icon: Cpu,          index: "03" },
-    { id: "Цени",    href: "/#Цени",    text: "Цени",        icon: Tag,          index: "04" },
-    { id: "Контакт", href: "/#Контакт", text: "Контакт",     icon: MessageSquare,index: "05" },
+    { id: "Начало", href: "/", text: "Начало", icon: Home, index: "00" },
+    { id: "Защо", href: "/zashto", text: "Защо MyTeam", icon: HelpCircle, index: "01" },
+    { id: "VIP", href: "/vip", text: "VIP CLUB", icon: Crown, index: "02" },
+    { id: "Функции", href: "/funkcii", text: "Функции", icon: Cpu, index: "03" },
   ];
 
   return (
