@@ -2856,14 +2856,43 @@ body.menu-open-active .dock-container {
 
   .vip-card {
     padding: 60px 24px 40px;
+    text-align: center;
+  }
+
+  .section-tag-premium, .vip-title, .vip-description {
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .vip-title {
-    font-size: 32px;
+    font-size: 30px;
   }
 
   .vip-description {
     font-size: 17px;
+  }
+
+  .vip-privileges-grid {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 32px;
+  }
+
+  .vip-privilege-item {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+  }
+
+  .vip-privilege-item:not(:last-child) {
+    border-bottom: 1px solid rgba(57, 255, 20, 0.1);
+    padding-bottom: 32px;
+  }
+
+  .privilege-title, .privilege-desc {
+    text-align: center !important;
   }
 
   .vip-spots-badge {
@@ -2874,4 +2903,58 @@ body.menu-open-active .dock-container {
     margin-bottom: 32px;
     border-radius: 12px;
   }
-}
+
+  /* Expand Section Mobile Centering */
+  .expand-section .section-header-centered {
+    text-align: center;
+  }
+
+  .expand-card {
+    text-align: center !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+/* ── FEATURES ACCORDION ── */
+.features-accordion-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.accordion-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.accordion-item:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(57, 255, 20, 0.2) !important;
+}
+
+.accordion-active {
+  background: rgba(57, 255, 20, 0.03) !important;
+  border-color: rgba(57, 255, 20, 0.3) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.accordion-trigger:hover h3 {
+  color: #fff !important;
+}
+
+@media (max-width: 768px) {
+  .accordion-trigger {
+    padding: 20px !important;
+  }
+  
+  .accordion-trigger h3 {
+    font-size: 16px !important;
+  }
+
+  .accordion-content {
+    padding-left: 56px !important;
+    font-size: 14px;
+  }
+}

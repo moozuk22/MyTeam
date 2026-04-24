@@ -10,7 +10,8 @@ import {
   Phone, Mail, MessageSquare, MessageCircle, User,
   Wifi, WifiOff, Menu, Calendar,
   MapPin, TrendingUp, Activity, Globe, Lock,
-  Check, X as CloseX, PhoneCall
+  Check, X as CloseX, PhoneCall,
+  IdCard, BarChart3, ChevronDown
 } from "lucide-react";
 import ChatBot from "@/components/ChatBot";
 
@@ -1744,6 +1745,7 @@ export default function Home() {
   const [expandedImage, setExpandedImage] = useState(null);
   const [benefitsOpen, setBenefitsOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(1);
   const contactRef = useRef(null);
 
   useEffect(() => {
@@ -2051,7 +2053,7 @@ export default function Home() {
 
                 <div className="vip-privileges-grid">
                   {[
-                    { t: "0 лв. такса интеграция", d: "Ние поемаме пълното дигитализиране на Вашата база данни и обучение на екипа Ви.", i: "⚡" },
+                    { t: "0€ такса интеграция", d: "Ние поемаме пълното дигитализиране на Вашата база данни и обучение на екипа Ви.", i: "⚡" },
                     { t: "Удължен безплатен период", d: "Ползвате пълната функционалност безвъзмездно до края на 2026 г.", i: "⏳" },
                     { t: "Моделиране по задание", d: "Системата ще бъде доразвита спрямо Вашия конкретен начин на работа.", i: "🛠" },
                     { t: "Гарантирана най-ниска цена", d: "След промо периода, Вашата месечна такса остава преференциална - завинаги.", i: "📉" },
@@ -2072,6 +2074,68 @@ export default function Home() {
         </section>
       </RevealSection>
 
+      <div id="Функции" style={{ scrollMarginTop: "140px" }}></div>
+      <RevealSection>
+        <section className="features-accordion-section" style={{ padding: "80px 24px", background: "#070C14" }}>
+          <div className="section-container-wide" style={{ maxWidth: 800 }}>
+            <div className="section-header-centered" style={{ marginBottom: 60 }}>
+              <h2 className="section-title-premium">Всичко, от което се нуждаеш.<br /><span style={{ color: "var(--neon-green)", fontStyle: "italic" }}>Нищо излишно.</span></h2>
+            </div>
+
+            <div className="accordion-container">
+              {[
+                { id: 1, t: "Управление на деца, групи и треньори", d: "Пълен дигитален регистър на всички членове на клуба. Разпределяйте състезатели в групи и следете работата на всеки треньор с един клик.", i: <Users size={24} /> },
+                { id: 2, t: "Автоматично проследяване на плащания", d: "Край на закъснелите такси. Системата автоматично отчита плащанията и генерира напомняния за родителите.", i: <CreditCard size={24} /> },
+                { id: 3, t: "Смарт карти за достъп и контрол", d: "Интеграция с физически или дигитални карти. Следете присъствието в реално време и контролирайте достъпа до базата.", i: <IdCard size={24} /> },
+                { id: 4, t: "Отчети в реално време", d: "Вижте пълната картина на финансите и спортните резултати чрез подробни аналитични графики и справки.", i: <BarChart3 size={24} /> },
+                { id: 5, t: "Интелигентен тренировъчен график", d: "Автоматизирано планиране на графиците за тренировки, съобразено с капацитета на залите и заетостта на треньорите.", i: <Calendar size={24} /> }
+              ].map((f) => (
+                <div key={f.id} className={`accordion-item ${activeFeature === f.id ? "accordion-active" : ""}`} 
+                     onClick={() => setActiveFeature(activeFeature === f.id ? null : f.id)}
+                     style={{ 
+                       background: "rgba(255,255,255,0.02)", 
+                       border: "1px solid rgba(255,255,255,0.05)", 
+                       borderRadius: 16, 
+                       marginBottom: 12,
+                       cursor: "pointer",
+                       overflow: "hidden",
+                       transition: "all 0.3s ease"
+                     }}>
+                  <div className="accordion-trigger" style={{ 
+                    padding: "24px", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "space-between",
+                    gap: 16
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <div style={{ color: activeFeature === f.id ? "var(--neon-green)" : "rgba(255,255,255,0.4)" }}>{f.i}</div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, color: activeFeature === f.id ? "#fff" : "rgba(255,255,255,0.7)" }}>{f.t}</h3>
+                    </div>
+                    <div style={{ 
+                      transition: "transform 0.3s ease", 
+                      transform: activeFeature === f.id ? "rotate(180deg)" : "rotate(0deg)",
+                      color: activeFeature === f.id ? "var(--neon-green)" : "rgba(255,255,255,0.2)"
+                    }}>
+                      <ChevronDown size={20} />
+                    </div>
+                  </div>
+                  <div className="accordion-content" style={{ 
+                    maxHeight: activeFeature === f.id ? "200px" : "0",
+                    opacity: activeFeature === f.id ? 1 : 0,
+                    transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                    padding: activeFeature === f.id ? "0 24px 24px 64px" : "0 24px 0 64px",
+                    color: "rgba(255,255,255,0.5)",
+                    lineHeight: 1.6
+                  }}>
+                    {f.d}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </RevealSection>
       <RevealSection>
         <section id="Цени" className="pricing-section">
           <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -2080,23 +2144,24 @@ export default function Home() {
           </div>
           <div className="pricing-grid">
             {[
-              { price: "44€", count: "До 100 деца" },
-              { price: "53€", count: "До 200 деца", popular: true },
-              { price: "71€", count: "Над 300 деца" }
+              { base: 44, count: "До 100 деца" },
+              { base: 53, count: "До 200 деца", popular: true },
+              { base: 71, count: "Над 300 деца" }
             ].map((plan, i) => (
               <div key={i} className={`pricing-card ${plan.popular ? "pricing-card-popular" : ""}`}>
                 {plan.popular && <div className="pricing-badge">НАЙ-ПРЕДПОЧИТАН</div>}
                 <h3 className="comp-title">{plan.count}</h3>
-                <div className="price-box">
-                  <span className="price-val" style={{ filter: "blur(12px)", userSelect: "none", transition: "all 0.4s ease" }}>
-                    {i === 0 ? "??€" : i === 1 ? "??€" : "???€"}{withSchedule ? " + ??€" : ""}
+                <div className="price-box" style={{ marginBottom: 24 }}>
+                  <span className="price-val" style={{ fontSize: 48, fontWeight: 900, color: "#fff" }}>
+                    {withSchedule ? plan.base + 9 : plan.base}€
                   </span>
-                  <span className="price-unit">/ месец</span>
+                  <span className="price-unit" style={{ fontSize: 14, opacity: 0.5, marginLeft: 8 }}>/ месец</span>
                 </div>
-                <div className="comp-list" style={{ marginBottom: 24 }}>
+                <div className="comp-list" style={{ marginBottom: 32 }}>
                   <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Обучение и интеграция</span></div>
                   <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Смарт карти за достъп</span></div>
                   <div className="comp-item"><Check size={16} color="var(--neon-green)" /> <span>Партньорски отстъпки</span></div>
+                  {withSchedule && <div className="comp-item" style={{ color: "var(--neon-green)" }}><Check size={16} /> <span>Тренировъчен график</span></div>}
                 </div>
 
                 <div
