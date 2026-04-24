@@ -1202,6 +1202,14 @@ function NavBar() {
     return () => window.removeEventListener("scroll", h);
   }, []);
 
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.classList.add("menu-open-active");
+    } else {
+      document.body.classList.remove("menu-open-active");
+    }
+  }, [isMenuOpen]);
+
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
   return (
@@ -1219,22 +1227,32 @@ function NavBar() {
 
         {/* Mobile Burger Toggle */}
         <button className="burger-menu" onClick={toggleMenu} aria-label="Menu">
-          <div className={`burger-bar ${isMenuOpen ? "bar-top-open" : ""}`} />
-          <div className={`burger-bar ${isMenuOpen ? "bar-mid-open" : ""}`} />
-          <div className={`burger-bar ${isMenuOpen ? "bar-bot-open" : ""}`} />
+          <div className="burger-bar" />
+          <div className="burger-bar" />
+          <div className="burger-bar" />
         </button>
 
+        {/* Full Screen Mobile Menu */}
         <div className={`nav-links-wrapper ${isMenuOpen ? "links-open" : ""}`}>
-          <a href="#Защо" onClick={() => setIsMenuOpen(false)} className="nav-link">Защо MyTeam7</a>
-          <a href="#Функции" onClick={() => setIsMenuOpen(false)} className="nav-link">Функции</a>
-          <a href="#Цени" onClick={() => setIsMenuOpen(false)} className="nav-link">Инвестиция</a>
-          <a href="#Контакт" onClick={() => setIsMenuOpen(false)} className="nav-link">Контакт</a>
-        </div>
+          <div className="mobile-menu-header">
+            <img src="/myteam-logo.png" alt="MyTeam Logo" className="mobile-nav-logo" />
+            <button className="close-menu-btn" onClick={() => setIsMenuOpen(false)}>
+              <CloseX size={32} color="#fff" />
+            </button>
+          </div>
+          
+          <div className="mobile-links-container">
+            <a href="#Защо" onClick={() => setIsMenuOpen(false)} className="nav-link">Защо MyTeam7</a>
+            <a href="#Функции" onClick={() => setIsMenuOpen(false)} className="nav-link">Функции</a>
+            <a href="#Цени" onClick={() => setIsMenuOpen(false)} className="nav-link">Инвестиция</a>
+            <a href="#Контакт" onClick={() => setIsMenuOpen(false)} className="nav-link">Контакт</a>
+          </div>
 
-        <div className={`nav-actions ${showBtn ? "nav-actions-visible" : "nav-actions-hidden"}`}>
-          <a href="#Контакт" className="nav-demo-btn" style={{ fontSize: "13px", padding: "10px 20px" }}>
-            БЕЗПЛАТНА <span style={{ color: "#000", fontWeight: "900" }}>ВИДЕО</span> КОНСУЛТАЦИЯ
-          </a>
+          <div className="mobile-menu-footer">
+            <a href="#Контакт" onClick={() => setIsMenuOpen(false)} className="nav-demo-btn">
+              БЕЗПЛАТНА ВИДЕО КОНСУЛТАЦИЯ
+            </a>
+          </div>
         </div>
       </div>
     </nav>
