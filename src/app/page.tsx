@@ -1191,18 +1191,21 @@ function TrustedNetwork({ contactRef }) {
 function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [showBtn, setShowBtn] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     const h = () => {
       setScrolled(window.scrollY > 40);
-      setShowBtn(window.scrollY > 450); // Threshold to appear after hero section
+      setShowBtn(window.scrollY > 450);
     };
     window.addEventListener("scroll", h);
     return () => window.removeEventListener("scroll", h);
   }, []);
 
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+
   return (
-    <nav className={`navbar ${scrolled ? "navbar-scrolled" : ""}`}>
+    <nav className={`navbar ${scrolled ? "navbar-scrolled" : ""} ${isMenuOpen ? "navbar-open" : ""}`}>
       <div className="navbar-container">
         <div className="navbar-logo">
           <img
@@ -1214,8 +1217,24 @@ function NavBar() {
           />
         </div>
 
+        {/* Mobile Burger Toggle */}
+        <button className="burger-menu" onClick={toggleMenu} aria-label="Menu">
+          <div className={`burger-bar ${isMenuOpen ? "bar-top-open" : ""}`} />
+          <div className={`burger-bar ${isMenuOpen ? "bar-mid-open" : ""}`} />
+          <div className={`burger-bar ${isMenuOpen ? "bar-bot-open" : ""}`} />
+        </button>
+
+        <div className={`nav-links-wrapper ${isMenuOpen ? "links-open" : ""}`}>
+          <a href="#Защо" onClick={() => setIsMenuOpen(false)} className="nav-link">Защо MyTeam7</a>
+          <a href="#Функции" onClick={() => setIsMenuOpen(false)} className="nav-link">Функции</a>
+          <a href="#Цени" onClick={() => setIsMenuOpen(false)} className="nav-link">Инвестиция</a>
+          <a href="#Контакт" onClick={() => setIsMenuOpen(false)} className="nav-link">Контакт</a>
+        </div>
+
         <div className={`nav-actions ${showBtn ? "nav-actions-visible" : "nav-actions-hidden"}`}>
-          <a href="#Контакт" className="nav-demo-btn">БЕЗПЛАТНА <span style={{ color: "#000", fontWeight: "900" }}>ВИДЕО</span> КОНСУЛТАЦИЯ</a>
+          <a href="#Контакт" className="nav-demo-btn" style={{ fontSize: "13px", padding: "10px 20px" }}>
+            БЕЗПЛАТНА <span style={{ color: "#000", fontWeight: "900" }}>ВИДЕО</span> КОНСУЛТАЦИЯ
+          </a>
         </div>
       </div>
     </nav>
@@ -1752,27 +1771,28 @@ export default function Home() {
 
             <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 64, width: "100%" }} className="hero-split">
               <div className="hero-text-col" style={{ flex: 1, minWidth: 320, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <h1 className="hero-title">
+                <h1 className="hero-title" style={{ fontSize: "clamp(32px, 5vw, 48px)" }}>
                   <span className="hero-title-highlight"><span style={{ color: "#fff" }}>My</span>Team</span> – интелигентна платформа за управление на Вашия клуб
                 </h1>
 
-                <p className="hero-description" style={{ margin: "0 0 48px 0", maxWidth: 700, textAlign: "center" }}>
+                <p className="hero-description" style={{ margin: "0 0 32px 0", maxWidth: 650, textAlign: "center", fontSize: "16px" }}>
                   Проследявайте плащанията, използвайте онлайн график и се възползвайте от специални отстъпки – всичко на едно място.
                 </p>
 
-                <div className="hero-actions" style={{ marginTop: 10 }}>
-                  <a href="#Контакт" className="hero-btn-primary hero-btn-cta">
-                    <div className="hero-btn-stack">
-                      <div className="hero-line-1">
+                <div className="hero-actions" style={{ marginTop: 0, gap: 16 }}>
+                  <a href="#Контакт" className="hero-btn-primary hero-btn-cta" style={{ padding: "14px 28px", height: "auto" }}>
+                    <div className="hero-btn-stack" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                      <div className="hero-line-1" style={{ fontSize: "13px", fontWeight: "900", letterSpacing: "0.5px" }}>
                         БЕЗПЛАТНА <span style={{ color: "#000", fontWeight: "900" }}>ВИДЕО</span>
                       </div>
-                      <div className="hero-line-2">
-                        КОНСУЛТАЦИЯ <ArrowRight size={20} style={{ marginLeft: 8 }} />
+                      <div className="hero-line-2" style={{ fontSize: "13px", fontWeight: "900", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: 6 }}>
+                        КОНСУЛТАЦИЯ <ArrowRight size={16} />
                       </div>
                     </div>
                   </a>
                   <a href="#Системата" className="hero-btn-secondary" style={{
-                    padding: "16px 28px",
+                    padding: "0 28px",
+                    height: "58px", // Match the height of the primary button
                     textDecoration: "none",
                     background: "#FF3E3E",
                     color: "#000",
@@ -1780,9 +1800,11 @@ export default function Home() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    borderRadius: "12px"
+                    borderRadius: "12px",
+                    fontSize: "13px",
+                    border: "none"
                   }}>
-                    ВИЖ КАК РАБОТИ <ArrowDown size={20} />
+                    ВИЖ КАК РАБОТИ <ArrowDown size={16} />
                   </a>
                 </div>
 
