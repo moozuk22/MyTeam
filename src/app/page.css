@@ -442,7 +442,8 @@ img {
 }
 
 /* Mobile Menu Header/Footer (Hidden on desktop) */
-.mobile-menu-header, .mobile-menu-footer {
+.mobile-menu-header,
+.mobile-menu-footer {
   display: none;
 }
 
@@ -529,7 +530,7 @@ img {
     font-size: 14px;
     padding: 18px;
   }
-  
+
   .nav-actions {
     display: none !important;
   }
@@ -2631,8 +2632,9 @@ body.menu-open-active .dock-container {
 }
 
 .section-container-wide {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
+  width: 100%;
 }
 
 .section-header-centered {
@@ -2666,14 +2668,14 @@ body.menu-open-active .dock-container {
 
 .why-p-main {
   font-size: 19px;
-  color: rgba(255,255,255,0.9);
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.8;
   margin-bottom: 24px;
 }
 
 .why-p-sub {
   font-size: 18px;
-  color: rgba(255,255,255,0.7);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.8;
   margin-bottom: 32px;
 }
@@ -2699,8 +2701,8 @@ body.menu-open-active .dock-container {
 .why-image-card {
   height: 480px;
   border-radius: 32px;
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
 }
 
 .why-experience-badge {
@@ -2714,7 +2716,7 @@ body.menu-open-active .dock-container {
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 .badge-icon {
@@ -2783,7 +2785,7 @@ body.menu-open-active .dock-container {
 .vip-description {
   font-size: 20px;
   line-height: 1.6;
-  color: rgba(255,255,255,0.7);
+  color: rgba(255, 255, 255, 0.7);
   margin-bottom: 60px;
   max-width: 800px;
   text-align: left;
@@ -2818,7 +2820,7 @@ body.menu-open-active .dock-container {
 
 .privilege-desc {
   font-size: 14px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.5);
   line-height: 1.6;
 }
 
@@ -2827,7 +2829,7 @@ body.menu-open-active .dock-container {
     grid-template-columns: 1fr;
     gap: 60px;
   }
-  
+
   .vip-privileges-grid {
     grid-template-columns: 1fr;
   }
@@ -2838,7 +2840,8 @@ body.menu-open-active .dock-container {
     font-size: 32px;
   }
 
-  .why-section, .vip-section {
+  .why-section,
+  .vip-section {
     padding: 60px 20px;
   }
 
@@ -2859,7 +2862,9 @@ body.menu-open-active .dock-container {
     text-align: center;
   }
 
-  .section-tag-premium, .vip-title, .vip-description {
+  .section-tag-premium,
+  .vip-title,
+  .vip-description {
     text-align: center;
     margin-left: auto;
     margin-right: auto;
@@ -2891,7 +2896,8 @@ body.menu-open-active .dock-container {
     padding-bottom: 32px;
   }
 
-  .privilege-title, .privilege-desc {
+  .privilege-title,
+  .privilege-desc {
     text-align: center !important;
   }
 
@@ -2948,7 +2954,7 @@ body.menu-open-active .dock-container {
   .accordion-trigger {
     padding: 20px !important;
   }
-  
+
   .accordion-trigger h3 {
     font-size: 16px !important;
   }
@@ -2956,5 +2962,1656 @@ body.menu-open-active .dock-container {
   .accordion-content {
     padding-left: 56px !important;
     font-size: 14px;
+  }
+}
+
+.vip-dashboard-section {
+  padding: 80px 24px;
+  background: #05080F;
+  color: #fff;
+}
+
+.dashboard-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.dashboard-main-title {
+  font-size: clamp(24px, 4vw, 42px);
+  font-weight: 900;
+  margin-bottom: 30px;
+  line-height: 1.1;
+  letter-spacing: -1px;
+}
+
+.dashboard-stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 30px;
+  padding: 15px 0;
+}
+
+.dash-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.left-modules-wrapper {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 32px 24px;
+  background: rgba(255, 255, 255, 0.01);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-tag-centered {
+  color: var(--neon-green);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  margin-bottom: 32px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.card-tag {
+  color: var(--neon-green);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.modules-container {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  margin-bottom: 24px;
+  justify-content: center;
+  position: relative;
+}
+
+.module-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.module-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.module-icon-box {
+  font-size: 28px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 4px;
+}
+
+.module-header h3 {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.module-header p {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+}
+
+.module-pricing {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.v-price-old-red {
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+  margin-top: 2px;
+  position: relative;
+  display: inline-block;
+}
+
+.v-price-old-red::before,
+.v-price-old-red::after {
+  content: '';
+  position: absolute;
+  left: -5%;
+  top: 50%;
+  width: 110%;
+  height: 2.5px;
+  background: #ff3e3e;
+}
+
+.v-price-old-red::before {
+  transform: rotate(10deg);
+}
+
+.v-price-old-red::after {
+  transform: rotate(-10deg);
+}
+
+.price-crossed {
+  font-size: 18px;
+  font-weight: 900;
+  color: #ff3e3e;
+  position: relative;
+  display: inline-block;
+}
+
+.price-crossed::after {
+  content: '';
+  position: absolute;
+  left: -10%;
+  top: 50%;
+  width: 120%;
+  height: 3px;
+  background: #ff3e3e;
+  transform: rotate(-10deg);
+}
+
+.price-arrow {
+  color: var(--neon-green);
+  margin-bottom: 12px;
+}
+
+.your-profit-badge {
+  background: var(--neon-green);
+  color: #000;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 16px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.zero-price {
+  font-size: 32px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.plus-profit {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.promo-period {
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.total-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: -10px;
+  margin-bottom: 8px;
+}
+
+.module-plus {
+  width: 46px;
+  height: 46px;
+  background: rgba(57, 255, 20, 0.3);
+  color: var(--neon-green);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  border: 2px solid var(--neon-green);
+  flex-shrink: 0;
+  z-index: 2;
+  position: relative;
+  align-self: center;
+  margin: 0 -18px;
+  box-shadow: 0 0 25px rgba(57, 255, 20, 0.5);
+}
+
+.module-perks {
+  list-style: none;
+  padding: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.module-perks li {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.scale-box-integrated {
+  padding-top: 16px;
+  margin-top: 0;
+}
+
+.scale-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.scale-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.scale-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.scale-chip.active {
+  border-color: var(--neon-green);
+  color: var(--neon-green);
+  background: rgba(57, 255, 20, 0.1);
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);
+}
+
+.vip-neon-card {
+  height: 100%;
+  border: 1.5px solid var(--neon-green);
+  border-radius: 24px;
+  padding: 24px;
+  background: rgba(57, 255, 20, 0.04);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 0 40px rgba(57, 255, 20, 0.05), 0 0 20px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.vip-neon-header {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vip-title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.vip-title-with-icon h2 {
+  font-size: 38px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin: 0;
+  letter-spacing: 1.5px;
+}
+
+.vip-neon-header p {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.vip-rows-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+
+.vip-row-v2 {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  width: 100%;
+}
+
+.vip-row-v2:last-child {
+  border-bottom: none;
+}
+
+.v-icon-col {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.v-info-col {
+  flex: 1;
+  text-align: left;
+  padding: 0 10px;
+}
+
+.v-separator-line {
+  width: 1.5px;
+  height: 36px;
+  background: var(--neon-green);
+  opacity: 0.3;
+  margin-left: 12px;
+  margin-right: 32px;
+}
+
+.v-value-col {
+  width: 140px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.v-val {
+  font-size: 21px;
+  font-weight: 900;
+  color: var(--neon-green);
+  line-height: 1;
+}
+
+.v-sub-badge {
+  font-size: 9px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+.v-sub-green {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--neon-green);
+  margin-top: 4px;
+}
+
+.v-status-label {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--neon-green);
+  text-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+}
+
+.dashboard-bottom {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.smart-card-box-v3 {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  transition: all 0.3s ease;
+}
+
+.new-div {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 32px;
+}
+
+.card-visual-side {
+  flex-shrink: 0;
+}
+
+.debit-card-mockup-v2 {
+  width: 190px;
+  height: 115px;
+  background: linear-gradient(135deg, #111 0%, #000 100%);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-logo-large {
+  height: 36px;
+  width: auto;
+  align-self: flex-start;
+}
+
+.card-footer-info-v2 {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-holder-white {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #fff;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.nfc-waves-only {
+  display: flex;
+  align-items: center;
+  color: var(--neon-green);
+  margin-top: -2px;
+}
+
+.card-content-side {
+  flex: 1;
+}
+
+.side-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+}
+
+.price-info-col-v2 {
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.card-title-compact {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin: 0 0 4px 0;
+  line-height: 1.1;
+}
+
+.price-medium {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.price-sub-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.perks-info-col {
+  flex: 1;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 20px;
+}
+
+.card-check-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-check-list li {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 5px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.new-div {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 40px;
+}
+
+.card-visual-side {
+  flex-shrink: 0;
+}
+
+.debit-card-mockup-v2 {
+  width: 220px;
+  height: 140px;
+  background: linear-gradient(135deg, #111 0%, #000 100%);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-logo-large {
+  height: 44px;
+  width: auto;
+  align-self: flex-start;
+  opacity: 1;
+}
+
+.card-footer-info-v2 {
+  align-self: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-holder-white {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.nfc-waves-only {
+  color: var(--neon-green);
+  opacity: 0.9;
+}
+
+.card-content-side {
+  flex: 1;
+}
+
+.side-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 20px;
+}
+
+.price-info-col-v2 {
+  flex-shrink: 0;
+  min-width: 140px;
+}
+
+.card-title-compact {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin: 0 0 6px 0;
+  line-height: 1.1;
+}
+
+.price-medium {
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.price-sub-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.perks-info-col {
+  flex: 1;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 24px;
+}
+
+.card-check-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-check-list li {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 6px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.new-div {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 40px;
+}
+
+.card-visual-side {
+  flex-shrink: 0;
+}
+
+.debit-card-mockup {
+  width: 220px;
+  height: 140px;
+  background: linear-gradient(135deg, #111 0%, #000 100%);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-logo-img {
+  height: 32px;
+  width: auto;
+  align-self: flex-start;
+  opacity: 0.9;
+}
+
+.card-chip-nfc {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.nfc-icon.sideways {
+  color: var(--neon-green);
+  transform: rotate(90deg);
+  opacity: 0.8;
+}
+
+.card-footer-info {
+  align-self: flex-end;
+}
+
+.card-holder {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.card-content-side {
+  flex: 1;
+}
+
+.side-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 40px;
+}
+
+.price-info-col {
+  flex-shrink: 0;
+}
+
+.card-title-neon {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin-bottom: 8px;
+}
+
+.price-big {
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.price-sub-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.perks-info-col {
+  flex: 1;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 32px;
+}
+
+.card-check-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-check-list li {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-visual-side {
+  flex-shrink: 0;
+}
+
+.debit-card-mockup {
+  width: 220px;
+  height: 140px;
+  background: linear-gradient(135deg, #222 0%, #000 100%);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-logo-img {
+  height: 28px;
+  width: auto;
+  align-self: flex-start;
+}
+
+.card-chip-nfc {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.chip {
+  width: 35px;
+  height: 26px;
+  background: linear-gradient(135deg, #d4af37 0%, #f9f295 50%, #d4af37 100%);
+  border-radius: 4px;
+  opacity: 0.8;
+}
+
+.nfc-icon {
+  color: var(--neon-green);
+  opacity: 0.8;
+}
+
+.card-footer-info {
+  align-self: flex-end;
+}
+
+.card-holder {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.card-content-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.side-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-title-neon {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin: 0;
+}
+
+.side-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 20px;
+}
+
+.price-info-col {
+  flex-shrink: 0;
+  min-width: 140px;
+}
+
+.price-big {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.price-sub-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.perks-info-col {
+  flex: 1;
+}
+
+.card-check-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-check-list li {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.card-visual-side {
+  flex-shrink: 0;
+}
+
+.debit-card-mockup {
+  width: 220px;
+  height: 140px;
+  background: linear-gradient(135deg, #222 0%, #000 100%);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-logo-img {
+  height: 28px;
+  width: auto;
+  align-self: flex-start;
+}
+
+.card-chip-nfc {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.chip {
+  width: 35px;
+  height: 26px;
+  background: linear-gradient(135deg, #d4af37 0%, #f9f295 50%, #d4af37 100%);
+  border-radius: 4px;
+  opacity: 0.8;
+}
+
+.nfc-icon {
+  color: var(--neon-green);
+  opacity: 0.8;
+}
+
+.card-footer-info {
+  align-self: flex-end;
+}
+
+.card-holder {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.card-content-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.side-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-title-neon {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin: 0;
+}
+
+.side-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 20px;
+}
+
+.price-info-col {
+  flex-shrink: 0;
+  min-width: 140px;
+}
+
+.price-big {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.price-sub-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.perks-info-col {
+  flex: 1;
+}
+
+.card-check-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-check-list li {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.box-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.box-content-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+}
+
+.card-top-info {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.card-visual-col {
+  flex-shrink: 0;
+}
+
+.debit-card-mockup {
+  width: 220px;
+  height: 140px;
+  background: linear-gradient(135deg, #222 0%, #000 100%);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-logo-img {
+  height: 28px;
+  width: auto;
+  align-self: flex-start;
+}
+
+.card-chip-nfc {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.chip {
+  width: 35px;
+  height: 26px;
+  background: linear-gradient(135deg, #d4af37 0%, #f9f295 50%, #d4af37 100%);
+  border-radius: 4px;
+  opacity: 0.8;
+}
+
+.nfc-icon {
+  color: var(--neon-green);
+  opacity: 0.8;
+}
+
+.card-footer-info {
+  align-self: flex-end;
+}
+
+.card-holder {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.card-pricing-col {
+  flex-shrink: 0;
+}
+
+.card-title-neon {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin: 0;
+}
+
+.card-price-display {
+  display: flex;
+  flex-direction: column;
+}
+
+.price-big {
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.price-sub-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.card-perks-col {
+  flex: 1;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 32px;
+}
+
+.card-check-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-check-list li {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-visual-col {
+  flex-shrink: 0;
+}
+
+.debit-card-mockup {
+  width: 220px;
+  height: 140px;
+  background: linear-gradient(135deg, #222 0%, #000 100%);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-logo-img {
+  height: 28px;
+  width: auto;
+  align-self: flex-start;
+}
+
+.card-chip-nfc {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.chip {
+  width: 35px;
+  height: 26px;
+  background: linear-gradient(135deg, #d4af37 0%, #f9f295 50%, #d4af37 100%);
+  border-radius: 4px;
+  opacity: 0.8;
+}
+
+.nfc-icon {
+  color: var(--neon-green);
+  opacity: 0.8;
+}
+
+.card-footer-info {
+  align-self: flex-end;
+}
+
+.card-holder {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.card-pricing-col {
+  flex: 1;
+}
+
+.card-title-neon {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--neon-green);
+  margin: 4px 0 12px;
+}
+
+.card-price-display {
+  display: flex;
+  flex-direction: column;
+}
+
+.price-big {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.price-sub-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.card-perks-col {
+  flex: 1.2;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding-left: 24px;
+}
+
+.card-check-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-check-list li {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+
+.dashboard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 24px 40px;
+  border-radius: 20px;
+  gap: 30px;
+  margin-top: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.footer-left {
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.4;
+  color: var(--neon-green);
+  flex: 1.2;
+  min-width: 370px;
+}
+
+.footer-mid {
+  display: flex;
+  gap: 32px;
+  flex: 1;
+  justify-content: center;
+}
+
+.footer-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.footer-right {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--neon-green);
+  text-align: right;
+  flex: 1;
+  min-width: 200px;
+}
+
+/* ── RESPONSIVE DASHBOARD ── */
+@media (max-width: 1024px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-bottom {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-footer {
+    flex-direction: column !important;
+    text-align: center;
+    gap: 32px !important;
+    padding: 32px 24px !important;
+    height: auto !important;
+  }
+
+  .footer-left {
+    min-width: unset !important;
+    text-align: center !important;
+    width: 100% !important;
+  }
+
+  .footer-mid {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 16px !important;
+    width: 100% !important;
+    max-width: unset !important;
+  }
+
+  .footer-item {
+    justify-content: center !important;
+    font-size: 13px !important;
+  }
+
+  .footer-right {
+    text-align: center !important;
+    width: 100% !important;
+    margin-top: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .vip-dashboard-section {
+    padding: 40px 16px;
+  }
+
+  .dashboard-main-title {
+    font-size: 28px;
+  }
+
+  .vip-neon-card {
+    padding: 32px 16px;
+    height: auto;
+  }
+
+  .vip-neon-header h2 {
+    font-size: 28px !important;
+  }
+
+  .vip-neon-header p {
+    font-size: 14px !important;
+  }
+
+  .vip-title-with-icon {
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .vip-title-with-icon svg {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .modules-container {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .module-plus {
+    transform: rotate(90deg);
+    margin: 0;
+  }
+
+  .new-div {
+    flex-direction: column !important;
+    text-align: center;
+    gap: 24px !important;
+  }
+
+  .side-info-row {
+    flex-direction: column !important;
+    align-items: center !important;
+    border-top: none !important;
+    padding-top: 0 !important;
+    text-align: center;
+    gap: 24px !important;
+  }
+
+  .price-info-col-v2 {
+    min-width: unset !important;
+  }
+
+  .perks-info-col {
+    border-left: none !important;
+    padding-left: 0 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 20px;
+    margin-top: 10px;
+    width: 100%;
+  }
+
+  .card-check-list li {
+    justify-content: center;
+  }
+
+  .real-benefits-card {
+    flex-direction: column !important;
+    height: auto !important;
+    gap: 0 !important;
+  }
+
+  .benefits-image-side {
+    position: relative !important;
+    height: 320px !important;
+    width: 100% !important;
+    right: 0 !important;
+    order: 2;
+    margin-top: -10px !important;
+  }
+
+  .benefits-text-side {
+    background: #0a0e17 !important;
+    width: 100% !important;
+    padding: 24px 20px 10px 20px !important;
+    order: 1;
+    pointer-events: auto !important;
+  }
+
+  .coach-img {
+    object-position: top center !important;
+    position: relative !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  .vip-row-v2 {
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0;
+    gap: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .v-icon-col {
+    width: auto;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  .v-icon-circle, .v-icon-box {
+    transform: scale(1.1);
+  }
+
+  .v-info-col {
+    text-align: center;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .v-label {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+    max-width: 280px;
+    margin-bottom: 4px;
+  }
+
+  .v-separator-line {
+    display: none !important;
+  }
+
+  .v-value-col {
+    width: 100%;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+  }
+
+  .v-val {
+    font-size: 26px;
+    font-weight: 900;
+  }
+
+  .v-price-old-red {
+    font-size: 16px !important;
+    margin-bottom: 4px;
+  }
+
+  .vip-row-v2:last-child {
+    border-bottom: none !important;
+  }
+
+  .v-sub-badge, .v-sub-green {
+    margin-top: 4px;
+    display: inline-block;
+  }
+
+  .v-status-label {
+    font-size: 14px;
+    margin-top: 4px;
+  }
+}
+
+.real-benefits-card {
+  background: #0a0e17;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.benefits-text-side {
+  position: relative;
+  z-index: 2;
+  padding: 24px 32px;
+  flex: 1;
+  background: linear-gradient(90deg, #0a0e17 60%, transparent 100%);
+}
+
+.benefits-icon-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0 0;
+}
+
+.benefits-icon-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 12px;
+}
+
+.b-icon-bg {
+  width: 28px;
+  height: 28px;
+  background: rgba(57, 255, 20, 0.1);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neon-green);
+  flex-shrink: 0;
+}
+
+.benefits-image-side {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -1px;
+  left: 0;
+  z-index: 1;
+}
+
+.coach-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.coach-fade-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #0a0e17 0%, transparent 40%);
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .real-benefits-card {
+    flex-direction: column !important;
+    height: auto !important;
+    gap: 0 !important;
+  }
+
+  .benefits-image-side {
+    position: relative !important;
+    height: 320px !important;
+    width: 100% !important;
+    right: 0 !important;
+    order: 2;
+    margin-top: -10px !important;
+  }
+
+  .benefits-text-side {
+    background: #0a0e17 !important;
+    width: 100% !important;
+    padding: 32px 24px 20px 24px !important;
+    order: 1;
+    pointer-events: auto !important;
+    display: block !important;
+    flex: none !important;
+    text-align: center !important;
+  }
+
+  .benefits-icon-list {
+    margin: 20px 0 0 0 !important;
+    width: 100% !important;
+  }
+
+  .benefits-icon-list li {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 16px !important;
+    font-size: 15px !important;
+    margin-bottom: 20px !important;
+    color: #fff !important;
+    width: 100% !important;
+    text-align: center !important;
+  }
+
+  .benefits-icon-list li div {
+    flex-shrink: 0 !important;
+  }
+
+  .coach-img {
+    object-position: top center !important;
+    position: relative !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
   }
 }

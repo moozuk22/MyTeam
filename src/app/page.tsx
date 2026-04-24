@@ -11,7 +11,7 @@ import {
   Wifi, WifiOff, Menu, Calendar,
   MapPin, TrendingUp, Activity, Globe, Lock,
   Check, X as CloseX, PhoneCall,
-  IdCard, BarChart3, ChevronDown
+  IdCard, BarChart3, ChevronDown, Crown, CheckCircle, Shield
 } from "lucide-react";
 import ChatBot from "@/components/ChatBot";
 
@@ -1028,7 +1028,7 @@ function HoloPanel({ club, onClose }) {
                   {s.value}
                 </div>
                 {s.unit && (
-                  <div style={{ fontFamily: "'Exo 2',sans-serif", fontSize: 11, color: "rgba(255,255,255,.35)", marginTop: 2 }}>
+                  <div className="v-sub-green" style={{ fontSize: 11, fontWeight: 700, color: "var(--neon-green)", marginTop: 4 }}>
                     {s.unit}
                   </div>
                 )}
@@ -1746,6 +1746,7 @@ export default function Home() {
   const [benefitsOpen, setBenefitsOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [activeFeature, setActiveFeature] = useState(1);
+  const [selectedScale, setSelectedScale] = useState(2);
   const contactRef = useRef(null);
 
   useEffect(() => {
@@ -1965,111 +1966,259 @@ export default function Home() {
         </section>
       </RevealSection>
 
-      {/* <RevealSection>
-        <section style={{ padding: "40px 24px", background: "#05080F", textAlign: "center" }}>
-          <div style={{ maxWidth: 900, margin: "0 auto" }}>
-            <div className="section-tag-light">РЕШЕНИЕТО</div>
-            <h2 className="section-title" style={{ marginBottom: 32, fontFamily: "var(--serif-font)", textAlign: "center" }}>MyTeam – цялостно решение за управление на клуб</h2>
-
-            <div style={{ display: "inline-block", textAlign: "left", marginBottom: 60, maxWidth: "100%" }}>
-              {[
-                "Управление на деца, групи и треньори",
-                "Автоматично проследяване на плащания",
-                "Смарт карти за достъп и контрол",
-                "Отчети в реално време"
-              ].map((item, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, fontSize: 18 }}>
-                  <div style={{ color: "var(--neon-green)", fontWeight: 900 }}>✓</div>
-                  <span style={{ fontWeight: 500 }}>{item}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="ai-highlight-box">
-              <div className="ai-box-header" style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center" }}>
-                <div style={{ fontSize: 28 }}>🧠</div>
-                <h3 style={{ fontSize: 24, fontWeight: 800 }}>Интелигентен тренировъчен график</h3>
-              </div>
-              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 18, lineHeight: 1.6 }}>Автоматично разпределение на групи и оптимизация без грешки.</p>
-            </div>
-          </div>
-        </section>
-      </RevealSection> */}
-
-      {/* <RevealSection>
-        <section id="Функции" className="features-section">
-          <div className="features-container">
-            <div className="section-header">
-              <div className="section-tag-light">ВЪЗМОЖНОСТИ</div>
-              <h2 className="section-title" style={{ fontFamily: "var(--serif-font)" }}>
-                Всичко, от което се нуждаеш.<br />
-                <span className="section-title-highlight" style={{ fontStyle: "italic", color: "var(--neon-green)" }}>Нищо излишно.</span>
-              </h2>
-            </div>
-
-            <div className={`toggle-wrapper ${subActive ? "toggle-wrapper-active" : ""}`}>
-              <div className="toggle-label-group">
-                <WifiOff size={15} className={`toggle-icon ${subActive ? "icon-dim" : "icon-active"}`} />
-                <span className={`toggle-text ${subActive ? "text-dim" : "text-active"}`}>БЕЗ АБОНАМЕНТ</span>
-              </div>
-
-              <button onClick={() => setSubActive(!subActive)} className={`toggle-switch ${subActive ? "switch-active" : ""}`}>
-                <div className={`toggle-handle ${subActive ? "handle-active" : ""}`} />
-              </button>
-
-              <div className="toggle-label-group">
-                <span className={`toggle-text ${subActive ? "text-active" : "text-dim"}`}>С АБОНАМЕНТ</span>
-                <Wifi size={15} className={`toggle-icon ${subActive ? "icon-active" : "icon-dim"}`} />
-                {subActive && <div className="active-indicator" />}
-              </div>
-            </div>
-
-            <div className="feat-grid">
-              {FEATURES.map(f => (
-                <FeatureCard key={f.id} feature={f} active={subActive} onClick={() => setPopup(f)} />
-              ))}
-            </div>
-          </div>
-        </section>
-      </RevealSection> */}
-
-      {/* <RevealSection>
-        <TrustedNetwork contactRef={contactRef} />
-      </RevealSection> */}
-
       <div id="VIP" style={{ scrollMarginTop: "140px" }}></div>
       <RevealSection>
-        <section className="vip-section">
+        <section className="vip-dashboard-section">
           <div className="section-container-wide">
-            <div className="vip-card">
-              <div className="vip-spots-badge">ОСТАВАТ 5 МЕСТА</div>
 
-              <div className="vip-content">
-                <div className="section-tag-premium">ЕКСКЛУЗИВНА ПАРТНЬОРСКА ПРОГРАМА</div>
-                <h2 className="vip-title">Станете един от 10-те<br />„VIP“ клубове на MyTeam7!</h2>
-                <p className="vip-description">
-                  Търсим точно 10 спортни организации, с които да дигитализираме бъдещето на спорта в България. Тези „пилотни“ отбори ще получат статут на <strong>стратегически партньори</strong> със следните доживотни привилегии:
-                </p>
+            {/* TOP HEADER */}
+            <div className="dashboard-header">
+              <h1 className="dashboard-main-title">
+                MyTeam7: Софтуерът, който не Ви струва нищо – <br />
+                <span className="text-neon">ТОЙ ВИ НОСИ ПРИХОДИ</span>
+              </h1>
+              <div className="dashboard-stats-bar">
+                <div className="dash-stat"><Check size={18} color="var(--neon-green)" /> 100% събираемост на таксите</div>
+                <div className="dash-stat"><TrendingUp size={18} color="var(--neon-green)" /> Спестено време и нерви</div>
+                <div className="dash-stat"><Users size={18} color="var(--neon-green)" /> Доволни родители, лоялни деца</div>
+                <div className="dash-stat"><Activity size={18} color="var(--neon-green)" /> Контрол, прозрачност, растеж</div>
+              </div>
+            </div>
 
-                <div className="vip-privileges-grid">
-                  {[
-                    { t: "0€ такса интеграция", d: "Ние поемаме пълното дигитализиране на Вашата база данни и обучение на екипа Ви.", i: "⚡" },
-                    { t: "Удължен безплатен период", d: "Ползвате пълната функционалност безвъзмездно до края на 2026 г.", i: "⏳" },
-                    { t: "Моделиране по задание", d: "Системата ще бъде доразвита спрямо Вашия конкретен начин на работа.", i: "🛠" },
-                    { t: "Гарантирана най-ниска цена", d: "След промо периода, Вашата месечна такса остава преференциална - завинаги.", i: "📉" },
-                    { t: "Директно партньорство", d: "Контакт с основателите и приоритетно внедряване на всички нови модули.", i: "🤝" }
-                  ].map((p, i) => (
-                    <div key={i} className="vip-privilege-item">
-                      <div className="privilege-icon">{p.i}</div>
-                      <div className="privilege-text">
-                        <h4 className="privilege-title">{p.t}</h4>
-                        <p className="privilege-desc">{p.d}</p>
+            <div className="dashboard-main-grid">
+              {/* LEFT: MODULES & SCALE */}
+              <div className="dash-left-col">
+                <div className="left-modules-wrapper">
+                  <div className="dash-tag-centered">ГЪВКАВ МОДЕЛ СПОРЕД НУЖДИТЕ НА ВАШИЯ КЛУБ</div>
+
+                  <div className="modules-container">
+                    <div className="module-card">
+                      <div className="module-header">
+                        <div>
+                          <h3>БАЗОВ МОДУЛ</h3>
+                          <p>Автоматизирани такси и напомняния</p>
+                        </div>
+                      </div>
+                      <div className="module-pricing">
+                        <div className="price-crossed">44 € / месец</div>
+                        <ArrowDown size={24} className="price-arrow" />
+                        <div className="your-profit-badge">ВАШИЯТ ПРИХОД</div>
+                        <div className="zero-price">0 €</div>
+                        <div className="promo-period">до края на 2026 г.<br /><span className="text-neon">VIP ПРОМОЦИЯ</span></div>
+                      </div>
+                      <ul className="module-perks" style={{ marginTop: "auto" }}>
+                        <li><span className="text-neon">✓</span> Автоматизирано събиране на такси</li>
+                        <li><span className="text-neon">✓</span> Интелигентни напомняния</li>
+                        <li><span className="text-neon">✓</span> Централизирано управление</li>
+                        <li><span className="text-neon">✓</span> Прозрачност и отчетност</li>
+                      </ul>
+                    </div>
+
+                    <div className="module-plus">+</div>
+
+                    <div className="module-card">
+                      <div className="module-header">
+                        <div>
+                          <h3>ДОПЪЛНИТЕЛЕН МОДУЛ</h3>
+                          <p>Интелигентен график</p>
+                        </div>
+                      </div>
+                      <div className="module-pricing">
+                        <div className="price-crossed">+9 € / месец</div>
+                        <div className="total-label">(Общо 53 €)</div>
+                        <ArrowDown size={24} className="price-arrow" />
+                        <div className="your-profit-badge">ВАШИЯТ ПРИХОД</div>
+                        <div className="plus-profit">+4 € / месец</div>
+                        <div className="text-neon" style={{ fontSize: 12, fontWeight: 700 }}>VIP ПРЕФЕРЕНЦИЯ</div>
+                      </div>
+                      <ul className="module-perks" style={{ marginTop: "auto" }}>
+                        <li><span className="text-neon">✓</span> Интелигентен тренировъчен график</li>
+                        <li><span className="text-neon">✓</span> Автоматична комуникация</li>
+                        <li><span className="text-neon">✓</span> Синхронизация в реално време</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="scale-box-integrated">
+                    <div className="scale-title">ИЗБЕРЕТЕ СВОЯ МАЩАБ</div>
+                    <div className="scale-chips">
+                      {["0 - 50 деца", "50 - 100 деца", "100 - 200 деца", "200 - 300 деца", "300+ деца"].map((s, i) => (
+                        <button
+                          key={i}
+                          className={`scale-chip ${selectedScale === i ? "active" : ""}`}
+                          onClick={() => setSelectedScale(i)}
+                        >
+                          <Users size={14} /> {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT: VIP CLUB NEON CARD */}
+              <div className="dash-right-col">
+                <div className="vip-neon-card">
+                  <div className="vip-neon-header">
+                    <div className="vip-title-with-icon">
+                      <Crown size={42} color="var(--neon-green)" />
+                      <h2 className="text-neon">VIP CLUB</h2>
+                    </div>
+                    <p className="text-neon" style={{ color: "var(--neon-green)", opacity: 1 }}>Ексклузивно за първите 10 клуба</p>
+                  </div>
+
+                  <div className="vip-rows-v2">
+                    <div className="vip-row-v2">
+                      <div className="v-icon-col">
+                        <div className="v-icon-circle"><CheckCircle size={22} color="var(--neon-green)" /></div>
+                      </div>
+                      <div className="v-info-col">
+                        <div className="v-label">Такса за внедряване</div>
+                        <div className="v-price-old-red">0 €</div>
+                      </div>
+                      <div className="v-separator-line" style={{ width: 1.5, height: 36, background: "var(--neon-green)", opacity: 0.3, marginRight: 66 }}></div>
+                      <div className="v-value-col">
+                        <div className="v-val">0 €</div>
+                        <div className="v-sub-badge">НАПЪЛНО БЕЗПЛАТНО</div>
                       </div>
                     </div>
-                  ))}
+
+                    <div className="vip-row-v2">
+                      <div className="v-icon-col">
+                        <div className="v-icon-box"><Calendar size={22} color="var(--neon-green)" /></div>
+                      </div>
+                      <div className="v-info-col">
+                        <div className="v-label">Месечен абонамент за базовия пакет</div>
+                        <div className="v-price-old-red">44 € / месец</div>
+                      </div>
+                      <div className="v-separator-line" style={{ width: 1.5, height: 36, background: "var(--neon-green)", opacity: 0.3, marginRight: 66 }}></div>
+                      <div className="v-value-col">
+                        <div className="v-val">0 €</div>
+                        <div className="v-sub-green" style={{ fontSize: 11, fontWeight: 700, color: "var(--neon-green)", marginTop: 4 }}>до края на 2026 г.</div>
+                      </div>
+                    </div>
+
+                    <div className="vip-row-v2">
+                      <div className="v-icon-col">
+                        <Shield size={24} color="var(--neon-green)" />
+                      </div>
+                      <div className="v-info-col">
+                        <div className="v-label">Доживотна гаранция за <br /> най-ниска цена</div>
+                      </div>
+                      <div className="v-separator-line" style={{ width: 1.5, height: 36, background: "var(--neon-green)", opacity: 0.3, marginRight: 66 }}></div>
+                      <div className="v-value-col">
+                        <div className="v-status-label text-neon">ГАРАНТИРАНО</div>
+                      </div>
+                    </div>
+
+                    <div className="vip-row-v2">
+                      <div className="v-icon-col">
+                        <Users size={24} color="var(--neon-green)" />
+                      </div>
+                      <div className="v-info-col">
+                        <div className="v-label">Моделиране по задание според <br /> Вашия начин на работа</div>
+                      </div>
+                      <div className="v-separator-line" style={{ width: 1.5, height: 36, background: "var(--neon-green)", opacity: 0.3, marginRight: 66 }}></div>
+                      <div className="v-value-col">
+                        <div className="v-status-label text-neon">ПЕРСОНАЛИЗИРАНО</div>
+                      </div>
+                    </div>
+
+                    <div className="vip-row-v2">
+                      <div className="v-icon-col">
+                        <Zap size={24} color="var(--neon-green)" />
+                      </div>
+                      <div className="v-info-col">
+                        <div className="v-label">Приоритетна поддръжка <br /> и развитие</div>
+                      </div>
+                      <div className="v-separator-line" style={{ width: 1.5, height: 36, background: "var(--neon-green)", opacity: 0.3, marginRight: 66 }}></div>
+                      <div className="v-value-col">
+                        <div className="v-status-label text-neon">VIP ПОДДРЪЖКА</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* BOTTOM: SMART CARD & REAL BENEFITS */}
+            <div className="dashboard-bottom">
+
+              {/* SMART CARD BOX */}
+              <div className="smart-card-box-v3">
+                <div className="card-tag">ЕДИНСТВЕНАТА ТЕКУЩА ИНВЕСТИЦИЯ</div>
+
+                <div className="new-div">
+                  <div className="card-visual-side">
+                    <div className="debit-card-mockup-v2">
+                      <img src="/myteam-logo.png" alt="MyTeam" className="card-logo-large" />
+                      <div className="card-footer-info-v2">
+                        <span className="card-holder-white">SMART CARD</span>
+                        <div className="nfc-waves-only">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+                            <path d="M12 8a5 5 0 0 1 0 8" />
+                            <path d="M16 6a9 9 0 0 1 0 12" />
+                            <path d="M20 4a13 13 0 0 1 0 16" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="card-content-side">
+                    <div className="side-info-row">
+                      <div className="price-info-col-v2">
+                        <h3 className="card-title-compact">СМАРТ КАРТИ<br />MyTeam</h3>
+                        <div className="price-medium">15 € / 20 €</div>
+                        <div className="price-sub-label">еднократно</div>
+                      </div>
+
+                      <div className="perks-info-col">
+                        <ul className="card-check-list">
+                          <li><Check size={14} className="text-neon" /> 10% отстъпка в Sport Depot и партньори</li>
+                          <li><Check size={14} className="text-neon" /> Картата се изплаща сама чрез отстъпки</li>
+                          <li><Check size={14} className="text-neon" /> Повишава ангажираността и лоялността</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* REAL BENEFITS BOX */}
+              <div className="real-benefits-card">
+                <div className="benefits-text-side">
+                  <div className="card-tag">КАКВО ПОЛУЧАВАТЕ РЕАЛНО</div>
+                  <ul className="benefits-icon-list">
+                    <li><div className="b-icon-bg"><Calendar size={14} /></div> MyTeam7 поема „черната работа“</li>
+                    <li><div className="b-icon-bg"><TrendingUp size={14} /></div> 100% контрол върху приходите</li>
+                    <li><div className="b-icon-bg"><BarChart3 size={14} /></div> Предвидим растеж на клуба</li>
+                    <li><div className="b-icon-bg"><ShieldCheck size={14} /></div> Освободено време за тренировките</li>
+                  </ul>
+                </div>
+                <div className="benefits-image-side">
+                  <div className="coach-fade-overlay"></div>
+                  <img src="/coach.png" alt="Coach" className="coach-img" style={{ position: "absolute", left: "180px" }} />
+                </div>
+              </div>
+
+            </div>
+
+            {/* DASHBOARD FOOTER BAR */}
+            <div className="dashboard-footer">
+              <div className="footer-left">
+                ВЪПРОСЪТ НЕ Е „КОЛКО СТРУВА MyTeam7?“<br />
+                <span className="text-neon">ВЪПРОСЪТ Е: КОЛКО ГУБИТЕ БЕЗ НЕГО?</span>
+              </div>
+              <div className="footer-mid">
+                <div className="footer-item"><Activity size={16} /> НЯМА ХАОС</div>
+                <div className="footer-item"><CreditCard size={16} /> НЯМА ПРОПУСНАТИ ПЛАЩАНИЯ</div>
+                <div className="footer-item"><Users size={16} /> НЯМА ИЗЛИШНА АДМИНИСТРАЦИЯ</div>
+              </div>
+              <div className="footer-right">
+                ИМА КОНТРОЛ, РАСТЕЖ И СИГУРНИ ПРИХОДИ.
+              </div>
+            </div>
+
           </div>
         </section>
       </RevealSection>
@@ -2090,21 +2239,21 @@ export default function Home() {
                 { id: 4, t: "Отчети в реално време", d: "Вижте пълната картина на финансите и спортните резултати чрез подробни аналитични графики и справки.", i: <BarChart3 size={24} /> },
                 { id: 5, t: "Интелигентен тренировъчен график", d: "Автоматизирано планиране на графиците за тренировки, съобразено с капацитета на залите и заетостта на треньорите.", i: <Calendar size={24} /> }
               ].map((f) => (
-                <div key={f.id} className={`accordion-item ${activeFeature === f.id ? "accordion-active" : ""}`} 
-                     onClick={() => setActiveFeature(activeFeature === f.id ? null : f.id)}
-                     style={{ 
-                       background: "rgba(255,255,255,0.02)", 
-                       border: "1px solid rgba(255,255,255,0.05)", 
-                       borderRadius: 16, 
-                       marginBottom: 12,
-                       cursor: "pointer",
-                       overflow: "hidden",
-                       transition: "all 0.3s ease"
-                     }}>
-                  <div className="accordion-trigger" style={{ 
-                    padding: "24px", 
-                    display: "flex", 
-                    alignItems: "center", 
+                <div key={f.id} className={`accordion-item ${activeFeature === f.id ? "accordion-active" : ""}`}
+                  onClick={() => setActiveFeature(activeFeature === f.id ? null : f.id)}
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 16,
+                    marginBottom: 12,
+                    cursor: "pointer",
+                    overflow: "hidden",
+                    transition: "all 0.3s ease"
+                  }}>
+                  <div className="accordion-trigger" style={{
+                    padding: "24px",
+                    display: "flex",
+                    alignItems: "center",
                     justifyContent: "space-between",
                     gap: 16
                   }}>
@@ -2112,15 +2261,15 @@ export default function Home() {
                       <div style={{ color: activeFeature === f.id ? "var(--neon-green)" : "rgba(255,255,255,0.4)" }}>{f.i}</div>
                       <h3 style={{ fontSize: 18, fontWeight: 700, color: activeFeature === f.id ? "#fff" : "rgba(255,255,255,0.7)" }}>{f.t}</h3>
                     </div>
-                    <div style={{ 
-                      transition: "transform 0.3s ease", 
+                    <div style={{
+                      transition: "transform 0.3s ease",
                       transform: activeFeature === f.id ? "rotate(180deg)" : "rotate(0deg)",
                       color: activeFeature === f.id ? "var(--neon-green)" : "rgba(255,255,255,0.2)"
                     }}>
                       <ChevronDown size={20} />
                     </div>
                   </div>
-                  <div className="accordion-content" style={{ 
+                  <div className="accordion-content" style={{
                     maxHeight: activeFeature === f.id ? "200px" : "0",
                     opacity: activeFeature === f.id ? 1 : 0,
                     transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -2136,6 +2285,7 @@ export default function Home() {
           </div>
         </section>
       </RevealSection>
+
       <RevealSection>
         <section id="Цени" className="pricing-section">
           <div style={{ textAlign: "center", marginBottom: 32 }}>
