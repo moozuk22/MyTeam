@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  escapeHtml,
+  sendBrevoEmail,
+  buildLeadConfirmationContent,
+} from "@/lib/email";
 
 const BREVO_CONTACTS_ENDPOINT = "https://api.brevo.com/v3/contacts";
-const BREVO_SMTP_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 export const runtime = "nodejs";
 
 type LeadPayload = {
@@ -10,18 +14,6 @@ type LeadPayload = {
   email?: unknown;
   phone?: unknown;
   kids?: unknown;
-};
-
-type BrevoEmailPayload = {
-  senderEmail: string;
-  senderName: string;
-  toEmail: string;
-  toName?: string;
-  subject: string;
-  htmlContent: string;
-  textContent: string;
-  replyToEmail?: string;
-  replyToName?: string;
 };
 
 function asTrimmedString(value: unknown): string {
@@ -80,47 +72,6 @@ function addCustomAttribute(
   }
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-async function sendBrevoEmail(
-  apiKey: string,
-  payload: BrevoEmailPayload
-): Promise<boolean> {
-  const response = await fetch(BREVO_SMTP_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "api-key": apiKey,
-    },
-    body: JSON.stringify({
-      sender: {
-        email: payload.senderEmail,
-        name: payload.senderName,
-      },
-      to: [{ email: payload.toEmail, name: payload.toName }],
-      replyTo: payload.replyToEmail
-        ? { email: payload.replyToEmail, name: payload.replyToName }
-        : undefined,
-      subject: payload.subject,
-      htmlContent: payload.htmlContent,
-      textContent: payload.textContent,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Brevo email send failed:", errorText);
-    return false;
-  }
-
-  return true;
-}
-
 function buildSubmissionNotificationContent(
   club: string,
   name: string,
@@ -144,57 +95,6 @@ function buildSubmissionNotificationContent(
     `Имейл: ${email}`,
     `Телефон: ${phone}`,
     `Брой деца: ${kids}`,
-  ].join("\n");
-
-  return { htmlContent, textContent };
-}
-
-function buildLeadConfirmationContent(
-  logoUrl: string,
-  club: string,
-  name: string,
-  email: string,
-  phone: string,
-  kids: string
-) {
-  const htmlContent = `
-  <div style="margin:0;padding:24px 0;background:#070C14;font-family:Arial,sans-serif;color:#EAF2FF;">
-    <div style="max-width:620px;margin:0 auto;background:#0D1520;border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;">
-      <div style="padding:28px 28px 18px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.08);">
-        <img src="${escapeHtml(logoUrl)}" alt="MyTeam" style="max-width:160px;height:auto;display:inline-block;" />
-      </div>
-      <div style="padding:28px;">
-        <h1 style="margin:0 0 12px;font-size:24px;line-height:1.3;color:#39FF14;">Благодарим Ви за запитването, ${escapeHtml(name)}!</h1>
-        <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#D9E5F5;">
-          Получихме Вашата заявка успешно. Нашият екип ще се свърже с Вас възможно най-скоро.
-        </p>
-        <p style="margin:0 0 14px;font-size:14px;color:#9FB2C9;">Подадени данни:</p>
-        <table role="presentation" style="width:100%;border-collapse:collapse;">
-          <tr><td style="padding:8px 0;color:#8FA4BC;font-size:14px;">Клуб</td><td style="padding:8px 0;color:#FFFFFF;font-size:14px;">${escapeHtml(club)}</td></tr>
-          <tr><td style="padding:8px 0;color:#8FA4BC;font-size:14px;">Име</td><td style="padding:8px 0;color:#FFFFFF;font-size:14px;">${escapeHtml(name)}</td></tr>
-          <tr><td style="padding:8px 0;color:#8FA4BC;font-size:14px;">Имейл</td><td style="padding:8px 0;color:#FFFFFF;font-size:14px;">${escapeHtml(email)}</td></tr>
-          <tr><td style="padding:8px 0;color:#8FA4BC;font-size:14px;">Телефон</td><td style="padding:8px 0;color:#FFFFFF;font-size:14px;">${escapeHtml(phone)}</td></tr>
-          <tr><td style="padding:8px 0;color:#8FA4BC;font-size:14px;">Прибл. брой деца</td><td style="padding:8px 0;color:#FFFFFF;font-size:14px;">${escapeHtml(kids)}</td></tr>
-        </table>
-      </div>
-      <div style="padding:16px 28px;background:#0A111B;border-top:1px solid rgba(255,255,255,0.08);color:#88A0BC;font-size:12px;">
-        MyTeam • Това е автоматично потвърждение.
-      </div>
-    </div>
-  </div>
-  `;
-
-  const textContent = [
-    `Благодарим Ви за запитването, ${name}!`,
-    "Получихме Вашата заявка успешно.",
-    "Подадени данни:",
-    `Клуб: ${club}`,
-    `Име: ${name}`,
-    `Имейл: ${email}`,
-    `Телефон: ${phone}`,
-    `Прибл. брой деца: ${kids}`,
-    "",
-    "MyTeam",
   ].join("\n");
 
   return { htmlContent, textContent };
@@ -327,20 +227,10 @@ async function sendLeadConfirmationEmail(
   senderEmail: string,
   senderName: string,
   logoUrl: string,
-  club: string,
   name: string,
-  email: string,
-  phone: string,
-  kids: string
+  email: string
 ): Promise<boolean> {
-  const { htmlContent, textContent } = buildLeadConfirmationContent(
-    logoUrl,
-    club,
-    name,
-    email,
-    phone,
-    kids
-  );
+  const { htmlContent, textContent } = buildLeadConfirmationContent(logoUrl, name);
 
   return sendBrevoEmail(apiKey, {
     senderEmail,
@@ -420,11 +310,8 @@ export async function POST(request: NextRequest) {
     senderEmail,
     senderName,
     logoUrl,
-    club,
     name,
-    email,
-    phone,
-    kids
+    email
   );
 
   const shouldSyncContacts = process.env.BREVO_SYNC_CONTACTS?.trim() === "true";
