@@ -1240,7 +1240,7 @@ function NavBar() {
               <CloseX size={32} color="#fff" />
             </button>
           </div>
-          
+
           <div className="mobile-links-container">
             <a href="#Защо" onClick={() => setIsMenuOpen(false)} className="nav-link">Защо MyTeam7</a>
             <a href="#Функции" onClick={() => setIsMenuOpen(false)} className="nav-link">Функции</a>
@@ -1854,10 +1854,48 @@ export default function Home() {
         </section>
       </RevealSection>
 
+      <div id="Защо" style={{ scrollMarginTop: "140px" }}></div>
+      <RevealSection>
+        <section className="why-section">
+          <div className="section-container-wide">
+            <div className="section-header-centered">
+              <div className="section-tag-light">ИСТОРИЯТА ЗАД ПРОДУКТА</div>
+              <h2 className="section-title-premium">Вдъхновен от терена,<br />създаден от професионалисти.</h2>
+              <div className="section-divider-center" />
+            </div>
+
+            <div className="why-grid">
+              <div className="why-text-col">
+                <p className="why-p-main">
+                  MyTeam7 не е просто софтуерна система. Той е дигиталното отражение на <strong>10 години опит</strong> в професионалния футбол (А група) и ежедневното управление на най-развитата школа за Belly Dance и шоу програми в Пловдив – <strong>Dalida Dance</strong>.
+                </p>
+                <p className="why-p-sub">
+                  Продуктът е изграден по модела на нашия „Първи пилот“ – треньор с десетилетен стаж в елитния спорт, който познава административния хаос от първо лице. Взехме неговата доказана методология и я съчетахме с реалните бизнес решения!
+                </p>
+                <div className="why-quote-box">
+                  <p className="why-quote-text">
+                    "Бяхме в капана на хартиените дневници, изгубената информация и безкрайните Viber групи – и създадохме изход."
+                  </p>
+                </div>
+              </div>
+              <div className="why-visual-col">
+                <div className="why-image-card" style={{ background: "url('/professional_pitch_history.png') center/cover" }} />
+                <div className="why-experience-badge">
+                  <div className="badge-icon">🏆</div>
+                  <div className="badge-content">
+                    <div className="badge-title">10 ГОДИНИ</div>
+                    <div className="badge-subtitle">В ЕЛИТНИЯ СПОРТ</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </RevealSection>
+
       <RevealSection>
         <section style={{ padding: "40px 24px", background: "#070C14", textAlign: "center" }}>
           <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-
             <div className="problem-grid" style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -1996,6 +2034,43 @@ export default function Home() {
       {/* <RevealSection>
         <TrustedNetwork contactRef={contactRef} />
       </RevealSection> */}
+
+      <div id="VIP" style={{ scrollMarginTop: "140px" }}></div>
+      <RevealSection>
+        <section className="vip-section">
+          <div className="section-container-wide">
+            <div className="vip-card">
+              <div className="vip-spots-badge">ОСТАВАТ 5 МЕСТА</div>
+
+              <div className="vip-content">
+                <div className="section-tag-premium">ЕКСКЛУЗИВНА ПАРТНЬОРСКА ПРОГРАМА</div>
+                <h2 className="vip-title">Станете един от 10-те<br />„VIP“ клубове на MyTeam7!</h2>
+                <p className="vip-description">
+                  Търсим точно 10 спортни организации, с които да дигитализираме бъдещето на спорта в България. Тези „пилотни“ отбори ще получат статут на <strong>стратегически партньори</strong> със следните доживотни привилегии:
+                </p>
+
+                <div className="vip-privileges-grid">
+                  {[
+                    { t: "0 лв. такса интеграция", d: "Ние поемаме пълното дигитализиране на Вашата база данни и обучение на екипа Ви.", i: "⚡" },
+                    { t: "Удължен безплатен период", d: "Ползвате пълната функционалност безвъзмездно до края на 2026 г.", i: "⏳" },
+                    { t: "Моделиране по задание", d: "Системата ще бъде доразвита спрямо Вашия конкретен начин на работа.", i: "🛠" },
+                    { t: "Гарантирана най-ниска цена", d: "След промо периода, Вашата месечна такса остава преференциална - завинаги.", i: "📉" },
+                    { t: "Директно партньорство", d: "Контакт с основателите и приоритетно внедряване на всички нови модули.", i: "🤝" }
+                  ].map((p, i) => (
+                    <div key={i} className="vip-privilege-item">
+                      <div className="privilege-icon">{p.i}</div>
+                      <div className="privilege-text">
+                        <h4 className="privilege-title">{p.t}</h4>
+                        <p className="privilege-desc">{p.d}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </RevealSection>
 
       <RevealSection>
         <section id="Цени" className="pricing-section">
