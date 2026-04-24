@@ -228,9 +228,10 @@ async function sendLeadConfirmationEmail(
   senderName: string,
   logoUrl: string,
   name: string,
-  email: string
+  email: string,
+  videoUrl: string
 ): Promise<boolean> {
-  const { htmlContent, textContent } = buildLeadConfirmationContent(logoUrl, name);
+  const { htmlContent, textContent } = buildLeadConfirmationContent(logoUrl, name, videoUrl);
 
   return sendBrevoEmail(apiKey, {
     senderEmail,
@@ -285,7 +286,9 @@ export async function POST(request: NextRequest) {
     process.env.APP_BASE_URL?.trim() ??
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ??
     request.nextUrl.origin;
-  const logoUrl = `${appBaseUrl.replace(/\/$/, "")}/myteam-logo.png`;
+  const baseUrl = appBaseUrl.replace(/\/$/, "");
+  const logoUrl = `${baseUrl}/myteam-logo.png`;
+  const videoUrl = `${baseUrl}/?video=1`;
 
   const emailSent = await sendSubmissionNotificationEmail(
     apiKey,
@@ -311,7 +314,8 @@ export async function POST(request: NextRequest) {
     senderName,
     logoUrl,
     name,
-    email
+    email,
+    videoUrl
   );
 
   const shouldSyncContacts = process.env.BREVO_SYNC_CONTACTS?.trim() === "true";

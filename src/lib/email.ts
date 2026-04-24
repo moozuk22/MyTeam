@@ -50,7 +50,7 @@ export async function sendBrevoEmail(
   return true;
 }
 
-export function buildLeadConfirmationContent(logoUrl: string, name: string) {
+export function buildLeadConfirmationContent(logoUrl: string, name: string, videoUrl: string) {
   const supportPhoneDisplay = "0896 495 254";
   const supportPhoneHref = "+359896495254";
 
@@ -119,7 +119,7 @@ export function buildLeadConfirmationContent(logoUrl: string, name: string) {
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="background-color: #1a1a1a; border: 2px solid #333333; border-radius: 8px;">
-                          <a href="#" target="_blank" style="display: inline-block; padding: 15px 40px; font-size: 14px; font-weight: bold; color: #ffffff; text-decoration: none; text-align: center;">
+                          <a href="${escapeHtml(videoUrl)}" target="_blank" style="display: inline-block; padding: 15px 40px; font-size: 14px; font-weight: bold; color: #ffffff; text-decoration: none; text-align: center;">
                             <span style="vertical-align: middle;">&#9658;</span>&nbsp;&nbsp;ГЛЕДАЙ ВИДЕО ДЕМО
                           </a>
                         </td>

@@ -60,9 +60,11 @@ export async function POST(request: NextRequest) {
     process.env.APP_BASE_URL?.trim() ??
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ??
     request.nextUrl.origin;
-  const logoUrl = `${appBaseUrl.replace(/\/$/, "")}/myteam-logo.png`;
+  const baseUrl = appBaseUrl.replace(/\/$/, "");
+  const logoUrl = `${baseUrl}/myteam-logo.png`;
+  const videoUrl = `${baseUrl}/?video=1`;
 
-  const { htmlContent, textContent } = buildLeadConfirmationContent(logoUrl, name);
+  const { htmlContent, textContent } = buildLeadConfirmationContent(logoUrl, name, videoUrl);
 
   const sent = await sendBrevoEmail(apiKey, {
     senderEmail,

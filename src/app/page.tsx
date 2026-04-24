@@ -1520,6 +1520,84 @@ function Lightbox({ image, onClose }) {
   );
 }
 
+function VideoModal({ onClose }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = "auto"; };
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, []);
+
+  const handleOverlayClick = () => {
+    if (videoRef.current) videoRef.current.pause();
+    onClose();
+  };
+
+  return (
+    <div
+      onClick={handleOverlayClick}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.92)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px"
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: 900,
+          background: "#000",
+          borderRadius: 16,
+          overflow: "hidden",
+          boxShadow: "0 0 60px rgba(57,255,20,0.2)"
+        }}
+      >
+        <button
+          onClick={handleOverlayClick}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 10,
+            background: "rgba(0,0,0,0.6)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            borderRadius: "50%",
+            width: 40,
+            height: 40,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "#fff"
+          }}
+        >
+          <X size={20} />
+        </button>
+        <video
+          ref={videoRef}
+          src="/demo.mp4"
+          controls
+          playsInline
+          style={{ width: "100%", display: "block", maxHeight: "80vh" }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function InfiniteCarousel({ onExpand }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -1726,6 +1804,7 @@ export default function Home() {
   const [expandedImage, setExpandedImage] = useState(null);
   const [benefitsOpen, setBenefitsOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const contactRef = useRef(null);
 
   useEffect(() => {
@@ -1757,12 +1836,22 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("video") === "1") {
+        setShowVideoModal(true);
+      }
+    }
+  }, []);
+
   return (
     <>
       <NavBar />
       {popup && <FeaturePopup feature={popup} onClose={() => setPopup(null)} />}
       {expandedImage && <Lightbox image={expandedImage} onClose={() => setExpandedImage(null)} />}
       {showSuccess && <SuccessModal onClose={() => setShowSuccess(false)} />}
+      {showVideoModal && <VideoModal onClose={() => setShowVideoModal(false)} />}
 
       <RevealSection>
         <section className="hero-section" style={{ minHeight: "100vh", display: "flex", alignItems: "center" }}>
