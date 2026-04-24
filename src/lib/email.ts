@@ -51,6 +51,9 @@ export async function sendBrevoEmail(
 }
 
 export function buildLeadConfirmationContent(logoUrl: string, name: string) {
+  const supportPhoneDisplay = "0896 495 254";
+  const supportPhoneHref = "+359896495254";
+
   const htmlContent = `<!DOCTYPE html>
 <html lang="bg">
 <head>
@@ -166,7 +169,7 @@ export function buildLeadConfirmationContent(logoUrl: string, name: string) {
                     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td style="background-color: #7CFC00; border-radius: 8px; text-align: center;">
-                          <a href="tel:0896495254" style="display: block; padding: 18px 40px; font-size: 14px; font-weight: bold; color: #000000; text-decoration: none; text-align: center;">
+                          <a href="tel:${supportPhoneHref}" style="display: block; padding: 18px 40px; font-size: 14px; font-weight: bold; color: #000001; text-decoration: none; text-align: center;">
                             <span style="vertical-align: middle;">&#128222;</span>&nbsp;&nbsp;ОБАДИ СЕ НА MyTeam
                           </a>
                         </td>
@@ -175,6 +178,9 @@ export function buildLeadConfirmationContent(logoUrl: string, name: string) {
                   </td>
                 </tr>
               </table>
+              <p style="margin: 14px 0 0 0; text-align: center; font-size: 14px; color: #aaaaaa;">
+                <a href="tel:${supportPhoneHref}" style="color: #7CFC00; text-decoration: underline;">${supportPhoneDisplay}</a>
+              </p>
             </td>
           </tr>
           <tr>
