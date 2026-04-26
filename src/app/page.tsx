@@ -2237,22 +2237,21 @@ export default function Home() {
         </div>
       </footer>
 
-      <div className={`dock-container ${!showDockActions ? "dock-hidden-actions" : ""}`}>
-        <a href="tel:0896495254" className="action-btn action-phone dock-item" title="Call Us">
-          <div className="dock-icon-wrapper call-wrapper">
-            <PhoneCall size={20} color="#000" />
-          </div>
-          <span className="dock-text">Обаждане</span>
-        </a>
+      <div className="mobile-fab-dock">
+        <div className={`fab-left-wing ${showDockActions ? "" : "dock-hidden-actions"}`}>
+          <a href="tel:0896495254" className="fab-circle call-fab" title="Call Us">
+            <PhoneCall size={26} color="#000" />
+          </a>
+        </div>
 
-        <ChatBot scrollToContact={() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })} />
-
-        <a href="viber://chat?number=%2B359896495254" className="action-btn action-viber dock-item" title="Viber">
-          <div className="dock-icon-wrapper viber-wrapper">
-            <img src="/viber.png" alt="Viber" style={{ width: 34, height: 34, objectFit: "contain" }} />
+        <div className="fab-right-wing">
+          <ChatBot scrollToContact={() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })} />
+          <div className={`${showDockActions ? "" : "dock-hidden-actions"}`} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <a href="viber://chat?number=%2B359896495254" className="fab-circle viber-fab" title="Viber">
+              <img src="/viber.png" alt="Viber" style={{ width: 50, height: 50, objectFit: "contain" }} />
+            </a>
           </div>
-          <span className="dock-text">Viber</span>
-        </a>
+        </div>
       </div>
     </>
   );

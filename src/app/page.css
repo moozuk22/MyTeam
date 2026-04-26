@@ -4851,10 +4851,148 @@ body.menu-open-active .dock-container {
   }
 }
 
+/* -- MOBILE FAB DOCK -- */
+.mobile-fab-dock {
+  position: fixed;
+  bottom: 24px;
+  left: 40px;
+  right: 40px;
+  z-index: 9999;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fab-left-wing, .fab-right-wing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  pointer-events: auto;
+}
+
+.fab-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid rgba(255,255,255,0.1);
+  text-decoration: none;
+}
+
+.fab-circle:active {
+  transform: scale(0.9);
+}
+
+.call-fab {
+  background: var(--neon-green);
+  box-shadow: 0 12px 30px rgba(57, 255, 20, 0.4);
+}
+
+.viber-fab {
+  background: #7c509e;
+}
+
+.dock-hidden-actions {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(40px);
+}
+
 /* -- PERMANENT PRICE BLUR -- */
 .price-val, .v-price-old-red, .price-crossed, .zero-price, .plus-profit, .price-big, .price-medium {
   filter: blur(12px) !important;
   user-select: none !important;
+}
+
+.no-blur {
+  filter: none !important;
+  user-select: auto !important;
+}
+
+.pricing-schedule-toggle {
+  margin-top: auto;
+  margin-bottom: 32px;
+}
+
+.pricing-card .comp-list {
+  min-height: 160px;
+}
+
+
+/* -- VIP CTA SECTION -- */
+.vip-cta-wrapper {
+  transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.4s ease;
+}
+
+.vip-cta-wrapper:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 30px 60px rgba(57, 255, 20, 0.08);
+}
+
+.vip-main-cta-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 50px rgba(57, 255, 20, 0.6);
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid var(--neon-green) !important;
+}
+
+.vip-main-cta-btn:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .vip-cta-wrapper {
+    margin: 60px 0 40px !important;
+    padding: 40px 20px !important;
+    border-radius: 32px !important;
+  }
+  
+  .vip-cta-wrapper h2 {
+    font-size: 26px !important;
+  }
+  
+  .vip-cta-wrapper p {
+    font-size: 15px !important;
+    margin-bottom: 32px !important;
+  }
+  
+  .vip-main-cta-btn {
+    padding: 18px 32px !important;
+    font-size: 15px !important;
+    width: 100%;
+    justify-content: center;
+    border-radius: 16px !important;
+  }
+  
+  .cta-icon-badge {
+    width: 60px !important;
+    height: 60px !important;
+    margin-bottom: 16px !important;
+  }
+  
+  .cta-icon-badge svg {
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
+
+/* -- PERMANENT PRICE BLUR -- */
+.price-val, .v-price-old-red, .price-crossed, .zero-price, .plus-profit, .price-big, .price-medium {
+  filter: blur(12px) !important;
+  user-select: none !important;
+}
+
+.no-blur {
+  filter: none !important;
+  user-select: auto !important;
 }
 
 .pricing-schedule-toggle {
