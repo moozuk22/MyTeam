@@ -59,7 +59,7 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
 
     const timer = setTimeout(() => {
       setShowNotification(true);
-    }, 15000); 
+    }, 30000); 
 
     return () => clearTimeout(timer);
   }, []);
@@ -157,7 +157,7 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
   return (
     <>
       <div 
-        className={`chat-toggle-pill ${isOpen ? 'hidden' : ''}`}
+        className={`chat-toggle-circle ${isOpen ? 'hidden' : ''}`}
         onClick={() => {
           setIsOpen(true);
           setShowNotification(false);
@@ -166,10 +166,8 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
         tabIndex={0}
       >
         <div className="chat-toggle-avatar">
-          <img src="/myteam-logo.png" alt="Bot" />
+          <img src="/chatbot.png" alt="MyTeam Bot" />
         </div>
-        <span className="chat-toggle-text">MyTeam Асистент</span>
-        <span className="status-dot-pulse"></span>
 
         {showNotification && !isOpen && (
           <div className="notification-bubble-wrapper">
@@ -191,7 +189,7 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
           <div className="chat-header">
             <div className="chat-header-info">
               <div className="chat-avatar">
-                <img src="/myteam-logo.png" alt="MyTeam Bot" className="chat-avatar-img" />
+                <img src="/chatbot.png" alt="MyTeam Bot" className="chat-avatar-img" />
               </div>
               <div>
                 <div className="chat-name">MyTeam Асистент</div>
@@ -211,7 +209,7 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
           <div key={msg.id} className={`chat-bubble-wrapper ${msg.sender === "user" ? "user" : "bot"}`}>
             {msg.sender === "bot" && (
                <div className="chat-bubble-avatar">
-                 <img src="/myteam-logo.png" alt="MyTeam Bot" />
+                 <img src="/chatbot.png" alt="MyTeam Bot" />
                </div>
             )}
             <div className={`chat-bubble ${msg.sender === "user" ? "user-bubble" : "bot-bubble"}`}>
@@ -223,7 +221,7 @@ export default function ChatBot({ scrollToContact }: { scrollToContact: () => vo
         {isTyping && (
           <div className="chat-bubble-wrapper bot">
             <div className="chat-bubble-avatar">
-              <img src="/myteam-logo.png" alt="MyTeam Bot" />
+              <img src="/chatbot.png" alt="MyTeam Bot" />
             </div>
             <div className="chat-bubble bot-bubble typing-bubble">
               <div className="typing-dot"></div>
