@@ -147,7 +147,7 @@ export default function VipPage() {
                       </div>
                       <div className="v-info-col">
                         <div className="v-label">Такса за внедряване</div>
-                        <div className="v-price-old-red">0 €</div>
+                        <div className="v-price-old-red no-blur">0 €</div>
                       </div>
                       <div className="v-separator-line" style={{ width: 1.5, height: 36, background: "var(--neon-green)", opacity: 0.3, marginRight: 66 }}></div>
                       <div className="v-value-col">
@@ -162,7 +162,7 @@ export default function VipPage() {
                       </div>
                       <div className="v-info-col">
                         <div className="v-label">Месечен абонамент за базовия пакет</div>
-                        <div className="v-price-old-red">44 € / месец</div>
+                        <div className="v-price-old-red no-blur">44 € / месец</div>
                       </div>
                       <div className="v-separator-line" style={{ width: 1.5, height: 36, background: "var(--neon-green)", opacity: 0.3, marginRight: 66 }}></div>
                       <div className="v-value-col">
