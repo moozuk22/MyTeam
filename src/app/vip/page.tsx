@@ -219,7 +219,7 @@ export default function VipPage() {
 
               {/* SMART CARD BOX */}
               <div className="smart-card-box-v3">
-                <div className="card-tag">ЕДИНСТВЕНАТА ТЕКУЩА ИНВЕСТИЦИЯ</div>
+                <div className="card-tag">СМАРТ КАРТИ MyTeam</div>
 
                 <div className="new-div">
                   <div className="card-visual-side">
@@ -240,9 +240,17 @@ export default function VipPage() {
                   <div className="card-content-side">
                     <div className="side-info-row">
                       <div className="price-info-col-v2">
-                        <h3 className="card-title-compact">СМАРТ КАРТИ<br />MyTeam</h3>
-                        <div className="price-medium">15 € / 20 €</div>
-                        <div className="price-sub-label">еднократно</div>
+                        <div className="price-sub-label" style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, color: "rgba(255, 255, 255, 0.9)" }}>
+                          <span style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            background: "var(--neon-green)",
+                            boxShadow: "0 0 12px var(--neon-green)",
+                            animation: "glowPulse 2s infinite ease-in-out"
+                          }}></span>
+                          Еднократно
+                        </div>
                       </div>
 
                       <div className="perks-info-col">
@@ -292,6 +300,93 @@ export default function VipPage() {
               </div>
             </div>
 
+            {/* VIP CTA SECTION */}
+            <div className="vip-cta-wrapper" style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              margin: "100px 0 80px",
+              padding: "60px 40px",
+              background: "rgba(57, 255, 20, 0.03)",
+              borderRadius: "40px",
+              border: "1px solid rgba(57, 255, 20, 0.1)",
+              position: "relative",
+              overflow: "hidden",
+              textAlign: "center"
+            }}>
+              {/* Background glow effect */}
+              <div style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "300px",
+                height: "300px",
+                background: "var(--neon-green)",
+                filter: "blur(140px)",
+                opacity: 0.08,
+                pointerEvents: "none"
+              }}></div>
+
+              <div className="cta-icon-badge" style={{
+                width: "80px",
+                height: "80px",
+                background: "rgba(57, 255, 20, 0.1)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "24px",
+                border: "1px solid rgba(57, 255, 20, 0.2)",
+                boxShadow: "0 0 20px rgba(57, 255, 20, 0.1)"
+              }}>
+                <Crown size={38} color="var(--neon-green)" />
+              </div>
+
+              <h2 style={{
+                fontSize: "36px",
+                fontWeight: 900,
+                marginBottom: "16px",
+                letterSpacing: "-0.5px",
+                color: "#fff"
+              }}>
+                СТАНЕТЕ ЧАСТ ОТ <span className="text-neon">VIP КЛУБА</span>
+              </h2>
+              <p style={{
+                color: "rgba(255,255,255,0.5)",
+                marginBottom: "40px",
+                maxWidth: "600px",
+                fontSize: "18px",
+                lineHeight: 1.6
+              }}>
+                Присъединете се към елитните клубове, които вече трансформираха своето управление и увеличиха приходите си.
+              </p>
+
+              <a href="/#Контакт" className="vip-main-cta-btn" style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "14px",
+                background: "var(--neon-green)",
+                color: "#000",
+                padding: "22px 56px",
+                borderRadius: "20px",
+                fontSize: "18px",
+                fontWeight: 900,
+                textDecoration: "none",
+                transition: "all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+                boxShadow: "0 10px 40px rgba(57, 255, 20, 0.3)",
+                textTransform: "uppercase",
+                letterSpacing: "1px"
+              }}>
+                <span>ЗАЯВЕТЕ VIP ДЕМО</span>
+                <Zap size={22} fill="#000" />
+              </a>
+
+              <div style={{ marginTop: "32px", display: "flex", alignItems: "center", gap: "10px", color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px" }}>
+                <ShieldCheck size={16} color="var(--neon-green)" />
+                БЕЗ ОБВЪРЗВАНЕ • 30 ДНИ БЕЗПЛАТЕН ТЕСТ
+              </div>
+            </div>
           </div>
         </section>
       </RevealSection>
