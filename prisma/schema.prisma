@@ -36,6 +36,7 @@ model Club {
   trainingNotes          TrainingNote[]
   trainingGroupSchedules ClubTrainingGroupSchedule[]
   trainingScheduleGroups ClubTrainingScheduleGroup[]
+  notifyOnCoachVisit     Boolean                     @default(false) @map("notify_on_coach_visit")
 
   @@map("clubs")
 }

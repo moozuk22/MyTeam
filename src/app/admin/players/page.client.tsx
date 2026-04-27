@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import "./page.css";
 
-const BellIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const BellIcon = ({ filled = false }: { filled?: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10.268 21a2 2 0 0 0 3.464 0" />
     <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
   </svg>
@@ -54,6 +54,7 @@ interface ClubRow {
   emblemUrl?: string | null;
   imageUrl?: string | null;
   imagePublicId?: string | null;
+  notifyOnCoachVisit?: boolean;
 }
 
 export default function AdminPlayersPage() {
@@ -73,6 +74,25 @@ export default function AdminPlayersPage() {
   const [coachClubSearch, setCoachClubSearch] = useState("");
   const [isSendingCoach, setIsSendingCoach] = useState(false);
   const coachPickerRef = useRef<HTMLDivElement | null>(null);
+
+  const [togglingNotifyClubId, setTogglingNotifyClubId] = useState<string | null>(null);
+
+  const toggleNotify = async (e: React.MouseEvent, clubId: string, current: boolean) => {
+    e.stopPropagation();
+    setTogglingNotifyClubId(clubId);
+    try {
+      await fetch(`/api/admin/clubs/${clubId}/notify`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifyOnCoachVisit: !current }),
+      });
+      setClubs((prev) =>
+        prev.map((c) => (c.id === clubId ? { ...c, notifyOnCoachVisit: !current } : c)),
+      );
+    } finally {
+      setTogglingNotifyClubId(null);
+    }
+  };
 
   const fetchClubs = async () => {
     setClubsLoading(true);
@@ -532,26 +552,34 @@ export default function AdminPlayersPage() {
             )}
 
             {!clubsLoading && visibleClubs.map((club) => (
-              <button
-                key={club.id}
+              <div key={club.id} className="mp-team-card">
+                <button
                   type="button"
-                  className="mp-team-card"
+                  className="mp-team-card-content"
                   onClick={() => router.push(`/admin/members?clubId=${club.id}`)}
                 >
-                  <div className="mp-team-card-content">
-                    <div className="mp-team-logo-wrap">
-                      {club.imageUrl || club.emblemUrl ? (
-                        <img src={club.imageUrl || club.emblemUrl || ""} alt={club.name} className="mp-team-logo mp-team-logo--img" />
-                      ) : (
-                        <span className="mp-team-logo">🏆</span>
-                      )}
-                    </div>
-                    <div className="mp-team-info">
-                      <h3 className="mp-team-name">{club.name}</h3>
-                    </div>
-                    <ChevronRightIcon />
+                  <div className="mp-team-logo-wrap">
+                    {club.imageUrl || club.emblemUrl ? (
+                      <img src={club.imageUrl || club.emblemUrl || ""} alt={club.name} className="mp-team-logo mp-team-logo--img" />
+                    ) : (
+                      <span className="mp-team-logo">🏆</span>
+                    )}
                   </div>
-              </button>
+                  <div className="mp-team-info">
+                    <h3 className="mp-team-name">{club.name}</h3>
+                  </div>
+                  <ChevronRightIcon />
+                </button>
+                <button
+                  type="button"
+                  className={`mp-notify-btn${club.notifyOnCoachVisit ? " is-active" : ""}`}
+                  onClick={(e) => void toggleNotify(e, club.id, club.notifyOnCoachVisit ?? false)}
+                  disabled={togglingNotifyClubId === club.id}
+                  title={club.notifyOnCoachVisit ? "Уведомленията са включени" : "Уведомленията са изключени"}
+                >
+                  <BellIcon filled={club.notifyOnCoachVisit} />
+                </button>
+              </div>
             ))}
             {!clubsLoading && clubs.length > 0 && visibleClubs.length === 0 && (
               <div className="mp-team-empty">Няма резултати за това търсене.</div>

@@ -300,17 +300,14 @@
 
 .mp-team-card {
   width: 100%;
-  text-align: left;
-  font: inherit;
-  color: inherit;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.1);
   background: linear-gradient(135deg, #1a1a1a, #1f1f1f, #1a1a1a);
-  cursor: pointer;
   transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
   position: relative;
   overflow: hidden;
-  padding: 24px 0;
+  display: flex;
+  align-items: stretch;
 }
 
 .mp-team-card:hover {
@@ -332,11 +329,19 @@
 .mp-team-card:hover::before { opacity: 1; }
 
 .mp-team-card-content {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
   position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 0 24px;
+  padding: 24px 16px 24px 24px;
   z-index: 1;
 }
 
@@ -389,6 +394,25 @@
   color: #32cd32;
   transform: translateX(4px);
 }
+
+.mp-notify-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,0.25);
+  padding: 0 16px 0 8px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s, opacity 0.2s;
+  position: relative;
+  z-index: 1;
+}
+
+.mp-notify-btn:hover { color: rgba(255,255,255,0.6); }
+.mp-notify-btn.is-active { color: #32cd32; }
+.mp-notify-btn.is-active:hover { color: #7fff00; }
+.mp-notify-btn:disabled { opacity: 0.4; cursor: default; }
 
 .mp-team-empty {
   border-radius: 12px;
