@@ -2562,16 +2562,39 @@ function AdminMembersPageContent() {
 
   useEffect(() => {
     if (!clubId) return;
-    void fetch("/api/admin/track/presence", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clubId, action: "connect" }),
-    });
-    return () => {
-      navigator.sendBeacon(
-        "/api/admin/track/presence",
-        JSON.stringify({ clubId, action: "disconnect" })
+
+    const sendConnect = () => {
+      void fetch("/api/admin/track/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clubId, action: "connect" }),
+      });
+    };
+
+    const sendDisconnect = () => {
+      const blob = new Blob(
+        [JSON.stringify({ clubId, action: "disconnect" })],
+        { type: "application/json" }
       );
+      navigator.sendBeacon("/api/admin/track/presence", blob);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        sendDisconnect();
+      } else {
+        sendConnect();
+      }
+    };
+
+    sendConnect();
+    window.addEventListener("pagehide", sendDisconnect);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", sendDisconnect);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      sendDisconnect();
     };
   }, [clubId]);
 

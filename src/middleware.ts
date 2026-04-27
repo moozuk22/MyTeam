@@ -38,7 +38,8 @@ export async function middleware(request: NextRequest) {
     if (
       pathname === "/admin/login" ||
       pathname === "/api/admin/login" ||
-      pathname === "/api/admin/check-session"
+      pathname === "/api/admin/check-session" ||
+      pathname === "/api/admin/track/presence"
     ) {
       if (adminSession && pathname === "/admin/login") {
         try {
