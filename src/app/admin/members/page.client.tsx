@@ -2561,6 +2561,21 @@ function AdminMembersPageContent() {
   }, [clubId]);
 
   useEffect(() => {
+    if (!clubId) return;
+    void fetch("/api/admin/track/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clubId, action: "connect" }),
+    });
+    return () => {
+      navigator.sendBeacon(
+        "/api/admin/track/presence",
+        JSON.stringify({ clubId, action: "disconnect" })
+      );
+    };
+  }, [clubId]);
+
+  useEffect(() => {
     if (!clubId) {
       setClubNotifications([]);
       setClubNotificationsUnreadCount(0);

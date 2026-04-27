@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { after } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { verifyAdminToken } from "@/lib/adminAuth";
+import { fireN8nWebhook } from "@/lib/n8nWebhook";
 import AdminMembersPageClient from "./page.client";
 
 type MembersPageSearchParams = {
@@ -74,6 +78,34 @@ export async function generateMetadata(
   };
 }
 
-export default function AdminMembersPage() {
+export default async function AdminMembersPage(
+  { searchParams }: { searchParams: Promise<MembersPageSearchParams> },
+) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("admin_session")?.value;
+  if (token) {
+    const session = await verifyAdminToken(token);
+    if (session?.roles.includes("coach") && !session.roles.includes("admin")) {
+      const resolvedSearchParams = await searchParams;
+      const clubIdValue = resolvedSearchParams.clubId;
+      const clubId = (Array.isArray(clubIdValue) ? clubIdValue[0] : clubIdValue ?? "").trim();
+      if (clubId) {
+        const clubName = await getClubName(clubId);
+        after(async () => {
+          const now = new Date();
+          const час = new Intl.DateTimeFormat("bg-BG", {
+            timeZone: "Europe/Sofia",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }).format(now);
+          await fireN8nWebhook({
+            "Отбор": clubName ?? clubId,
+            "Час": час,
+          });
+        });
+      }
+    }
+  }
   return <AdminMembersPageClient />;
 }
