@@ -237,3 +237,93 @@ export function buildLeadConfirmationContent(logoUrl: string, name: string, vide
 
   return { htmlContent, textContent };
 }
+
+export function buildManualEmailContent(logoUrl: string, message: string) {
+  const supportPhoneDisplay = "0896 495 254";
+  const supportPhoneHref = "+359896495254";
+
+  const escapedMessage = escapeHtml(message).replaceAll("\n", "<br>");
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyTeam</title>
+  <!--[if mso]>
+  <style type="text/css">
+    table {border-collapse: collapse;}
+  </style>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #000000; font-family: Arial, Helvetica, sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #000000;">
+    <tr>
+      <td align="center" style="padding: 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: #000000;">
+          <tr>
+            <td align="center" style="padding: 40px 20px 30px 20px;">
+              <img src="${escapeHtml(logoUrl)}" alt="MyTeam" width="160" style="display: inline-block; max-width: 160px; height: auto;">
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 30px 30px 30px;">
+              <p style="margin: 0; font-size: 16px; line-height: 1.7; color: #cccccc;">${escapedMessage}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 30px 30px 30px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 14px;">
+                <tr>
+                  <td style="border-top: 1px solid #333333; height: 1px; font-size: 1px; line-height: 1px;">&nbsp;</td>
+                </tr>
+              </table>
+              <p style="margin: 0 0 6px 0; font-size: 16px; color: #ffffff; line-height: 1.6;">
+                Поздрави,<br>
+                Екипът на <span style="color: #7CFC00; font-weight: bold;">MyTeam7</span>
+              </p>
+              <p style="margin: 0; font-size: 14px; color: #888888;">
+                <a href="tel:${supportPhoneHref}" style="color: #7CFC00; text-decoration: underline;">${supportPhoneDisplay}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #111111; padding: 30px 20px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td width="33%" valign="top" style="text-align: center; padding: 10px; border-right: 1px solid #333333;">
+                    <img src="https://img.icons8.com/ios/50/7CFC00/time.png" alt="Time" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">СПЕСТЯВАТЕ ВРЕМЕ</p>
+                    <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Автоматизация на графици, такси и още</p>
+                  </td>
+                  <td width="33%" valign="top" style="text-align: center; padding: 10px; border-right: 1px solid #333333;">
+                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/bar-chart.png" alt="Growth" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">РАЗВИВАЙТЕ КЛУБА СИ</p>
+                    <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Фокусирайте се върху спорта, ние върху администрацията</p>
+                  </td>
+                  <td width="33%" valign="top" style="text-align: center; padding: 10px;">
+                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/rocket.png" alt="Rocket" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">УВЕЛИЧАВАНЕ НА ЧЛЕНОВЕТЕ</p>
+                    <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Искате групите Ви да са винаги пълни? MyTeam ще се погрижи и за това</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const textContent = [
+    message,
+    "",
+    "Поздрави,",
+    "Екипът на MyTeam7",
+    supportPhoneDisplay,
+  ].join("\n");
+
+  return { htmlContent, textContent };
+}

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import { buildLeadConfirmationContent, sendBrevoEmail } from "@/lib/email";
+import { buildLeadConfirmationContent, buildManualEmailContent, sendBrevoEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
 
 type SendEmailBody = {
+  template?: unknown;
   name?: unknown;
   email?: unknown;
+  subject?: unknown;
+  message?: unknown;
 };
 
 function asTrimmedString(value: unknown): string {
@@ -32,10 +35,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const name = asTrimmedString(body.name);
+  const template = asTrimmedString(body.template) || "confirmation";
   const email = asTrimmedString(body.email);
 
-  if (!name || !email) {
+  if (!email) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -62,16 +65,34 @@ export async function POST(request: NextRequest) {
     request.nextUrl.origin;
   const baseUrl = appBaseUrl.replace(/\/$/, "");
   const logoUrl = `${baseUrl}/myteam-logo.png`;
-  const videoUrl = `${baseUrl}/?video=1`;
 
-  const { htmlContent, textContent } = buildLeadConfirmationContent(logoUrl, name, videoUrl);
+  let emailSubject: string;
+  let htmlContent: string;
+  let textContent: string;
+
+  if (template === "manual") {
+    const subject = asTrimmedString(body.subject);
+    const message = asTrimmedString(body.message);
+    if (!subject || !message) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+    emailSubject = subject;
+    ({ htmlContent, textContent } = buildManualEmailContent(logoUrl, message));
+  } else {
+    const name = asTrimmedString(body.name);
+    if (!name) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+    const videoUrl = `${baseUrl}/?video=1`;
+    emailSubject = "Получихме Вашето запитване - MyTeam";
+    ({ htmlContent, textContent } = buildLeadConfirmationContent(logoUrl, name, videoUrl));
+  }
 
   const sent = await sendBrevoEmail(apiKey, {
     senderEmail,
     senderName,
     toEmail: email,
-    toName: name,
-    subject: "Получихме Вашето запитване - MyTeam",
+    subject: emailSubject,
     htmlContent,
     textContent,
     replyToEmail: process.env.BREVO_NOTIFY_TO?.trim() ?? senderEmail,
