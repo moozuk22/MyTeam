@@ -125,7 +125,7 @@ const PARTNERS = [
 const ALL_PARTNERS = [
   { name: "Sport Depot", logo: "/sd-logo.png" },
   { name: "Мебели НИКО", logo: "/niko-logo.png" },
-  { name: "Dalida", logo: "/dalida-logo.png" },
+  { name: "Dalida Dance Show", logo: "/dalida-logo.png" },
   { name: "Inline Body", logo: "/idb-logo.svg" }
 ];
 
