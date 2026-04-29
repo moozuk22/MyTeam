@@ -3453,7 +3453,7 @@ function AdminMembersPageContent() {
 
   /* ── Derived ── */
   const groupOptions = [...new Set(
-    members.map((m) => m.teamGroup).filter((g): g is number => g !== null)
+    members.filter((m) => m.isActive).map((m) => m.teamGroup).filter((g): g is number => g !== null)
   )].sort((a, b) => a - b);
   const activeMembersByGroup = members.reduce<Record<number, number>>((acc, member) => {
     if (!member.isActive || member.teamGroup === null) {
