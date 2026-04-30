@@ -317,14 +317,28 @@ export default function AdminPlayersPage() {
           className="mp-reports-btn"
           style={{ width: "100%", justifyContent: "center" }}
           type="button"
+          onClick={() => router.push("/admin/discounts")}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+          </svg>
+          Управление на отстъпки
+        </button>
+
+        <button
+          className="mp-reports-btn"
+          style={{ width: "100%", justifyContent: "center", marginTop: "-16px" }}
+          type="button"
           onClick={() => router.push("/admin/discount-stats")}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="19" y1="5" x2="5" y2="19" />
-            <circle cx="6.5" cy="6.5" r="2.5" />
-            <circle cx="17.5" cy="17.5" r="2.5" />
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
           </svg>
-          Партньорски отстъпки
+          Статистика на отстъпки
         </button>
 
         <button

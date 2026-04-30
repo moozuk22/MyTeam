@@ -39,6 +39,7 @@ model Club {
   trainingScheduleGroups ClubTrainingScheduleGroup[]
   customTrainingGroups   ClubCustomTrainingGroup[]
   notifyOnCoachVisit     Boolean                     @default(false) @map("notify_on_coach_visit")
+  discountConfigs        TeamDiscountConfig[]
 
   @@map("clubs")
 }
@@ -346,4 +347,37 @@ enum PlayerStatus {
 enum UserRole {
   admin
   coach
+}
+
+model PartnerDiscount {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  logoUrl     String?  @map("logo_url")
+  badgeText   String?  @map("badge_text")
+  description String?
+  code        String?
+  validUntil  DateTime? @map("valid_until") @db.Timestamptz(6)
+  storeUrl    String?  @map("store_url")
+  terms       String[]
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teamConfigs TeamDiscountConfig[]
+
+  @@map("partner_discounts")
+}
+
+model TeamDiscountConfig {
+  id         String  @id @default(uuid()) @db.Uuid
+  clubId     String  @map("club_id") @db.Uuid
+  teamGroup  Int     @map("team_group")
+  discountId String  @map("discount_id") @db.Uuid
+  order      Int     @default(0)
+  isVisible  Boolean @default(true) @map("is_visible")
+
+  club     Club            @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  discount PartnerDiscount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, teamGroup, discountId])
+  @@map("team_discount_configs")
 }
