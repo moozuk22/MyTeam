@@ -384,6 +384,7 @@ model PartnerDiscount {
   validUntil  DateTime? @map("valid_until") @db.Timestamptz(6)
   storeUrl    String?   @map("store_url")
   terms       String[]
+  themeColor  String?   @map("theme_color")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
