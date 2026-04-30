@@ -47,6 +47,7 @@ interface MemberProfile {
     code: string | null;
     storeUrl: string | null;
     terms: string[];
+    themeColor: string | null;
   }>;
 }
 
@@ -599,6 +600,7 @@ export default function MemberCardPage({
           return;
         }
         const data = (await response.json()) as MemberProfile;
+        console.log("MEMBER DISCOUNTS JSON:", data.discounts);
         setMember(data);
       } catch (e) {
         console.error("Failed to fetch member:", e);
@@ -1535,50 +1537,64 @@ export default function MemberCardPage({
 
             {/* ── Partner discount buttons ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "14px" }}>
-                {member.discounts && member.discounts.length > 0 && (
-                  <button
+              {member.discounts && member.discounts.length > 0 && (
+                  <div
                     className="sd-discount-btn"
-                    style={{ marginTop: 0 }}
                     onClick={() => { setActiveDiscount(member.discounts![0]); trackDiscount(member.discounts![0].name, "view"); }}
-                    type="button"
-                    aria-label={`${member.discounts[0].name} отстъпка`}
+                    role="button"
+                    tabIndex={0}
+                    style={{ 
+                      marginTop: 0,
+                      "--theme-color-main": (member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`,
+                      "--theme-color-shadow": `${(member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`}99`,
+                      "--theme-color-border": `${(member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`}cc`
+                    } as any}
                   >
                     <div className="sd-discount-logo-wrap">
                       <img src={member.discounts[0].logoUrl || "/placeholder.png"} alt={member.discounts[0].name} className="sd-discount-logo" />
                     </div>
                     <span className="sd-discount-label">{member.discounts[0].name}</span>
-                    {member.discounts[0].badgeText && <span className="sd-discount-badge">{member.discounts[0].badgeText}</span>}
-                  </button>
-                )}
+                    {member.discounts[0].badgeText && (
+                      <span 
+                        className="sd-discount-badge"
+                        style={{ 
+                          background: (member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`
+                        }}
+                      >
+                        {member.discounts[0].badgeText}
+                      </span>
+                    )}
+                  </div>
+              )}
 
-                {member.discounts && member.discounts.length > 1 && (
-                  <button
-                    onClick={() => setAllDiscountsModalOpen(true)}
-                    style={{
-                      background: "rgba(255,255,255,0.05)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      color: "rgba(255,255,255,0.8)",
-                      padding: "12px",
-                      borderRadius: "10px",
-                      marginTop: "2px",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      transition: "all 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                      e.currentTarget.style.transform = "scale(1.01)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
-                    type="button"
-                  >
-                    Виж всички оферти ({member.discounts.length})
-                  </button>
-                )}
+              {member.discounts && member.discounts.length > 1 && (
+                <button
+                  onClick={() => setAllDiscountsModalOpen(true)}
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "rgba(255,255,255,0.8)",
+                    padding: "12px",
+                    borderRadius: "10px",
+                    marginTop: "2px",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                    e.currentTarget.style.transform = "scale(1.01)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                  type="button"
+                >
+                  Виж всички оферти ({member.discounts.length})
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1827,7 +1843,14 @@ export default function MemberCardPage({
         {/* ── Dynamic discount modal ── */}
         {activeDiscount && (
           <div className="pm-overlay sd-overlay" onClick={() => setActiveDiscount(null)}>
-            <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="sd-modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                boxShadow: `0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}26`,
+                border: `1px solid ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}33`
+              }}
+            >
               <button className="pm-close sd-modal-close" onClick={() => setActiveDiscount(null)} aria-label="Затвори">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
@@ -1836,8 +1859,18 @@ export default function MemberCardPage({
               <div className="sd-modal-header">
                 {activeDiscount.logoUrl && <img src={activeDiscount.logoUrl} alt={activeDiscount.name} className="sd-modal-logo" />}
                 <div className="sd-modal-title-wrap">
-                  <p className="sd-modal-eyebrow">Партньорска програма</p>
+                  <p className="sd-modal-eyebrow" style={{ color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` }}>Партньорска програма</p>
                   <h2 className="sd-modal-title">{activeDiscount.name}</h2>
+                  {activeDiscount.validUntil && (
+                    <p style={{
+                      fontSize: "12px",
+                      color: "rgba(255,255,255,0.5)",
+                      marginTop: "4px",
+                      fontWeight: 500
+                    }}>
+                      Важи до: {new Date(activeDiscount.validUntil).toLocaleDateString("bg-BG")}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1846,9 +1879,12 @@ export default function MemberCardPage({
               {/* Discount highlights */}
               {activeDiscount.badgeText && (
                 <div className="sd-highlights">
-                  <div className="sd-highlight">
-                    <span className="sd-highlight-value">{activeDiscount.badgeText}</span>
-                    <span className="sd-highlight-label">отстъпка</span>
+                  <div className="sd-highlight" style={{
+                    background: `${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}1a`,
+                    border: `1px solid ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}33`
+                  }}>
+                    <span className="sd-highlight-value" style={{ color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` }}>{activeDiscount.badgeText}</span>
+                    <span className="sd-highlight-label" style={{ color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` }}>отстъпка</span>
                   </div>
                 </div>
               )}
@@ -1858,6 +1894,11 @@ export default function MemberCardPage({
                 <button
                   className={`sd-code-row${activeDiscountCodeCopied ? " sd-code-row--copied" : ""}`}
                   type="button"
+                  style={activeDiscountCodeCopied ? {
+                    background: `${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}26`,
+                    borderColor: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`,
+                    color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`
+                  } : {}}
                   onClick={() => {
                     void navigator.clipboard.writeText(activeDiscount.code!).then(() => {
                       setActiveDiscountCodeCopied(true);
@@ -1867,20 +1908,61 @@ export default function MemberCardPage({
                   }}
                   aria-label={`Копирай код ${activeDiscount.code}`}
                 >
-                  <span className="sd-code-lbl">{activeDiscountCodeCopied ? "Копирано!" : "Код:"}</span>
-                  <span className="sd-code">{activeDiscountCodeCopied ? "✓" : activeDiscount.code}</span>
+                  <span className="sd-code-lbl" style={activeDiscountCodeCopied ? { color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` } : {}}>{activeDiscountCodeCopied ? "Копирано!" : "Код:"}</span>
+                  <span className="sd-code" style={{ color: activeDiscountCodeCopied ? ((activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`) : (activeDiscount.themeColor === "#ffffff" ? "#fff" : ((activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`)) }}>{activeDiscountCodeCopied ? "✓" : activeDiscount.code}</span>
                   {!activeDiscountCodeCopied && (
-                    <svg className="sd-copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="sd-copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` }}>
                       <rect x="9" y="9" width="13" height="13" rx="2" />
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                     </svg>
                   )}
                 </button>
               )}
-              
+
               {activeDiscount.storeUrl && (
-                <div className="sd-qr-wrap">
-                  <p className="sd-qr-hint">Разгледайте онлайн на{" "}<a href={activeDiscount.storeUrl} target="_blank" rel="noopener noreferrer" className="sd-store-link" onClick={() => trackDiscount(activeDiscount.name, "link_click")}>{activeDiscount.storeUrl.replace(/^https?:\/\/(www\.)?/, "")}</a></p>
+                <div style={{ marginTop: "16px" }}>
+                  <a
+                    href={activeDiscount.storeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="sd-store-link-btn"
+                    onClick={() => trackDiscount(activeDiscount.name, "link_click")}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      background: `linear-gradient(135deg, ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}33 0%, ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}1a 100%)`,
+                      border: `1px solid ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}4d`,
+                      color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`,
+                      padding: "14px",
+                      borderRadius: "12px",
+                      textDecoration: "none",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      transition: "all 0.2s ease",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      boxShadow: "0 4px 15px rgba(0,0,0,0.1)"
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}4d 0%, ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}33 100%)`;
+                      e.currentTarget.style.transform = "translateY(-1px)";
+                      e.currentTarget.style.boxShadow = `0 6px 20px ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}26`;
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}33 0%, ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}1a 100%)`;
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 15px rgba(0,0,0,0.1)";
+                    }}
+                  >
+                    Пазарувай онлайн
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </a>
                 </div>
               )}
 
@@ -1918,23 +2000,44 @@ export default function MemberCardPage({
 
               <div className="sd-modal-divider" style={{ background: "linear-gradient(to right, transparent, rgba(201, 168, 76, 0.5), transparent)" }} />
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", overflowY: "auto", maxHeight: "60vh", paddingRight: "4px" }}>
-                {member.discounts && member.discounts.map((discount) => (
-                  <button
-                    key={discount.id}
-                    className="sd-discount-btn"
-                    style={{ marginTop: 0 }}
-                    onClick={() => { setAllDiscountsModalOpen(false); setActiveDiscount(discount); trackDiscount(discount.name, "view"); }}
-                    type="button"
-                    aria-label={`${discount.name} отстъпка`}
-                  >
-                    <div className="sd-discount-logo-wrap">
-                      <img src={discount.logoUrl || "/placeholder.png"} alt={discount.name} className="sd-discount-logo" />
+              <div style={{ display: "flex", flexDirection: "column", gap: "24px", overflowY: "auto", maxHeight: "60vh", padding: "20px 30px 30px" }}>
+                {member.discounts && member.discounts.map((discount, idx) => {
+                  const fallbackColors = ["#ff4d4d", "#c9a84c", "#3498db", "#2ecc71", "#9b59b6", "#e67e22"];
+                  const themeColor = (discount.themeColor || fallbackColors[idx % fallbackColors.length]).startsWith("#")
+                    ? (discount.themeColor || fallbackColors[idx % fallbackColors.length])
+                    : `#${discount.themeColor || fallbackColors[idx % fallbackColors.length]}`;
+
+                  return (
+                    <div
+                      key={discount.id}
+                      className="sd-discount-btn"
+                      onClick={() => { setAllDiscountsModalOpen(false); setActiveDiscount(discount); trackDiscount(discount.name, "view"); }}
+                      role="button"
+                      tabIndex={0}
+                      style={{
+                        marginTop: 0,
+                        "--theme-color-main": themeColor,
+                        "--theme-color-shadow": `${themeColor}99`,
+                        "--theme-color-border": `${themeColor}cc`
+                      } as any}
+                    >
+                      <div className="sd-discount-logo-wrap">
+                        <img src={discount.logoUrl || "/placeholder.png"} alt={discount.name} className="sd-discount-logo" />
+                      </div>
+                      <span className="sd-discount-label">{discount.name}</span>
+                      {discount.badgeText && (
+                        <span
+                          className="sd-discount-badge"
+                          style={{
+                            background: themeColor
+                          }}
+                        >
+                          {discount.badgeText}
+                        </span>
+                      )}
                     </div>
-                    <span className="sd-discount-label">{discount.name}</span>
-                    {discount.badgeText && <span className="sd-discount-badge">{discount.badgeText}</span>}
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
