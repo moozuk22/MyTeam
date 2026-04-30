@@ -269,6 +269,8 @@ export default function MemberCardPage({
     code: string | null;
     storeUrl: string | null;
     terms: string[];
+    themeColor?: string | null;
+    validUntil?: string | null;
   } | null>(null);
   const [activeDiscountCodeCopied, setActiveDiscountCodeCopied] = useState(false);
   const [allDiscountsModalOpen, setAllDiscountsModalOpen] = useState(false);
