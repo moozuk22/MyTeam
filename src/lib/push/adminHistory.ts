@@ -40,10 +40,14 @@ export async function saveAdminNotificationHistory(input: {
 export async function getClubAdminNotifications(input: {
   clubId: string;
   playerId?: string | null;
+  coachGroupId?: string | null;
 }) {
   const where: Record<string, unknown> = { clubId: input.clubId };
   if (input.playerId) {
     where.playerId = input.playerId;
+  }
+  if (input.coachGroupId) {
+    where.player = { coachGroupId: input.coachGroupId };
   }
   return await prismaAdmin.adminNotification.findMany({
     where,
@@ -66,10 +70,14 @@ export async function getClubAdminNotifications(input: {
 export async function getClubAdminUnreadCount(input: {
   clubId: string;
   playerId?: string | null;
+  coachGroupId?: string | null;
 }) {
   const where: Record<string, unknown> = { clubId: input.clubId, readAt: null };
   if (input.playerId) {
     where.playerId = input.playerId;
+  }
+  if (input.coachGroupId) {
+    where.player = { coachGroupId: input.coachGroupId };
   }
   return await prismaAdmin.adminNotification.count({ where });
 }
@@ -77,10 +85,14 @@ export async function getClubAdminUnreadCount(input: {
 export async function markClubAdminNotificationsRead(input: {
   clubId: string;
   playerId?: string | null;
+  coachGroupId?: string | null;
 }) {
   const where: Record<string, unknown> = { clubId: input.clubId, readAt: null };
   if (input.playerId) {
     where.playerId = input.playerId;
+  }
+  if (input.coachGroupId) {
+    where.player = { coachGroupId: input.coachGroupId };
   }
   return await prismaAdmin.adminNotification.updateMany({
     where,

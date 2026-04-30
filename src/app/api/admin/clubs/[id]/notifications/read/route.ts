@@ -36,9 +36,12 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const playerIdRaw = (body as { playerId?: unknown }).playerId;
   const playerId = typeof playerIdRaw === "string" && playerIdRaw.trim() ? playerIdRaw.trim() : null;
+  const coachGroupIdRaw = (body as { coachGroupId?: unknown }).coachGroupId;
+  const coachGroupId =
+    typeof coachGroupIdRaw === "string" && coachGroupIdRaw.trim() ? coachGroupIdRaw.trim() : null;
 
   try {
-    const updated = await markClubAdminNotificationsRead({ clubId, playerId });
+    const updated = await markClubAdminNotificationsRead({ clubId, playerId, coachGroupId });
     return NextResponse.json({ success: true, markedRead: updated.count });
   } catch (error) {
     console.error("Admin notifications read error:", error);

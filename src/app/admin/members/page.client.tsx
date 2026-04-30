@@ -84,6 +84,7 @@ interface Member {
   nfcTagId: string;
   status: PlayerStatus;
   teamGroup: number | null;
+  coachGroupId: string | null;
   jerseyNumber: string | null;
   avatarUrl: string | null;
   imageUrl: string | null;
@@ -94,6 +95,12 @@ interface Member {
   paymentLogs: PaymentLog[];
   cards: MemberCard[];
   isActive: boolean;
+}
+
+interface CoachGroup {
+  id: string;
+  name: string;
+  playerCount: number;
 }
 
 interface TrainingAttendancePlayer {
@@ -213,6 +220,7 @@ function normalizeMember(item: unknown): Member {
     nfcTagId,
     status,
     teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
+    coachGroupId: raw.coachGroupId ? String(raw.coachGroupId) : null,
     jerseyNumber: raw.jerseyNumber ? String(raw.jerseyNumber) : null,
     avatarUrl,
     imageUrl,
@@ -639,7 +647,17 @@ const ClipboardListIcon = ({ size = 16 }: { size?: number }) => (
 );
 
 // Attendance Coach Dashboard Component
-function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId: string }) {
+function AttendanceDashboard({
+  onClose,
+  clubId,
+  coachGroupId = "",
+  coachGroupName = "",
+}: {
+  onClose: () => void;
+  clubId: string;
+  coachGroupId?: string;
+  coachGroupName?: string;
+}) {
   const todayIso = new Date().toISOString().slice(0, 10);
   const defaultFrom = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
 
@@ -661,12 +679,21 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
   const [pendingChanges, setPendingChanges] = useState<Map<string, boolean>>(new Map());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const attendanceScopeKey = `${clubId}|${coachGroupId}`;
 
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const membersUrl = clubId
-          ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
+        let playerTeamGroups: number[] = [];
+        const membersSearch = new URLSearchParams();
+        if (clubId) {
+          membersSearch.set("clubId", clubId);
+        }
+        if (coachGroupId) {
+          membersSearch.set("coachGroupId", coachGroupId);
+        }
+        const membersUrl = membersSearch.size
+          ? `/api/admin/members?${membersSearch.toString()}`
           : "/api/admin/members";
         const groupsUrl = `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups`;
 
@@ -695,6 +722,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
           const groups = Array.from(
             new Set(players.map((p) => p.teamGroup).filter((g): g is number => g !== null)),
           ).sort((a, b) => a - b);
+          playerTeamGroups = groups;
           setAvailableGroups(groups);
         }
 
@@ -728,6 +756,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
                 } satisfies TrainingScheduleGroup;
               })
               .filter((g) => g.id && g.teamGroups.length >= 2)
+              .filter((g) => !coachGroupId || g.teamGroups.some((teamGroup) => playerTeamGroups.includes(teamGroup)))
             : [];
           setScheduleGroups(groups);
         }
@@ -737,7 +766,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
     };
     void fetchOptions();
      
-  }, [clubId]);
+  }, [attendanceScopeKey]);
 
   useEffect(() => {
     if (scopeType === "group" && !groupScope && (scheduleGroups.length > 0 || availableGroups.length > 0)) {
@@ -775,6 +804,9 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
         } else if (groupScope.startsWith("year:")) {
           search.set("teamGroup", groupScope.slice(5));
         }
+        if (coachGroupId) {
+          search.set("coachGroupId", coachGroupId);
+        }
         const res = await fetch(
           `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/report?${search.toString()}`,
           { cache: "no-store" },
@@ -809,7 +841,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
       clearTimeout(timer);
     };
      
-  }, [from, to, scopeType, groupScope, selectedPlayerId, clubId]);
+  }, [from, to, scopeType, groupScope, selectedPlayerId, attendanceScopeKey]);
 
   const formatDateHeader = (iso: string): string => {
     const parts = iso.split("-");
@@ -941,6 +973,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+    const scopeTitle = coachGroupId ? `Само за треньорска група: ${coachGroupName || "текущата група"}` : "";
 
     const tHeadHtml = `
       <tr>
@@ -1006,6 +1039,7 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
 <body>
   <div class="page">
     <h1>Отчет присъствия (${from} до ${to})</h1>
+    ${scopeTitle ? `<p style="margin: 0 0 12px; color: #6b7280; font-size: 13px;">${escapeHtml(scopeTitle)}</p>` : ""}
     <table>
       <thead>${tHeadHtml}</thead>
       <tbody>${tbodyHtml}</tbody>
@@ -1039,6 +1073,11 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
             <ClipboardListIcon size={20} />
             Присъствия на тренировки
           </h2>
+          {coachGroupId && (
+            <p className="rd-subtitle">
+              Само за треньорска група: {coachGroupName || "текущата група"}
+            </p>
+          )}
         </div>
 
         <div className="rd-filters">
@@ -1331,7 +1370,17 @@ function AttendanceDashboard({ onClose, clubId }: { onClose: () => void; clubId:
 }
 
 // Reports Dialog Component
-function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: string }) {
+function ReportsDialog({
+  onClose,
+  clubId,
+  coachGroupId = "",
+  coachGroupName = "",
+}: {
+  onClose: () => void;
+  clubId: string;
+  coachGroupId?: string;
+  coachGroupName?: string;
+}) {
   const now = new Date();
   const [month, setMonth] = useState(MONTHS[now.getMonth()] ?? MONTHS[0]);
   const [year, setYear] = useState(String(Math.max(2026, now.getFullYear())));
@@ -1339,12 +1388,20 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [players, setPlayers] = useState<ReportPlayer[]>([]);
   const [loading, setLoading] = useState(true);
+  const reportScopeKey = `${clubId}|${coachGroupId}`;
 
   useEffect(() => {
     const fetchPlayers = async () => {
       setLoading(true);
       try {
-        const endpoint = clubId ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}` : "/api/admin/members";
+        const search = new URLSearchParams();
+        if (clubId) {
+          search.set("clubId", clubId);
+        }
+        if (coachGroupId) {
+          search.set("coachGroupId", coachGroupId);
+        }
+        const endpoint = search.size ? `/api/admin/members?${search.toString()}` : "/api/admin/members";
         const response = await fetch(endpoint, { cache: "no-store" });
         if (!response.ok) {
           setPlayers([]);
@@ -1385,7 +1442,7 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
     };
 
     void fetchPlayers();
-  }, [clubId]);
+  }, [reportScopeKey]);
 
   const years = Array.from(
     { length: Math.max(1, now.getFullYear() - 2026 + 2) },
@@ -1506,6 +1563,7 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
     const percent = totalRows > 0 ? Math.round((paid / totalRows) * 100) : 0;
     const unpaid = totalRows - paid;
     const periodTitle = kind === "monthly" ? `${month} ${year}` : `Година ${year}`;
+    const scopeTitle = coachGroupId ? `Само за треньорска група: ${coachGroupName || "текущата група"}` : "";
 
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
@@ -1563,6 +1621,7 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
   <div class="page">
     <h1>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</h1>
     <p class="sub">Период: ${escapeHtml(periodTitle)}</p>
+    ${scopeTitle ? `<p class="sub">${escapeHtml(scopeTitle)}</p>` : ""}
     <div class="stats">
       <div class="stat">Платили: <strong>${paid}</strong> / ${totalRows}</div>
       <div class="stat">Събираемост: <strong>${percent}%</strong></div>
@@ -1608,6 +1667,11 @@ function ReportsDialog({ onClose, clubId }: { onClose: () => void; clubId: strin
             <ChartColumnIcon size={20} />
             Център за отчети
           </h2>
+          {coachGroupId && (
+            <p className="rd-subtitle">
+              Само за треньорска група: {coachGroupName || "текущата група"}
+            </p>
+          )}
         </div>
 
         <div className="rd-filters">
@@ -1911,6 +1975,8 @@ function MemberDetailModal({
   onRequestPermanentDelete,
   isReactivating = false,
   isDeletingPermanent = false,
+  coachGroups,
+  onCoachGroupAssigned,
 }: {
   member: Member;
   onClose: () => void;
@@ -1921,9 +1987,14 @@ function MemberDetailModal({
   onRequestPermanentDelete?: (member: Member) => void;
   isReactivating?: boolean;
   isDeletingPermanent?: boolean;
+  coachGroups?: CoachGroup[];
+  onCoachGroupAssigned?: (memberId: string, coachGroupId: string | null) => void;
 }) {
   const s = getStatusMeta(member.status);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [assignCoachGroupValue, setAssignCoachGroupValue] = useState<string | null>(member.coachGroupId);
+  const [assignCoachGroupSaving, setAssignCoachGroupSaving] = useState(false);
+  const [assignCoachGroupError, setAssignCoachGroupError] = useState("");
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<MemberNotification[]>([]);
@@ -2093,6 +2164,56 @@ function MemberDetailModal({
                 </p>
               </div>
             </div>
+
+            {coachGroups && coachGroups.length > 0 && actionMode === "active" && (
+              <div className="amp-info-cell amp-info-cell--full">
+                <div style={{ width: "100%" }}>
+                  <p className="amp-lbl" style={{ marginBottom: "6px" }}>Треньорска група</p>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <select
+                      className="amp-edit-input"
+                      value={assignCoachGroupValue ?? ""}
+                      onChange={(e) => { setAssignCoachGroupValue(e.target.value || null); setAssignCoachGroupError(""); }}
+                      disabled={assignCoachGroupSaving}
+                      style={{ flex: 1 }}
+                    >
+                      <option value="">Без група</option>
+                      {coachGroups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--ghost amp-btn--compact"
+                      disabled={assignCoachGroupSaving || assignCoachGroupValue === member.coachGroupId}
+                      onClick={async () => {
+                        setAssignCoachGroupSaving(true);
+                        setAssignCoachGroupError("");
+                        try {
+                          const response = await fetch(`/api/admin/members/${encodeURIComponent(member.id)}/coach-group`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ coachGroupId: assignCoachGroupValue }),
+                          });
+                          if (!response.ok) {
+                            const payload = await response.json().catch(() => ({}));
+                            throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
+                          }
+                          onCoachGroupAssigned?.(member.id, assignCoachGroupValue);
+                        } catch (err) {
+                          setAssignCoachGroupError(err instanceof Error ? err.message : "Грешка");
+                        } finally {
+                          setAssignCoachGroupSaving(false);
+                        }
+                      }}
+                    >
+                      {assignCoachGroupSaving ? "..." : "Запиши"}
+                    </button>
+                  </div>
+                  {assignCoachGroupError && <p className="amp-confirm-error" style={{ marginTop: "6px", marginBottom: 0 }}>{assignCoachGroupError}</p>}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="amp-acc">
@@ -2264,6 +2385,7 @@ function PlayerCard({
   onReactivate,
   isDeleteLoading = false,
   onPermanentDelete,
+  coachGroupName,
 }: {
   member: Member;
   onClick: () => void;
@@ -2272,6 +2394,7 @@ function PlayerCard({
   onReactivate?: () => void;
   isDeleteLoading?: boolean;
   onPermanentDelete?: () => void;
+  coachGroupName?: string | null;
 }) {
   const router = useRouter();
   const s = getStatusMeta(member.status);
@@ -2306,6 +2429,11 @@ function PlayerCard({
             <span className="amp-badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
               {s.label}
             </span>
+            {coachGroupName && (
+              <span className="amp-badge" style={{ color: "#6366f1", background: "#ede9fe", border: "1px solid #c4b5fd", fontSize: "0.7rem" }}>
+                {coachGroupName}
+              </span>
+            )}
           </div>
         </div>
 
@@ -2334,6 +2462,24 @@ function AdminMembersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clubId = searchParams.get("clubId") ?? "";
+  const coachGroupId = searchParams.get("coachGroupId") ?? "";
+  const [coachGroups, setCoachGroups] = useState<CoachGroup[]>([]);
+  const [coachGroupsPanelOpen, setCoachGroupsPanelOpen] = useState(false);
+  const [coachGroupCreateName, setCoachGroupCreateName] = useState("");
+  const [coachGroupCreateError, setCoachGroupCreateError] = useState("");
+  const [coachGroupCreateSaving, setCoachGroupCreateSaving] = useState(false);
+  const [coachGroupDeleteId, setCoachGroupDeleteId] = useState<string | null>(null);
+  const [coachGroupDeleteSaving, setCoachGroupDeleteSaving] = useState(false);
+  const [coachGroupCopiedId, setCoachGroupCopiedId] = useState<string | null>(null);
+  const [coachGroupEditId, setCoachGroupEditId] = useState<string | null>(null);
+  const [coachGroupEditName, setCoachGroupEditName] = useState("");
+  const [coachGroupEditSaving, setCoachGroupEditSaving] = useState(false);
+  const [coachGroupEditError, setCoachGroupEditError] = useState("");
+  const [memberCoachGroupAssignMemberId, setMemberCoachGroupAssignMemberId] = useState<string | null>(null);
+  const [coachGroupScheduleRedirectOpen, setCoachGroupScheduleRedirectOpen] = useState(false);
+  const [memberCoachGroupAssignValue, setMemberCoachGroupAssignValue] = useState<string | null>(null);
+  const [memberCoachGroupAssignSaving, setMemberCoachGroupAssignSaving] = useState(false);
+  const [memberCoachGroupAssignError, setMemberCoachGroupAssignError] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCoach, setIsCoach] = useState(false);
@@ -2464,7 +2610,7 @@ function AdminMembersPageContent() {
   const [trainingGroupModeSettingsOpen, setTrainingGroupModeSettingsOpen] = useState(false);
   const [trainingGroupModeSaving, setTrainingGroupModeSaving] = useState(false);
   const [trainingGroupModeError, setTrainingGroupModeError] = useState("");
-  const [trainingDaysEditorMode, setTrainingDaysEditorMode] = useState<"teamGroup" | "createGroup" | "trainingGroup" | "customGroup">("teamGroup");
+  const [trainingDaysEditorMode, setTrainingDaysEditorMode] = useState<"teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup">("teamGroup");
   const [trainingDaysEditorGroups, setTrainingDaysEditorGroups] = useState<string[]>([]);
   const [trainingDaysEditorGroupName, setTrainingDaysEditorGroupName] = useState("");
   const [trainingDaysEditorCreateOpen, setTrainingDaysEditorCreateOpen] = useState(false);
@@ -2720,6 +2866,7 @@ function AdminMembersPageContent() {
         },
         body: JSON.stringify({
           subscription: subscription.toJSON(),
+          ...(coachGroupId ? { coachGroupId } : {}),
         }),
       });
 
@@ -2729,7 +2876,10 @@ function AdminMembersPageContent() {
       }
 
       setIsClubPushSubscribed(true);
-      setClubPushStatusMessage("Известията за треньори са активирани за този отбор.");
+      const scopeLabel = coachGroupId
+        ? (coachGroups.find((g) => g.id === coachGroupId)?.name ?? "тази група треньор")
+        : "този отбор";
+      setClubPushStatusMessage(`Известията за треньори са активирани за ${scopeLabel}.`);
     } catch (error) {
       console.error("Enable club notifications error:", error);
       setClubPushErrorMessage(error instanceof Error ? error.message : "Неуспешно активиране на известията.");
@@ -2790,7 +2940,11 @@ function AdminMembersPageContent() {
 
     setClubNotificationsLoading(true);
     try {
-      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/notifications`, {
+      const search = new URLSearchParams();
+      if (coachGroupId) {
+        search.set("coachGroupId", coachGroupId);
+      }
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/notifications${search.size ? `?${search.toString()}` : ""}`, {
         cache: "no-store",
       });
       if (!response.ok) {
@@ -2817,7 +2971,9 @@ function AdminMembersPageContent() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          ...(coachGroupId ? { coachGroupId } : {}),
+        }),
       });
       if (!response.ok) {
         return;
@@ -2981,6 +3137,8 @@ function AdminMembersPageContent() {
     setMemberToEdit(member);
     setEditAvatarFile(null);
     setEditAvatarPreviewUrl("");
+    setMemberCoachGroupAssignValue(null);
+    setMemberCoachGroupAssignError("");
     setEditForm({
       fullName: member.fullName,
       clubId: member.club?.id ?? "",
@@ -3195,9 +3353,10 @@ function AdminMembersPageContent() {
 
   const refreshMembersList = async () => {
     try {
-      const endpoint = clubId
-        ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
-        : "/api/admin/members";
+      const params = new URLSearchParams();
+      if (clubId) params.set("clubId", clubId);
+      if (coachGroupId) params.set("coachGroupId", coachGroupId);
+      const endpoint = params.toString() ? `/api/admin/members?${params.toString()}` : "/api/admin/members";
       const response = await fetch(endpoint, { cache: "no-store" });
       if (!response.ok) {
         return;
@@ -3252,6 +3411,8 @@ function AdminMembersPageContent() {
     setIsClubStandalone(standaloneByDisplayMode || standaloneByNavigator);
   }, []);
 
+  const clubPushScopeKey = `${clubId}|${coachGroupId}`;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -3297,8 +3458,12 @@ function AdminMembersPageContent() {
         }
 
         const endpoint = subscription.endpoint.trim();
+        const search = new URLSearchParams({ endpoint });
+        if (coachGroupId) {
+          search.set("coachGroupId", coachGroupId);
+        }
         const response = await fetch(
-          `/api/admin/clubs/${encodeURIComponent(clubId)}/push-subscriptions?endpoint=${encodeURIComponent(endpoint)}`,
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/push-subscriptions?${search.toString()}`,
           { cache: "no-store" },
         );
 
@@ -3326,7 +3491,7 @@ function AdminMembersPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [clubId]);
+  }, [clubPushScopeKey]);
 
   useEffect(() => {
     if (!clubId) {
@@ -3376,9 +3541,10 @@ function AdminMembersPageContent() {
           setClubLogoUrl(null);
         }
 
-        const endpoint = clubId
-          ? `/api/admin/members?clubId=${encodeURIComponent(clubId)}`
-          : "/api/admin/members";
+        const fetchParams = new URLSearchParams();
+        if (clubId) fetchParams.set("clubId", clubId);
+        if (coachGroupId) fetchParams.set("coachGroupId", coachGroupId);
+        const endpoint = fetchParams.toString() ? `/api/admin/members?${fetchParams.toString()}` : "/api/admin/members";
         const res = await fetch(endpoint);
         if (res.status === 404) {
           router.replace("/404");
@@ -3439,6 +3605,7 @@ function AdminMembersPageContent() {
 
     void fetchMembers();
     void fetchClubName();
+    void loadCoachGroups();
   }, [clubId, router]);
 
   useEffect(() => {
@@ -3472,6 +3639,9 @@ function AdminMembersPageContent() {
   const selectedTeamGroup = parseSelectedTeamGroup(resolvedTrainingGroupScope);
   const selectedTrainingGroup = trainingScheduleGroups.find((group) => group.id === selectedTrainingGroupId) ?? null;
   const selectedCustomGroup = customTrainingGroups.find((group) => group.id === selectedTrainingGroupId) ?? null;
+  const currentCoachGroupName = coachGroupId
+    ? (coachGroups.find((group) => group.id === coachGroupId)?.name.trim() ?? "")
+    : "";
   const isCustomTrainingGroupMode = trainingGroupMode === "custom_group";
   const activeMemberIdSet = new Set(members.filter((m) => m.isActive).map((m) => m.id));
   const activeMembersByCustomGroup = customTrainingGroups.reduce<Record<string, number>>((acc, group) => {
@@ -3895,6 +4065,33 @@ function AdminMembersPageContent() {
     }
   };
 
+  const loadCoachGroups = async (): Promise<CoachGroup[]> => {
+    if (!clubId) return [];
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups`, {
+        cache: "no-store",
+      });
+      if (!response.ok) return [];
+      const payload: unknown = await response.json();
+      const groups: CoachGroup[] = Array.isArray(payload)
+        ? payload
+          .map((item) => {
+            const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+            return {
+              id: String(raw.id ?? ""),
+              name: String(raw.name ?? "").trim(),
+              playerCount: typeof raw.playerCount === "number" ? raw.playerCount : 0,
+            };
+          })
+          .filter((g) => g.id && g.name)
+        : [];
+      setCoachGroups(groups);
+      return groups;
+    } catch {
+      return [];
+    }
+  };
+
   const saveTrainingGroupMode = async (nextMode: "team_group" | "custom_group") => {
     if (!clubId || trainingGroupModeSaving) return;
     if (nextMode === trainingGroupMode) {
@@ -4175,7 +4372,7 @@ function AdminMembersPageContent() {
     }
   };
 
-  const openTrainingDaysEditor = async (mode: "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" = "teamGroup") => {
+  const openTrainingDaysEditor = async (mode: "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup" = "teamGroup") => {
     if (!clubId) return;
     if (trainingDaysEditorOpen) {
       setTrainingDaysEditorOpen(false);
@@ -4242,6 +4439,41 @@ function AdminMembersPageContent() {
           resolvedGroup.trainingDateTimes,
           nextWindowDates,
           resolvedGroup.trainingTime ?? null,
+        );
+        const resolvedUniformTime = getUniformTrainingTime(nextWindowDates, resolvedDateTimes);
+        setSchedulerForm((prev) => ({
+          ...prev,
+          trainingDates: nextWindowDates,
+          trainingTime: resolvedUniformTime,
+        }));
+        setTrainingDaysInitialDates(nextWindowDates);
+        setTrainingDateTimes(resolvedDateTimes);
+        setTrainingDaysInitialDateTimes(resolvedDateTimes);
+        setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
+        setTrainingDaysEditorOpen(true);
+        return;
+      }
+      if (mode === "coachGroup") {
+        if (!coachGroupId) throw new Error("Няма избрана треньорска група.");
+        const cgResponse = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups/${encodeURIComponent(coachGroupId)}/schedule`,
+          { cache: "no-store" },
+        );
+        if (!cgResponse.ok) {
+          const cgPayload = await cgResponse.json().catch(() => ({}));
+          throw new Error((cgPayload as { error?: unknown }).error as string || "Неуспешно зареждане на графика.");
+        }
+        const cgPayload = await cgResponse.json();
+        const nextWindowDates = Array.isArray(cgPayload.trainingDates)
+          ? (cgPayload.trainingDates as unknown[])
+              .map((v) => String(v ?? "").trim())
+              .filter((v) => schedulerCalendarDateSet.has(v))
+              .sort((a, b) => a.localeCompare(b))
+          : [];
+        const resolvedDateTimes = normalizeTrainingDateTimes(
+          cgPayload.trainingDateTimes,
+          nextWindowDates,
+          typeof cgPayload.trainingTime === "string" ? cgPayload.trainingTime : null,
         );
         const resolvedUniformTime = getUniformTrainingTime(nextWindowDates, resolvedDateTimes);
         setSchedulerForm((prev) => ({
@@ -4381,7 +4613,7 @@ function AdminMembersPageContent() {
         id: group.id,
         name: group.name,
       }));
-      if (trainingDaysEditorMode === "trainingGroup" || trainingDaysEditorMode === "customGroup") {
+      if (trainingDaysEditorMode === "trainingGroup" || trainingDaysEditorMode === "customGroup" || trainingDaysEditorMode === "coachGroup") {
         const normalizedTrainingTime = schedulerForm.trainingTime.trim();
         if (hasMissingTrainingTime) {
           throw new Error("Въведете валиден час на тренировка (HH:mm).");
@@ -4410,9 +4642,11 @@ function AdminMembersPageContent() {
         const groupResponse = await fetch(
           trainingDaysEditorMode === "customGroup"
             ? `/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups/${encodeURIComponent(selectedTrainingGroupId)}`
-            : `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups/${encodeURIComponent(selectedTrainingGroupId)}`,
+            : trainingDaysEditorMode === "coachGroup"
+              ? `/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups/${encodeURIComponent(coachGroupId)}/schedule`
+              : `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups/${encodeURIComponent(selectedTrainingGroupId)}`,
           {
-            method: "PATCH",
+            method: trainingDaysEditorMode === "coachGroup" ? "PUT" : "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               trainingDates: nextTrainingDates,
@@ -4427,18 +4661,22 @@ function AdminMembersPageContent() {
         );
         if (!groupResponse.ok) {
           const payload = await groupResponse.json().catch(() => ({}));
-          throw new Error(payload?.error || "Неуспешно запазване на тренировъчните дни.");
+          throw new Error((payload as { error?: unknown }).error as string || "Неуспешно запазване на тренировъчните дни.");
         }
         setTrainingDaysEditorCreateOpen(false);
         setTrainingDaysEditorGroupName("");
         setTrainingDaysEditorGroups([]);
-        if (trainingDaysEditorMode === "customGroup") {
+        if (trainingDaysEditorMode === "coachGroup") {
+          setTrainingDaysEditorOpen(false);
+        } else if (trainingDaysEditorMode === "customGroup") {
           await loadCustomTrainingGroups();
+          await fetchTrainingAttendance(trainingAttendanceDate);
+          setTrainingDaysEditorOpen(false);
         } else {
           await loadTrainingScheduleGroups();
+          await fetchTrainingAttendance(trainingAttendanceDate);
+          setTrainingDaysEditorOpen(false);
         }
-        await fetchTrainingAttendance(trainingAttendanceDate);
-        setTrainingDaysEditorOpen(false);
         setTrainingDaysSuccessMessage(
           nextTrainingDates.length > 1
             ? `Промените по графика са изпратени успешно за ${nextTrainingDates.length} дни.`
@@ -5295,7 +5533,10 @@ function AdminMembersPageContent() {
             ) : (
               <div className="amp-club-icon">🏆</div>
             )}
-            <h2 className="amp-club-name">{clubName}</h2>
+            <h2 className="amp-club-name">
+              {clubName}
+              {currentCoachGroupName && <span>{` - ${currentCoachGroupName}`}</span>}
+            </h2>
           </div>
           {clubId && (
             <div className="amp-modal-title-actions">
@@ -5318,7 +5559,7 @@ function AdminMembersPageContent() {
 
         {/* ── Buttons grid ── */}
         <div className="amp-buttons-grid">
-          <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}`)}>
+          <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`)}>
             <PlusIcon />
             Добави играч
           </button>
@@ -5358,6 +5599,16 @@ function AdminMembersPageContent() {
               <span>Групи</span>
             </button>
           )}
+          {isAdmin && clubId && !coachGroupId && (
+            <button
+              className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+              onClick={() => { void loadCoachGroups(); setCoachGroupsPanelOpen(true); }}
+              type="button"
+            >
+              <UsersIcon />
+              <span>Треньори</span>
+            </button>
+          )}
           <button className="amp-reports-btn amp-btn--compact" onClick={() => setReportsOpen(true)}>
             <ChartColumnIcon size={16} />
             <span>Отчети</span>
@@ -5374,7 +5625,17 @@ function AdminMembersPageContent() {
               </button>
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
-                onClick={() => void openTrainingAttendance()}
+                onClick={() => {
+                  if (coachGroupId) {
+                    void openTrainingAttendance();
+                  } else if (coachGroups.length > 1) {
+                    setCoachGroupScheduleRedirectOpen(true);
+                  } else if (coachGroups.length === 1) {
+                    window.location.href = `/admin/members?clubId=${encodeURIComponent(clubId)}&coachGroupId=${encodeURIComponent(coachGroups[0].id)}`;
+                  } else {
+                    void openTrainingAttendance();
+                  }
+                }}
                 type="button"
               >
                 <UsersIcon />
@@ -5499,6 +5760,25 @@ function AdminMembersPageContent() {
 
         <div className="amp-content">
 
+          {/* Coach group page links */}
+          {!coachGroupId && coachGroups.length > 0 && (
+            <div className="amp-coach-group-nav-list">
+              {coachGroups.map((group) => (
+                <button
+                  key={group.id}
+                  className="amp-coach-group-nav-btn"
+                  onClick={() => { window.location.href = `/admin/members?clubId=${encodeURIComponent(clubId)}&coachGroupId=${encodeURIComponent(group.id)}`; }}
+                  type="button"
+                >
+                  <span>{group.name}</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Group filter dropdown */}
           <div className="amp-edit-field" style={{ marginBottom: "10px", padding: "0", position: "relative" }}>
             <div
@@ -5562,7 +5842,12 @@ function AdminMembersPageContent() {
           ) : (
             <div className="amp-cards">
               {filtered.map((m) => (
-                <PlayerCard key={m.id} member={m} onClick={() => setSelectedMember(m)} />
+                <PlayerCard
+                  key={m.id}
+                  member={m}
+                  onClick={() => setSelectedMember(m)}
+                  coachGroupName={!coachGroupId && m.coachGroupId ? (coachGroups.find((g) => g.id === m.coachGroupId)?.name ?? null) : null}
+                />
               ))}
               {filtered.length === 0 && (
                 <p className="amp-empty">Няма намерени играчи</p>
@@ -5720,6 +6005,11 @@ function AdminMembersPageContent() {
           }}
           isReactivating={reactivatingMemberId === selectedMember.id}
           isDeletingPermanent={deletingPermanentMemberId === selectedMember.id}
+          coachGroups={isAdmin && coachGroups.length > 0 ? coachGroups : undefined}
+          onCoachGroupAssigned={(memberId, newCoachGroupId) => {
+            setMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, coachGroupId: newCoachGroupId } : m));
+            setSelectedMember((prev) => prev?.id === memberId ? { ...prev, coachGroupId: newCoachGroupId } : prev);
+          }}
         />
       )}
       {memberToEdit && (
@@ -5796,6 +6086,63 @@ function AdminMembersPageContent() {
                     onChange={(e) => setEditForm((prev) => ({ ...prev, birthDate: e.target.value }))}
                   />
                 </label>
+                {isAdmin && coachGroups.length > 0 && (
+                  <div className="amp-edit-field">
+                    <span className="amp-lbl">Група треньор</span>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <select
+                        className="amp-edit-input"
+                        value={memberCoachGroupAssignValue ?? memberToEdit.coachGroupId ?? ""}
+                        onChange={(e) => setMemberCoachGroupAssignValue(e.target.value || null)}
+                        disabled={memberCoachGroupAssignSaving}
+                      >
+                        <option value="">Без група</option>
+                        {coachGroups.map((g) => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--ghost amp-btn--compact"
+                        disabled={memberCoachGroupAssignSaving}
+                        onClick={async () => {
+                          if (!memberToEdit) return;
+                          setMemberCoachGroupAssignSaving(true);
+                          setMemberCoachGroupAssignError("");
+                          try {
+                            const nextValue = memberCoachGroupAssignValue === undefined
+                              ? memberToEdit.coachGroupId
+                              : memberCoachGroupAssignValue;
+                            const response = await fetch(`/api/admin/members/${memberToEdit.id}/coach-group`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ coachGroupId: nextValue || null }),
+                            });
+                            if (!response.ok) {
+                              const payload = await response.json().catch(() => ({}));
+                              throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
+                            }
+                            const updatedCoachGroupId = nextValue || null;
+                            setMembers((prev) => prev.map((m) => m.id === memberToEdit.id ? { ...m, coachGroupId: updatedCoachGroupId } : m));
+                            setSelectedMember((prev) => prev?.id === memberToEdit.id ? { ...prev, coachGroupId: updatedCoachGroupId } : prev);
+                            setMemberToEdit((prev) => prev ? { ...prev, coachGroupId: updatedCoachGroupId } : prev);
+                            setMemberCoachGroupAssignValue(null);
+                            void loadCoachGroups();
+                          } catch (err) {
+                            setMemberCoachGroupAssignError(err instanceof Error ? err.message : "Грешка");
+                          } finally {
+                            setMemberCoachGroupAssignSaving(false);
+                          }
+                        }}
+                      >
+                        Запази
+                      </button>
+                    </div>
+                    {memberCoachGroupAssignError && (
+                      <p className="amp-error" style={{ marginTop: "4px" }}>{memberCoachGroupAssignError}</p>
+                    )}
+                  </div>
+                )}
                 <label className="amp-edit-field amp-edit-field--full">
                   <span className="amp-lbl">Текуща снимка</span>
                   {editAvatarPreviewUrl || editForm.avatarUrl ? (
@@ -5982,6 +6329,207 @@ function AdminMembersPageContent() {
           </div>
         </div>
       )}
+      {coachGroupsPanelOpen && isAdmin && (
+        <div className="amp-overlay amp-overlay--confirm" onClick={() => { setCoachGroupsPanelOpen(false); setCoachGroupCreateName(""); setCoachGroupCreateError(""); setCoachGroupDeleteId(null); setCoachGroupEditId(null); setCoachGroupEditName(""); setCoachGroupEditError(""); }}>
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Групи за треньори</span>
+              <button className="amp-modal-close" onClick={() => { setCoachGroupsPanelOpen(false); setCoachGroupCreateName(""); setCoachGroupCreateError(""); setCoachGroupDeleteId(null); setCoachGroupEditId(null); setCoachGroupEditName(""); setCoachGroupEditError(""); }} aria-label="Затвори">
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              {/* Create form */}
+              <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                <input
+                  className="amp-edit-input"
+                  placeholder="Ново име на група"
+                  value={coachGroupCreateName}
+                  onChange={(e) => { setCoachGroupCreateName(e.target.value); setCoachGroupCreateError(""); }}
+                  disabled={coachGroupCreateSaving}
+                  maxLength={100}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--primary amp-btn--compact"
+                  disabled={coachGroupCreateSaving || !coachGroupCreateName.trim()}
+                  onClick={async () => {
+                    const name = coachGroupCreateName.trim();
+                    if (!name || !clubId) return;
+                    setCoachGroupCreateSaving(true);
+                    setCoachGroupCreateError("");
+                    try {
+                      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name }),
+                      });
+                      if (!response.ok) {
+                        const payload = await response.json().catch(() => ({}));
+                        throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
+                      }
+                      setCoachGroupCreateName("");
+                      void loadCoachGroups();
+                    } catch (err) {
+                      setCoachGroupCreateError(err instanceof Error ? err.message : "Грешка");
+                    } finally {
+                      setCoachGroupCreateSaving(false);
+                    }
+                  }}
+                >
+                  {coachGroupCreateSaving ? "..." : "Създай"}
+                </button>
+              </div>
+              {coachGroupCreateError && <p className="amp-confirm-error" style={{ marginBottom: "8px" }}>{coachGroupCreateError}</p>}
+
+              {/* Group list */}
+              {coachGroups.length === 0 ? (
+                <p className="amp-empty amp-empty--modal">Няма групи за треньори.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {coachGroups.map((group) => (
+                    <div key={group.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      {coachGroupEditId === group.id ? (
+                        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <input
+                              className="amp-edit-input"
+                              value={coachGroupEditName}
+                              onChange={(e) => { setCoachGroupEditName(e.target.value); setCoachGroupEditError(""); }}
+                              disabled={coachGroupEditSaving}
+                              maxLength={100}
+                              style={{ flex: 1 }}
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--primary amp-btn--compact"
+                              disabled={coachGroupEditSaving || !coachGroupEditName.trim() || coachGroupEditName.trim() === group.name}
+                              onClick={async () => {
+                                const name = coachGroupEditName.trim();
+                                if (!name || !clubId) return;
+                                setCoachGroupEditSaving(true);
+                                setCoachGroupEditError("");
+                                try {
+                                  const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups/${encodeURIComponent(group.id)}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ name }),
+                                  });
+                                  if (!response.ok) {
+                                    const payload = await response.json().catch(() => ({}));
+                                    throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
+                                  }
+                                  setCoachGroupEditId(null);
+                                  setCoachGroupEditName("");
+                                  void loadCoachGroups();
+                                } catch (err) {
+                                  setCoachGroupEditError(err instanceof Error ? err.message : "Грешка");
+                                } finally {
+                                  setCoachGroupEditSaving(false);
+                                }
+                              }}
+                            >
+                              {coachGroupEditSaving ? "..." : "Запиши"}
+                            </button>
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--ghost amp-btn--compact"
+                              disabled={coachGroupEditSaving}
+                              onClick={() => { setCoachGroupEditId(null); setCoachGroupEditName(""); setCoachGroupEditError(""); }}
+                            >
+                              Отказ
+                            </button>
+                          </div>
+                          {coachGroupEditError && <p className="amp-confirm-error" style={{ margin: 0 }}>{coachGroupEditError}</p>}
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontWeight: 500 }}>{group.name}</span>
+                            <span style={{ marginLeft: "8px", fontSize: "0.8rem", opacity: 0.6 }}>{group.playerCount} играчи</span>
+                          </div>
+                          {coachGroupDeleteId !== group.id && (
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--ghost amp-btn--compact"
+                              onClick={async () => {
+                                const url = `${window.location.origin}/admin/members?clubId=${encodeURIComponent(clubId)}&coachGroupId=${encodeURIComponent(group.id)}`;
+                                try {
+                                  await navigator.clipboard.writeText(url);
+                                  setCoachGroupCopiedId(group.id);
+                                  setTimeout(() => setCoachGroupCopiedId(null), 2000);
+                                } catch {
+                                  const tmp = document.createElement("input");
+                                  tmp.value = url;
+                                  document.body.appendChild(tmp);
+                                  tmp.select();
+                                  document.execCommand("copy");
+                                  document.body.removeChild(tmp);
+                                  setCoachGroupCopiedId(group.id);
+                                  setTimeout(() => setCoachGroupCopiedId(null), 2000);
+                                }
+                              }}
+                              style={{ minWidth: "90px" }}
+                            >
+                              {coachGroupCopiedId === group.id ? "Копирано!" : "Копирай линк"}
+                            </button>
+                          )}
+                          {coachGroupDeleteId === group.id ? (
+                            <>
+                              <button
+                                type="button"
+                                className="amp-btn amp-btn--danger amp-btn--compact"
+                                disabled={coachGroupDeleteSaving}
+                                onClick={async () => {
+                                  if (!clubId) return;
+                                  setCoachGroupDeleteSaving(true);
+                                  try {
+                                    const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups/${encodeURIComponent(group.id)}`, { method: "DELETE" });
+                                    if (!response.ok) throw new Error("Грешка при изтриване");
+                                    setCoachGroupDeleteId(null);
+                                    void loadCoachGroups();
+                                    void refreshMembersList();
+                                  } catch {
+                                    // ignore
+                                  } finally {
+                                    setCoachGroupDeleteSaving(false);
+                                  }
+                                }}
+                              >
+                                {coachGroupDeleteSaving ? "..." : "Потвърди"}
+                              </button>
+                              <button type="button" className="amp-btn amp-btn--ghost amp-btn--compact" disabled={coachGroupDeleteSaving} onClick={() => setCoachGroupDeleteId(null)}>
+                                Отказ
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="amp-btn amp-btn--ghost amp-btn--icon-only"
+                                title="Редактирай"
+                                onClick={() => { setCoachGroupEditId(group.id); setCoachGroupEditName(group.name); setCoachGroupEditError(""); setCoachGroupDeleteId(null); }}
+                              >
+                                <PencilIcon size={14} />
+                              </button>
+                              <button type="button" className="amp-btn amp-btn--ghost amp-btn--compact" onClick={() => setCoachGroupDeleteId(group.id)}>
+                                Изтрий
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {trainingGroupDeleteConfirmOpen && (
         <ConfirmDeleteTrainingGroupModal
           groupName={
@@ -6000,12 +6548,40 @@ function AdminMembersPageContent() {
           onConfirm={() => void deleteSelectedTrainingGroup()}
         />
       )}
-      {reportsOpen && <ReportsDialog onClose={() => setReportsOpen(false)} clubId={clubId} />}
+      {reportsOpen && (
+        <ReportsDialog
+          onClose={() => setReportsOpen(false)}
+          clubId={clubId}
+          coachGroupId={coachGroupId}
+          coachGroupName={currentCoachGroupName}
+        />
+      )}
       {attendanceDashboardOpen && clubId && (
         <AttendanceDashboard
           onClose={() => setAttendanceDashboardOpen(false)}
           clubId={clubId}
+          coachGroupId={coachGroupId}
+          coachGroupName={currentCoachGroupName}
         />
+      )}
+
+      {coachGroupScheduleRedirectOpen && (
+        <div className="amp-overlay amp-overlay--confirm" onClick={() => setCoachGroupScheduleRedirectOpen(false)}>
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient" style={{ flex: 1, textAlign: "center", paddingLeft: "32px" }}>График</span>
+              <button className="amp-modal-close" onClick={() => setCoachGroupScheduleRedirectOpen(false)} aria-label="Затвори">
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              <p style={{ textAlign: "center", opacity: 0.8 }}>
+                За да зададете тренировъчен график, влезте в страницата на съответния треньор.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
       {trainingAttendanceOpen && (
         <div
@@ -6871,7 +7447,9 @@ function AdminMembersPageContent() {
                         ? "Създай сборен отбор"
                         : trainingDaysEditorMode === "trainingGroup"
                           ? "Задай тренировъчни дни за сборен отбор"
-                          : "Избери тренировъчни дни (следващи 30 дни)"}
+                          : trainingDaysEditorMode === "coachGroup"
+                            ? "Тренировъчен график"
+                            : "Избери тренировъчни дни (следващи 30 дни)"}
                     </span>
                     {trainingDaysEditorMode !== "createGroup" && (
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Избрани: {schedulerForm.trainingDates.length}</span>
@@ -6898,18 +7476,22 @@ function AdminMembersPageContent() {
                         ? `Сборен отбор: ${selectedTrainingGroup?.name ?? "-"}`
                         : trainingDaysEditorMode === "customGroup"
                           ? `Персонализирана група: ${selectedCustomGroup?.name ?? "-"}`
-                          : selectedTeamGroup === null
-                            ? "Набор: Всички"
-                            : `Набор: ${selectedTeamGroup}`}
+                          : trainingDaysEditorMode === "coachGroup"
+                            ? `Треньорска група: ${coachGroups.find((g) => g.id === coachGroupId)?.name ?? ""}`
+                            : selectedTeamGroup === null
+                              ? "Набор: Всички"
+                              : `Набор: ${selectedTeamGroup}`}
                     </span>
                     <span style={{ textAlign: "center" }}>
                       {trainingDaysEditorMode === "trainingGroup"
                         ? `Тези промени ще се запазят за сборен отбор ${selectedTrainingGroup?.name ?? "-"}.`
                         : trainingDaysEditorMode === "customGroup"
                           ? `Тези промени ще се запазят за персонализирана група ${selectedCustomGroup?.name ?? "-"}.`
-                          : selectedTeamGroup === null
-                            ? "Тези промени ще се запазят за всички набори."
-                            : `Тези промени ще се запазят за набор ${selectedTeamGroup}.`}
+                          : trainingDaysEditorMode === "coachGroup"
+                            ? `Тези промени ще се запазят за треньорска група ${coachGroups.find((g) => g.id === coachGroupId)?.name ?? ""}.`
+                            : selectedTeamGroup === null
+                              ? "Тези промени ще се запазят за всички набори."
+                              : `Тези промени ще се запазят за набор ${selectedTeamGroup}.`}
                     </span>
                   </div>
                   {trainingDaysEditorMode !== "createGroup" && (

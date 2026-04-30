@@ -35,11 +35,13 @@ export async function GET(
 
   const playerIdRaw = request.nextUrl.searchParams.get("playerId");
   const playerId = playerIdRaw && playerIdRaw.trim() ? playerIdRaw.trim() : null;
+  const coachGroupIdRaw = request.nextUrl.searchParams.get("coachGroupId");
+  const coachGroupId = coachGroupIdRaw && coachGroupIdRaw.trim() ? coachGroupIdRaw.trim() : null;
 
   try {
     const [notifications, unreadCount] = await Promise.all([
-      getClubAdminNotifications({ clubId, playerId }),
-      getClubAdminUnreadCount({ clubId, playerId }),
+      getClubAdminNotifications({ clubId, playerId, coachGroupId }),
+      getClubAdminUnreadCount({ clubId, playerId, coachGroupId }),
     ]);
 
     const normalizedNotifications = Array.isArray(notifications)

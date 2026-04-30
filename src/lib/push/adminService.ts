@@ -42,6 +42,7 @@ export interface SaveAdminPushSubscriptionInput {
   subscription: BrowserPushSubscription;
   userAgent?: string | null;
   device?: string | null;
+  coachGroupId?: string | null;
 }
 
 export async function saveAdminPushSubscription(input: SaveAdminPushSubscriptionInput) {
@@ -57,6 +58,7 @@ export async function saveAdminPushSubscription(input: SaveAdminPushSubscription
       auth: input.subscription.keys.auth,
       userAgent: input.userAgent ?? undefined,
       device: input.device ?? undefined,
+      coachGroupId: input.coachGroupId ?? null,
       isActive: true,
     },
     create: {
@@ -66,6 +68,7 @@ export async function saveAdminPushSubscription(input: SaveAdminPushSubscription
       auth: input.subscription.keys.auth,
       userAgent: input.userAgent ?? undefined,
       device: input.device ?? undefined,
+      coachGroupId: input.coachGroupId ?? null,
       isActive: true,
     },
   });
@@ -83,7 +86,11 @@ export async function deactivateAdminPushSubscription(clubId: string, endpoint: 
   });
 }
 
-export async function isAdminPushSubscriptionActive(clubId: string, endpoint: string) {
+export async function isAdminPushSubscriptionActive(
+  clubId: string,
+  endpoint: string,
+  coachGroupId: string | null = null,
+) {
   const row = await prisma.adminPushSubscription.findUnique({
     where: {
       clubId_endpoint: {
@@ -93,10 +100,11 @@ export async function isAdminPushSubscriptionActive(clubId: string, endpoint: st
     },
     select: {
       isActive: true,
+      coachGroupId: true,
     },
   });
 
-  return Boolean(row?.isActive);
+  return Boolean(row?.isActive && (row.coachGroupId ?? null) === coachGroupId);
 }
 
 export interface SendAdminPushResult {
@@ -109,11 +117,15 @@ export interface SendAdminPushResult {
 export async function sendPushToClubAdmins(
   clubId: string,
   payload: PushNotificationPayload,
+  coachGroupId?: string | null,
 ): Promise<SendAdminPushResult> {
   const subscriptions = await prisma.adminPushSubscription.findMany({
     where: {
       clubId,
       isActive: true,
+      ...(coachGroupId != null
+        ? { coachGroupId }
+        : { coachGroupId: null }),
     },
     select: {
       id: true,

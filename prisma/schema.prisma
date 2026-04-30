@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma-client"
 }
 
 datasource db {
@@ -11,6 +10,7 @@ datasource db {
 model Club {
   id                     String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                   String
+  sports                 String?
   createdAt              DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
   emblemUrl              String?                     @map("emblem_url")
   imagePublicId          String?                     @map("image_public_id")
@@ -18,52 +18,51 @@ model Club {
   reminderDay            Int                         @default(25) @map("reminder_day")
   overdueDay             Int                         @default(1) @map("overdue_day")
   reminderHour           Int                         @default(10) @map("reminder_hour")
-  reminderTz             String                      @default("Europe/Sofia") @map("reminder_tz")
-  trainingWeekdays       Int[]                       @default([]) @map("training_weekdays")
-  trainingWindowDays     Int                         @default(30) @map("training_window_days")
-  trainingDates          String[]                    @default([]) @map("training_dates")
   reminderMinute         Int                         @default(0) @map("reminder_minute")
-  overdueHour            Int                         @default(10) @map("overdue_hour")
-  overdueMinute          Int                         @default(0) @map("overdue_minute")
-  sports                 String?
-  trainingTime           String?                     @map("training_time")
-  trainingDateTimes      Json?                       @map("training_date_times")
   secondReminderDay      Int?                        @map("second_reminder_day")
   secondReminderHour     Int?                        @map("second_reminder_hour")
   secondReminderMinute   Int?                        @map("second_reminder_minute")
-  notifyOnCoachVisit     Boolean                     @default(false) @map("notify_on_coach_visit")
+  overdueHour            Int                         @default(10) @map("overdue_hour")
+  overdueMinute          Int                         @default(0) @map("overdue_minute")
+  reminderTz             String                      @default("Europe/Sofia") @map("reminder_tz")
+  trainingWeekdays       Int[]                       @default([]) @map("training_weekdays")
+  trainingDates          String[]                    @default([]) @map("training_dates")
+  trainingTime           String?                     @map("training_time")
+  trainingDateTimes      Json?                       @map("training_date_times")
+  trainingWindowDays     Int                         @default(30) @map("training_window_days")
   trainingGroupMode      String                      @default("team_group") @map("training_group_mode")
-  adminNotifications     AdminNotification[]
+  players                Player[]
   adminPushSubscriptions AdminPushSubscription[]
-  customTrainingGroups   ClubCustomTrainingGroup[]
+  adminNotifications     AdminNotification[]
+  trainingNotes          TrainingNote[]
   trainingGroupSchedules ClubTrainingGroupSchedule[]
   trainingScheduleGroups ClubTrainingScheduleGroup[]
-  coach_groups           coach_groups[]
-  players                Player[]
+  customTrainingGroups   ClubCustomTrainingGroup[]
+  coachGroups            CoachGroup[]
+  notifyOnCoachVisit     Boolean                     @default(false) @map("notify_on_coach_visit")
   discountConfigs        TeamDiscountConfig[]
-  trainingNotes          TrainingNote[]
 
   @@map("clubs")
 }
 
 model AdminPushSubscription {
-  id             String        @id @default(uuid())
-  clubId         String        @map("club_id") @db.Uuid
-  endpoint       String
-  p256dh         String
-  auth           String
-  userAgent      String?       @map("user_agent")
-  device         String?
-  isActive       Boolean       @default(true) @map("is_active")
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-  coach_group_id String?       @db.Uuid
-  club           Club          @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  coach_groups   coach_groups? @relation(fields: [coach_group_id], references: [id])
+  id           String      @id @default(uuid())
+  clubId       String      @map("club_id") @db.Uuid
+  endpoint     String
+  p256dh       String
+  auth         String
+  userAgent    String?     @map("user_agent")
+  device       String?
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  coachGroupId String?     @map("coach_group_id") @db.Uuid
+  club         Club        @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  coachGroup   CoachGroup? @relation(fields: [coachGroupId], references: [id], onDelete: SetNull)
 
   @@unique([clubId, endpoint])
   @@index([clubId, isActive])
-  @@index([clubId, coach_group_id, isActive])
+  @@index([clubId, coachGroupId, isActive])
   @@map("admin_push_subscriptions")
 }
 
@@ -73,11 +72,11 @@ model ClubTrainingGroupSchedule {
   teamGroup          Int      @map("team_group")
   trainingWeekdays   Int[]    @default([]) @map("training_weekdays")
   trainingDates      String[] @default([]) @map("training_dates")
+  trainingTime       String?  @map("training_time")
+  trainingDateTimes  Json?    @map("training_date_times")
   trainingWindowDays Int      @default(30) @map("training_window_days")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  trainingTime       String?  @map("training_time")
-  trainingDateTimes  Json?    @map("training_date_times")
   club               Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
   @@unique([clubId, teamGroup])
@@ -92,11 +91,11 @@ model ClubTrainingScheduleGroup {
   teamGroups         Int[]    @default([]) @map("team_groups")
   trainingWeekdays   Int[]    @default([]) @map("training_weekdays")
   trainingDates      String[] @default([]) @map("training_dates")
+  trainingTime       String?  @map("training_time")
+  trainingDateTimes  Json?    @map("training_date_times")
   trainingWindowDays Int      @default(30) @map("training_window_days")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  trainingTime       String?  @map("training_time")
-  trainingDateTimes  Json?    @map("training_date_times")
   club               Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
   @@index([clubId])
@@ -114,11 +113,30 @@ model ClubCustomTrainingGroup {
   trainingWindowDays Int                             @default(30) @map("training_window_days")
   createdAt          DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime                        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  players            ClubCustomTrainingGroupPlayer[]
   club               Club                            @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  players            ClubCustomTrainingGroupPlayer[]
 
   @@index([clubId])
   @@map("club_custom_training_groups")
+}
+
+model CoachGroup {
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId                 String                  @map("club_id") @db.Uuid
+  name                   String
+  trainingWeekdays       Int[]                   @default([]) @map("training_weekdays")
+  trainingDates          String[]                @default([]) @map("training_dates")
+  trainingTime           String?                 @map("training_time")
+  trainingDateTimes      Json?                   @map("training_date_times")
+  trainingWindowDays     Int                     @default(30) @map("training_window_days")
+  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  club                   Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  players                Player[]
+  adminPushSubscriptions AdminPushSubscription[]
+
+  @@index([clubId])
+  @@map("coach_groups")
 }
 
 model User {
@@ -132,30 +150,30 @@ model User {
 }
 
 model Player {
-  id                   String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clubId               String                         @map("club_id") @db.Uuid
-  fullName             String                         @map("full_name")
-  status               PlayerStatus                   @default(paid)
-  createdAt            DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime                       @default(now()) @map("updated_at") @db.Timestamptz(6)
-  jerseyNumber         String?                        @map("jersey_number")
-  birthDate            DateTime?                      @map("birth_date") @db.Date
-  teamGroup            Int?                           @map("team_group")
-  lastPaymentDate      DateTime?                      @map("last_payment_date") @db.Timestamptz(6)
-  isActive             Boolean                        @default(true) @map("is_active")
-  coach_group_id       String?                        @db.Uuid
-  adminNotifications   AdminNotification[]
+  id                   String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId               String                          @map("club_id") @db.Uuid
+  fullName             String                          @map("full_name")
+  status               PlayerStatus                    @default(paid)
+  createdAt            DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                        @default(now()) @map("updated_at") @db.Timestamptz(6)
+  jerseyNumber         String?                         @map("jersey_number")
+  birthDate            DateTime?                       @map("birth_date") @db.Date
+  teamGroup            Int?                            @map("team_group")
+  lastPaymentDate      DateTime?                       @map("last_payment_date") @db.Timestamptz(6)
+  isActive             Boolean                         @default(true) @map("is_active")
   cards                Card[]
-  customTrainingGroups ClubCustomTrainingGroupPlayer?
   images               Image[]
-  discountUsages       PartnerDiscountUsage[]
   paymentLogs          PaymentLog[]
   paymentWaivers       PaymentWaiver[]
   playerNotification   PlayerNotification[]
-  club                 Club                           @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  coach_groups         coach_groups?                  @relation(fields: [coach_group_id], references: [id])
+  adminNotifications   AdminNotification[]
+  club                 Club                            @relation(fields: [clubId], references: [id], onDelete: Cascade)
   pushSubscriptions    PushSubscription[]
   trainingOptOuts      TrainingOptOut[]
+  discountUsages       PartnerDiscountUsage[]
+  customTrainingGroups ClubCustomTrainingGroupPlayer[]
+  coachGroupId         String?                         @map("coach_group_id") @db.Uuid
+  coachGroup           CoachGroup?                     @relation(fields: [coachGroupId], references: [id], onDelete: SetNull)
 
   @@index([clubId])
   @@map("players")
@@ -163,12 +181,13 @@ model Player {
 
 model ClubCustomTrainingGroupPlayer {
   groupId   String                  @map("group_id") @db.Uuid
-  playerId  String                  @unique @map("player_id") @db.Uuid
+  playerId  String                  @map("player_id") @db.Uuid
   createdAt DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   group     ClubCustomTrainingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   player    Player                  @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@id([groupId, playerId])
+  @@unique([playerId])
   @@index([groupId])
   @@map("club_custom_training_group_players")
 }
@@ -177,9 +196,9 @@ model TrainingOptOut {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   playerId     String   @map("player_id") @db.Uuid
   trainingDate DateTime @map("training_date") @db.Date
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   reasonCode   String?  @map("reason_code")
   reasonText   String?  @map("reason_text")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   player       Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([playerId, trainingDate])
@@ -284,7 +303,7 @@ model AdminNotification {
   sentAt   DateTime  @default(now()) @map("sent_at")
   readAt   DateTime? @map("read_at")
   club     Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  player   Player?   @relation(fields: [playerId], references: [id])
+  player   Player?   @relation(fields: [playerId], references: [id], onDelete: SetNull)
 
   @@index([clubId, sentAt])
   @@index([clubId, readAt])
@@ -309,9 +328,9 @@ model CronJobRun {
   runYear      Int       @map("run_year")
   runMonth     Int       @map("run_month")
   completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   failedAt     DateTime? @map("failed_at") @db.Timestamptz(6)
   errorMessage String?   @map("error_message")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@unique([jobName, runYear, runMonth])
   @@map("cron_job_runs")
@@ -334,57 +353,12 @@ model PartnerDiscountUsage {
 
 model PageClick {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clickedAt DateTime @default(now()) @map("clicked_at") @db.Timestamptz(6)
   action    String   @default("unknown")
+  clickedAt DateTime @default(now()) @map("clicked_at") @db.Timestamptz(6)
 
   @@index([clickedAt])
   @@index([action])
   @@map("page_clicks")
-}
-
-model PartnerDiscount {
-  id          String               @id @default(uuid()) @db.Uuid
-  name        String
-  logoUrl     String?              @map("logo_url")
-  badgeText   String?              @map("badge_text")
-  description String?
-  code        String?
-  validUntil  DateTime?            @map("valid_until") @db.Timestamptz(6)
-  storeUrl    String?              @map("store_url")
-  terms       String[]
-  themeColor  String?              @map("theme_color")
-  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  teamConfigs TeamDiscountConfig[]
-
-  @@map("partner_discounts")
-}
-
-model TeamDiscountConfig {
-  id         String          @id @default(uuid()) @db.Uuid
-  clubId     String          @map("club_id") @db.Uuid
-  teamGroup  Int             @map("team_group")
-  discountId String          @map("discount_id") @db.Uuid
-  order      Int             @default(0)
-  isVisible  Boolean         @default(true) @map("is_visible")
-  club       Club            @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  discount   PartnerDiscount @relation(fields: [discountId], references: [id], onDelete: Cascade)
-
-  @@unique([clubId, teamGroup, discountId])
-  @@map("team_discount_configs")
-}
-
-model coach_groups {
-  id                       String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  club_id                  String                  @db.Uuid
-  name                     String
-  created_at               DateTime                @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime                @default(now()) @db.Timestamptz(6)
-  admin_push_subscriptions AdminPushSubscription[]
-  clubs                    Club                    @relation(fields: [club_id], references: [id], onDelete: Cascade)
-  players                  Player[]
-
-  @@index([club_id])
 }
 
 enum PlayerStatus {
@@ -398,4 +372,37 @@ enum PlayerStatus {
 enum UserRole {
   admin
   coach
+}
+
+model PartnerDiscount {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  logoUrl     String?   @map("logo_url")
+  badgeText   String?   @map("badge_text")
+  description String?
+  code        String?
+  validUntil  DateTime? @map("valid_until") @db.Timestamptz(6)
+  storeUrl    String?   @map("store_url")
+  terms       String[]
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teamConfigs TeamDiscountConfig[]
+
+  @@map("partner_discounts")
+}
+
+model TeamDiscountConfig {
+  id         String  @id @default(uuid()) @db.Uuid
+  clubId     String  @map("club_id") @db.Uuid
+  teamGroup  Int     @map("team_group")
+  discountId String  @map("discount_id") @db.Uuid
+  order      Int     @default(0)
+  isVisible  Boolean @default(true) @map("is_visible")
+
+  club     Club            @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  discount PartnerDiscount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, teamGroup, discountId])
+  @@map("team_discount_configs")
 }

@@ -110,6 +110,23 @@ export async function POST(request: NextRequest) {
 
     const teamGroup = birthDate.getUTCFullYear();
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const rawCoachGroupId = body.coachGroupId != null ? String(body.coachGroupId).trim() : null;
+    let coachGroupId: string | null = null;
+    if (rawCoachGroupId) {
+      if (!uuidRegex.test(rawCoachGroupId)) {
+        return NextResponse.json({ error: "Invalid coachGroupId" }, { status: 400 });
+      }
+      const groupExists = await prisma.coachGroup.findFirst({
+        where: { id: rawCoachGroupId, clubId },
+        select: { id: true },
+      });
+      if (!groupExists) {
+        return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
+      }
+      coachGroupId = rawCoachGroupId;
+    }
+
     let createdPlayer = null;
     let lastError: unknown = null;
 
@@ -126,6 +143,7 @@ export async function POST(request: NextRequest) {
             birthDate,
             teamGroup,
             lastPaymentDate,
+            coachGroupId,
             ...(adminImagePath
               ? {
                   images: {
@@ -201,10 +219,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const clubId = request.nextUrl.searchParams.get("clubId")?.trim() ?? "";
     if (clubId) {
-      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clubId);
-      if (!uuidLike) {
+      if (!uuidRegex.test(clubId)) {
         return NextResponse.json({ error: "Club not found" }, { status: 404 });
       }
 
@@ -218,10 +236,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const coachGroupId = request.nextUrl.searchParams.get("coachGroupId")?.trim() ?? "";
+    if (coachGroupId) {
+      if (!uuidRegex.test(coachGroupId)) {
+        return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
+      }
+      const groupExists = await prisma.coachGroup.findFirst({
+        where: { id: coachGroupId, ...(clubId ? { clubId } : {}) },
+        select: { id: true },
+      });
+      if (!groupExists) {
+        return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
+      }
+    }
+
     const players = await withPrismaPoolRetry(() =>
       prisma.player.findMany({
       where: {
         ...(clubId ? { clubId } : {}),
+        ...(coachGroupId ? { coachGroupId } : {}),
       },
       include: {
         club: true,

@@ -43,9 +43,11 @@ export async function GET(
   if (!endpoint) {
     return NextResponse.json({ error: "endpoint is required" }, { status: 400 });
   }
+  const coachGroupIdParam = request.nextUrl.searchParams.get("coachGroupId")?.trim() ?? "";
+  const coachGroupId = coachGroupIdParam || null;
 
   try {
-    const isActive = await isAdminPushSubscriptionActive(clubId, endpoint);
+    const isActive = await isAdminPushSubscriptionActive(clubId, endpoint, coachGroupId);
     return NextResponse.json({ success: true, isActive });
   } catch (error) {
     console.error("Admin push subscription GET error:", error);
@@ -74,10 +76,30 @@ export async function POST(
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const payload = body as { subscription?: unknown };
+  const payload = body as { subscription?: unknown; coachGroupId?: unknown };
   const subscription = parseBrowserPushSubscription(payload.subscription);
   if (!subscription) {
     return NextResponse.json({ error: "Invalid push subscription payload" }, { status: 400 });
+  }
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const rawCoachGroupId = payload.coachGroupId;
+  const coachGroupId =
+    rawCoachGroupId === null || rawCoachGroupId === undefined || String(rawCoachGroupId).trim() === ""
+      ? null
+      : String(rawCoachGroupId).trim();
+
+  if (coachGroupId !== null) {
+    if (!uuidRegex.test(coachGroupId)) {
+      return NextResponse.json({ error: "Invalid coachGroupId" }, { status: 400 });
+    }
+    const groupExists = await prisma.coachGroup.findFirst({
+      where: { id: coachGroupId, clubId },
+      select: { id: true },
+    });
+    if (!groupExists) {
+      return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
+    }
   }
 
   try {
@@ -88,6 +110,7 @@ export async function POST(
       subscription,
       userAgent,
       device,
+      coachGroupId,
     });
 
     return NextResponse.json({

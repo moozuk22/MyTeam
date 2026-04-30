@@ -8,6 +8,7 @@ import AdminMembersPageClient from "./page.client";
 
 type MembersPageSearchParams = {
   clubId?: string | string[];
+  coachGroupId?: string | string[];
 };
 
 async function getClubData(clubIdRaw: string): Promise<{ name: string; notifyOnCoachVisit: boolean } | null> {

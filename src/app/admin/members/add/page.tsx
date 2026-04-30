@@ -16,6 +16,7 @@ interface ClubData {
 function AddMemberPageContent() {
   const searchParams = useSearchParams();
   const clubId = searchParams.get("clubId")?.trim() ?? "";
+  const coachGroupId = searchParams.get("coachGroupId")?.trim() ?? "";
   const [fullName, setFullName] = useState("");
   const [status, setStatus] = useState<"paid" | "warning" | "overdue">("paid");
   const [clubData, setClubData] = useState<ClubData | null>(null);
@@ -29,7 +30,7 @@ function AddMemberPageContent() {
   const [isClubValidated, setIsClubValidated] = useState(false);
   const [isValidatingClubId, setIsValidatingClubId] = useState(true);
   const router = useRouter();
-  const returnUrl = `/admin/members?clubId=${encodeURIComponent(clubId)}`;
+  const returnUrl = `/admin/members?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`;
   const parsedBirthDate = birthDate.trim() ? new Date(`${birthDate}T00:00:00.000Z`) : null;
   const derivedTeamGroup = parsedBirthDate && !Number.isNaN(parsedBirthDate.getTime()) ? String(parsedBirthDate.getUTCFullYear()) : "";
 
@@ -139,6 +140,7 @@ function AddMemberPageContent() {
         clubId,
         birthDate: birthDate.trim(),
       };
+      if (coachGroupId) payload.coachGroupId = coachGroupId;
 
       if (jerseyNumber.trim()) payload.jerseyNumber = jerseyNumber.trim();
       if (resolvedAvatarUrl) payload.avatarUrl = resolvedAvatarUrl;

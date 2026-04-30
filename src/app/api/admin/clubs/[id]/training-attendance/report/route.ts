@@ -58,6 +58,14 @@ function parseOptionalPlayerId(raw: unknown): string | null {
   return value ? value : null;
 }
 
+function parseOptionalCoachGroupId(raw: unknown): string | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  const value = String(raw).trim();
+  return value ? value : null;
+}
+
 function getTrainingDatesInRange({
   from,
   to,
@@ -128,11 +136,13 @@ export async function GET(
   let trainingGroupId: string | null = null;
   let customTrainingGroupId: string | null = null;
   let playerId: string | null = null;
+  let coachGroupId: string | null = null;
   try {
     teamGroup = parseOptionalTeamGroup(request.nextUrl.searchParams.get("teamGroup"));
     trainingGroupId = parseOptionalTrainingGroupId(request.nextUrl.searchParams.get("trainingGroupId"));
     customTrainingGroupId = parseOptionalCustomTrainingGroupId(request.nextUrl.searchParams.get("customTrainingGroupId"));
     playerId = parseOptionalPlayerId(request.nextUrl.searchParams.get("playerId"));
+    coachGroupId = parseOptionalCoachGroupId(request.nextUrl.searchParams.get("coachGroupId"));
   } catch {
     return NextResponse.json({ error: "Invalid query parameter" }, { status: 400 });
   }
@@ -156,12 +166,26 @@ export async function GET(
     if (!club) {
       return NextResponse.json({ error: "Club not found" }, { status: 404 });
     }
+    if (coachGroupId) {
+      const coachGroup = await prisma.coachGroup.findFirst({
+        where: { id: coachGroupId, clubId: id },
+        select: { id: true },
+      });
+      if (!coachGroup) {
+        return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
+      }
+    }
 
     // If playerId is given, resolve player and use their teamGroup for schedule lookup
     let targetPlayer: { id: string; fullName: string; teamGroup: number | null } | null = null;
     if (playerId) {
       targetPlayer = await prisma.player.findFirst({
-        where: { id: playerId, clubId: id, isActive: true },
+        where: {
+          id: playerId,
+          clubId: id,
+          isActive: true,
+          ...(coachGroupId ? { coachGroupId } : {}),
+        },
         select: { id: true, fullName: true, teamGroup: true },
       });
       if (!targetPlayer) {
@@ -252,6 +276,7 @@ export async function GET(
             ...(customTrainingGroup ? { id: { in: customTrainingGroup.players.map((item) => item.playerId) } } : {}),
             ...(trainingGroup ? { teamGroup: { in: trainingGroup.teamGroups } } : {}),
             ...(teamGroup !== null ? { teamGroup } : {}),
+            ...(coachGroupId ? { coachGroupId } : {}),
           },
           select: { id: true, fullName: true, teamGroup: true },
           orderBy: { fullName: "asc" },

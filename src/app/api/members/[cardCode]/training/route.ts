@@ -70,6 +70,7 @@ function buildCoachAttendancePayload(input: {
   optedOut: boolean;
   optOutReasonCode?: OptOutReasonCode | null;
   optOutReasonText?: string | null;
+  coachGroupId?: string | null;
 }): PushNotificationPayload {
   const formattedDate = formatBgDate(input.trainingDate);
   const reasonLabel = input.optOutReasonCode ? OPT_OUT_REASON_LABELS_BG[input.optOutReasonCode] : null;
@@ -84,7 +85,9 @@ function buildCoachAttendancePayload(input: {
     body: input.optedOut
       ? `${input.playerName} отбеляза отсъствие за тренировка на ${formattedDate}.${reasonSuffix}`
       : `${input.playerName} потвърди присъствие за тренировка на ${formattedDate}.`,
-    url: `/admin/members?clubId=${encodeURIComponent(input.clubId)}`,
+    url: input.coachGroupId
+      ? `/admin/members?clubId=${encodeURIComponent(input.clubId)}&coachGroupId=${encodeURIComponent(input.coachGroupId)}`
+      : `/admin/members?clubId=${encodeURIComponent(input.clubId)}`,
     icon: "/myteam-logo.png",
     badge: "/myteam-logo.png",
     tag: "training-attendance-updated",
@@ -138,6 +141,7 @@ async function getMemberTrainingContext(cardCode: string) {
           fullName: true,
           clubId: true,
           teamGroup: true,
+          coachGroupId: true,
           club: {
             select: {
               id: true,
@@ -162,6 +166,15 @@ async function getMemberTrainingContext(cardCode: string) {
               },
             },
           },
+          coachGroup: {
+            select: {
+              trainingDates: true,
+              trainingDateTimes: true,
+              trainingTime: true,
+              trainingWeekdays: true,
+              trainingWindowDays: true,
+            },
+          },
         },
       },
     },
@@ -173,10 +186,15 @@ async function getMemberTrainingContext(cardCode: string) {
 
   const isCustomGroupMode = card.player.club.trainingGroupMode === "custom_group";
   const customGroup = isCustomGroupMode
-    ? card.player.customTrainingGroups?.group ?? null
+    ? card.player.customTrainingGroups[0]?.group ?? null
     : null;
 
-  const groupSchedule = card.player.teamGroup === null
+  const coachGroupSchedule = card.player.coachGroup;
+  const hasCoachGroupSchedule =
+    coachGroupSchedule !== null &&
+    (coachGroupSchedule.trainingDates.length > 0 || coachGroupSchedule.trainingWeekdays.length > 0);
+
+  const groupSchedule = hasCoachGroupSchedule || card.player.teamGroup === null
     ? null
     : await prisma.clubTrainingGroupSchedule.findUnique({
         where: {
@@ -194,7 +212,7 @@ async function getMemberTrainingContext(cardCode: string) {
         },
       });
 
-  const trainingGroupOverride = card.player.teamGroup === null
+  const trainingGroupOverride = hasCoachGroupSchedule || card.player.teamGroup === null
     ? null
     : await prisma.clubTrainingScheduleGroup.findFirst({
         where: {
@@ -218,39 +236,51 @@ async function getMemberTrainingContext(cardCode: string) {
         },
       });
 
-  const trainingWeekdays = (isCustomGroupMode
-    ? customGroup?.trainingWeekdays ?? []
-    : trainingGroupOverride?.trainingWeekdays ?? groupSchedule?.trainingWeekdays ?? card.player.club.trainingWeekdays ?? [])
+  const trainingWeekdays = (
+    hasCoachGroupSchedule
+      ? coachGroupSchedule!.trainingWeekdays
+      : isCustomGroupMode
+        ? customGroup?.trainingWeekdays ?? []
+        : trainingGroupOverride?.trainingWeekdays ?? groupSchedule?.trainingWeekdays ?? card.player.club.trainingWeekdays ?? []
+  )
     .filter((value) => Number.isInteger(value) && value >= 1 && value <= 7)
     .sort((a, b) => a - b);
   const trainingWindowDays = TRAINING_SELECTION_WINDOW_DAYS;
 
   const upcomingDates = getConfiguredTrainingDates({
-    trainingDates: isCustomGroupMode
-      ? customGroup?.trainingDates ?? []
-      : trainingGroupOverride?.trainingDates ?? groupSchedule?.trainingDates ?? card.player.club.trainingDates ?? [],
+    trainingDates: hasCoachGroupSchedule
+      ? coachGroupSchedule!.trainingDates
+      : isCustomGroupMode
+        ? customGroup?.trainingDates ?? []
+        : trainingGroupOverride?.trainingDates ?? groupSchedule?.trainingDates ?? card.player.club.trainingDates ?? [],
     weekdays: trainingWeekdays,
-    windowDays: isCustomGroupMode
-      ? customGroup?.trainingWindowDays ?? trainingWindowDays
-      : trainingGroupOverride?.trainingWindowDays ?? groupSchedule?.trainingWindowDays ?? card.player.club.trainingWindowDays ?? trainingWindowDays,
+    windowDays: hasCoachGroupSchedule
+      ? coachGroupSchedule!.trainingWindowDays
+      : isCustomGroupMode
+        ? customGroup?.trainingWindowDays ?? trainingWindowDays
+        : trainingGroupOverride?.trainingWindowDays ?? groupSchedule?.trainingWindowDays ?? card.player.club.trainingWindowDays ?? trainingWindowDays,
     timeZone: FIXED_TIME_ZONE,
     maxDays: TRAINING_SELECTION_WINDOW_DAYS,
   });
   const scheduleDateTimes = normalizeStoredTrainingDateTimes(
-    isCustomGroupMode
-      ? customGroup?.trainingDateTimes
-      : trainingGroupOverride?.trainingDateTimes ??
-      groupSchedule?.trainingDateTimes ??
-      card.player.club.trainingDateTimes,
+    hasCoachGroupSchedule
+      ? coachGroupSchedule!.trainingDateTimes
+      : isCustomGroupMode
+        ? customGroup?.trainingDateTimes
+        : trainingGroupOverride?.trainingDateTimes ??
+          groupSchedule?.trainingDateTimes ??
+          card.player.club.trainingDateTimes,
     upcomingDates,
   );
   const scheduleFallbackTime = safeNormalizeTrainingTime(
-    isCustomGroupMode
-      ? customGroup?.trainingTime
-      : trainingGroupOverride?.trainingTime ??
-    groupSchedule?.trainingTime ??
-    card.player.club.trainingTime ??
-    null,
+    hasCoachGroupSchedule
+      ? coachGroupSchedule!.trainingTime
+      : isCustomGroupMode
+        ? customGroup?.trainingTime
+        : trainingGroupOverride?.trainingTime ??
+          groupSchedule?.trainingTime ??
+          card.player.club.trainingTime ??
+          null,
   );
 
   return {
@@ -258,6 +288,7 @@ async function getMemberTrainingContext(cardCode: string) {
     playerId: card.playerId,
     playerName: card.player.fullName,
     clubId: card.player.clubId,
+    coachGroupId: card.player.coachGroupId ?? null,
     trainingWeekdays,
     trainingWindowDays,
     upcomingDates,
@@ -402,6 +433,7 @@ export async function POST(
     optedOut: true,
     optOutReasonCode: parsedReason.code,
     optOutReasonText: parsedReason.text,
+    coachGroupId: context.coachGroupId,
   });
 
   try {
@@ -416,7 +448,7 @@ export async function POST(
   }
 
   try {
-    coachPush = await sendPushToClubAdmins(context.clubId, coachPayload);
+    coachPush = await sendPushToClubAdmins(context.clubId, coachPayload, context.coachGroupId);
   } catch (error) {
     console.error("Coach attendance push send error (opt-out):", error);
   }
@@ -463,6 +495,7 @@ export async function DELETE(
     playerName: context.playerName,
     trainingDate,
     optedOut: false,
+    coachGroupId: context.coachGroupId,
   });
 
   try {
@@ -477,7 +510,7 @@ export async function DELETE(
   }
 
   try {
-    coachPush = await sendPushToClubAdmins(context.clubId, coachPayload);
+    coachPush = await sendPushToClubAdmins(context.clubId, coachPayload, context.coachGroupId);
   } catch (error) {
     console.error("Coach attendance push send error (opt-in):", error);
   }
