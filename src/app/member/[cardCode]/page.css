@@ -1975,52 +1975,54 @@
    SPORT DEPOT DISCOUNT BUTTON (inside card)
 ══════════════════════════════════════ */
 .sd-discount-btn {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
   padding: 14px 16px;
   margin-top: 14px;
-  background: linear-gradient(135deg, rgba(224, 53, 53, 0.18), rgba(20, 0, 0, 0.24));
-  border: 1px solid rgba(224, 53, 53, 0.5);
-  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.95) 0%, rgba(30, 30, 30, 0.9) 100%);
+  border: 1px solid var(--theme-color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 24px;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s;
   text-align: left;
-  box-shadow: 0 0 16px rgba(224, 53, 53, 0.18), inset 0 1px 0 rgba(255, 100, 100, 0.1);
-  animation: sd-btn-pulse 3s ease-in-out infinite;
+  animation: sd-dynamic-pulse 3s ease-in-out infinite;
+  z-index: 1;
 }
 
-@keyframes sd-btn-pulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(224, 53, 53, 0.18), inset 0 1px 0 rgba(255, 100, 100, 0.1); }
-  50%       { box-shadow: 0 0 30px rgba(224, 53, 53, 0.45), inset 0 1px 0 rgba(255, 100, 100, 0.1); }
+/* ✅ Glow lives here — border-radius: inherit makes it round */
+.sd-discount-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 15px 2px var(--theme-color-shadow, transparent);
+  animation: sd-glow-pulse 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
 }
 
-@keyframes idb-btn-pulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(234, 177, 38, 0.1), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
-  50%       { box-shadow: 0 0 32px rgba(234, 177, 38, 0.35), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
+@keyframes sd-dynamic-pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.005); }
 }
 
-@keyframes niko-btn-pulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(0, 84, 166, 0.12), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
-  50%       { box-shadow: 0 0 32px rgba(0, 84, 166, 0.4), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
-}
-
-@keyframes idb-btn-pulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(234, 177, 38, 0.1), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
-  50%       { box-shadow: 0 0 32px rgba(234, 177, 38, 0.35), inset 0 1px 0 rgba(234, 177, 38, 0.05); }
-}
-
-@keyframes niko-btn-pulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(0, 84, 166, 0.12), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
-  50%       { box-shadow: 0 0 32px rgba(0, 84, 166, 0.4), inset 0 1px 0 rgba(0, 84, 166, 0.05); }
+@keyframes sd-glow-pulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 12px 1px var(--theme-color-shadow, transparent); }
+  50%       { box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4), 0 0 28px 5px var(--theme-color-shadow, transparent); }
 }
 
 .sd-discount-btn:hover {
-  background: linear-gradient(135deg, rgba(224, 53, 53, 0.28), rgba(30, 0, 0, 0.3));
-  border-color: rgba(244, 67, 54, 0.8);
-  box-shadow: 0 0 32px rgba(224, 53, 53, 0.42);
-  transform: scale(1.02);
+  background: linear-gradient(135deg, rgba(30, 30, 30, 0.98) 0%, rgba(40, 40, 40, 0.95) 100%);
+  border-color: var(--theme-color-main, #fff);
+  transform: translateY(-2px);
+  animation: none;
+}
+
+.sd-discount-btn:hover::before {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4), 0 0 32px 6px var(--theme-color-shadow, transparent);
   animation: none;
 }
 
@@ -2052,15 +2054,16 @@
 
 .sd-discount-label {
   flex: 1;
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
+  color: #fff;
   text-align: center;
-  margin-left: 4px;
+  font-size: 16px;
+  font-weight: 800;
   line-height: 1.2;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 @media (max-width: 400px) {
@@ -2074,14 +2077,12 @@
 
 .sd-discount-badge {
   flex-shrink: 0;
-  background: #dc2626;
   color: #ffffff;
   font-size: 14px;
   font-weight: 900;
   padding: 5px 10px;
   border-radius: 8px;
   letter-spacing: 0.04em;
-  box-shadow: 0 0 10px rgba(224, 53, 53, 0.45);
 }
 
 /* ══════════════════════════════════════
@@ -2096,16 +2097,16 @@
 .sd-modal {
   position: relative;
   width: 100%;
-  max-width: 380px;
+  max-width: 440px;
   max-height: 90dvh;
   overflow-y: auto;
-  background: linear-gradient(160deg, #141010, #191014);
-  border: 1px solid rgba(224, 53, 53, 0.25);
+  background: linear-gradient(160deg, #101414, #101919);
+  border: 1px solid rgba(50, 205, 50, 0.25);
   border-radius: 16px;
   padding: 24px 20px 28px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7), 0 0 40px rgba(224, 53, 53, 0.07);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7), 0 0 40px rgba(50, 205, 50, 0.07);
   scrollbar-width: thin;
-  scrollbar-color: rgba(224, 53, 53, 0.25) transparent;
+  scrollbar-color: rgba(50, 205, 50, 0.25) transparent;
 }
 
 .sd-modal::before {
@@ -2116,8 +2117,8 @@
   right: 20px;
   height: 2px;
   border-radius: 9999px;
-  background: linear-gradient(90deg, transparent, rgba(224, 53, 53, 0.7) 50%, transparent);
-  box-shadow: 0 0 12px rgba(224, 53, 53, 0.4);
+  background: linear-gradient(90deg, transparent, rgba(50, 205, 50, 0.7) 50%, transparent);
+  box-shadow: 0 0 12px rgba(50, 205, 50, 0.4);
   pointer-events: none;
 }
 
@@ -2181,7 +2182,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(224, 53, 53, 0.9);
+  color: rgba(50, 205, 50, 0.9);
 }
 
 .sd-modal-title {
@@ -2195,7 +2196,7 @@
 
 .sd-modal-divider {
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(224, 53, 53, 0.3), transparent);
+  background: linear-gradient(to right, transparent, rgba(50, 205, 50, 0.3), transparent);
   margin: 14px 0;
 }
 
