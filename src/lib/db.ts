@@ -47,7 +47,7 @@ function isRetriablePrismaError(error: unknown): boolean {
     }
 
     const code = String((error as { code?: unknown }).code ?? "");
-    return code === "P1001" || code === "P2024";
+    return code === "P1001" || code === "P1017" || code === "P2024";
 }
 
 function createPrismaClient() {
@@ -101,8 +101,9 @@ function isPoolTimeoutError(error: unknown): boolean {
         typeof error === "object" &&
         error !== null &&
         "code" in error &&
-        (String((error as { code?: unknown }).code) === "P2024" ||
-            String((error as { code?: unknown }).code) === "P1001")
+        (String((error as { code?: unknown }).code) === "P1001" ||
+            String((error as { code?: unknown }).code) === "P1017" ||
+            String((error as { code?: unknown }).code) === "P2024")
     );
 }
 

@@ -7,6 +7,7 @@ import { publishMemberUpdated } from "@/lib/memberEvents";
 import {
   addMonths,
   compareYearMonth,
+  getFirstUnpaidYM,
   normalizeToMonthStart,
   toMonthKey,
   toYearMonth,
@@ -56,11 +57,22 @@ export async function POST(
       },
       select: {
         playerId: true,
+        player: {
+          select: { firstBillingMonth: true },
+        },
       },
     });
 
     if (!card) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    const playerFirstBillingMonth = card.player.firstBillingMonth;
+    if (!playerFirstBillingMonth) {
+      return NextResponse.json(
+        { error: "Billing is not active for this member" },
+        { status: 400 },
+      );
     }
 
     const [existingLogs, existingWaivers] = await Promise.all([
@@ -75,23 +87,25 @@ export async function POST(
       }),
     ]);
 
+    const firstBillingYM = toYearMonth(playerFirstBillingMonth);
     const targetYM = toYearMonth(paidForDate);
+
+    if (compareYearMonth(targetYM, firstBillingYM) < 0) {
+      return NextResponse.json(
+        { error: "Cannot record payment before billing start month" },
+        { status: 400 },
+      );
+    }
+
     const paidSet = new Set(existingLogs.map((log) => toMonthKey(toYearMonth(log.paidFor))));
     const waivedSet = new Set(existingWaivers.map((row) => toMonthKey(toYearMonth(row.waivedFor))));
     const settledSet = new Set<string>([...paidSet, ...waivedSet]);
 
-    const firstUnpaidYM: YearMonth = (() => {
-      if (existingLogs.length === 0) {
-        const now = new Date();
-        return { year: now.getFullYear(), month: now.getMonth() };
-      }
-      const latestPaid = toYearMonth(existingLogs[existingLogs.length - 1].paidFor);
-      let cursor = addMonths(latestPaid, 1);
-      while (settledSet.has(toMonthKey(cursor))) {
-        cursor = addMonths(cursor, 1);
-      }
-      return cursor;
-    })();
+    const firstUnpaidYM: YearMonth = getFirstUnpaidYM(
+      existingLogs.map((log) => log.paidFor),
+      existingWaivers.map((row) => row.waivedFor),
+      firstBillingYM,
+    ) ?? firstBillingYM;
 
     if (compareYearMonth(targetYM, firstUnpaidYM) < 0) {
       return NextResponse.json(

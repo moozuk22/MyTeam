@@ -7,6 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BillingStatus {
+  demo
+  active
+
+  @@map("billing_status")
+}
+
 model Club {
   id                     String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                   String
@@ -40,6 +47,9 @@ model Club {
   customTrainingGroups   ClubCustomTrainingGroup[]
   coachGroups            CoachGroup[]
   notifyOnCoachVisit     Boolean                     @default(false) @map("notify_on_coach_visit")
+  billingStatus          BillingStatus               @default(demo) @map("billing_status")
+  firstBillingMonth      DateTime?                   @db.Timestamptz(6) @map("first_billing_month")
+  billingActivatedAt     DateTime?                   @db.Timestamptz(6) @map("billing_activated_at")
   discountConfigs        TeamDiscountConfig[]
 
   @@map("clubs")
@@ -174,6 +184,7 @@ model Player {
   customTrainingGroups ClubCustomTrainingGroupPlayer[]
   coachGroupId         String?                         @map("coach_group_id") @db.Uuid
   coachGroup           CoachGroup?                     @relation(fields: [coachGroupId], references: [id], onDelete: SetNull)
+  firstBillingMonth    DateTime?                       @map("first_billing_month") @db.Timestamptz(6)
 
   @@index([clubId])
   @@map("players")

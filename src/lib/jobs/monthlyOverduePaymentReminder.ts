@@ -210,6 +210,7 @@ async function runMonthlyStatusRollover(year: number, month: number, clubId: str
 
   try {
     const currentMonthStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+    const previousMonthStart = new Date(Date.UTC(year, month - 2, 1, 0, 0, 0, 0));
     const nextMonthStart = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
 
     const pausedCurrentMonthRows = await prisma.paymentWaiver.findMany({
@@ -263,33 +264,33 @@ async function runMonthlyStatusRollover(year: number, month: number, clubId: str
 
     const [paidRows, warningRows] = await Promise.all([
       prisma.player.findMany({
-      where: {
-        clubId,
-        status: "paid",
-        ...(excludedFromRolloverIds.length > 0
-          ? {
-              id: {
-                notIn: excludedFromRolloverIds,
-              },
-            }
-          : {}),
-      },
-      select: { id: true },
-    }),
+        where: {
+          clubId,
+          status: "paid",
+          firstBillingMonth: {
+            not: null,
+            lte: currentMonthStart,
+          },
+          ...(excludedFromRolloverIds.length > 0
+            ? { id: { notIn: excludedFromRolloverIds } }
+            : {}),
+        },
+        select: { id: true },
+      }),
       prisma.player.findMany({
-      where: {
-        clubId,
-        status: "warning",
-        ...(excludedFromRolloverIds.length > 0
-          ? {
-              id: {
-                notIn: excludedFromRolloverIds,
-              },
-            }
-          : {}),
-      },
-      select: { id: true },
-    }),
+        where: {
+          clubId,
+          status: "warning",
+          firstBillingMonth: {
+            not: null,
+            lte: previousMonthStart,
+          },
+          ...(excludedFromRolloverIds.length > 0
+            ? { id: { notIn: excludedFromRolloverIds } }
+            : {}),
+        },
+        select: { id: true },
+      }),
     ]);
 
     const paidIds = paidRows.map((row) => row.id);

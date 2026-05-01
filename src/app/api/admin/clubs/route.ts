@@ -53,6 +53,9 @@ export async function GET(request: NextRequest) {
           trainingWindowDays: true,
           trainingGroupMode: true,
           notifyOnCoachVisit: true,
+          billingStatus: true,
+          firstBillingMonth: true,
+          billingActivatedAt: true,
         },
         orderBy: {
           name: "asc",
@@ -85,6 +88,9 @@ export async function GET(request: NextRequest) {
           trainingWindowDays: true,
           trainingGroupMode: true,
           notifyOnCoachVisit: true,
+          billingStatus: true,
+          firstBillingMonth: true,
+          billingActivatedAt: true,
         },
         orderBy: {
           name: "asc",

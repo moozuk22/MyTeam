@@ -224,6 +224,10 @@ export async function runMonthlyMembershipPaymentReminder(
           status: {
             in: ["warning", "overdue"],
           },
+          firstBillingMonth: {
+            not: null,
+            lte: monthStart,
+          },
           paymentWaivers: {
             none: {
               waivedFor: {

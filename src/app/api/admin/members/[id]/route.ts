@@ -12,6 +12,7 @@ import {
   normalizeToMonthStart,
 } from "@/lib/paymentStatus";
 
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -106,7 +107,10 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const fullName = String(body.fullName ?? "").trim();
+    const firstNameRaw = String(body.firstName ?? "").trim();
+    const secondNameRaw = String(body.secondName ?? "").trim();
+    const fullNameRaw = String(body.fullName ?? "").trim();
+    const fullName = fullNameRaw || [firstNameRaw, secondNameRaw].filter(Boolean).join(" ").trim();
     const clubIdRaw = body.clubId;
     const jerseyNumberRaw = body.jerseyNumber;
     const teamGroupRaw = body.teamGroup;
@@ -115,6 +119,7 @@ export async function PUT(
     const avatarUrlRaw = body.avatarUrl;
     const imageUrlRaw = body.imageUrl;
     const hasImageUrl = Object.prototype.hasOwnProperty.call(body, "imageUrl");
+    const hasFirstBillingMonth = Object.prototype.hasOwnProperty.call(body, "firstBillingMonth");
 
     if (!fullName) {
       return NextResponse.json(
@@ -131,6 +136,9 @@ export async function PUT(
             imageUrl: true,
             isAdminView: true,
           },
+        },
+        club: {
+          select: { billingStatus: true },
         },
       },
     });
@@ -171,6 +179,26 @@ export async function PUT(
         : new Date(String(birthDateRaw));
     if (birthDate && Number.isNaN(birthDate.getTime())) {
       return NextResponse.json({ error: "birthDate is invalid" }, { status: 400 });
+    }
+
+    let firstBillingMonthUpdate: Date | null | undefined = undefined;
+    if (hasFirstBillingMonth) {
+      const fbmRaw = body.firstBillingMonth;
+      if (fbmRaw === null || fbmRaw === undefined || String(fbmRaw).trim() === "") {
+        if (existingPlayer.club.billingStatus === "active") {
+          return NextResponse.json(
+            { error: "Cannot clear firstBillingMonth for a player in an active billing club" },
+            { status: 400 }
+          );
+        }
+        firstBillingMonthUpdate = null;
+      } else {
+        const parsed = new Date(`${String(fbmRaw).trim()}-01T00:00:00.000Z`);
+        if (Number.isNaN(parsed.getTime())) {
+          return NextResponse.json({ error: "Invalid firstBillingMonth" }, { status: 400 });
+        }
+        firstBillingMonthUpdate = normalizeToMonthStart(parsed);
+      }
     }
 
     const nextImageUrl = hasImageUrl
@@ -215,6 +243,7 @@ export async function PUT(
             }
           : {}),
         ...(status ? { status } : {}),
+        ...(firstBillingMonthUpdate !== undefined ? { firstBillingMonth: firstBillingMonthUpdate } : {}),
       },
       include: {
         cards: { orderBy: { createdAt: "desc" } },

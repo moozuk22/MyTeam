@@ -6,7 +6,7 @@ import {
   applyCloudinaryTransformToUrl,
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
-import { isCurrentMonthWaived } from "@/lib/paymentStatus";
+import { isCurrentMonthWaived, normalizeToMonthStart } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +77,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const club = await prisma.club.findUnique({
+      where: { id: clubId },
+      select: { id: true, billingStatus: true, firstBillingMonth: true },
+    });
+    if (!club) {
+      return NextResponse.json({ error: "Club not found" }, { status: 404 });
+    }
+
+    const rawFirstBillingMonth = String(body.firstBillingMonth ?? "").trim();
+    let resolvedFirstBillingMonth: Date | null = null;
+    if (rawFirstBillingMonth) {
+      const parsed = new Date(`${rawFirstBillingMonth}-01T00:00:00.000Z`);
+      if (Number.isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: "Invalid firstBillingMonth" }, { status: 400 });
+      }
+      resolvedFirstBillingMonth = normalizeToMonthStart(parsed);
+    } else if (club.billingStatus === "active") {
+      if (!club.firstBillingMonth) {
+        return NextResponse.json(
+          { error: "Club billing is active but no default billing start. Provide firstBillingMonth." },
+          { status: 400 }
+        );
+      }
+      resolvedFirstBillingMonth = club.firstBillingMonth;
+    }
+
     const rawStatus = String(body.status ?? "paid").trim().toLowerCase();
     const status = rawStatus === "warning" || rawStatus === "overdue" ? rawStatus : "paid";
 
@@ -144,6 +170,7 @@ export async function POST(request: NextRequest) {
             teamGroup,
             lastPaymentDate,
             coachGroupId,
+            firstBillingMonth: resolvedFirstBillingMonth,
             ...(adminImagePath
               ? {
                   images: {

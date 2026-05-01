@@ -256,6 +256,7 @@ export async function GET(
         jerseyNumber: card.player.jerseyNumber,
         birthDate: card.player.birthDate,
         status: pausedThisMonth ? "paused" : card.player.status,
+        firstBillingMonth: card.player.firstBillingMonth,
         last_payment_date: card.player.lastPaymentDate,
         paymentLogs: paymentLogs.map((item) => ({
           id: item.id,

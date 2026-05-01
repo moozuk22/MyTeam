@@ -5,7 +5,7 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
 import { publishMemberUpdated } from "@/lib/memberEvents";
-import { normalizeToMonthStart } from "@/lib/paymentStatus";
+import { normalizeToMonthStart, toYearMonth, compareYearMonth } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +58,16 @@ export async function POST(
 
     if (!player) {
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
+    }
+
+    if (player.firstBillingMonth) {
+      const firstBillingYM = toYearMonth(player.firstBillingMonth);
+      if (compareYearMonth(toYearMonth(paidForDate), firstBillingYM) < 0) {
+        return NextResponse.json(
+          { error: "Cannot record payment before billing start month" },
+          { status: 400 },
+        );
+      }
     }
 
     // Check if this month/year is already paid

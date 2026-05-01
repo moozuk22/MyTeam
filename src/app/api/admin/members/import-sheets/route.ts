@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { getGoogleServiceAccountToken } from "@/lib/googleAuth";
 import { randomBytes } from "crypto";
+import { normalizeToMonthStart } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,12 +114,14 @@ async function createPlayerWithCard({
   birthDate,
   teamGroup,
   jerseyNumber,
+  firstBillingMonth,
 }: {
   clubId: string;
   fullName: string;
   birthDate: Date | null;
   teamGroup: number | null;
   jerseyNumber: string | null;
+  firstBillingMonth: Date | null;
 }) {
   let lastError: unknown = null;
   for (let i = 0; i < 5; i++) {
@@ -132,6 +135,7 @@ async function createPlayerWithCard({
           birthDate: birthDate ?? undefined,
           teamGroup: teamGroup ?? undefined,
           jerseyNumber: jerseyNumber ?? undefined,
+          firstBillingMonth: firstBillingMonth ?? undefined,
           cards: { create: { cardCode, isActive: true } },
         },
       });
@@ -158,11 +162,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "spreadsheetId is required" }, { status: 400 });
   }
 
+  const clubId = searchParams.get("clubId") ?? "";
+  let clubBillingInfo: { billingStatus: string; firstBillingMonth: Date | null } | null = null;
+  if (clubId) {
+    const club = await prisma.club.findUnique({
+      where: { id: clubId },
+      select: { billingStatus: true, firstBillingMonth: true },
+    });
+    if (club) clubBillingInfo = club;
+  }
+
   try {
     const values = await fetchSheetValues(spreadsheetId);
     const { rows, error } = parseSheetRows(values);
     if (error) return NextResponse.json({ error }, { status: 422 });
-    return NextResponse.json({ rows });
+    return NextResponse.json({
+      rows,
+      ...(clubBillingInfo
+        ? {
+            clubBillingStatus: clubBillingInfo.billingStatus,
+            clubFirstBillingMonth: clubBillingInfo.firstBillingMonth,
+          }
+        : {}),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to read sheet" },
@@ -181,6 +203,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     spreadsheetId?: unknown;
     clubId?: unknown;
+    firstBillingMonth?: unknown;
   };
 
   const spreadsheetId = String(body.spreadsheetId ?? "").trim();
@@ -189,9 +212,31 @@ export async function POST(request: NextRequest) {
   if (!spreadsheetId) return NextResponse.json({ error: "spreadsheetId is required" }, { status: 400 });
   if (!clubId) return NextResponse.json({ error: "clubId is required" }, { status: 400 });
 
-  // Verify club exists
-  const club = await prisma.club.findUnique({ where: { id: clubId }, select: { id: true } });
+  // Verify club exists and fetch billing info
+  const club = await prisma.club.findUnique({
+    where: { id: clubId },
+    select: { id: true, billingStatus: true, firstBillingMonth: true },
+  });
   if (!club) return NextResponse.json({ error: "Club not found" }, { status: 404 });
+
+  // Resolve firstBillingMonth for players
+  const rawFirstBillingMonth = String(body.firstBillingMonth ?? "").trim();
+  let resolvedFirstBillingMonth: Date | null = null;
+  if (rawFirstBillingMonth) {
+    const parsed = new Date(`${rawFirstBillingMonth}-01T00:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json({ error: "Invalid firstBillingMonth" }, { status: 400 });
+    }
+    resolvedFirstBillingMonth = normalizeToMonthStart(parsed);
+  } else if (club.billingStatus === "active") {
+    if (!club.firstBillingMonth) {
+      return NextResponse.json(
+        { error: "Club billing is active but no default billing start. Provide firstBillingMonth." },
+        { status: 400 }
+      );
+    }
+    resolvedFirstBillingMonth = club.firstBillingMonth;
+  }
 
   try {
     const values = await fetchSheetValues(spreadsheetId);
@@ -215,6 +260,7 @@ export async function POST(request: NextRequest) {
           birthDate: row.birthDateIso ? new Date(row.birthDateIso) : null,
           teamGroup: row.teamGroup,
           jerseyNumber: row.jerseyNumber,
+          firstBillingMonth: resolvedFirstBillingMonth,
         });
         created++;
       } catch (err) {
