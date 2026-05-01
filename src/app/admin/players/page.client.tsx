@@ -55,6 +55,7 @@ interface ClubRow {
   imageUrl?: string | null;
   imagePublicId?: string | null;
   notifyOnCoachVisit?: boolean;
+  billingStatus?: string;
 }
 
 export default function AdminPlayersPage() {
@@ -566,7 +567,7 @@ export default function AdminPlayersPage() {
             )}
 
             {!clubsLoading && visibleClubs.map((club) => (
-              <div key={club.id} className="mp-team-card">
+              <div key={club.id} className={`mp-team-card${club.billingStatus === "active" ? " mp-team-card--active" : " mp-team-card--demo"}`}>
                 <button
                   type="button"
                   className="mp-team-card-content"

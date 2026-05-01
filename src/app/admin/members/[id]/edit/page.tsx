@@ -13,9 +13,11 @@ interface MemberResponse {
   id: string;
   firstName: string;
   secondName: string;
+  fullName?: string;
   visitsTotal: number;
   visitsUsed: number;
   cards: Card[];
+  firstBillingMonth?: string | null;
 }
 
 export default function EditMemberPage() {
@@ -34,6 +36,7 @@ export default function EditMemberPage() {
   const [visitsTotal, setVisitsTotal] = useState("0");
   const [visitsUsed, setVisitsUsed] = useState("0");
   const [cards, setCards] = useState<Card[]>([]);
+  const [firstBillingMonth, setFirstBillingMonth] = useState("");
 
   useEffect(() => {
     const fetchMember = async () => {
@@ -45,11 +48,15 @@ export default function EditMemberPage() {
         }
 
         const member: MemberResponse = await response.json();
-        setFirstName(member.firstName);
-        setSecondName(member.secondName);
-        setVisitsTotal(String(member.visitsTotal));
-        setVisitsUsed(String(member.visitsUsed));
+        const parts = (member.fullName ?? "").trim().split(/\s+/);
+        setFirstName(member.firstName ?? parts[0] ?? "");
+        setSecondName(member.secondName ?? parts.slice(1).join(" ") ?? "");
+        setVisitsTotal(String(member.visitsTotal ?? 0));
+        setVisitsUsed(String(member.visitsUsed ?? 0));
         setCards(member.cards ?? []);
+        if (member.firstBillingMonth) {
+          setFirstBillingMonth(new Date(member.firstBillingMonth).toISOString().slice(0, 7));
+        }
       } catch (err) {
         console.error("Error fetching member:", err);
         setError("Грешка при зареждане на члена.");
@@ -97,17 +104,23 @@ export default function EditMemberPage() {
 
     setSaving(true);
     try {
+      const fullName = [firstName.trim(), secondName.trim()].filter(Boolean).join(" ");
+      const body: Record<string, unknown> = {
+        fullName,
+        firstName: firstName.trim(),
+        secondName: secondName.trim(),
+        visitsTotal: parsedVisitsTotal,
+        visitsUsed: parsedVisitsUsed,
+      };
+      if (firstBillingMonth.trim()) {
+        body.firstBillingMonth = firstBillingMonth.trim();
+      }
       const response = await fetch(`/api/admin/members/${memberId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          firstName: firstName.trim(),
-          secondName: secondName.trim(),
-          visitsTotal: parsedVisitsTotal,
-          visitsUsed: parsedVisitsUsed,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -224,6 +237,17 @@ export default function EditMemberPage() {
                 disabled={saving}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block mb-2 text-secondary">Начален месец на таксуване</label>
+            <input
+              type="month"
+              className="input w-full"
+              value={firstBillingMonth}
+              onChange={(e) => setFirstBillingMonth(e.target.value)}
+              disabled={saving}
+            />
           </div>
 
           <div>

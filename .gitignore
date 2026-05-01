@@ -23,8 +23,7 @@
 # misc
 .DS_Store
 *.pem
-.idea/workspace.xml
-.idea/shelf/
+.idea/
 
 # debug
 npm-debug.log*

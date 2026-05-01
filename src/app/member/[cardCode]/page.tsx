@@ -38,6 +38,7 @@ interface MemberProfile {
     createdAt: string;
     createdBy: string;
   }>;
+  firstBillingMonth?: string | null;
   isPausedThisMonth?: boolean;
   discounts?: Array<{
     id: string;
@@ -348,6 +349,12 @@ export default function MemberCardPage({
     })
   );
   const settledSet = new Set<string>([...paidSet, ...waivedSet]);
+
+  // First billing month — null means billing not yet active
+  const firstBillingYM: { year: number; month: number } | null = (() => {
+    if (!member?.firstBillingMonth) return null;
+    return parseYearMonth(member.firstBillingMonth);
+  })();
   const selectedPauseKeys = new Set(
     selectedPauseMonths.map((item) => `${item.year}-${item.month}`),
   );
@@ -429,20 +436,23 @@ export default function MemberCardPage({
       .sort((a, b) => cmpYM(b, a))[0];
   })();
 
-  // Next unpaid = first month that is not settled (paid or waived)
-  const firstUnpaidYM = (() => {
-    let candidate = lastPaidYM
-      ? addMonths(lastPaidYM, 1)
-      : { year: new Date().getFullYear(), month: new Date().getMonth() };
+  // Next unpaid = first month not settled, anchored to firstBillingYM
+  const firstUnpaidYM: { year: number; month: number } | null = (() => {
+    if (!firstBillingYM) return null;
+
+    let candidate = lastPaidYM ? addMonths(lastPaidYM, 1) : firstBillingYM;
 
     while (settledSet.has(`${candidate.year}-${candidate.month}`)) {
       candidate = addMonths(candidate, 1);
     }
 
+    if (cmpYM(candidate, firstBillingYM) < 0) return firstBillingYM;
+
     return candidate;
   })();
 
   const openPaymentModal = () => {
+    if (!firstUnpaidYM) return;
     setCalendarYear(firstUnpaidYM.year);
     setSelectedYM(firstUnpaidYM);
     setPaymentError(null);
@@ -455,8 +465,9 @@ export default function MemberCardPage({
     const key = `${ym.year}-${ym.month}`;
     if (paidSet.has(key)) return "paid";
     if (waivedSet.has(key)) return "waived";
-    if (cmpYM(ym, firstUnpaidYM) < 0) return "disabled";
-    const isNext = key === `${firstUnpaidYM.year}-${firstUnpaidYM.month}`;
+    if (firstBillingYM && cmpYM(ym, firstBillingYM) < 0) return "disabled";
+    if (!firstUnpaidYM || cmpYM(ym, firstUnpaidYM) < 0) return "disabled";
+    const isNext = firstUnpaidYM && key === `${firstUnpaidYM.year}-${firstUnpaidYM.month}`;
     if (selectedYM && `${selectedYM.year}-${selectedYM.month}` === key) return "selected";
     if (isNext) return "next";
     return "available";
@@ -465,7 +476,7 @@ export default function MemberCardPage({
   const handleMonthClick = (ym: { year: number; month: number }) => {
     const key = `${ym.year}-${ym.month}`;
     if (paidSet.has(key) || waivedSet.has(key)) return;
-    // Only allow selecting the exact next unpaid month — no skipping
+    if (!firstUnpaidYM) return;
     if (key !== `${firstUnpaidYM.year}-${firstUnpaidYM.month}`) return;
     setSelectedYM(ym);
   };
@@ -1679,9 +1690,15 @@ export default function MemberCardPage({
         {/* Below card buttons */}
         <div className="below-card">
           {canManagePayments && (<>
-            <button className="pay-btn" onClick={openPaymentModal}>
-              Плати
-            </button>
+            {member.firstBillingMonth ? (
+              <button className="pay-btn" onClick={openPaymentModal}>
+                Плати
+              </button>
+            ) : (
+              <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", margin: "0 0 8px", textAlign: "center" }}>
+                Таксуването не е активирано
+              </p>
+            )}
             <button
               className="add-btn member-action-btn pause-btn"
               onClick={() => {
@@ -2476,7 +2493,7 @@ export default function MemberCardPage({
         )}
 
         {/* ══ PAYMENT MODAL ══ */}
-        {paymentModalOpen && (
+        {paymentModalOpen && firstUnpaidYM && (
           <div className="pm-overlay" onClick={() => setPaymentModalOpen(false)}>
             <div className="pm-modal" onClick={(e) => e.stopPropagation()}>
 

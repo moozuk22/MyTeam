@@ -164,16 +164,16 @@ async function resolveClubId(inputClubId) {
   if (inputClubId) {
     const club = await prisma.club.findUnique({
       where: { id: inputClubId },
-      select: { id: true },
+      select: { id: true, billingStatus: true, firstBillingMonth: true },
     });
     if (!club) {
       throw new Error(`Club not found for id: ${inputClubId}`);
     }
-    return inputClubId;
+    return club;
   }
 
   const clubs = await prisma.club.findMany({
-    select: { id: true },
+    select: { id: true, billingStatus: true, firstBillingMonth: true },
     orderBy: { createdAt: "asc" },
     take: 2,
   });
@@ -184,10 +184,10 @@ async function resolveClubId(inputClubId) {
     );
   }
 
-  return clubs[0].id;
+  return clubs[0];
 }
 
-async function createPlayerWithCard({ clubId, fullName, birthDate, teamGroup, jerseyNumber }) {
+async function createPlayerWithCard({ clubId, fullName, birthDate, teamGroup, jerseyNumber, firstBillingMonth }) {
   let lastError = null;
 
   for (let i = 0; i < 5; i += 1) {
@@ -202,6 +202,7 @@ async function createPlayerWithCard({ clubId, fullName, birthDate, teamGroup, je
           birthDate: birthDate ?? undefined,
           teamGroup: teamGroup ?? undefined,
           jerseyNumber: jerseyNumber ?? undefined,
+          firstBillingMonth: firstBillingMonth ?? undefined,
           cards: {
             create: {
               cardCode,
@@ -226,13 +227,22 @@ async function createPlayerWithCard({ clubId, fullName, birthDate, teamGroup, je
   throw lastError || new Error("Failed to generate unique card code.");
 }
 
+function parseFirstBillingMonthArg(args) {
+  const flag = "--first-billing-month";
+  const idx = args.indexOf(flag);
+  if (idx >= 0 && args[idx + 1]) {
+    return args[idx + 1];
+  }
+  return null;
+}
+
 async function main() {
   const csvArg = process.argv[2];
-  const clubArg = process.argv[3];
+  const clubArg = process.argv[3] && !process.argv[3].startsWith("--") ? process.argv[3] : null;
 
   if (!csvArg) {
     throw new Error(
-      "Usage: node scripts/import-players-from-csv.js <csvPath> [clubId]"
+      "Usage: node scripts/import-players-from-csv.js <csvPath> [clubId] [--first-billing-month YYYY-MM]"
     );
   }
 
@@ -261,7 +271,26 @@ async function main() {
     );
   }
 
-  const clubId = await resolveClubId(clubArg);
+  const club = await resolveClubId(clubArg);
+  const clubId = club.id;
+
+  // Resolve firstBillingMonth
+  const firstBillingMonthArg = parseFirstBillingMonthArg(process.argv);
+  let firstBillingMonth = null;
+
+  if (firstBillingMonthArg) {
+    const parsed = new Date(`${firstBillingMonthArg}-01T00:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error(`Invalid --first-billing-month value: "${firstBillingMonthArg}". Use YYYY-MM format.`);
+    }
+    firstBillingMonth = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), 1));
+  } else if (club.firstBillingMonth) {
+    firstBillingMonth = club.firstBillingMonth;
+  } else if (club.billingStatus === "active") {
+    throw new Error(
+      "Club billing is active but no firstBillingMonth is set. Provide --first-billing-month YYYY-MM."
+    );
+  }
 
   let created = 0;
   let skipped = 0;
@@ -289,7 +318,7 @@ async function main() {
     const jerseyNumber = kitRaw || null;
 
     try {
-      await createPlayerWithCard({ clubId, fullName, birthDate, teamGroup, jerseyNumber });
+      await createPlayerWithCard({ clubId, fullName, birthDate, teamGroup, jerseyNumber, firstBillingMonth });
       created += 1;
     } catch (error) {
       failed += 1;

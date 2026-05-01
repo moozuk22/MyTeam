@@ -310,11 +310,26 @@
   align-items: stretch;
 }
 
+.mp-team-card--active {
+  border-color: rgba(50,205,50,0.35);
+  box-shadow: 0 0 18px rgba(50,205,50,0.18);
+}
+
+.mp-team-card--demo {
+  border-color: rgba(239,68,68,0.35);
+  box-shadow: 0 0 18px rgba(239,68,68,0.18);
+}
+
 .mp-team-card:hover {
   border-color: rgba(50,205,50,0.5);
   background: linear-gradient(135deg, #1f1f1f, #252525, #1f1f1f);
   box-shadow: 0 0 30px rgba(50,205,50,0.2);
   transform: scale(1.02);
+}
+
+.mp-team-card--demo:hover {
+  border-color: rgba(239,68,68,0.6);
+  box-shadow: 0 0 30px rgba(239,68,68,0.25);
 }
 
 .mp-team-card::before {

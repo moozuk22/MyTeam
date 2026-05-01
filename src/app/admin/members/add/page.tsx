@@ -11,6 +11,8 @@ interface ClubData {
   id: string;
   name: string;
   imageUrl?: string | null;
+  billingStatus?: "demo" | "active";
+  firstBillingMonth?: string | null;
 }
 
 function AddMemberPageContent() {
@@ -18,10 +20,11 @@ function AddMemberPageContent() {
   const clubId = searchParams.get("clubId")?.trim() ?? "";
   const coachGroupId = searchParams.get("coachGroupId")?.trim() ?? "";
   const [fullName, setFullName] = useState("");
-  const [status, setStatus] = useState<"paid" | "warning" | "overdue">("paid");
+  const [status, setStatus] = useState<"paid" | "warning" | "overdue">("warning");
   const [clubData, setClubData] = useState<ClubData | null>(null);
   const [jerseyNumber, setJerseyNumber] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [firstBillingMonth, setFirstBillingMonth] = useState("");
   const [avatarUrl] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
@@ -70,10 +73,18 @@ function AddMemberPageContent() {
         }
 
         const raw = currentClub as Record<string, unknown>;
+        const billingStatus = raw.billingStatus === "active" ? "active" : "demo";
+        const clubFirstBillingMonth = typeof raw.firstBillingMonth === "string"
+          ? raw.firstBillingMonth.slice(0, 7)
+          : raw.firstBillingMonth instanceof Date
+            ? raw.firstBillingMonth.toISOString().slice(0, 7)
+            : null;
         setClubData({
           id: String(raw.id ?? ""),
           name: String(raw.name ?? "Отбор"),
           imageUrl: typeof raw.imageUrl === "string" ? raw.imageUrl : null,
+          billingStatus,
+          firstBillingMonth: clubFirstBillingMonth,
         });
         setIsClubValidated(true);
       } catch (validationError) {
@@ -116,6 +127,10 @@ function AddMemberPageContent() {
       setError("Birth date is required.");
       return;
     }
+    if (clubData?.billingStatus === "active" && !firstBillingMonth.trim()) {
+      setError("First billing month is required for active billing clubs.");
+      return;
+    }
     setIsSubmitting(true);
     setError("");
 
@@ -143,6 +158,7 @@ function AddMemberPageContent() {
       if (coachGroupId) payload.coachGroupId = coachGroupId;
 
       if (jerseyNumber.trim()) payload.jerseyNumber = jerseyNumber.trim();
+      if (firstBillingMonth.trim()) payload.firstBillingMonth = firstBillingMonth.trim();
       if (resolvedAvatarUrl) payload.avatarUrl = resolvedAvatarUrl;
       if (resolvedImagePath) payload.imageUrl = resolvedImagePath;
       if (resolvedImagePublicId) payload.imagePublicId = resolvedImagePublicId;
@@ -278,6 +294,25 @@ function AddMemberPageContent() {
                 onChange={(e) => setBirthDate(e.target.value)}
                 className="add-member-input"
               />
+            </div>
+
+            <div className="add-member-field">
+              <label className="add-member-label">
+                Начален месец на таксуване
+                {clubData?.billingStatus === "active" && <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>}
+              </label>
+              <input
+                type="month"
+                required={clubData?.billingStatus === "active"}
+                value={firstBillingMonth}
+                onChange={(e) => setFirstBillingMonth(e.target.value)}
+                className="add-member-input"
+              />
+              {clubData?.billingStatus !== "active" && (
+                <span className="add-member-hint" style={{ marginTop: "4px", display: "block" }}>
+                  Таксуването не е активирано за този клуб. Полето е незадължително.
+                </span>
+              )}
             </div>
 
             <div className="add-member-field">

@@ -76,6 +76,7 @@ interface ClubOption {
   trainingWeekdays?: number[];
   trainingWindowDays?: number;
   trainingGroupMode?: "team_group" | "custom_group";
+  billingStatus?: string;
 }
 
 interface Member {
@@ -2525,6 +2526,7 @@ function AdminMembersPageContent() {
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState("");
   const [clubName, setClubName] = useState("Всички отбори");
+  const [clubBillingStatus, setClubBillingStatus] = useState<string>("");
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [attendanceDashboardOpen, setAttendanceDashboardOpen] = useState(false);
@@ -3530,6 +3532,9 @@ function AdminMembersPageContent() {
           setTrainingGroupMode(selectedMode === "custom_group" ? "custom_group" : "team_group");
           setTrainingGroupModeDraft(selectedMode === "custom_group" ? "custom_group" : "team_group");
 
+          const billing = (selectedClub as Record<string, unknown>).billingStatus;
+          setClubBillingStatus(typeof billing === "string" ? billing : "");
+
           const logo = (selectedClub as Record<string, unknown>).imageUrl;
           if (typeof logo === "string" && logo) {
             setClubLogoUrl(logo);
@@ -3538,6 +3543,7 @@ function AdminMembersPageContent() {
           }
         } else {
           setClubName("Всички отбори");
+          setClubBillingStatus("");
           setClubLogoUrl(null);
         }
 
@@ -3594,6 +3600,8 @@ function AdminMembersPageContent() {
         const selectedMode = (selectedClub as Record<string, unknown> | null)?.trainingGroupMode;
         setTrainingGroupMode(selectedMode === "custom_group" ? "custom_group" : "team_group");
         setTrainingGroupModeDraft(selectedMode === "custom_group" ? "custom_group" : "team_group");
+        const billing = (selectedClub as Record<string, unknown> | null)?.billingStatus;
+        setClubBillingStatus(typeof billing === "string" ? billing : "");
         const logo = (selectedClub as Record<string, unknown> | null)?.imageUrl;
         if (typeof logo === "string" && logo) {
           setClubLogoUrl(logo);
@@ -5536,6 +5544,11 @@ function AdminMembersPageContent() {
             <h2 className="amp-club-name">
               {clubName}
               {currentCoachGroupName && <span>{` - ${currentCoachGroupName}`}</span>}
+              {clubId && clubBillingStatus && (
+                <span className={`amp-billing-badge amp-billing-badge--${clubBillingStatus}`}>
+                  {clubBillingStatus === "active" ? "Активен" : "Демо"}
+                </span>
+              )}
             </h2>
           </div>
           {clubId && (
@@ -5663,6 +5676,13 @@ function AdminMembersPageContent() {
           )}
           {isAdmin && clubId && (
             <>
+              <button
+                className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+                onClick={() => router.push(`/admin/clubs/${encodeURIComponent(clubId)}/billing`)}
+                type="button"
+              >
+                <span>Таксуване</span>
+              </button>
               <button
                 className="amp-edit-team-btn amp-btn--compact"
                 onClick={() => router.push(`/admin/teams/${encodeURIComponent(clubId)}/edit`)}

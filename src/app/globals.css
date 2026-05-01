@@ -201,24 +201,28 @@ input, select {
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="time"]::-webkit-calendar-picker-indicator {
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
   cursor: pointer;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator:hover,
-input[type="time"]::-webkit-calendar-picker-indicator:hover {
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover {
   filter: invert(1) brightness(1.2);
 }
 
 input[type="date"]::-moz-calendar-picker-indicator,
-input[type="time"]::-moz-calendar-picker-indicator {
+input[type="time"]::-moz-calendar-picker-indicator,
+input[type="month"]::-moz-calendar-picker-indicator {
   filter: invert(1);
   cursor: pointer;
 }
 
 input[type="date"]::-moz-calendar-picker-indicator:hover,
-input[type="time"]::-moz-calendar-picker-indicator:hover {
+input[type="time"]::-moz-calendar-picker-indicator:hover,
+input[type="month"]::-moz-calendar-picker-indicator:hover {
   filter: invert(1) brightness(1.2);
 }
 
