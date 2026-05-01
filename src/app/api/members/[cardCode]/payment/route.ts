@@ -69,13 +69,8 @@ export async function POST(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    const playerFirstBillingMonth = card.player.firstBillingMonth;
-    if (!playerFirstBillingMonth) {
-      return NextResponse.json(
-        { error: "Billing is not active for this member" },
-        { status: 400 },
-      );
-    }
+    const playerFirstBillingMonth =
+      card.player.firstBillingMonth ?? normalizeToMonthStart(new Date());
 
     const [existingLogs, existingWaivers] = await Promise.all([
       prisma.paymentLog.findMany({
@@ -308,9 +303,9 @@ export async function DELETE(
       const nextStatus = resolveStatusFromSettledMonths({
         paidDates: remainingLogs.map((log) => log.paidFor),
         waivedDates: remainingWaivers.map((waiver) => waiver.waivedFor),
-        firstBillingMonth: card.player.firstBillingMonth
-          ? toYearMonth(card.player.firstBillingMonth)
-          : null,
+        firstBillingMonth: toYearMonth(
+          card.player.firstBillingMonth ?? normalizeToMonthStart(new Date()),
+        ),
       });
 
       await tx.player.update({

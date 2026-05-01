@@ -352,9 +352,13 @@ export default function MemberCardPage({
   );
   const settledSet = new Set<string>([...paidSet, ...waivedSet]);
 
-  // First billing month — null means billing not yet active
+  // Demo clubs can test payments before billing activation; start from current month.
   const firstBillingYM: { year: number; month: number } | null = (() => {
-    if (!member?.firstBillingMonth) return null;
+    if (!member) return null;
+    if (!member.firstBillingMonth) {
+      const now = new Date();
+      return { year: now.getFullYear(), month: now.getMonth() };
+    }
     return parseYearMonth(member.firstBillingMonth);
   })();
   const selectedPauseKeys = new Set(
@@ -1758,8 +1762,7 @@ export default function MemberCardPage({
         {/* Below card buttons */}
         <div className="below-card">
           {canManagePayments && (<>
-            {member.firstBillingMonth ? (
-              <>
+            <>
               <button className="pay-btn" onClick={openPaymentModal}>
                 Плати
               </button>
@@ -1770,12 +1773,7 @@ export default function MemberCardPage({
               >
                 Изтрий плащане
               </button>
-              </>
-            ) : (
-              <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", margin: "0 0 8px", textAlign: "center" }}>
-                Таксуването не е активирано
-              </p>
-            )}
+            </>
             <button
               className="add-btn member-action-btn pause-btn"
               onClick={() => {
