@@ -2622,6 +2622,7 @@ function AdminMembersPageContent() {
   const [trainingGroupCreateGroups, setTrainingGroupCreateGroups] = useState<string[]>([]);
   const [trainingGroupCreateName, setTrainingGroupCreateName] = useState("");
   const [trainingGroupCreatePlayerIds, setTrainingGroupCreatePlayerIds] = useState<string[]>([]);
+  const [customGroupCreateSearch, setCustomGroupCreateSearch] = useState("");
   const [trainingGroupEditOpen, setTrainingGroupEditOpen] = useState(false);
   const [trainingGroupEditSaving, setTrainingGroupEditSaving] = useState(false);
   const [trainingGroupEditError, setTrainingGroupEditError] = useState("");
@@ -2631,6 +2632,7 @@ function AdminMembersPageContent() {
   const [trainingGroupEditName, setTrainingGroupEditName] = useState("");
   const [trainingGroupEditGroups, setTrainingGroupEditGroups] = useState<string[]>([]);
   const [trainingGroupEditPlayerIds, setTrainingGroupEditPlayerIds] = useState<string[]>([]);
+  const [customGroupEditSearch, setCustomGroupEditSearch] = useState("");
   const [selectedTrainingGroupId, setSelectedTrainingGroupId] = useState("");
   const [postTeamGroupSavePromptOpen, setPostTeamGroupSavePromptOpen] = useState(false);
   const [postTeamGroupSavePromptGroupId, setPostTeamGroupSavePromptGroupId] = useState("");
@@ -3669,6 +3671,16 @@ function AdminMembersPageContent() {
       member.isActive &&
       (!customTrainingGroupAssignedPlayerIds.has(member.id) || customTrainingGroupEditOriginalPlayerIds.has(member.id)),
   );
+  const filteredPlayersForCustomGroupCreate = customGroupCreateSearch.trim()
+    ? availablePlayersForCustomGroupCreate.filter((m) =>
+        m.fullName.toLowerCase().includes(customGroupCreateSearch.toLowerCase()),
+      )
+    : availablePlayersForCustomGroupCreate;
+  const filteredPlayersForCustomGroupEdit = customGroupEditSearch.trim()
+    ? availablePlayersForCustomGroupEdit.filter((m) =>
+        m.fullName.toLowerCase().includes(customGroupEditSearch.toLowerCase()),
+      )
+    : availablePlayersForCustomGroupEdit;
   const trainingGroupTeamGroupSet = new Set(trainingScheduleGroups.flatMap((g) => g.teamGroups));
   const standaloneTeamGroups = groupOptions.filter((g) => !trainingGroupTeamGroupSet.has(g));
   const unifiedGroupScopeValue =
@@ -4152,6 +4164,7 @@ function AdminMembersPageContent() {
     setTrainingGroupCreateGroups([]);
     setTrainingGroupCreateName("");
     setTrainingGroupCreatePlayerIds([]);
+    setCustomGroupCreateSearch("");
     setTrainingGroupCreateOpen(true);
   };
 
@@ -4166,6 +4179,7 @@ function AdminMembersPageContent() {
       setTrainingGroupEditId(group.id);
       setTrainingGroupEditName(group.name);
       setTrainingGroupEditPlayerIds(group.playerIds);
+      setCustomGroupEditSearch("");
       setTrainingGroupEditOpen(true);
       return;
     }
@@ -5681,7 +5695,7 @@ function AdminMembersPageContent() {
                 onClick={() => router.push(`/admin/clubs/${encodeURIComponent(clubId)}/billing`)}
                 type="button"
               >
-                <span>Таксуване</span>
+                <span>Такси</span>
               </button>
               <button
                 className="amp-edit-team-btn amp-btn--compact"
@@ -7140,8 +7154,17 @@ function AdminMembersPageContent() {
                   </label>
                   <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
                     <span className="amp-lbl">Играчите в групата</span>
+                    <input
+                      className="amp-edit-input"
+                      type="search"
+                      placeholder="Търси играч..."
+                      value={customGroupEditSearch}
+                      onChange={(e) => setCustomGroupEditSearch(e.target.value)}
+                      disabled={trainingGroupEditSaving}
+                      style={{ marginBottom: "8px" }}
+                    />
                     <div className="amp-group-check-grid">
-                      {availablePlayersForCustomGroupEdit.map((member) => {
+                      {filteredPlayersForCustomGroupEdit.map((member) => {
                         const isChecked = trainingGroupEditPlayerIds.includes(member.id);
                         return (
                           <label key={`custom-training-group-edit-${member.id}`} className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupEditSaving ? " is-disabled" : ""}`}>
@@ -7164,6 +7187,9 @@ function AdminMembersPageContent() {
                     </div>
                     {availablePlayersForCustomGroupEdit.length === 0 && (
                       <p className="amp-empty amp-empty--modal">Няма свободни играчи за добавяне.</p>
+                    )}
+                    {availablePlayersForCustomGroupEdit.length > 0 && filteredPlayersForCustomGroupEdit.length === 0 && (
+                      <p className="amp-empty amp-empty--modal">Няма играчи, отговарящи на търсенето.</p>
                     )}
                   </div>
                 </>
@@ -7286,8 +7312,17 @@ function AdminMembersPageContent() {
                   </label>
                   <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
                     <span className="amp-lbl">Играчите в групата</span>
+                    <input
+                      className="amp-edit-input"
+                      type="search"
+                      placeholder="Търси играч..."
+                      value={customGroupCreateSearch}
+                      onChange={(e) => setCustomGroupCreateSearch(e.target.value)}
+                      disabled={trainingGroupCreateSaving}
+                      style={{ marginBottom: "8px" }}
+                    />
                     <div className="amp-group-check-grid">
-                      {availablePlayersForCustomGroupCreate.map((member) => {
+                      {filteredPlayersForCustomGroupCreate.map((member) => {
                         const isChecked = trainingGroupCreatePlayerIds.includes(member.id);
                         return (
                           <label key={`custom-training-group-create-${member.id}`} className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}>
@@ -7310,6 +7345,9 @@ function AdminMembersPageContent() {
                     </div>
                     {availablePlayersForCustomGroupCreate.length === 0 && (
                       <p className="amp-empty amp-empty--modal">Няма свободни играчи за добавяне.</p>
+                    )}
+                    {availablePlayersForCustomGroupCreate.length > 0 && filteredPlayersForCustomGroupCreate.length === 0 && (
+                      <p className="amp-empty amp-empty--modal">Няма играчи, отговарящи на търсенето.</p>
                     )}
                   </div>
                 </>

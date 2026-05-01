@@ -143,6 +143,9 @@
 /* ── Select ── */
 .select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 11px 14px;
   background: #181818;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -167,6 +170,9 @@
 /* ── Input ── */
 .input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 11px 14px;
   background: #181818;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -327,7 +333,7 @@
   }
 
   .card {
-    padding: 22px 18px;
+    padding: 22px 16px;
   }
 
   .title {
@@ -336,5 +342,15 @@
 
   .btnRow {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 380px) {
+  .page {
+    padding-inline: 8px;
+  }
+
+  .card {
+    padding-inline: 12px;
   }
 }
