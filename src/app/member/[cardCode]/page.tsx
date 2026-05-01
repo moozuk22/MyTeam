@@ -306,8 +306,10 @@ export default function MemberCardPage({
 
   // Payment modal
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentModalMode, setPaymentModalMode] = useState<"create" | "delete">("create");
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [selectedYM, setSelectedYM] = useState<{ year: number; month: number } | null>(null);
+  const [selectedPaymentDeleteMonths, setSelectedPaymentDeleteMonths] = useState<Array<{ year: number; month: number }>>([]);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
@@ -357,6 +359,9 @@ export default function MemberCardPage({
   })();
   const selectedPauseKeys = new Set(
     selectedPauseMonths.map((item) => `${item.year}-${item.month}`),
+  );
+  const selectedPaymentDeleteKeys = new Set(
+    selectedPaymentDeleteMonths.map((item) => `${item.year}-${item.month}`),
   );
   const canApplyPause = selectedPauseMonths.some(
     (item) => !waivedSet.has(`${item.year}-${item.month}`),
@@ -453,18 +458,32 @@ export default function MemberCardPage({
 
   const openPaymentModal = () => {
     if (!firstUnpaidYM) return;
+    setPaymentModalMode("create");
     setCalendarYear(firstUnpaidYM.year);
     setSelectedYM(firstUnpaidYM);
+    setSelectedPaymentDeleteMonths([]);
+    setPaymentError(null);
+    setPaymentModalOpen(true);
+  };
+
+  const openPaymentDeleteModal = () => {
+    const initialYear = lastPaidYM?.year ?? firstUnpaidYM?.year ?? new Date().getFullYear();
+    setPaymentModalMode("delete");
+    setCalendarYear(initialYear);
+    setSelectedYM(null);
+    setSelectedPaymentDeleteMonths([]);
     setPaymentError(null);
     setPaymentModalOpen(true);
   };
 
   // Month state
-  type MonthState = "paid" | "waived" | "selected" | "next" | "available" | "disabled";
+  type MonthState = "paid" | "waived" | "deleteSelected" | "selected" | "next" | "available" | "disabled";
   const getMonthState = (ym: { year: number; month: number }): MonthState => {
     const key = `${ym.year}-${ym.month}`;
+    if (selectedPaymentDeleteKeys.has(key)) return "deleteSelected";
     if (paidSet.has(key)) return "paid";
     if (waivedSet.has(key)) return "waived";
+    if (paymentModalMode === "delete") return "disabled";
     if (firstBillingYM && cmpYM(ym, firstBillingYM) < 0) return "disabled";
     if (!firstUnpaidYM || cmpYM(ym, firstUnpaidYM) < 0) return "disabled";
     const isNext = firstUnpaidYM && key === `${firstUnpaidYM.year}-${firstUnpaidYM.month}`;
@@ -475,13 +494,23 @@ export default function MemberCardPage({
 
   const handleMonthClick = (ym: { year: number; month: number }) => {
     const key = `${ym.year}-${ym.month}`;
-    if (paidSet.has(key) || waivedSet.has(key)) return;
+    if (paidSet.has(key)) {
+      if (paymentModalMode !== "delete") return;
+      setSelectedPaymentDeleteMonths((prev) => {
+        const exists = prev.some((item) => `${item.year}-${item.month}` === key);
+        return exists
+          ? prev.filter((item) => `${item.year}-${item.month}` !== key)
+          : [...prev, ym];
+      });
+      return;
+    }
+    if (waivedSet.has(key)) return;
+    if (paymentModalMode === "delete") return;
     if (!firstUnpaidYM) return;
-    if (key !== `${firstUnpaidYM.year}-${firstUnpaidYM.month}`) return;
+    if (cmpYM(ym, firstUnpaidYM) < 0) return;
+    setSelectedPaymentDeleteMonths([]);
     setSelectedYM(ym);
   };
-
-  void handleMonthClick;
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -665,7 +694,12 @@ export default function MemberCardPage({
         return;
       }
 
-      if (type === "status-updated" || type === "payment-history-updated") {
+      if (
+        type === "member-updated" ||
+        type === "status-updated" ||
+        type === "payment-history-updated" ||
+        type === "notification-created"
+      ) {
         void (async () => {
           try {
             const response = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
@@ -1061,7 +1095,41 @@ export default function MemberCardPage({
       }
       const refreshed = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
       if (refreshed.ok) setMember(await refreshed.json());
+      setSelectedPaymentDeleteMonths([]);
       setPaymentModalOpen(false);
+    } catch (e) {
+      setPaymentError(e instanceof Error ? e.message : "Възникна грешка");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleDeletePayments = async () => {
+    if (!member || selectedPaymentDeleteMonths.length === 0) return;
+    setPaymentLoading(true);
+    setPaymentError(null);
+    try {
+      const response = await fetch(`/api/members/${normalizedCardCode}/payment`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paidFor: selectedPaymentDeleteMonths.map((item) => toISOMonth(item)),
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof err?.error === "string" && err.error.trim()
+            ? err.error
+            : "Грешка при изтриване на плащания",
+        );
+      }
+
+      const refreshed = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
+      if (refreshed.ok) {
+        setMember((await refreshed.json()) as MemberProfile);
+      }
+      setSelectedPaymentDeleteMonths([]);
     } catch (e) {
       setPaymentError(e instanceof Error ? e.message : "Възникна грешка");
     } finally {
@@ -1691,9 +1759,18 @@ export default function MemberCardPage({
         <div className="below-card">
           {canManagePayments && (<>
             {member.firstBillingMonth ? (
+              <>
               <button className="pay-btn" onClick={openPaymentModal}>
                 Плати
               </button>
+              <button
+                className="add-btn member-action-btn payment-delete-btn"
+                onClick={openPaymentDeleteModal}
+                disabled={(member.paymentLogs?.length ?? 0) === 0}
+              >
+                Изтрий плащане
+              </button>
+              </>
             ) : (
               <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.82rem", margin: "0 0 8px", textAlign: "center" }}>
                 Таксуването не е активирано
@@ -2504,7 +2581,9 @@ export default function MemberCardPage({
               <div className="pm-header">
                 <div className="pm-title-icon">⚽</div>
                 <div>
-                  <h2 className="pm-title">Плащане</h2>
+                  <h2 className="pm-title">
+                    {paymentModalMode === "delete" ? "Изтриване на плащане" : "Плащане"}
+                  </h2>
                   <p className="pm-name">{member.name}</p>
                 </div>
               </div>
@@ -2512,9 +2591,13 @@ export default function MemberCardPage({
               <div className="pm-divider" />
 
               <div className="pm-info-row">
-                <span className="pm-info-lbl">Следващ дължим месец:</span>
+                <span className="pm-info-lbl">
+                  {paymentModalMode === "delete" ? "Изберете платени месеци:" : "Следващ дължим месец:"}
+                </span>
                 <span className="pm-info-val">
-                  {MONTH_NAMES_BG_FULL[firstUnpaidYM.month]} {firstUnpaidYM.year}
+                  {paymentModalMode === "delete"
+                    ? "Може да изберете един или повече"
+                    : `${MONTH_NAMES_BG_FULL[firstUnpaidYM.month]} ${firstUnpaidYM.year}`}
                 </span>
               </div>
 
@@ -2540,29 +2623,28 @@ export default function MemberCardPage({
                     cmpYM(ym, selectedYM) <= 0 &&
                     state !== "paid" &&
                     state !== "waived" &&
+                    state !== "deleteSelected" &&
                     state !== "selected";
                   return (
                     <button
                       key={i}
                       className={`pm-month-btn pm-month-btn--${state}${inAdvanceRange ? " pm-month-btn--range" : ""}`}
-                      onClick={() => {
-                        const state = getMonthState(ym);
-                        if (state === "paid" || state === "waived" || state === "disabled") return;
-                        setSelectedYM(ym);
-                      }}
-                      disabled={state === "paid" || state === "waived" || state === "disabled"}
+                      onClick={() => handleMonthClick(ym)}
+                      disabled={state === "waived" || state === "disabled" || (paymentModalMode === "create" && state === "paid")}
                       title={
                         state === "disabled"
                           ? "Платете първо предишните месеци"
                           : state === "paid"
-                            ? "Вече платено"
+                            ? paymentModalMode === "delete"
+                              ? "Изберете за изтриване"
+                              : "Вече платено"
                             : state === "waived"
                               ? "Освободен месец (пауза)"
                               : undefined
                       }
                     >
                       {name}
-                      {state === "paid" && <span className="pm-paid-dot" />}
+                      {(state === "paid" || state === "deleteSelected") && <span className="pm-paid-dot" />}
                       {state === "waived" && <span className="pm-waived-dot" />}
                     </button>
                   );
@@ -2570,7 +2652,18 @@ export default function MemberCardPage({
               </div>
 
               {/* Selected summary */}
-              {selectedYM && (
+              {selectedPaymentDeleteMonths.length > 0 ? (
+                <div className="pm-selected-summary pm-selected-summary--delete">
+                  <span className="pm-selected-lbl">За изтриване:</span>
+                  <span className="pm-selected-val">
+                    {selectedPaymentDeleteMonths
+                      .slice()
+                      .sort((a, b) => cmpYM(a, b))
+                      .map((item) => `${MONTH_NAMES_BG_FULL[item.month]} ${item.year}`)
+                      .join(", ")}
+                  </span>
+                </div>
+              ) : selectedYM && (
                 <div className="pm-selected-summary">
                   <span className="pm-selected-lbl">Избрано:</span>
                   <span className="pm-selected-val">
@@ -2591,10 +2684,19 @@ export default function MemberCardPage({
                 <button className="pm-btn pm-btn--cancel" onClick={() => setPaymentModalOpen(false)}>
                   Отказ
                 </button>
+                {selectedPaymentDeleteMonths.length > 0 && (
+                  <button
+                    className="pm-btn pm-btn--danger"
+                    onClick={handleDeletePayments}
+                    disabled={paymentLoading}
+                  >
+                    {paymentLoading ? "Изтриване..." : "Изтрий плащания"}
+                  </button>
+                )}
                 <button
                   className="pm-btn pm-btn--submit"
                   onClick={handlePayment}
-                  disabled={!selectedYM || paymentLoading}
+                  disabled={!selectedYM || paymentLoading || selectedPaymentDeleteMonths.length > 0}
                 >
                   {paymentLoading ? "Обработка..." : "Потвърди плащане"}
                 </button>

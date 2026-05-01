@@ -4,6 +4,7 @@ type MemberEvent = {
     | "reset"
     | "questions-updated"
     | "notification-created"
+    | "member-updated"
     | "status-updated"
     | "payment-history-updated"
     | "training-updated";
@@ -44,6 +45,7 @@ export function publishMemberUpdated(
     | "check-in"
     | "reset"
     | "notification-created"
+    | "member-updated"
     | "status-updated"
     | "payment-history-updated"
     | "training-updated"

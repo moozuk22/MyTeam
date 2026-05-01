@@ -6,6 +6,7 @@ import {
 } from "@/lib/cloudinaryImagePath";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { cloudinary } from "@/lib/cloudinary";
+import { publishMemberUpdated } from "@/lib/memberEvents";
 import { isCurrentMonthWaived } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
@@ -481,6 +482,8 @@ export async function PUT(
         console.error("Cloudinary deletion error during public image update:", cloudinaryError);
       }
     }
+
+    publishMemberUpdated(normalizedCardCode, "member-updated");
 
     return NextResponse.json({ ok: true });
   } catch (error) {

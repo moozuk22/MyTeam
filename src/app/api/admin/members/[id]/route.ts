@@ -258,8 +258,11 @@ export async function PUT(
       updatedPlayer.cards.find((card) => card.isActive)?.cardCode ??
       updatedPlayer.cards[0]?.cardCode;
 
-    if (activeCardCode && status) {
-      publishMemberUpdated(activeCardCode, "status-updated");
+    if (activeCardCode) {
+      publishMemberUpdated(activeCardCode, "member-updated");
+      if (status) {
+        publishMemberUpdated(activeCardCode, "status-updated");
+      }
     }
 
     return NextResponse.json({

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { verifyAdminToken } from "@/lib/adminAuth";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
@@ -9,6 +10,7 @@ import {
   compareYearMonth,
   getFirstUnpaidYM,
   normalizeToMonthStart,
+  resolveStatusFromSettledMonths,
   toMonthKey,
   toYearMonth,
   type YearMonth,
@@ -99,7 +101,6 @@ export async function POST(
 
     const paidSet = new Set(existingLogs.map((log) => toMonthKey(toYearMonth(log.paidFor))));
     const waivedSet = new Set(existingWaivers.map((row) => toMonthKey(toYearMonth(row.waivedFor))));
-    const settledSet = new Set<string>([...paidSet, ...waivedSet]);
 
     const firstUnpaidYM: YearMonth = getFirstUnpaidYM(
       existingLogs.map((log) => log.paidFor),
@@ -175,13 +176,11 @@ export async function POST(
       });
 
       try {
+        await saveMemberNotificationHistory(player.id, "trainer_message", payload);
         pushResult = await sendPushToMember(player.id, payload);
-        if (pushResult.sent > 0) {
-          await saveMemberNotificationHistory(player.id, "trainer_message", payload);
-        }
       } catch (pushError) {
-        // Payment should remain successful even if push delivery fails.
-        console.error("Member payment push send error:", pushError);
+        // Payment should remain successful even if notification delivery fails.
+        console.error("Member payment notification error:", pushError);
       }
     }
 
@@ -211,6 +210,163 @@ export async function POST(
     });
   } catch (error) {
     console.error("Member payment creation error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ cardCode: string }> },
+) {
+  const token = request.cookies.get("admin_session")?.value;
+
+  if (!token || !(await verifyAdminToken(token))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { cardCode } = await params;
+    const normalizedCardCode = cardCode.trim().toUpperCase();
+    const body = await request.json().catch(() => ({}));
+    const paidForValues = Array.isArray((body as { paidFor?: unknown }).paidFor)
+      ? (body as { paidFor: unknown[] }).paidFor
+      : [];
+
+    const paidForDates = paidForValues
+      .map((value) => normalizeToMonthStart(new Date(String(value))))
+      .filter((date) => !Number.isNaN(date.getTime()));
+    const uniqueDates = Array.from(
+      new Map(paidForDates.map((date) => [date.toISOString(), date])).values(),
+    );
+
+    if (uniqueDates.length === 0) {
+      return NextResponse.json(
+        { error: "Select at least one valid paid month" },
+        { status: 400 },
+      );
+    }
+
+    const card = await prisma.card.findFirst({
+      where: {
+        cardCode: normalizedCardCode,
+        isActive: true,
+      },
+      select: {
+        playerId: true,
+        player: {
+          select: {
+            id: true,
+            fullName: true,
+            firstBillingMonth: true,
+            cards: {
+              where: { isActive: true },
+              select: { cardCode: true },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!card) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const logsToDelete = await tx.paymentLog.findMany({
+        where: {
+          playerId: card.playerId,
+          paidFor: {
+            in: uniqueDates,
+          },
+        },
+        select: { paidFor: true },
+        orderBy: { paidFor: "asc" },
+      });
+
+      const deleted = await tx.paymentLog.deleteMany({
+        where: {
+          playerId: card.playerId,
+          paidFor: {
+            in: uniqueDates,
+          },
+        },
+      });
+
+      const [remainingLogs, remainingWaivers] = await Promise.all([
+        tx.paymentLog.findMany({
+          where: { playerId: card.playerId },
+          select: { paidFor: true, paidAt: true },
+          orderBy: { paidAt: "desc" },
+        }),
+        tx.paymentWaiver.findMany({
+          where: { playerId: card.playerId },
+          select: { waivedFor: true },
+        }),
+      ]);
+
+      const nextStatus = resolveStatusFromSettledMonths({
+        paidDates: remainingLogs.map((log) => log.paidFor),
+        waivedDates: remainingWaivers.map((waiver) => waiver.waivedFor),
+        firstBillingMonth: card.player.firstBillingMonth
+          ? toYearMonth(card.player.firstBillingMonth)
+          : null,
+      });
+
+      await tx.player.update({
+        where: { id: card.playerId },
+        data: {
+          status: nextStatus,
+          lastPaymentDate: remainingLogs[0]?.paidAt ?? null,
+        },
+      });
+
+      return {
+        deletedCount: deleted.count,
+        removedMonths: logsToDelete.map((log) => log.paidFor),
+        status: nextStatus,
+        lastPaymentDate: remainingLogs[0]?.paidAt ?? null,
+      };
+    });
+
+    let pushResult = { total: 0, sent: 0, failed: 0, deactivated: 0 };
+    if (result.deletedCount > 0) {
+      const targetCardCode = card.player.cards[0]?.cardCode ?? normalizedCardCode;
+      const monthLabels = result.removedMonths.map(formatPaidMonthLabel);
+      const removedMonthsText =
+        monthLabels.length > 1
+          ? `${monthLabels.slice(0, -1).join(", ")} и ${monthLabels[monthLabels.length - 1]}`
+          : monthLabels[0] ?? "";
+      const trainerMessage =
+        monthLabels.length > 1
+          ? `Плащанията за месеците ${removedMonthsText} бяха премахнати от вашия профил.`
+          : `Плащането за месец ${removedMonthsText} беше премахнато от вашия профил.`;
+      const payload = buildNotificationPayload({
+        type: "trainer_message",
+        memberName: card.player.fullName.trim(),
+        trainerMessage,
+        url: `/member/${targetCardCode}`,
+      });
+
+      try {
+        await saveMemberNotificationHistory(card.player.id, "trainer_message", payload);
+        pushResult = await sendPushToMember(card.player.id, payload);
+      } catch (pushError) {
+        // Payment deletion should remain successful even if notification delivery fails.
+        console.error("Member payment deletion notification error:", pushError);
+      }
+    }
+
+    publishMemberUpdated(normalizedCardCode, "status-updated");
+    publishMemberUpdated(normalizedCardCode, "payment-history-updated");
+
+    return NextResponse.json({
+      success: true,
+      ...result,
+      push: pushResult,
+    });
+  } catch (error) {
+    console.error("Member payment deletion error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
