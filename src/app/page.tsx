@@ -2062,6 +2062,10 @@ export default function Home() {
       <RevealSection>
         <section id="Абонаменти" className="new-pricing-section" style={{ scrollMarginTop: "100px" }}>
           <div className="section-container-wide">
+            <h2 style={{ fontSize: 42, fontWeight: 800, textAlign: "center", marginBottom: 8 }}>
+              <span style={{ background: "linear-gradient(135deg, #39FF14, #00D4FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Абонаменти</span>
+            </h2>
+            <p style={{ color: "#FF3E3E", fontWeight: 700, fontSize: 18, textAlign: "center", marginBottom: 20, width: "100%" }}>* Свободни места: 5 от общо 10 отбора</p>
             <div className="new-pricing-grid">
 
               {/* LEFT: Subscription Levels Table */}
@@ -2157,6 +2161,7 @@ export default function Home() {
           </div>
         </section>
       </RevealSection>
+      
       <RevealSection>
         <section id="Контакт" ref={contactRef} style={{ padding: "40px 24px", background: `linear-gradient(180deg,#09101C 0%,${BG} 100%)`, scrollMarginTop: "100px" }}>
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
