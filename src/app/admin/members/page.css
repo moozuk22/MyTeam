@@ -1539,6 +1539,104 @@
   gap: 8px;
 }
 
+.amp-training-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+.amp-training-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.amp-training-step:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.amp-training-step:not(:disabled):hover {
+  border-color: rgba(50, 205, 50, 0.42);
+  background: rgba(50, 205, 50, 0.09);
+  color: rgba(215, 255, 215, 0.9);
+}
+
+.amp-training-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.amp-training-step.is-active {
+  border-color: rgba(50, 205, 50, 0.6);
+  background: rgba(50, 205, 50, 0.14);
+  color: #d7ffd7;
+}
+
+.amp-training-step.is-complete {
+  border-color: rgba(50, 205, 50, 0.36);
+  color: rgba(215, 255, 215, 0.78);
+}
+
+.amp-training-step-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(50, 205, 50, 0.26);
+  border-radius: 8px;
+  background: rgba(50, 205, 50, 0.08);
+}
+
+.amp-training-step-summary-label {
+  display: block;
+  margin-bottom: 3px;
+  color: rgba(215, 255, 215, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.amp-training-step-summary-value {
+  display: block;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.amp-training-step-nav {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
 .amp-training-days-editor-header {
   display: flex;
   justify-content: space-between;

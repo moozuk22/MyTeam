@@ -6,7 +6,7 @@ import {
   applyCloudinaryTransformToUrl,
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
-import { isCurrentMonthWaived, normalizeToMonthStart } from "@/lib/paymentStatus";
+import { normalizeToMonthStart } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -277,30 +277,80 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const now = new Date();
+    const currentMonthStart = normalizeToMonthStart(now);
+    const nextMonthStart = new Date(Date.UTC(
+      currentMonthStart.getUTCFullYear(),
+      currentMonthStart.getUTCMonth() + 1,
+      1,
+      0,
+      0,
+      0,
+      0,
+    ));
+
     const players = await withPrismaPoolRetry(() =>
       prisma.player.findMany({
       where: {
         ...(clubId ? { clubId } : {}),
         ...(coachGroupId ? { coachGroupId } : {}),
       },
-      include: {
-        club: true,
+      select: {
+        id: true,
+        clubId: true,
+        fullName: true,
+        status: true,
+        jerseyNumber: true,
+        birthDate: true,
+        teamGroup: true,
+        lastPaymentDate: true,
+        isActive: true,
+        coachGroupId: true,
+        club: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         cards: {
+          select: {
+            cardCode: true,
+            isActive: true,
+          },
           orderBy: {
             createdAt: "desc",
           },
         },
         paymentLogs: {
+          select: {
+            id: true,
+            paidFor: true,
+            paidAt: true,
+          },
           orderBy: {
             paidAt: "desc",
           },
         },
         paymentWaivers: {
+          where: {
+            waivedFor: {
+              gte: currentMonthStart,
+              lt: nextMonthStart,
+            },
+          },
+          select: {
+            waivedFor: true,
+          },
           orderBy: {
             waivedFor: "desc",
           },
         },
-        images: true,
+        images: {
+          select: {
+            imageUrl: true,
+            isAdminView: true,
+          },
+        },
       },
       orderBy: {
         fullName: "asc",
@@ -312,10 +362,9 @@ export async function GET(request: NextRequest) {
     const normalizedPlayers = players.map((player) => {
       const imagePath = getPrimaryPlayerImagePath(player.images);
       const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
-      const pausedThisMonth = isCurrentMonthWaived(waivedDates);
       return {
         ...player,
-        status: pausedThisMonth ? "paused" : player.status,
+        status: waivedDates.length > 0 ? "paused" : player.status,
         imageUrl: imagePath,
         avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
         imagePublicId: null,

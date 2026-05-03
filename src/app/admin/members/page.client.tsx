@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
@@ -11,6 +11,7 @@ import "./page.css";
 const MONTHS = ["Януари", "Февруари", "Март", "Април", "Май", "Юни", "Юли", "Август", "Септември", "Октомври", "Ноември", "Декември"];
 const TRAINING_SELECTION_WINDOW_DAYS = 30;
 const TRAINING_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DEFAULT_TRAINING_DURATION_MINUTES = 60;
 const TRAINING_WEEKDAY_SHORT_BG = Array.from({ length: 7 }, (_, index) =>
   new Intl.DateTimeFormat("bg-BG", { weekday: "short" })
     .format(new Date(Date.UTC(2024, 0, index + 1)))
@@ -73,6 +74,7 @@ interface ClubOption {
   trainingDates?: string[];
   trainingTime?: string | null;
   trainingDateTimes?: Record<string, string> | null;
+  trainingDurationMinutes?: number;
   trainingWeekdays?: number[];
   trainingWindowDays?: number;
   trainingGroupMode?: "team_group" | "custom_group";
@@ -130,18 +132,45 @@ interface TrainingScheduleGroup {
   trainingDates: string[];
   trainingTime?: string | null;
   trainingDateTimes?: Record<string, string> | null;
+  trainingDurationMinutes?: number;
+  trainingFieldId?: string | null;
+  trainingFieldPieceIds?: string[];
+  trainingFieldSelections?: Record<string, TrainingFieldSelection> | null;
 }
 
 interface CustomTrainingGroup {
   id: string;
   name: string;
   playerIds: string[];
+  coachGroupId?: string | null;
   trainingDates: string[];
   trainingTime?: string | null;
   trainingDateTimes?: Record<string, string> | null;
+  trainingDurationMinutes?: number;
+  trainingFieldId?: string | null;
+  trainingFieldPieceIds?: string[];
+  trainingFieldSelections?: Record<string, TrainingFieldSelection> | null;
+}
+
+interface TrainingFieldSelection {
+  trainingFieldId: string | null;
+  trainingFieldPieceIds: string[];
+}
+
+interface TrainingFieldPiece {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+interface TrainingField {
+  id: string;
+  name: string;
+  pieces: TrainingFieldPiece[];
 }
 
 type TrainingTimeMode = "all" | "perDay" | "byWeekday";
+type TrainingDaysStep = "days" | "time" | "field";
 
 interface TrainingTodaySessionItem {
   id: string;
@@ -341,6 +370,53 @@ function getUniformTrainingTime(dates: string[], dateTimes: Record<string, strin
     return "";
   }
   return dates.every((date) => (dateTimes[date] ?? "").trim() === first) ? first : "";
+}
+
+function normalizeTrainingDurationInput(raw: unknown): number {
+  const parsed = Number.parseInt(String(raw ?? "").trim(), 10);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 1440 ? parsed : DEFAULT_TRAINING_DURATION_MINUTES;
+}
+
+function getTrainingDurationFormValue(raw: unknown): string {
+  return String(normalizeTrainingDurationInput(raw));
+}
+
+function normalizeOptionalId(raw: unknown): string | null {
+  const value = String(raw ?? "").trim();
+  return value || null;
+}
+
+function normalizeTrainingFieldSelections(
+  raw: unknown,
+  dates: string[],
+  fallback?: TrainingFieldSelection,
+): Record<string, TrainingFieldSelection> {
+  const allowedDates = new Set(dates);
+  const result: Record<string, TrainingFieldSelection> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [date, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (!allowedDates.has(date) || !value || typeof value !== "object" || Array.isArray(value)) {
+        continue;
+      }
+      const source = value as Record<string, unknown>;
+      const trainingFieldId = normalizeOptionalId(source.trainingFieldId);
+      result[date] = {
+        trainingFieldId,
+        trainingFieldPieceIds: Array.isArray(source.trainingFieldPieceIds)
+          ? source.trainingFieldPieceIds.map(String).filter(Boolean)
+          : [],
+      };
+    }
+  }
+  for (const date of dates) {
+    if (!result[date] && fallback?.trainingFieldId) {
+      result[date] = {
+        trainingFieldId: fallback.trainingFieldId,
+        trainingFieldPieceIds: fallback.trainingFieldPieceIds,
+      };
+    }
+  }
+  return result;
 }
 
 function inferTrainingTimeMode(dates: string[], dateTimes: Record<string, string>): TrainingTimeMode {
@@ -754,6 +830,13 @@ function AttendanceDashboard({
                   trainingDates: td,
                   trainingTime: typeof raw.trainingTime === "string" ? raw.trainingTime.trim() : null,
                   trainingDateTimes: null,
+                  trainingDurationMinutes: normalizeTrainingDurationInput(raw.trainingDurationMinutes),
+                  trainingFieldId: normalizeOptionalId(raw.trainingFieldId),
+                  trainingFieldPieceIds: Array.isArray(raw.trainingFieldPieceIds) ? raw.trainingFieldPieceIds.map(String) : [],
+                  trainingFieldSelections: normalizeTrainingFieldSelections(raw.trainingFieldSelections, td, {
+                    trainingFieldId: normalizeOptionalId(raw.trainingFieldId),
+                    trainingFieldPieceIds: Array.isArray(raw.trainingFieldPieceIds) ? raw.trainingFieldPieceIds.map(String) : [],
+                  }),
                 } satisfies TrainingScheduleGroup;
               })
               .filter((g) => g.id && g.teamGroups.length >= 2)
@@ -2567,9 +2650,14 @@ function AdminMembersPageContent() {
     overdueMinute: "0",
     trainingDates: [] as string[],
     trainingTime: "",
+    trainingDurationMinutes: String(DEFAULT_TRAINING_DURATION_MINUTES),
+    trainingFieldId: "",
+    trainingFieldPieceIds: [] as string[],
   });
   const [trainingDateTimes, setTrainingDateTimes] = useState<Record<string, string>>({});
+  const [trainingFieldSelections, setTrainingFieldSelections] = useState<Record<string, TrainingFieldSelection>>({});
   const [trainingDaysInitialDateTimes, setTrainingDaysInitialDateTimes] = useState<Record<string, string>>({});
+  const [trainingDaysInitialFieldSelections, setTrainingDaysInitialFieldSelections] = useState<Record<string, TrainingFieldSelection>>({});
   const [trainingTimeMode, setTrainingTimeMode] = useState<TrainingTimeMode>("all");
   const reminderTimeValue = `${schedulerForm.reminderHour.padStart(2, "0")}:${schedulerForm.reminderMinute.padStart(2, "0")}`;
   const secondReminderTimeValue = `${schedulerForm.secondReminderHour.padStart(2, "0")}:${schedulerForm.secondReminderMinute.padStart(2, "0")}`;
@@ -2600,11 +2688,19 @@ function AdminMembersPageContent() {
   const [trainingNoteComparisonLoading, setTrainingNoteComparisonLoading] = useState(false);
   const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
   const [trainingDayDetailsOpening, setTrainingDayDetailsOpening] = useState(false);
+  const [trainingDayDurationMinutes, setTrainingDayDurationMinutes] = useState(DEFAULT_TRAINING_DURATION_MINUTES);
+  const [trainingDayField, setTrainingDayField] = useState<{ id: string; name: string; pieces: { id: string; name: string }[] } | null>(null);
+  const [trainingDayFieldPieceIds, setTrainingDayFieldPieceIds] = useState<string[]>([]);
   const [trainingDaysEditorOpen, setTrainingDaysEditorOpen] = useState(false);
   const [trainingDaysEditorLoading, setTrainingDaysEditorLoading] = useState(false);
   const [trainingDaysEditorSaving, setTrainingDaysEditorSaving] = useState(false);
   const [trainingDaysEditorError, setTrainingDaysEditorError] = useState("");
+  const [trainingDaysActiveStep, setTrainingDaysActiveStep] = useState<TrainingDaysStep>("days");
+  const [trainingFieldActiveDate, setTrainingFieldActiveDate] = useState("");
   const [trainingDaysInitialDates, setTrainingDaysInitialDates] = useState<string[]>([]);
+  const [trainingDaysInitialDurationMinutes, setTrainingDaysInitialDurationMinutes] = useState(DEFAULT_TRAINING_DURATION_MINUTES);
+  const [trainingDaysInitialFieldId, setTrainingDaysInitialFieldId] = useState("");
+  const [trainingDaysInitialFieldPieceIds, setTrainingDaysInitialFieldPieceIds] = useState<string[]>([]);
   const [trainingDaysSuccessOpen, setTrainingDaysSuccessOpen] = useState(false);
   const [trainingDaysSuccessMessage, setTrainingDaysSuccessMessage] = useState("");
   const [trainingGroupMode, setTrainingGroupMode] = useState<"team_group" | "custom_group">("team_group");
@@ -2644,6 +2740,16 @@ function AdminMembersPageContent() {
   const [trainingScheduleGroupsLoading, setTrainingScheduleGroupsLoading] = useState(false);
   const [trainingScheduleGroups, setTrainingScheduleGroups] = useState<TrainingScheduleGroup[]>([]);
   const [customTrainingGroups, setCustomTrainingGroups] = useState<CustomTrainingGroup[]>([]);
+  const [trainingFields, setTrainingFields] = useState<TrainingField[]>([]);
+  const [trainingFieldsLoading, setTrainingFieldsLoading] = useState(false);
+  const [fieldConflictsMap, setFieldConflictsMap] = useState<Record<string, { blockedPieceIds: string[]; wholeFieldBlocked: boolean }>>({});
+  const [fieldConflictsLoading, setFieldConflictsLoading] = useState(false);
+  const [trainingFieldModalOpen, setTrainingFieldModalOpen] = useState(false);
+  const [trainingFieldSaving, setTrainingFieldSaving] = useState(false);
+  const [trainingFieldError, setTrainingFieldError] = useState("");
+  const [trainingFieldEditId, setTrainingFieldEditId] = useState<string | null>(null);
+  const [trainingFieldName, setTrainingFieldName] = useState("");
+  const [trainingFieldPieces, setTrainingFieldPieces] = useState<Array<{ id: string | null; name: string }>>([]);
   const schedulerCalendarDates = getNextTrainingCalendarDates();
   const schedulerCalendarDateSet = new Set(schedulerCalendarDates);
   const schedulerCalendarMonths = buildCalendarMonths(schedulerCalendarDates);
@@ -3649,6 +3755,91 @@ function AdminMembersPageContent() {
   const selectedTeamGroup = parseSelectedTeamGroup(resolvedTrainingGroupScope);
   const selectedTrainingGroup = trainingScheduleGroups.find((group) => group.id === selectedTrainingGroupId) ?? null;
   const selectedCustomGroup = customTrainingGroups.find((group) => group.id === selectedTrainingGroupId) ?? null;
+  const fieldConflictsFetchParams = useMemo<string | null>(() => {
+    if (!trainingDaysEditorOpen || trainingDaysEditorMode === "createGroup" || !clubId) return null;
+    const datesArr = [...schedulerForm.trainingDates].filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    if (datesArr.length === 0) return null;
+    const effectiveTimes: Record<string, string> = {};
+    const fallback = trainingTimeMode === "all" ? schedulerForm.trainingTime.trim() : "";
+    for (const date of datesArr) {
+      const t = ((trainingDateTimes as Record<string, unknown>)[date] as string | undefined)?.trim() ?? fallback;
+      if (/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) {
+        effectiveTimes[date] = t;
+      }
+    }
+    const dur = Math.max(1, Math.min(1440, Number.parseInt(schedulerForm.trainingDurationMinutes, 10) || 60));
+    const params = new URLSearchParams();
+    params.set("dates", datesArr.join(","));
+    if (Object.keys(effectiveTimes).length > 0) {
+      params.set("dateTimes", JSON.stringify(effectiveTimes));
+    }
+    params.set("duration", String(dur));
+    if (trainingDaysEditorMode === "trainingGroup" && selectedTrainingGroupId) {
+      params.set("excludeType", "trainingGroup");
+      params.set("excludeId", selectedTrainingGroupId);
+    } else if (trainingDaysEditorMode === "customGroup" && selectedTrainingGroupId) {
+      params.set("excludeType", "customGroup");
+      params.set("excludeId", selectedTrainingGroupId);
+    } else if (trainingDaysEditorMode === "coachGroup" && coachGroupId) {
+      params.set("excludeType", "coachGroup");
+      params.set("excludeId", coachGroupId);
+    } else if (trainingDaysEditorMode === "teamGroup") {
+      if (selectedTeamGroup !== null) {
+        params.set("excludeType", "teamGroup");
+        params.set("excludeTeamGroup", String(selectedTeamGroup));
+        params.set("excludeTeamGroups", String(selectedTeamGroup));
+      } else {
+        params.set("excludeType", "club");
+      }
+    }
+    return params.toString();
+  }, [trainingDaysEditorOpen, trainingDaysEditorMode, clubId, schedulerForm.trainingDates, schedulerForm.trainingDurationMinutes, schedulerForm.trainingTime, trainingDateTimes, trainingTimeMode, selectedTrainingGroupId, coachGroupId, selectedTeamGroup]);
+
+  useEffect(() => {
+    if (!fieldConflictsFetchParams || !clubId) {
+      setFieldConflictsMap({});
+      return;
+    }
+    let cancelled = false;
+    setFieldConflictsLoading(true);
+    const run = async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/field-conflicts?${fieldConflictsFetchParams}`,
+          { cache: "no-store" },
+        );
+        if (cancelled) return;
+        if (!response.ok) {
+          setFieldConflictsMap({});
+          return;
+        }
+        const payload = await response.json() as { occupiedResources?: unknown[] };
+        if (cancelled) return;
+        const occupied = Array.isArray(payload?.occupiedResources) ? payload.occupiedResources as Array<{ date?: string; fieldId: string; pieceIds: string[] }> : [];
+        const map: Record<string, { blockedPieceIds: string[]; wholeFieldBlocked: boolean }> = {};
+        for (const field of trainingFields) {
+          const relevant = occupied.filter((r) => r.fieldId === field.id && (!r.date || r.date === trainingFieldActiveDate));
+          if (relevant.length === 0) continue;
+          const blockedSet = new Set<string>();
+          for (const r of relevant) {
+            if (r.pieceIds.length === 0) {
+              for (const piece of field.pieces) blockedSet.add(piece.id);
+            } else {
+              for (const pid of r.pieceIds) blockedSet.add(pid);
+            }
+          }
+          map[field.id] = { blockedPieceIds: Array.from(blockedSet), wholeFieldBlocked: true };
+        }
+        setFieldConflictsMap(map);
+      } catch {
+        if (!cancelled) setFieldConflictsMap({});
+      } finally {
+        if (!cancelled) setFieldConflictsLoading(false);
+      }
+    };
+    void run();
+    return () => { cancelled = true; };
+  }, [fieldConflictsFetchParams, clubId, trainingFields, trainingFieldActiveDate]);
   const currentCoachGroupName = coachGroupId
     ? (coachGroups.find((group) => group.id === coachGroupId)?.name.trim() ?? "")
     : "";
@@ -3693,6 +3884,21 @@ function AdminMembersPageContent() {
     selectedTeamGroup === null
       ? []
       : trainingScheduleGroups.filter((group) => group.teamGroups.includes(selectedTeamGroup));
+  const activeTrainingFieldSelection = trainingFieldSelections[trainingFieldActiveDate] ?? { trainingFieldId: "", trainingFieldPieceIds: [] };
+  const selectedActiveTrainingField = trainingFields.find((field) => field.id === activeTrainingFieldSelection.trainingFieldId) ?? null;
+  const hasMissingTrainingField =
+    trainingDaysEditorMode !== "createGroup" &&
+    trainingFields.length > 0 &&
+    schedulerForm.trainingDates.length > 0 &&
+    schedulerForm.trainingDates.some((date) => !trainingFieldSelections[date]?.trainingFieldId);
+  const missingTrainingFieldDates = schedulerForm.trainingDates
+    .map((value) => String(value ?? "").trim())
+    .filter((date) => schedulerCalendarDateSet.has(date) && !trainingFieldSelections[date]?.trainingFieldId)
+    .sort((a, b) => a.localeCompare(b));
+  const missingTrainingFieldMessage =
+    missingTrainingFieldDates.length === 0
+      ? "Трябва да изберете терен"
+      : `Трябва да изберете терен за: ${missingTrainingFieldDates.map((date) => formatIsoDateForDisplay(date)).join(", ")}`;
   const normalizedTrainingDaysSelection = schedulerForm.trainingDates
     .map((value) => String(value ?? "").trim())
     .filter((value) => schedulerCalendarDateSet.has(value))
@@ -3714,16 +3920,32 @@ function AdminMembersPageContent() {
   const hasMissingTrainingTime =
     normalizedTrainingDaysSelection.length > 0 &&
     normalizedTrainingDaysSelection.some((date) => !TRAINING_TIME_REGEX.test((normalizedTrainingDateTimesSelection[date] ?? "").trim()));
-  const normalizedTrainingDateTimesSelectionKey = normalizedTrainingDaysSelection
-    .map((date) => `${date}:${normalizedTrainingDateTimesSelection[date] ?? ""}`)
-    .join("|");
-  const normalizedTrainingDateTimesInitialKey = normalizedTrainingDaysInitial
-    .map((date) => `${date}:${normalizedTrainingDateTimesInitial[date] ?? ""}`)
-    .join("|");
-  const isTrainingDaysScheduleUnchanged =
+  const parsedTrainingDurationSelection = Number.parseInt(schedulerForm.trainingDurationMinutes.trim(), 10);
+  const normalizedTrainingDurationSelection = Number.isInteger(parsedTrainingDurationSelection)
+    ? parsedTrainingDurationSelection
+    : DEFAULT_TRAINING_DURATION_MINUTES;
+  const hasInvalidTrainingDuration =
     trainingDaysEditorMode !== "createGroup" &&
-    normalizedTrainingDaysSelection.join("|") === normalizedTrainingDaysInitial.join("|") &&
-    normalizedTrainingDateTimesSelectionKey === normalizedTrainingDateTimesInitialKey;
+    (!/^\d+$/.test(schedulerForm.trainingDurationMinutes.trim()) ||
+      normalizedTrainingDurationSelection < 1 ||
+      normalizedTrainingDurationSelection > 1440);
+  const canShowTrainingDaysTimeStep =
+    trainingDaysEditorMode !== "createGroup" &&
+    normalizedTrainingDaysSelection.length > 0;
+  const canShowTrainingDaysFieldStep =
+    canShowTrainingDaysTimeStep &&
+    !hasMissingTrainingTime &&
+    !hasInvalidTrainingDuration;
+  const effectiveTrainingDaysActiveStep: TrainingDaysStep =
+    trainingDaysEditorMode === "createGroup"
+      ? "days"
+      : trainingDaysActiveStep === "field" && !canShowTrainingDaysFieldStep
+        ? canShowTrainingDaysTimeStep
+          ? "time"
+          : "days"
+        : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
+          ? "days"
+          : trainingDaysActiveStep;
   const trainingWeekdayBuckets = Array.from(
     new Set(
       normalizedTrainingDaysSelection
@@ -3731,6 +3953,67 @@ function AdminMembersPageContent() {
         .filter((weekday) => Number.isInteger(weekday) && weekday >= 0 && weekday <= 6),
     ),
   ).sort((a, b) => a - b);
+  const trainingDaysSummaryText =
+    normalizedTrainingDaysSelection.length === 0
+      ? "Няма избрани дни"
+      : normalizedTrainingDaysSelection.length <= 4
+        ? normalizedTrainingDaysSelection.map((date) => formatIsoDateForDisplay(date)).join(", ")
+        : `${normalizedTrainingDaysSelection.slice(0, 4).map((date) => formatIsoDateForDisplay(date)).join(", ")} + още ${normalizedTrainingDaysSelection.length - 4}`;
+  const trainingTimeSummaryText = hasMissingTrainingTime
+    ? "Няма въведен валиден час"
+    : trainingTimeMode === "all"
+      ? `Всички тренировки: ${schedulerForm.trainingTime.trim()}`
+      : trainingTimeMode === "byWeekday"
+        ? `По седмични дни: ${trainingWeekdayBuckets.map((weekdayIndex) => {
+            const weekdayDate = normalizedTrainingDaysSelection.find(
+              (date) => getWeekdayMondayFirstIndex(date) === weekdayIndex,
+            );
+            const weekdayTime = weekdayDate ? normalizedTrainingDateTimesSelection[weekdayDate] : "";
+            return `${TRAINING_WEEKDAY_LONG_BG[weekdayIndex] ?? `#${weekdayIndex + 1}`} ${weekdayTime}`;
+          }).join(", ")}`
+        : normalizedTrainingDaysSelection.length <= 3
+          ? `Индивидуално: ${normalizedTrainingDaysSelection.map((date) => `${formatIsoDateForDisplay(date)} ${normalizedTrainingDateTimesSelection[date] ?? ""}`).join(", ")}`
+          : `Индивидуални часове за ${normalizedTrainingDaysSelection.length} тренировки`;
+  const trainingDurationSummaryText = hasInvalidTrainingDuration
+    ? "Невалидна продължителност"
+    : `${normalizedTrainingDurationSelection} мин.`;
+  const primaryTrainingFieldSelection =
+    normalizedTrainingDaysSelection.map((date) => trainingFieldSelections[date]).find((selection) => selection?.trainingFieldId) ??
+    { trainingFieldId: null, trainingFieldPieceIds: [] };
+  const showTrainingStepBack =
+    trainingDaysEditorMode !== "createGroup" &&
+    effectiveTrainingDaysActiveStep !== "days";
+  const showTrainingStepNext =
+    trainingDaysEditorMode !== "createGroup" &&
+    effectiveTrainingDaysActiveStep !== "field";
+  const isTrainingStepNextDisabled =
+    trainingDaysEditorSaving ||
+    (effectiveTrainingDaysActiveStep === "days" && !canShowTrainingDaysTimeStep) ||
+    (effectiveTrainingDaysActiveStep === "time" && !canShowTrainingDaysFieldStep);
+  const normalizedTrainingDateTimesSelectionKey = normalizedTrainingDaysSelection
+    .map((date) => `${date}:${normalizedTrainingDateTimesSelection[date] ?? ""}`)
+    .join("|");
+  const normalizedTrainingDateTimesInitialKey = normalizedTrainingDaysInitial
+    .map((date) => `${date}:${normalizedTrainingDateTimesInitial[date] ?? ""}`)
+    .join("|");
+  const normalizedTrainingFieldSelectionsKey = normalizedTrainingDaysSelection
+    .map((date) => {
+      const selection = trainingFieldSelections[date];
+      return `${date}:${selection?.trainingFieldId ?? ""}:${[...(selection?.trainingFieldPieceIds ?? [])].sort().join(",")}`;
+    })
+    .join("|");
+  const normalizedTrainingFieldSelectionsInitialKey = normalizedTrainingDaysInitial
+    .map((date) => {
+      const selection = trainingDaysInitialFieldSelections[date];
+      return `${date}:${selection?.trainingFieldId ?? ""}:${[...(selection?.trainingFieldPieceIds ?? [])].sort().join(",")}`;
+    })
+    .join("|");
+  const isTrainingDaysScheduleUnchanged =
+    trainingDaysEditorMode !== "createGroup" &&
+    normalizedTrainingDaysSelection.join("|") === normalizedTrainingDaysInitial.join("|") &&
+    normalizedTrainingDateTimesSelectionKey === normalizedTrainingDateTimesInitialKey &&
+    normalizedTrainingDurationSelection === trainingDaysInitialDurationMinutes &&
+    normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey;
   const activeMembersCount = members.filter((m) => m.isActive).length;
   const inactiveMembers = members.filter((m) => !m.isActive);
 
@@ -3770,6 +4053,16 @@ function AdminMembersPageContent() {
       }
       return changed ? next : prev;
     });
+    setTrainingFieldSelections((prev) => {
+      const next: Record<string, TrainingFieldSelection> = {};
+      for (const date of schedulerForm.trainingDates) {
+        if (prev[date]) next[date] = prev[date];
+      }
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+    if (schedulerForm.trainingDates.length > 0 && !schedulerForm.trainingDates.includes(trainingFieldActiveDate)) {
+      setTrainingFieldActiveDate(schedulerForm.trainingDates[0]);
+    }
   }, [schedulerForm.trainingDates]);
 
   useEffect(() => {
@@ -3957,6 +4250,9 @@ function AdminMembersPageContent() {
         overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: resolvedTrainingDates,
         trainingTime: resolvedUniformTime,
+        trainingDurationMinutes: getTrainingDurationFormValue(payload.trainingDurationMinutes),
+        trainingFieldId: normalizeOptionalId(payload.trainingFieldId) ?? "",
+        trainingFieldPieceIds: Array.isArray(payload.trainingFieldPieceIds) ? payload.trainingFieldPieceIds.map(String) : [],
       });
       setSecondReminderEnabled(hasSecondReminder);
       setTrainingDateTimes(resolvedDateTimes);
@@ -4008,6 +4304,13 @@ function AdminMembersPageContent() {
               trainingDates,
               typeof raw.trainingTime === "string" ? raw.trainingTime : null,
             ),
+            trainingDurationMinutes: normalizeTrainingDurationInput(raw.trainingDurationMinutes),
+            trainingFieldId: normalizeOptionalId(raw.trainingFieldId),
+            trainingFieldPieceIds: Array.isArray(raw.trainingFieldPieceIds) ? raw.trainingFieldPieceIds.map(String) : [],
+            trainingFieldSelections: normalizeTrainingFieldSelections(raw.trainingFieldSelections, trainingDates, {
+              trainingFieldId: normalizeOptionalId(raw.trainingFieldId),
+              trainingFieldPieceIds: Array.isArray(raw.trainingFieldPieceIds) ? raw.trainingFieldPieceIds.map(String) : [],
+            }),
           } satisfies TrainingScheduleGroup;
         }).filter((group) => group.id && group.teamGroups.length >= 2)
         : [];
@@ -4028,11 +4331,55 @@ function AdminMembersPageContent() {
     }
   };
 
+  const loadTrainingFields = async (): Promise<TrainingField[]> => {
+    if (!clubId) return [];
+    setTrainingFieldsLoading(true);
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/fields`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error("Неуспешно зареждане на терените.");
+      }
+      const payload: unknown = await response.json();
+      const fields = Array.isArray(payload)
+        ? payload.map((item) => {
+          const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+          const pieces = Array.isArray(raw.pieces)
+            ? raw.pieces.map((piece) => {
+              const pieceRaw = typeof piece === "object" && piece !== null ? (piece as Record<string, unknown>) : {};
+              return {
+                id: String(pieceRaw.id ?? ""),
+                name: String(pieceRaw.name ?? "").trim(),
+                sortOrder: Number.isInteger(pieceRaw.sortOrder) ? Number(pieceRaw.sortOrder) : 0,
+              };
+            }).filter((piece) => piece.id && piece.name)
+            : [];
+          return {
+            id: String(raw.id ?? ""),
+            name: String(raw.name ?? "").trim(),
+            pieces: pieces.sort((a, b) => a.sortOrder - b.sortOrder),
+          } satisfies TrainingField;
+        }).filter((field) => field.id && field.name)
+        : [];
+      setTrainingFields(fields);
+      return fields;
+    } catch (error) {
+      setTrainingDaysEditorError(error instanceof Error ? error.message : "Възникна грешка.");
+      setTrainingFields([]);
+      return [];
+    } finally {
+      setTrainingFieldsLoading(false);
+    }
+  };
+
   const loadCustomTrainingGroups = async (): Promise<CustomTrainingGroup[]> => {
     if (!clubId) return [];
     setTrainingScheduleGroupsLoading(true);
     try {
-      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups`, {
+      const search = new URLSearchParams();
+      if (coachGroupId) search.set("coachGroupId", coachGroupId);
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups${search.size ? `?${search.toString()}` : ""}`, {
         cache: "no-store",
       });
       if (!response.ok) {
@@ -4054,6 +4401,7 @@ function AdminMembersPageContent() {
           return {
             id: String(raw.id ?? ""),
             name: String(raw.name ?? "").trim(),
+            coachGroupId: normalizeOptionalId(raw.coachGroupId),
             playerIds,
             trainingDates,
             trainingTime:
@@ -4065,6 +4413,13 @@ function AdminMembersPageContent() {
               trainingDates,
               typeof raw.trainingTime === "string" ? raw.trainingTime : null,
             ),
+            trainingDurationMinutes: normalizeTrainingDurationInput(raw.trainingDurationMinutes),
+            trainingFieldId: normalizeOptionalId(raw.trainingFieldId),
+            trainingFieldPieceIds: Array.isArray(raw.trainingFieldPieceIds) ? raw.trainingFieldPieceIds.map(String) : [],
+            trainingFieldSelections: normalizeTrainingFieldSelections(raw.trainingFieldSelections, trainingDates, {
+              trainingFieldId: normalizeOptionalId(raw.trainingFieldId),
+              trainingFieldPieceIds: Array.isArray(raw.trainingFieldPieceIds) ? raw.trainingFieldPieceIds.map(String) : [],
+            }),
           } satisfies CustomTrainingGroup;
         }).filter((group) => group.id && group.name)
         : [];
@@ -4212,6 +4567,7 @@ function AdminMembersPageContent() {
           body: JSON.stringify({
             name,
             playerIds: trainingGroupCreatePlayerIds,
+            coachGroupId: coachGroupId || null,
           }),
         });
         if (!response.ok) {
@@ -4403,15 +4759,23 @@ function AdminMembersPageContent() {
     }
 
     setTrainingDaysEditorMode(mode);
+    setTrainingDaysActiveStep("days");
     setTrainingDaysEditorGroups([]);
     setTrainingDaysEditorGroupName("");
     setTrainingDaysEditorCreateOpen(true);
     setTrainingDaysEditorError("");
     setTrainingDaysInitialDates([]);
     setTrainingDaysInitialDateTimes({});
+    setTrainingDaysInitialFieldSelections({});
+    setTrainingDaysInitialDurationMinutes(DEFAULT_TRAINING_DURATION_MINUTES);
+    setTrainingDaysInitialFieldId("");
+    setTrainingDaysInitialFieldPieceIds([]);
     setTrainingDateTimes({});
+    setTrainingFieldSelections({});
+    setTrainingFieldActiveDate("");
     setTrainingTimeMode("all");
     setTrainingDaysEditorLoading(true);
+    await loadTrainingFields();
     const loadedGroups = isCustomTrainingGroupMode ? [] : await loadTrainingScheduleGroups();
     const loadedCustomGroups = isCustomTrainingGroupMode ? await loadCustomTrainingGroups() : [];
     try {
@@ -4433,14 +4797,28 @@ function AdminMembersPageContent() {
           resolvedGroup.trainingTime ?? null,
         );
         const resolvedUniformTime = getUniformTrainingTime(nextWindowDates, resolvedDateTimes);
+        const resolvedFieldSelections = normalizeTrainingFieldSelections(
+          resolvedGroup.trainingFieldSelections,
+          nextWindowDates,
+          { trainingFieldId: resolvedGroup.trainingFieldId ?? null, trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [] },
+        );
         setSchedulerForm((prev) => ({
           ...prev,
           trainingDates: nextWindowDates,
           trainingTime: resolvedUniformTime,
+          trainingDurationMinutes: getTrainingDurationFormValue(resolvedGroup.trainingDurationMinutes),
+          trainingFieldId: resolvedGroup.trainingFieldId ?? "",
+          trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [],
         }));
         setTrainingDaysInitialDates(nextWindowDates);
+        setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(resolvedGroup.trainingDurationMinutes));
+        setTrainingDaysInitialFieldId(resolvedGroup.trainingFieldId ?? "");
+        setTrainingDaysInitialFieldPieceIds(resolvedGroup.trainingFieldPieceIds ?? []);
         setTrainingDateTimes(resolvedDateTimes);
         setTrainingDaysInitialDateTimes(resolvedDateTimes);
+        setTrainingFieldSelections(resolvedFieldSelections);
+        setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
+        setTrainingFieldActiveDate(nextWindowDates[0] ?? "");
         setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
         setTrainingDaysEditorOpen(true);
         return;
@@ -4463,14 +4841,28 @@ function AdminMembersPageContent() {
           resolvedGroup.trainingTime ?? null,
         );
         const resolvedUniformTime = getUniformTrainingTime(nextWindowDates, resolvedDateTimes);
+        const resolvedFieldSelections = normalizeTrainingFieldSelections(
+          resolvedGroup.trainingFieldSelections,
+          nextWindowDates,
+          { trainingFieldId: resolvedGroup.trainingFieldId ?? null, trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [] },
+        );
         setSchedulerForm((prev) => ({
           ...prev,
           trainingDates: nextWindowDates,
           trainingTime: resolvedUniformTime,
+          trainingDurationMinutes: getTrainingDurationFormValue(resolvedGroup.trainingDurationMinutes),
+          trainingFieldId: resolvedGroup.trainingFieldId ?? "",
+          trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [],
         }));
         setTrainingDaysInitialDates(nextWindowDates);
+        setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(resolvedGroup.trainingDurationMinutes));
+        setTrainingDaysInitialFieldId(resolvedGroup.trainingFieldId ?? "");
+        setTrainingDaysInitialFieldPieceIds(resolvedGroup.trainingFieldPieceIds ?? []);
         setTrainingDateTimes(resolvedDateTimes);
         setTrainingDaysInitialDateTimes(resolvedDateTimes);
+        setTrainingFieldSelections(resolvedFieldSelections);
+        setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
+        setTrainingFieldActiveDate(nextWindowDates[0] ?? "");
         setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
         setTrainingDaysEditorOpen(true);
         return;
@@ -4498,14 +4890,28 @@ function AdminMembersPageContent() {
           typeof cgPayload.trainingTime === "string" ? cgPayload.trainingTime : null,
         );
         const resolvedUniformTime = getUniformTrainingTime(nextWindowDates, resolvedDateTimes);
+        const resolvedFieldSelections = normalizeTrainingFieldSelections(
+          cgPayload.trainingFieldSelections,
+          nextWindowDates,
+          { trainingFieldId: normalizeOptionalId(cgPayload.trainingFieldId), trainingFieldPieceIds: Array.isArray(cgPayload.trainingFieldPieceIds) ? cgPayload.trainingFieldPieceIds.map(String) : [] },
+        );
         setSchedulerForm((prev) => ({
           ...prev,
           trainingDates: nextWindowDates,
           trainingTime: resolvedUniformTime,
+          trainingDurationMinutes: getTrainingDurationFormValue(cgPayload.trainingDurationMinutes),
+          trainingFieldId: normalizeOptionalId(cgPayload.trainingFieldId) ?? "",
+          trainingFieldPieceIds: Array.isArray(cgPayload.trainingFieldPieceIds) ? cgPayload.trainingFieldPieceIds.map(String) : [],
         }));
         setTrainingDaysInitialDates(nextWindowDates);
+        setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(cgPayload.trainingDurationMinutes));
+        setTrainingDaysInitialFieldId(normalizeOptionalId(cgPayload.trainingFieldId) ?? "");
+        setTrainingDaysInitialFieldPieceIds(Array.isArray(cgPayload.trainingFieldPieceIds) ? cgPayload.trainingFieldPieceIds.map(String) : []);
         setTrainingDateTimes(resolvedDateTimes);
         setTrainingDaysInitialDateTimes(resolvedDateTimes);
+        setTrainingFieldSelections(resolvedFieldSelections);
+        setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
+        setTrainingFieldActiveDate(nextWindowDates[0] ?? "");
         setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
         setTrainingDaysEditorOpen(true);
         return;
@@ -4540,6 +4946,11 @@ function AdminMembersPageContent() {
           typeof payload.trainingTime === "string" ? payload.trainingTime : null,
         );
       const resolvedUniformTime = getUniformTrainingTime(resolvedTrainingDates, resolvedDateTimes);
+      const resolvedFieldSelections = normalizeTrainingFieldSelections(
+        payload.trainingFieldSelections,
+        resolvedTrainingDates,
+        { trainingFieldId: normalizeOptionalId(payload.trainingFieldId), trainingFieldPieceIds: Array.isArray(payload.trainingFieldPieceIds) ? payload.trainingFieldPieceIds.map(String) : [] },
+      );
       const hasSecondReminder =
         Number.isInteger(payload.secondReminderDay) &&
         Number.isInteger(payload.secondReminderHour) &&
@@ -4556,11 +4967,20 @@ function AdminMembersPageContent() {
         overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: resolvedTrainingDates,
         trainingTime: resolvedUniformTime,
+        trainingDurationMinutes: getTrainingDurationFormValue(payload.trainingDurationMinutes),
+        trainingFieldId: normalizeOptionalId(payload.trainingFieldId) ?? "",
+        trainingFieldPieceIds: Array.isArray(payload.trainingFieldPieceIds) ? payload.trainingFieldPieceIds.map(String) : [],
       });
       setSecondReminderEnabled(hasSecondReminder);
       setTrainingDaysInitialDates(resolvedTrainingDates);
+      setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(payload.trainingDurationMinutes));
+      setTrainingDaysInitialFieldId(normalizeOptionalId(payload.trainingFieldId) ?? "");
+      setTrainingDaysInitialFieldPieceIds(Array.isArray(payload.trainingFieldPieceIds) ? payload.trainingFieldPieceIds.map(String) : []);
       setTrainingDateTimes(resolvedDateTimes);
       setTrainingDaysInitialDateTimes(resolvedDateTimes);
+      setTrainingFieldSelections(resolvedFieldSelections);
+      setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
+      setTrainingFieldActiveDate(resolvedTrainingDates[0] ?? "");
       setTrainingTimeMode(inferTrainingTimeMode(resolvedTrainingDates, resolvedDateTimes));
       setTrainingDaysEditorOpen(true);
     } catch (error) {
@@ -4574,6 +4994,12 @@ function AdminMembersPageContent() {
     const normalizedTrainingTime = schedulerForm.trainingTime.trim();
     if (hasMissingTrainingTime) {
       throw new Error("Въведете валиден час на тренировка (HH:mm).");
+    }
+    if (hasInvalidTrainingDuration) {
+      throw new Error("Въведете продължителност на тренировката между 1 и 1440 минути.");
+    }
+    if (hasMissingTrainingField) {
+      throw new Error(missingTrainingFieldMessage);
     }
     const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/scheduler`, {
       method: "PUT",
@@ -4590,6 +5016,10 @@ function AdminMembersPageContent() {
         overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
         trainingDates: schedulerForm.trainingDates,
         trainingTime: normalizedTrainingTime || null,
+        trainingDurationMinutes: normalizedTrainingDurationSelection,
+        trainingFieldId: primaryTrainingFieldSelection.trainingFieldId || null,
+        trainingFieldPieceIds: primaryTrainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
         trainingDateTimes: normalizeTrainingDateTimes(
           trainingDateTimes,
           schedulerForm.trainingDates,
@@ -4640,6 +5070,12 @@ function AdminMembersPageContent() {
         if (hasMissingTrainingTime) {
           throw new Error("Въведете валиден час на тренировка (HH:mm).");
         }
+        if (hasInvalidTrainingDuration) {
+          throw new Error("Въведете продължителност на тренировката между 1 и 1440 минути.");
+        }
+        if (hasMissingTrainingField) {
+          throw new Error(missingTrainingFieldMessage);
+        }
         const nextTrainingDates = schedulerForm.trainingDates
           .map((value) => String(value ?? "").trim())
           .filter((value) => schedulerCalendarDateSet.has(value))
@@ -4657,7 +5093,9 @@ function AdminMembersPageContent() {
           .join("|");
         if (
           nextTrainingDates.join("|") === normalizedTrainingDaysInitial.join("|") &&
-          nextTrainingDateTimesKey === initialTrainingDateTimesKey
+          nextTrainingDateTimesKey === initialTrainingDateTimesKey &&
+          normalizedTrainingDurationSelection === trainingDaysInitialDurationMinutes &&
+          normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey
         ) {
           throw new Error("Графикът е същият като предишния.");
         }
@@ -4673,6 +5111,10 @@ function AdminMembersPageContent() {
             body: JSON.stringify({
               trainingDates: nextTrainingDates,
               trainingTime: normalizedTrainingTime || null,
+              trainingDurationMinutes: normalizedTrainingDurationSelection,
+              trainingFieldId: primaryTrainingFieldSelection.trainingFieldId || null,
+              trainingFieldPieceIds: primaryTrainingFieldSelection.trainingFieldPieceIds,
+              trainingFieldSelections,
               trainingDateTimes: normalizeTrainingDateTimes(
                 trainingDateTimes,
                 nextTrainingDates,
@@ -4710,7 +5152,8 @@ function AdminMembersPageContent() {
 
       if (
         normalizedTrainingDaysSelection.join("|") === normalizedTrainingDaysInitial.join("|") &&
-        normalizedTrainingDateTimesSelectionKey === normalizedTrainingDateTimesInitialKey
+        normalizedTrainingDateTimesSelectionKey === normalizedTrainingDateTimesInitialKey &&
+        normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey
       ) {
         throw new Error("Графикът е същият като предишния.");
       }
@@ -4760,12 +5203,98 @@ function AdminMembersPageContent() {
     }
   };
 
+  const openTrainingFieldModal = (field?: TrainingField) => {
+    setTrainingFieldError("");
+    if (field) {
+      setTrainingFieldEditId(field.id);
+      setTrainingFieldName(field.name);
+      setTrainingFieldPieces(field.pieces.map((piece) => ({ id: piece.id, name: piece.name })));
+    } else {
+      setTrainingFieldEditId(null);
+      setTrainingFieldName("");
+      setTrainingFieldPieces([]);
+    }
+    setTrainingFieldModalOpen(true);
+  };
+
+  const saveTrainingField = async () => {
+    if (!clubId || trainingFieldSaving) return;
+    setTrainingFieldSaving(true);
+    setTrainingFieldError("");
+    try {
+      const endpoint = trainingFieldEditId
+        ? `/api/admin/clubs/${encodeURIComponent(clubId)}/fields/${encodeURIComponent(trainingFieldEditId)}`
+        : `/api/admin/clubs/${encodeURIComponent(clubId)}/fields`;
+      const response = await fetch(endpoint, {
+        method: trainingFieldEditId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trainingFieldName.trim(),
+          pieces: trainingFieldEditId
+            ? trainingFieldPieces.map((piece) => ({ id: piece.id, name: piece.name.trim() }))
+            : trainingFieldPieces.map((piece) => piece.name.trim()),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof payload?.error === "string" ? payload.error : "Неуспешно запазване на терена.");
+      }
+      const fields = await loadTrainingFields();
+      const savedId = typeof payload?.id === "string" ? payload.id : trainingFieldEditId;
+      if (savedId && (!schedulerForm.trainingFieldId || schedulerForm.trainingFieldId === trainingFieldEditId)) {
+        const savedField = fields.find((field) => field.id === savedId);
+        setSchedulerForm((prev) => ({
+          ...prev,
+          trainingFieldId: savedId,
+          trainingFieldPieceIds: savedField?.pieces.length
+            ? prev.trainingFieldPieceIds.filter((id) => savedField.pieces.some((p) => p.id === id))
+            : [],
+        }));
+      }
+      setTrainingFieldModalOpen(false);
+    } catch (error) {
+      setTrainingFieldError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingFieldSaving(false);
+    }
+  };
+
+  const deleteTrainingField = async (fieldId: string) => {
+    if (!clubId || trainingFieldSaving) return;
+    setTrainingFieldSaving(true);
+    setTrainingFieldError("");
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/fields/${encodeURIComponent(fieldId)}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof payload?.error === "string" ? payload.error : "Неуспешно изтриване на терена.");
+      }
+      await loadTrainingFields();
+      setSchedulerForm((prev) => prev.trainingFieldId === fieldId
+        ? { ...prev, trainingFieldId: "", trainingFieldPieceIds: [] }
+        : prev);
+      setTrainingFieldModalOpen(false);
+    } catch (error) {
+      setTrainingFieldError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingFieldSaving(false);
+    }
+  };
+
   const saveSchedulerSettings = async () => {
     if (!clubId || schedulerSettingsSaving) return;
     setSchedulerSettingsSaving(true);
     setSchedulerSettingsError("");
     try {
       const normalizedTrainingTime = schedulerForm.trainingTime.trim();
+      if (hasInvalidTrainingDuration) {
+        throw new Error("Въведете продължителност на тренировката между 1 и 1440 минути.");
+      }
+      if (hasMissingTrainingField) {
+        throw new Error(missingTrainingFieldMessage);
+      }
       const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/scheduler`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -4781,6 +5310,10 @@ function AdminMembersPageContent() {
           overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
           trainingDates: schedulerForm.trainingDates,
           trainingTime: normalizedTrainingTime || null,
+          trainingDurationMinutes: normalizedTrainingDurationSelection,
+          trainingFieldId: primaryTrainingFieldSelection.trainingFieldId || null,
+          trainingFieldPieceIds: primaryTrainingFieldSelection.trainingFieldPieceIds,
+          trainingFieldSelections,
           trainingDateTimes: normalizeTrainingDateTimes(
             trainingDateTimes,
             schedulerForm.trainingDates,
@@ -5017,12 +5550,40 @@ function AdminMembersPageContent() {
         }
         return resolvedDate ? [resolvedDate] : [];
       });
+      setTrainingDayDurationMinutes(
+        typeof payload?.trainingDurationMinutes === "number" && payload.trainingDurationMinutes > 0
+          ? payload.trainingDurationMinutes
+          : DEFAULT_TRAINING_DURATION_MINUTES,
+      );
+      const rawField = payload?.trainingField;
+      setTrainingDayField(
+        rawField && typeof rawField === "object" && rawField !== null
+          ? {
+              id: String((rawField as Record<string, unknown>).id ?? ""),
+              name: String((rawField as Record<string, unknown>).name ?? ""),
+              pieces: Array.isArray((rawField as Record<string, unknown>).pieces)
+                ? ((rawField as Record<string, unknown>).pieces as unknown[]).map((p) => {
+                    const rp = typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {};
+                    return { id: String(rp.id ?? ""), name: String(rp.name ?? "") };
+                  })
+                : [],
+            }
+          : null,
+      );
+      setTrainingDayFieldPieceIds(
+        Array.isArray(payload?.trainingFieldPieceIds)
+          ? (payload.trainingFieldPieceIds as unknown[]).map(String)
+          : [],
+      );
     } catch (error) {
       setTrainingAttendancePlayers([]);
       setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
       setTrainingUpcomingDates([]);
       setTrainingNote("");
       setTrainingNoteTargetDates([]);
+      setTrainingDayDurationMinutes(DEFAULT_TRAINING_DURATION_MINUTES);
+      setTrainingDayField(null);
+      setTrainingDayFieldPieceIds([]);
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
       setTrainingAttendanceLoading(false);
@@ -7445,7 +8006,7 @@ function AdminMembersPageContent() {
                 <XIcon />
               </button>
             </h2>
-            <div className="amp-modal-body" style={{ position: "relative" }}>
+            <div className="amp-modal-body" style={{ position: "relative", display: "flex", flexDirection: "column" }}>
               {trainingDaysEditorSaving && (
                 <div className="amp-modal-loading-overlay" style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(16,16,20,0.9)" }}>
                   <div className="amp-loading" style={{ minHeight: 200 }}>
@@ -7553,6 +8114,37 @@ function AdminMembersPageContent() {
                     </span>
                   </div>
                   {trainingDaysEditorMode !== "createGroup" && (
+                    <div className="amp-training-stepper" aria-label="Стъпки за тренировъчен график" style={{ order: 0 }}>
+                      <button
+                        type="button"
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "days" ? " is-active" : " is-complete"}`}
+                        onClick={() => setTrainingDaysActiveStep("days")}
+                        disabled={trainingDaysEditorSaving}
+                      >
+                        <span className="amp-training-step-index">1</span>
+                        Дни
+                      </button>
+                      <button
+                        type="button"
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "time" ? " is-active" : ""}${canShowTrainingDaysFieldStep ? " is-complete" : ""}`}
+                        onClick={() => setTrainingDaysActiveStep("time")}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysTimeStep}
+                      >
+                        <span className="amp-training-step-index">2</span>
+                        Час
+                      </button>
+                      <button
+                        type="button"
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}`}
+                        onClick={() => setTrainingDaysActiveStep("field")}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysFieldStep}
+                      >
+                        <span className="amp-training-step-index">3</span>
+                        Терен
+                      </button>
+                    </div>
+                  )}
+                  {trainingDaysEditorMode !== "createGroup" && (
                     <label className="amp-edit-field" style={{ marginTop: "8px", display: "none", textAlign: "center" }}>
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Час на тренировка (HH:mm)</span>
                       <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
@@ -7568,8 +8160,26 @@ function AdminMembersPageContent() {
                       </div>
                     </label>
                   )}
-                  {trainingDaysEditorMode !== "createGroup" && (
-                    <div className="amp-training-time-panel" style={{ marginTop: "8px", textAlign: "center" }}>
+                  {trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep === "time" && (
+                    <div className="amp-training-step-summary" style={{ order: 1 }}>
+                      <span className="amp-training-step-summary-label">Избрани дни</span>
+                      <span className="amp-training-step-summary-value">{trainingDaysSummaryText}</span>
+                    </div>
+                  )}
+                  {trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep === "field" && (
+                    <div className="amp-training-step-summary" style={{ order: 1 }}>
+                      <div>
+                        <span className="amp-training-step-summary-label">Избрани дни</span>
+                        <span className="amp-training-step-summary-value">{trainingDaysSummaryText}</span>
+                      </div>
+                      <div>
+                        <span className="amp-training-step-summary-label">Час и продължителност</span>
+                        <span className="amp-training-step-summary-value">{trainingTimeSummaryText} · {trainingDurationSummaryText}</span>
+                      </div>
+                    </div>
+                  )}
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && (
+                    <div className="amp-training-time-panel" style={{ marginTop: "8px", textAlign: "center", order: 2 }}>
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Задай час за:</span>
                       <div className="amp-pills amp-training-time-mode-buttons" style={{ justifyContent: "center" }}>
                         <button
@@ -7599,9 +8209,9 @@ function AdminMembersPageContent() {
                       </div>
                     </div>
                   )}
-                  {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "all" && (
-                    <label className="amp-edit-field" style={{ marginTop: "8px", textAlign: "center" }}>
-                      <span className="amp-lbl" style={{ textAlign: "center" }}>Час на тренировка (HH:mm)</span>
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && trainingTimeMode === "all" && (
+                    <label className="amp-edit-field" style={{ marginTop: "8px", textAlign: "center", order: 2 }}>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Час на тренировка</span>
                       <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
                         <input
                           className="amp-inner-time-input"
@@ -7615,8 +8225,25 @@ function AdminMembersPageContent() {
                       </div>
                     </label>
                   )}
-                  {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "perDay" && (
-                    <div className="amp-training-time-list" style={{ marginTop: "8px" }}>
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && (
+                      <label className="amp-edit-field" style={{ marginTop: "8px", textAlign: "center", order: 2 }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Продължителност на тренировката (минути)</span>
+                        <input
+                            style={{ textAlign: "center" }}
+                            className="amp-edit-input"
+                            type="number"
+                            min={1}
+                            max={1440}
+                            step={5}
+                            value={schedulerForm.trainingDurationMinutes}
+                            onChange={(e) => setSchedulerForm((prev) => ({ ...prev, trainingDurationMinutes: e.target.value }))}
+                            required
+                            disabled={trainingDaysEditorSaving}
+                        />
+                      </label>
+                  )}
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && trainingTimeMode === "perDay" && (
+                    <div className="amp-training-time-list" style={{ marginTop: "8px", order: 2 }}>
                       {normalizedTrainingDaysSelection.length === 0 ? (
                         <span className="amp-lbl" style={{ opacity: 0.78, textAlign: "center", display: "block" }}>
                           {"\u041f\u044a\u0440\u0432\u043e \u0438\u0437\u0431\u0435\u0440\u0435\u0442\u0435 \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u044a\u0447\u043d\u0438 \u0434\u0430\u0442\u0438."}
@@ -7641,8 +8268,8 @@ function AdminMembersPageContent() {
                       )}
                     </div>
                   )}
-                  {trainingDaysEditorMode !== "createGroup" && trainingTimeMode === "byWeekday" && (
-                    <div className="amp-training-time-list" style={{ marginTop: "8px" }}>
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && trainingTimeMode === "byWeekday" && (
+                    <div className="amp-training-time-list" style={{ marginTop: "8px", order: 2 }}>
                       {trainingWeekdayBuckets.length === 0 ? (
                         <span className="amp-lbl" style={{ opacity: 0.78, textAlign: "center", display: "block" }}>
                           {"\u041f\u044a\u0440\u0432\u043e \u0438\u0437\u0431\u0435\u0440\u0435\u0442\u0435 \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u044a\u0447\u043d\u0438 \u0434\u0430\u0442\u0438."}
@@ -7676,7 +8303,7 @@ function AdminMembersPageContent() {
                     </div>
                   )}
                   {trainingDaysEditorMode === "teamGroup" && selectedTeamGroupLinkedTrainingGroups.length > 0 && (
-                    <p className="amp-confirm-error" style={{ marginTop: "8px", textAlign: "center" }}>
+                    <p className="amp-confirm-error" style={{ marginTop: "8px", textAlign: "center", order: 3 }}>
                       {`Внимание: набор ${selectedTeamGroup} участва в сборни отбори (${selectedTeamGroupLinkedTrainingGroups.map((group) => group.name).join(", ")}). При запазване ще бъде премахнат от тях и може да се наложи преименуване на групите.`}
                     </p>
                   )}
@@ -7741,8 +8368,8 @@ function AdminMembersPageContent() {
                       </div>
                     </>
                   )}
-                  {trainingDaysEditorMode !== "createGroup" && (
-                    <div className="amp-training-calendar">
+                  {trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep === "days" && (
+                    <div className="amp-training-calendar" style={{ order: 1 }}>
                       {schedulerCalendarMonths.map((month) => (
                         <div key={month.key} className="amp-training-month">
                           <div className="amp-training-month-title">{month.label}</div>
@@ -7796,11 +8423,287 @@ function AdminMembersPageContent() {
                       ))}
                     </div>
                   )}
-                  {trainingDaysEditorError && <p className="amp-confirm-error" style={{ textAlign: "center" }}>{trainingDaysEditorError}</p>}
-                  {isTrainingDaysScheduleUnchanged && !trainingDaysEditorError && (
-                    <p className="amp-confirm-error" style={{ textAlign: "center" }}>Графикът е същият като предишния.</p>
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysFieldStep && effectiveTrainingDaysActiveStep === "field" && trainingFields.length > 0 && (
+                      <div style={{ display: "grid", gap: "12px", marginTop: "8px", width: "min(100%, 620px)", marginInline: "auto", order: 3 }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Терен по дни{fieldConflictsLoading ? " …" : ""}</span>
+                        <div className="amp-pills" style={{ justifyContent: "center" }}>
+                          {normalizedTrainingDaysSelection.map((date) => (
+                            <button
+                              key={`field-date-${date}`}
+                              type="button"
+                              className={`amp-pill${trainingFieldActiveDate === date ? " amp-pill--active" : ""}`}
+                              onClick={() => setTrainingFieldActiveDate(date)}
+                              disabled={trainingDaysEditorSaving}
+                            >
+                              {formatIsoDateForDisplay(date)}
+                            </button>
+                          ))}
+                        </div>
+                        <span className="amp-lbl" style={{ textAlign: "center", opacity: 0.82 }}>
+                          Избран ден: {trainingFieldActiveDate ? formatIsoDateForDisplay(trainingFieldActiveDate) : "-"}
+                        </span>
+                        <div style={{ display: "grid", gap: "12px" }}>
+                          {trainingFields.map((field) => {
+                            const isFieldSelected = activeTrainingFieldSelection.trainingFieldId === field.id;
+                            const isWholeFieldSelected = isFieldSelected && activeTrainingFieldSelection.trainingFieldPieceIds.length === 0;
+                            const anyFieldSelected = !!activeTrainingFieldSelection.trainingFieldId;
+                            const fieldConflict = fieldConflictsMap[field.id];
+                            const isWholeFieldConflicted = Boolean(fieldConflict?.wholeFieldBlocked);
+                            const pieces = field.pieces.length > 0
+                                ? field.pieces
+                                : [{ id: "", name: "Цял терен", sortOrder: 0 }];
+                            return (
+                                <div key={field.id} style={{ display: "grid", gap: "6px", opacity: anyFieldSelected && !isFieldSelected ? 0.38 : 1, transition: "opacity 0.15s ease" }}>
+                                  <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (isWholeFieldConflicted) return;
+                                        setTrainingFieldSelections((prev) => ({
+                                          ...prev,
+                                          [trainingFieldActiveDate]: { trainingFieldId: field.id, trainingFieldPieceIds: [] },
+                                        }));
+                                      }}
+                                      disabled={trainingDaysEditorSaving || trainingFieldsLoading}
+                                      title={isWholeFieldConflicted ? "Целият терен е зает в избрания час" : undefined}
+                                      style={{
+                                        border: 0,
+                                        background: "transparent",
+                                        color: isWholeFieldSelected ? "#32cd32" : isWholeFieldConflicted ? "rgba(255,120,120,0.75)" : "rgba(255,255,255,0.88)",
+                                        fontWeight: 800,
+                                        fontSize: "14px",
+                                        textAlign: "center",
+                                        cursor: trainingDaysEditorSaving || trainingFieldsLoading || isWholeFieldConflicted ? "default" : "pointer",
+                                        padding: 0,
+                                        textDecoration: isWholeFieldSelected ? "underline" : isWholeFieldConflicted ? "line-through" : "none",
+                                        textUnderlineOffset: "3px",
+                                        opacity: isFieldSelected && activeTrainingFieldSelection.trainingFieldPieceIds.length > 0 ? 0.38 : 1,
+                                        transition: "opacity 0.15s ease, color 0.15s ease",
+                                      }}
+                                  >
+                                    {field.name}
+                                  </button>
+                                  <div
+                                      role="group"
+                                      aria-label={`Терен ${field.name}`}
+                                      style={{
+                                        display: "grid",
+                                        gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))`,
+                                        minHeight: "96px",
+                                        aspectRatio: "3 / 1",
+                                        border: isFieldSelected
+                                            ? "2px solid rgba(50,205,50,0.8)"
+                                            : "1px solid rgba(255,255,255,0.38)",
+                                        borderRadius: "8px",
+                                        overflow: "hidden",
+                                        background:
+                                            "linear-gradient(90deg, rgba(32,142,50,0.82) 0 12.5%, rgba(26,122,43,0.82) 12.5% 25%, rgba(32,142,50,0.82) 25% 37.5%, rgba(26,122,43,0.82) 37.5% 50%, rgba(32,142,50,0.82) 50% 62.5%, rgba(26,122,43,0.82) 62.5% 75%, rgba(32,142,50,0.82) 75% 87.5%, rgba(26,122,43,0.82) 87.5% 100%)",
+                                        boxShadow: isFieldSelected ? "0 0 0 1px rgba(50,205,50,0.6), 0 0 22px rgba(50,205,50,0.28)" : "none",
+                                        position: "relative",
+                                      }}
+                                  >
+                                    <div
+                                        aria-hidden="true"
+                                        style={{
+                                          position: "absolute",
+                                          inset: "8px",
+                                          border: "1px solid rgba(255,255,255,0.72)",
+                                          borderRadius: "4px",
+                                          pointerEvents: "none",
+                                        }}
+                                    />
+                                    <div
+                                        aria-hidden="true"
+                                        style={{
+                                          position: "absolute",
+                                          top: "8px",
+                                          bottom: "8px",
+                                          left: "50%",
+                                          width: "1px",
+                                          background: "rgba(255,255,255,0.72)",
+                                          transform: "translateX(-0.5px)",
+                                          pointerEvents: "none",
+                                        }}
+                                    />
+                                    <div
+                                        aria-hidden="true"
+                                        style={{
+                                          position: "absolute",
+                                          left: "50%",
+                                          top: "50%",
+                                          width: "26px",
+                                          height: "26px",
+                                          border: "1px solid rgba(255,255,255,0.72)",
+                                          borderRadius: "999px",
+                                          transform: "translate(-50%, -50%)",
+                                          pointerEvents: "none",
+                                        }}
+                                    />
+                                    <div
+                                        aria-hidden="true"
+                                        style={{
+                                          position: "absolute",
+                                          left: "50%",
+                                          top: "50%",
+                                          width: "4px",
+                                          height: "4px",
+                                          background: "rgba(255,255,255,0.8)",
+                                          borderRadius: "999px",
+                                          transform: "translate(-50%, -50%)",
+                                          pointerEvents: "none",
+                                        }}
+                                    />
+                                    {pieces.map((piece, index) => {
+                                      const isPieceConflicted = field.pieces.length === 0
+                                          ? isWholeFieldConflicted
+                                          : Boolean(fieldConflict?.blockedPieceIds.includes(piece.id));
+                                      const isPieceSelected =
+                                          field.pieces.length === 0
+                                              ? isWholeFieldSelected
+                                              : isFieldSelected && (
+                                              activeTrainingFieldSelection.trainingFieldPieceIds.length === 0 ||
+                                              activeTrainingFieldSelection.trainingFieldPieceIds.includes(piece.id)
+                                          );
+                                      return (
+                                          <button
+                                              key={piece.id || `${field.id}-whole`}
+                                              type="button"
+                                              title={isPieceConflicted ? "Тази позиция е заета в избрания час" : undefined}
+                                              onClick={() => {
+                                                if (isPieceConflicted) return;
+                                                if (field.pieces.length === 0) {
+                                                  setTrainingFieldSelections((prev) => ({
+                                                    ...prev,
+                                                    [trainingFieldActiveDate]: { trainingFieldId: field.id, trainingFieldPieceIds: [] },
+                                                  }));
+                                                  return;
+                                                }
+                                                setTrainingFieldSelections((prev) => {
+                                                  const current = prev[trainingFieldActiveDate];
+                                                  const prevIds = current?.trainingFieldId === field.id && current.trainingFieldPieceIds.length > 0
+                                                      ? current.trainingFieldPieceIds
+                                                      : [];
+                                                  let nextIds: string[];
+                                                  if (prevIds.includes(piece.id)) {
+                                                    nextIds = prevIds.filter((id) => id !== piece.id);
+                                                    if (nextIds.length === 0) nextIds = [];
+                                                  } else {
+                                                    nextIds = [...prevIds, piece.id];
+                                                    if (nextIds.length === field.pieces.length) nextIds = [];
+                                                  }
+                                                  return { ...prev, [trainingFieldActiveDate]: { trainingFieldId: field.id, trainingFieldPieceIds: nextIds } };
+                                                });
+                                              }}
+                                              disabled={trainingDaysEditorSaving || trainingFieldsLoading}
+                                              style={{
+                                                minWidth: 0,
+                                                border: 0,
+                                                borderLeft: index === 0 ? 0 : "1px dashed rgba(255,255,255,0.68)",
+                                                background: isPieceConflicted
+                                                    ? "rgba(180,0,0,0.32)"
+                                                    : isPieceSelected
+                                                        ? "rgba(50,205,50,0.18)"
+                                                        : isFieldSelected && activeTrainingFieldSelection.trainingFieldPieceIds.length > 0 && !isPieceSelected
+                                                            ? "rgba(0,0,0,0.52)"
+                                                            : "transparent",
+                                                boxShadow: isPieceSelected && !isPieceConflicted ? "inset 0 0 0 2px #32cd32" : "none",
+                                                color: isPieceConflicted
+                                                    ? "rgba(255,120,120,0.85)"
+                                                    : isPieceSelected
+                                                        ? "#32cd32"
+                                                        : isFieldSelected && activeTrainingFieldSelection.trainingFieldPieceIds.length > 0 && !isPieceSelected
+                                                            ? "rgba(255,255,255,0.42)"
+                                                            : "rgba(255,255,255,0.86)",
+                                                fontWeight: 800,
+                                                fontSize: "13px",
+                                                textAlign: "center",
+                                                padding: "8px",
+                                                cursor: trainingDaysEditorSaving || trainingFieldsLoading || isPieceConflicted ? "not-allowed" : "pointer",
+                                                position: "relative",
+                                                zIndex: 1,
+                                                textShadow: "0 1px 2px rgba(0,0,0,0.55)",
+                                                textDecoration: isPieceConflicted ? "line-through" : "none",
+                                                transition: "background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
+                                              }}
+                                          >
+                                            {piece.name}
+                                          </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
+                          <button
+                              type="button"
+                              className="amp-btn amp-btn--ghost"
+                              onClick={() => openTrainingFieldModal()}
+                              disabled={trainingDaysEditorSaving}
+                          >
+                            Добави терен
+                          </button>
+                          {selectedActiveTrainingField && (
+                              <button
+                                  type="button"
+                                  className="amp-btn amp-btn--ghost"
+                                  onClick={() => openTrainingFieldModal(selectedActiveTrainingField)}
+                                  disabled={trainingDaysEditorSaving}
+                              >
+                                Редактирай терен
+                              </button>
+                          )}
+                        </div>
+                      </div>
                   )}
-                  <div className="amp-modal-actions" style={{ justifyContent: "center" }}>
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysFieldStep && effectiveTrainingDaysActiveStep === "field" && trainingFields.length === 0 && (
+                      <div style={{ display: "flex", justifyContent: "center", marginTop: "8px", order: 3 }}>
+                        <button
+                            type="button"
+                            className="amp-btn amp-btn--ghost"
+                            onClick={() => openTrainingFieldModal()}
+                            disabled={trainingDaysEditorSaving}
+                        >
+                          Добави терен
+                        </button>
+                      </div>
+                  )}
+                  {canShowTrainingDaysFieldStep && effectiveTrainingDaysActiveStep === "field" && hasMissingTrainingField && (
+                      <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>{missingTrainingFieldMessage}</p>
+                  )}
+                  {trainingDaysEditorError && <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>{trainingDaysEditorError}</p>}
+                  {isTrainingDaysScheduleUnchanged && !trainingDaysEditorError && (
+                    <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>Графикът е същият като предишния.</p>
+                  )}
+                  {(showTrainingStepBack || showTrainingStepNext) && (
+                    <div className="amp-training-step-nav" style={{ order: 4 }}>
+                      {showTrainingStepBack && (
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost"
+                          onClick={() => {
+                            setTrainingDaysActiveStep(effectiveTrainingDaysActiveStep === "field" ? "time" : "days");
+                          }}
+                          disabled={trainingDaysEditorSaving}
+                        >
+                          Назад
+                        </button>
+                      )}
+                      {showTrainingStepNext && (
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--primary"
+                          onClick={() => {
+                            setTrainingDaysActiveStep(effectiveTrainingDaysActiveStep === "days" ? "time" : "field");
+                          }}
+                          disabled={isTrainingStepNextDisabled}
+                        >
+                          Напред
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div className="amp-modal-actions" style={{ justifyContent: "center", order: 4 }}>
                     <button
                       type="button"
                       className="amp-btn amp-btn--ghost"
@@ -7822,7 +8725,9 @@ function AdminMembersPageContent() {
                         trainingDaysEditorLoading ||
                         (trainingDaysEditorMode !== "createGroup" && isTrainingDaysScheduleUnchanged) ||
                         (trainingDaysEditorMode !== "createGroup" &&
-                          hasMissingTrainingTime)
+                          hasMissingTrainingTime) ||
+                        hasMissingTrainingField ||
+                        hasInvalidTrainingDuration
                       }
                     >
                       {trainingDaysEditorSaving
@@ -7834,6 +8739,114 @@ function AdminMembersPageContent() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {trainingFieldModalOpen && (
+        <div className="amp-overlay amp-overlay--confirm" onClick={() => !trainingFieldSaving && setTrainingFieldModalOpen(false)}>
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">{trainingFieldEditId ? "Редактирай терен" : "Добави терен"}</span>
+              <button
+                className="amp-modal-close"
+                onClick={() => setTrainingFieldModalOpen(false)}
+                aria-label="Затвори"
+                disabled={trainingFieldSaving}
+              >
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              <label className="amp-edit-field" style={{ textAlign: "center" }}>
+                <span className="amp-lbl" style={{ textAlign: "center" }}>Име на терена</span>
+                <input
+                  className="amp-edit-input"
+                  style={{ textAlign: "center" }}
+                  value={trainingFieldName}
+                  onChange={(e) => setTrainingFieldName(e.target.value)}
+                  disabled={trainingFieldSaving}
+                />
+              </label>
+
+              <div style={{ display: "grid", gap: "8px", marginTop: "12px" }}>
+                <span className="amp-lbl" style={{ textAlign: "center" }}>Полета на терена</span>
+                {trainingFieldPieces.length === 0 ? (
+                  <p className="amp-empty amp-empty--modal" style={{ margin: 0 }}>Теренът ще се използва като цял.</p>
+                ) : (
+                  trainingFieldPieces.map((piece, index) => (
+                    <label key={`${piece.id ?? "new"}-${index}`} className="amp-edit-field" style={{ textAlign: "center" }}>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>{`Поле ${index + 1}`}</span>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <input
+                          className="amp-edit-input"
+                          style={{ textAlign: "center" }}
+                          value={piece.name}
+                          onChange={(e) => {
+                            const nextName = e.target.value;
+                            setTrainingFieldPieces((prev) => prev.map((item, itemIndex) =>
+                              itemIndex === index ? { ...item, name: nextName } : item,
+                            ));
+                          }}
+                          disabled={trainingFieldSaving}
+                        />
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost"
+                          onClick={() => setTrainingFieldPieces((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                          disabled={trainingFieldSaving}
+                        >
+                          Премахни
+                        </button>
+                      </div>
+                    </label>
+                  ))
+                )}
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => setTrainingFieldPieces((prev) =>
+                    prev.length === 0
+                      ? [{ id: null, name: "Поле 1" }, { id: null, name: "Поле 2" }]
+                      : [...prev, { id: null, name: `Поле ${prev.length + 1}` }],
+                  )}
+                  disabled={trainingFieldSaving}
+                >
+                  Раздели на полета
+                </button>
+              </div>
+
+              {trainingFieldError && <p className="amp-confirm-error" style={{ textAlign: "center" }}>{trainingFieldError}</p>}
+
+              <div className="amp-modal-actions amp-modal-actions--end">
+                {trainingFieldEditId && (
+                  <button
+                    type="button"
+                    className="amp-btn amp-btn--danger"
+                    onClick={() => void deleteTrainingField(trainingFieldEditId)}
+                    disabled={trainingFieldSaving}
+                  >
+                    Изтрий
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => setTrainingFieldModalOpen(false)}
+                  disabled={trainingFieldSaving}
+                >
+                  Отказ
+                </button>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--primary"
+                  onClick={() => void saveTrainingField()}
+                  disabled={trainingFieldSaving}
+                >
+                  {trainingFieldSaving ? "Запазване..." : "Запази"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -7891,7 +8904,25 @@ function AdminMembersPageContent() {
                 <span>Общо: {trainingAttendanceStats.total}</span>
                 <span>Присъстващи: {trainingAttendanceStats.attending}</span>
                 <span>Отсъстващи: {trainingAttendanceStats.optedOut}</span>
+                <span>Продължителност: {trainingDayDurationMinutes} мин.</span>
               </div>
+              {trainingDayField && (
+                <div className="amp-edit-field">
+                  <span className="amp-lbl">Терен</span>
+                  <p className="amp-val">
+                    {trainingDayField.name}
+                    {trainingDayFieldPieceIds.length > 0 && trainingDayField.pieces.some((p) => trainingDayFieldPieceIds.includes(p.id)) && (
+                      <>
+                        {" — "}
+                        {trainingDayField.pieces
+                          .filter((p) => trainingDayFieldPieceIds.includes(p.id))
+                          .map((p) => p.name)
+                          .join(", ")}
+                      </>
+                    )}
+                  </p>
+                </div>
+              )}
               <div className="amp-edit-field">
                 <span className="amp-lbl">Описание за деня</span>
                 {trainingNote.trim() ? (
