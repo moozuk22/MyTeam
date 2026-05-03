@@ -6,18 +6,22 @@ import {
   getTodayIsoDateInTimeZone,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingDurationMinutes,
   normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
+import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const FIXED_TIME_ZONE = "Europe/Sofia";
 const TRAINING_SELECTION_WINDOW_DAYS = 30;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 async function verifySession(request: NextRequest) {
   const token = request.cookies.get("admin_session")?.value;
@@ -90,6 +94,11 @@ function serializeGroup(group: {
   trainingDates: string[];
   trainingTime: string | null;
   trainingDateTimes: unknown;
+  trainingDurationMinutes: number;
+  trainingFieldId: string | null;
+  trainingFieldPieceIds: string[];
+  trainingFieldSelections?: unknown;
+  coachGroupId: string | null;
   trainingWeekdays: number[];
   createdAt: Date;
   updatedAt: Date;
@@ -101,6 +110,11 @@ function serializeGroup(group: {
     trainingDates: group.trainingDates,
     trainingTime: group.trainingTime,
     trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
+    trainingDurationMinutes: group.trainingDurationMinutes,
+    trainingFieldId: group.trainingFieldId,
+    trainingFieldPieceIds: group.trainingFieldPieceIds,
+    trainingFieldSelections: group.trainingFieldSelections,
+    coachGroupId: group.coachGroupId,
     trainingWeekdays: group.trainingWeekdays,
     playerIds: group.players.map((item) => item.playerId),
     players: group.players.map((item) => ({
@@ -121,9 +135,14 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  const coachGroupIdRaw = request.nextUrl.searchParams.get("coachGroupId");
+  if (coachGroupIdRaw && !UUID_REGEX.test(coachGroupIdRaw)) {
+    return NextResponse.json({ error: "Невалидна треньорска група." }, { status: 400 });
+  }
+  const coachGroupId = coachGroupIdRaw || null;
   try {
     const groups = await prisma.clubCustomTrainingGroup.findMany({
-      where: { clubId: id },
+      where: { clubId: id, coachGroupId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -131,6 +150,11 @@ export async function GET(
         trainingDates: true,
         trainingTime: true,
         trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        coachGroupId: true,
+        trainingFieldSelections: true,
         trainingWeekdays: true,
         createdAt: true,
         updatedAt: true,
@@ -161,22 +185,65 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const name = String((body as { name?: unknown }).name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Group name is required." }, { status: 400 });
+  const coachGroupIdRaw = (body as { coachGroupId?: unknown }).coachGroupId;
+  if (coachGroupIdRaw !== undefined && coachGroupIdRaw !== null && typeof coachGroupIdRaw !== "string") {
+    return NextResponse.json({ error: "Невалидна треньорска група." }, { status: 400 });
+  }
+  const coachGroupIdValue = typeof coachGroupIdRaw === "string" ? coachGroupIdRaw.trim() : "";
+  if (coachGroupIdValue && !UUID_REGEX.test(coachGroupIdValue)) {
+    return NextResponse.json({ error: "Невалидна треньорска група." }, { status: 400 });
+  }
+  const coachGroupId = coachGroupIdValue || null;
+  if (coachGroupId) {
+    const coachGroup = await prisma.coachGroup.findFirst({
+      where: { id: coachGroupId, clubId: id },
+      select: { id: true },
+    });
+    if (!coachGroup) {
+      return NextResponse.json({ error: "Треньорската група не е намерена." }, { status: 400 });
+    }
+  }
 
   const playerIds = normalizePlayerIds((body as { playerIds?: unknown }).playerIds);
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
   const rawTrainingTime = (body as { trainingTime?: unknown }).trainingTime;
   const rawTrainingDateTimes = (body as { trainingDateTimes?: unknown }).trainingDateTimes;
+  const rawTrainingDurationMinutes = (body as { trainingDurationMinutes?: unknown }).trainingDurationMinutes;
+  const rawTrainingFieldId = (body as { trainingFieldId?: unknown }).trainingFieldId;
+  const rawTrainingFieldPieceId = (body as { trainingFieldPieceIds?: unknown }).trainingFieldPieceIds;
   let trainingTime: string | null = null;
+  let trainingDurationMinutes = 60;
+  let trainingFieldSelection = { trainingFieldId: null as string | null, trainingFieldPieceIds: [] as string[] };
   let trainingDates: string[] = [];
   let trainingDateTimes: Record<string, string> = {};
   try {
     trainingTime = normalizeTrainingTime(rawTrainingTime);
+    trainingDurationMinutes = rawTrainingDurationMinutes === undefined
+      ? 60
+      : normalizeTrainingDurationMinutes(rawTrainingDurationMinutes);
+    trainingFieldSelection = parseTrainingFieldSelection({
+      trainingFieldId: rawTrainingFieldId,
+      trainingFieldPieceIds: rawTrainingFieldPieceId,
+    });
     trainingDates = normalizeTrainingDates(rawTrainingDates);
     if (trainingDates.length > 0) {
+      const hasTrainingFields = await clubHasTrainingFields(id);
+      if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
+        throw new Error("Треньорът трябва да избере терен.");
+      }
+      await verifyTrainingFieldSelection(id, trainingFieldSelection);
       trainingDateTimes = buildTrainingDateTimes({
         rawTrainingDateTimes,
         trainingDates,
         fallbackTrainingTime: trainingTime,
+      });
+      await assertNoTrainingFieldConflict({
+        clubId: id,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
       });
     }
   } catch (error) {
@@ -188,6 +255,9 @@ export async function POST(
   ).sort((a, b) => a - b);
 
   try {
+    if (playerIds.length === 0) {
+      return NextResponse.json({ error: "В тази група няма избрани активни играчи." }, { status: 400 });
+    }
     const created = await prisma.$transaction(async (tx) => {
       const players = playerIds.length
         ? await tx.player.findMany({
@@ -199,10 +269,14 @@ export async function POST(
       const group = await tx.clubCustomTrainingGroup.create({
         data: {
           clubId: id,
+          coachGroupId,
           name,
           trainingDates,
           trainingTime: persistedTrainingTime,
           trainingDateTimes,
+          trainingDurationMinutes,
+          trainingFieldId: trainingFieldSelection.trainingFieldId,
+          trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
           trainingWeekdays,
           trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
         },
@@ -222,6 +296,11 @@ export async function POST(
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+          coachGroupId: true,
+          trainingFieldSelections: true,
           trainingWeekdays: true,
           createdAt: true,
           updatedAt: true,
@@ -249,7 +328,7 @@ export async function POST(
     return NextResponse.json({ ...serializeGroup(created), notifications }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_PLAYERS") {
-      return NextResponse.json({ error: "Selected players must belong to this club and be active." }, { status: 400 });
+      return NextResponse.json({ error: "Избраните играчи трябва да са активни и да принадлежат към този клуб." }, { status: 400 });
     }
     console.error("Custom training groups POST error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

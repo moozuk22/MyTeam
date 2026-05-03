@@ -6,12 +6,20 @@ import {
   getTodayIsoDateInTimeZone,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingDurationMinutes,
   normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
+import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import {
+  clubHasTrainingFields,
+  parseTrainingFieldSelection,
+  parseTrainingFieldSelectionsByDate,
+  verifyTrainingFieldSelectionsByDate,
+} from "@/lib/trainingFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,6 +95,11 @@ function serializeGroup(group: {
   trainingDates: string[];
   trainingTime: string | null;
   trainingDateTimes: unknown;
+  trainingDurationMinutes: number;
+  trainingFieldId: string | null;
+  trainingFieldPieceIds: string[];
+  trainingFieldSelections?: unknown;
+  coachGroupId: string | null;
   trainingWeekdays: number[];
   createdAt: Date;
   updatedAt: Date;
@@ -98,6 +111,11 @@ function serializeGroup(group: {
     trainingDates: group.trainingDates,
     trainingTime: group.trainingTime,
     trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
+    trainingDurationMinutes: group.trainingDurationMinutes,
+    trainingFieldId: group.trainingFieldId,
+    trainingFieldPieceIds: group.trainingFieldPieceIds,
+    trainingFieldSelections: group.trainingFieldSelections,
+    coachGroupId: group.coachGroupId,
     trainingWeekdays: group.trainingWeekdays,
     playerIds: group.players.map((item) => item.playerId),
     players: group.players.map((item) => ({ id: item.playerId, fullName: item.player.fullName, teamGroup: item.player.teamGroup })),
@@ -137,13 +155,21 @@ export async function PATCH(
     trainingDates?: unknown;
     trainingTime?: unknown;
     trainingDateTimes?: unknown;
+    trainingDurationMinutes?: unknown;
+    trainingFieldId?: unknown;
+    trainingFieldPieceIds?: unknown;
+    trainingFieldSelections?: unknown;
   };
   const hasName = Object.prototype.hasOwnProperty.call(payload, "name");
   const hasPlayerIds = Object.prototype.hasOwnProperty.call(payload, "playerIds");
   const hasTrainingDates = Object.prototype.hasOwnProperty.call(payload, "trainingDates");
   const hasTrainingTime = Object.prototype.hasOwnProperty.call(payload, "trainingTime");
   const hasTrainingDateTimes = Object.prototype.hasOwnProperty.call(payload, "trainingDateTimes");
-  if (!hasName && !hasPlayerIds && !hasTrainingDates && !hasTrainingTime && !hasTrainingDateTimes) {
+  const hasTrainingDuration = Object.prototype.hasOwnProperty.call(payload, "trainingDurationMinutes");
+  const hasTrainingField = Object.prototype.hasOwnProperty.call(payload, "trainingFieldId");
+  const hasTrainingFieldPiece = Object.prototype.hasOwnProperty.call(payload, "trainingFieldPieceIds");
+  const hasTrainingFieldSelections = Object.prototype.hasOwnProperty.call(payload, "trainingFieldSelections");
+  if (!hasName && !hasPlayerIds && !hasTrainingDates && !hasTrainingTime && !hasTrainingDateTimes && !hasTrainingDuration && !hasTrainingField && !hasTrainingFieldPiece && !hasTrainingFieldSelections) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -156,6 +182,11 @@ export async function PATCH(
         trainingDates: true,
         trainingTime: true,
         trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
+        coachGroupId: true,
         players: { select: { playerId: true } },
       },
     });
@@ -169,21 +200,88 @@ export async function PATCH(
       ? buildTrainingDateTimes({ rawTrainingDateTimes, trainingDates: nextTrainingDates, fallbackTrainingTime })
       : {};
     const nextTrainingTime = fallbackTrainingTime ?? Object.values(nextTrainingDateTimes)[0] ?? null;
+    let nextTrainingDurationMinutes = existing.trainingDurationMinutes;
+    if (hasTrainingDuration) {
+      try {
+        nextTrainingDurationMinutes = normalizeTrainingDurationMinutes(payload.trainingDurationMinutes);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training duration." },
+          { status: 400 },
+        );
+      }
+    }
+    let nextTrainingFieldId = existing.trainingFieldId ?? null;
+    let nextTrainingFieldPieceIds = existing.trainingFieldPieceIds ?? [];
+    if (hasTrainingField || hasTrainingFieldPiece) {
+      try {
+        const selection = parseTrainingFieldSelection({
+          trainingFieldId: hasTrainingField ? payload.trainingFieldId : nextTrainingFieldId,
+          trainingFieldPieceIds: hasTrainingFieldPiece ? payload.trainingFieldPieceIds : nextTrainingFieldPieceIds,
+        });
+        nextTrainingFieldId = selection.trainingFieldId;
+        nextTrainingFieldPieceIds = selection.trainingFieldPieceIds;
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training field." },
+          { status: 400 },
+        );
+      }
+    }
+    const nextTrainingFieldSelections = parseTrainingFieldSelectionsByDate({
+      trainingFieldSelections: hasTrainingFieldSelections ? payload.trainingFieldSelections : existing.trainingFieldSelections,
+      trainingDates: nextTrainingDates,
+      fallback: { trainingFieldId: nextTrainingFieldId, trainingFieldPieceIds: nextTrainingFieldPieceIds },
+    });
+    if (nextTrainingDates.length > 0) {
+      const hasTrainingFields = await clubHasTrainingFields(clubId);
+      if (hasTrainingFields && !nextTrainingFieldId) {
+        return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
+      }
+      try {
+        await verifyTrainingFieldSelectionsByDate(clubId, nextTrainingFieldSelections);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training field." },
+          { status: 400 },
+        );
+      }
+      try {
+        await assertNoTrainingFieldConflict({
+          clubId,
+          trainingDates: nextTrainingDates,
+          trainingDateTimes: nextTrainingDateTimes,
+          trainingDurationMinutes: nextTrainingDurationMinutes,
+          trainingFieldId: nextTrainingFieldId,
+          trainingFieldPieceIds: nextTrainingFieldPieceIds,
+          trainingFieldSelections: nextTrainingFieldSelections,
+          exclude: { type: "customGroup", id: groupId },
+        });
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training field schedule." },
+          { status: 400 },
+        );
+      }
+    }
     const nextTrainingWeekdays = Array.from(
       new Set(nextTrainingDates.map((date) => getWeekdayMondayFirst(date, FIXED_TIME_ZONE)).filter((value) => value >= 1 && value <= 7)),
     ).sort((a, b) => a - b);
     const playerIds = hasPlayerIds ? normalizePlayerIds(payload.playerIds) : existing.players.map((item) => item.playerId);
     const nextName = hasName ? String(payload.name ?? "").trim() : existing.name;
     if (!nextName) return NextResponse.json({ error: "Group name is required." }, { status: 400 });
+    if (hasPlayerIds && playerIds.length === 0) {
+      return NextResponse.json({ error: "В тази група няма избрани активни играчи." }, { status: 400 });
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const players = playerIds.length
-        ? await tx.player.findMany({
-            where: { id: { in: playerIds }, clubId, isActive: true },
-            select: { id: true },
-          })
-        : [];
-      if (players.length !== playerIds.length) throw new Error("INVALID_PLAYERS");
+      if (hasPlayerIds) {
+        const players = await tx.player.findMany({
+          where: { id: { in: playerIds }, clubId, isActive: true },
+          select: { id: true },
+        });
+        if (players.length !== playerIds.length) throw new Error("INVALID_PLAYERS");
+      }
       await tx.clubCustomTrainingGroup.update({
         where: { id: groupId },
         data: {
@@ -196,6 +294,10 @@ export async function PATCH(
                 trainingWeekdays: nextTrainingWeekdays,
                 trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
               }
+            : {}),
+          ...(hasTrainingDuration ? { trainingDurationMinutes: nextTrainingDurationMinutes } : {}),
+          ...(hasTrainingField || hasTrainingFieldPiece || hasTrainingFieldSelections
+            ? { trainingFieldId: nextTrainingFieldId, trainingFieldPieceIds: nextTrainingFieldPieceIds, trainingFieldSelections: nextTrainingFieldSelections }
             : {}),
         },
       });
@@ -217,6 +319,11 @@ export async function PATCH(
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+          trainingFieldSelections: true,
+          coachGroupId: true,
           trainingWeekdays: true,
           createdAt: true,
           updatedAt: true,
@@ -244,7 +351,7 @@ export async function PATCH(
     return NextResponse.json({ ...serializeGroup(updated), notifications });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_PLAYERS") {
-      return NextResponse.json({ error: "Selected players must belong to this club and be active." }, { status: 400 });
+      return NextResponse.json({ error: "Избраните играчи трябва да са активни и да принадлежат към този клуб." }, { status: 400 });
     }
     console.error("Custom training groups PATCH error:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });

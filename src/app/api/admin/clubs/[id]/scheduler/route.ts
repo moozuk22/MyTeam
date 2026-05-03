@@ -7,12 +7,21 @@ import {
   getWeekdayMondayFirst,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingDurationMinutes,
   normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
+import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import {
+  clubHasTrainingFields,
+  normalizeStoredTrainingFieldSelections,
+  parseTrainingFieldSelection,
+  parseTrainingFieldSelectionsByDate,
+  verifyTrainingFieldSelectionsByDate,
+} from "@/lib/trainingFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,6 +129,10 @@ export async function GET(
       trainingDates: true,
       trainingTime: true,
       trainingDateTimes: true,
+      trainingDurationMinutes: true,
+      trainingFieldId: true,
+      trainingFieldPieceIds: true,
+      trainingFieldSelections: true,
       trainingWeekdays: true,
       trainingWindowDays: true,
     },
@@ -142,6 +155,10 @@ export async function GET(
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+          trainingFieldSelections: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -166,6 +183,10 @@ export async function GET(
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+          trainingFieldSelections: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -184,6 +205,20 @@ export async function GET(
     teamGroup,
     trainingDates,
     trainingTime: trainingGroupOverride?.trainingTime ?? groupSchedule?.trainingTime ?? club.trainingTime ?? null,
+    trainingDurationMinutes:
+      trainingGroupOverride?.trainingDurationMinutes ??
+      groupSchedule?.trainingDurationMinutes ??
+      club.trainingDurationMinutes,
+    trainingFieldId: trainingGroupOverride?.trainingFieldId ?? groupSchedule?.trainingFieldId ?? club.trainingFieldId ?? null,
+    trainingFieldPieceIds: trainingGroupOverride?.trainingFieldPieceIds ?? groupSchedule?.trainingFieldPieceIds ?? club.trainingFieldPieceIds ?? null,
+    trainingFieldSelections: normalizeStoredTrainingFieldSelections(
+      trainingGroupOverride?.trainingFieldSelections ?? groupSchedule?.trainingFieldSelections ?? club.trainingFieldSelections,
+      trainingDates,
+      {
+        trainingFieldId: trainingGroupOverride?.trainingFieldId ?? groupSchedule?.trainingFieldId ?? club.trainingFieldId ?? null,
+        trainingFieldPieceIds: trainingGroupOverride?.trainingFieldPieceIds ?? groupSchedule?.trainingFieldPieceIds ?? club.trainingFieldPieceIds ?? [],
+      },
+    ),
     trainingDateTimes: normalizeStoredTrainingDateTimes(
       trainingGroupOverride?.trainingDateTimes ?? groupSchedule?.trainingDateTimes ?? club.trainingDateTimes,
       trainingDates,
@@ -216,17 +251,28 @@ export async function PUT(
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
   const rawTrainingTime = (body as { trainingTime?: unknown }).trainingTime;
   const rawTrainingDateTimes = (body as { trainingDateTimes?: unknown }).trainingDateTimes;
+  const rawTrainingDurationMinutes = (body as { trainingDurationMinutes?: unknown }).trainingDurationMinutes;
+  const rawTrainingFieldId = (body as { trainingFieldId?: unknown }).trainingFieldId;
+  const rawTrainingFieldPieceId = (body as { trainingFieldPieceIds?: unknown }).trainingFieldPieceIds;
+  const rawTrainingFieldSelections = (body as { trainingFieldSelections?: unknown }).trainingFieldSelections;
   const rawWeekdays = (body as { trainingWeekdays?: unknown }).trainingWeekdays;
   const rawWindowDays = Number.parseInt(String((body as { trainingWindowDays?: unknown }).trainingWindowDays ?? ""), 10);
   const rawTeamGroup = (body as { teamGroup?: unknown }).teamGroup;
 
   let teamGroup: number | null = null;
   let trainingTime: string | null = null;
+  let trainingDurationMinutes = 60;
+  let trainingFieldSelection = { trainingFieldId: null as string | null, trainingFieldPieceIds: [] as string[] };
   try {
     teamGroup = parseTeamGroupValue(rawTeamGroup);
     trainingTime = normalizeTrainingTime(rawTrainingTime);
+    trainingDurationMinutes = normalizeTrainingDurationMinutes(rawTrainingDurationMinutes);
+    trainingFieldSelection = parseTrainingFieldSelection({
+      trainingFieldId: rawTrainingFieldId,
+      trainingFieldPieceIds: rawTrainingFieldPieceId,
+    });
   } catch {
-    return NextResponse.json({ error: "Invalid teamGroup or trainingTime" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid teamGroup, trainingTime, trainingDurationMinutes, or training field" }, { status: 400 });
   }
 
   if (!Number.isInteger(reminderDay) || reminderDay < 1 || reminderDay > 28) {
@@ -313,12 +359,46 @@ export async function PUT(
     });
   }
   let trainingDateTimes: Record<string, string> = {};
+  let trainingFieldSelections: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> = {};
   if (trainingDates.length > 0) {
+    const hasTrainingFields = await clubHasTrainingFields(id);
+    if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
+      return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
+    }
+    try {
+      trainingFieldSelections = parseTrainingFieldSelectionsByDate({
+        trainingFieldSelections: rawTrainingFieldSelections,
+        trainingDates,
+        fallback: trainingFieldSelection,
+      });
+      if (hasTrainingFields && trainingDates.some((date) => !trainingFieldSelections[date]?.trainingFieldId)) {
+        return NextResponse.json({ error: "Треньорът трябва да избере терен за всеки тренировъчен ден." }, { status: 400 });
+      }
+      await verifyTrainingFieldSelectionsByDate(id, trainingFieldSelections);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Invalid training field." },
+        { status: 400 },
+      );
+    }
     try {
       trainingDateTimes = buildTrainingDateTimes({
         rawTrainingDateTimes,
         trainingDates,
         fallbackTrainingTime: trainingTime,
+      });
+      await assertNoTrainingFieldConflict({
+        clubId: id,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
+        exclude: teamGroup === null
+          ? { type: "club" }
+          : { type: "teamGroup", teamGroup },
+        excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
       });
     } catch (error) {
       return NextResponse.json(
@@ -364,9 +444,13 @@ export async function PUT(
       ...(teamGroup === null
         ? {
       trainingDates,
-      trainingTime,
-      trainingDateTimes,
-      trainingWeekdays,
+          trainingTime,
+          trainingDateTimes,
+          trainingDurationMinutes,
+          trainingFieldId: trainingFieldSelection.trainingFieldId,
+          trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+          trainingFieldSelections,
+          trainingWeekdays,
       trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
           }
         : {}),
@@ -386,6 +470,10 @@ export async function PUT(
       trainingDates: true,
       trainingTime: true,
       trainingDateTimes: true,
+      trainingDurationMinutes: true,
+      trainingFieldId: true,
+      trainingFieldPieceIds: true,
+      trainingFieldSelections: true,
       trainingWeekdays: true,
       trainingWindowDays: true,
     },
@@ -403,6 +491,10 @@ export async function PUT(
         trainingDates,
         trainingTime,
         trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
         trainingWeekdays,
         trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       },
@@ -412,6 +504,10 @@ export async function PUT(
         trainingDates,
         trainingTime,
         trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
         trainingWeekdays,
         trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       },
@@ -468,6 +564,10 @@ export async function PUT(
       trainingDates,
       trainingTime,
       trainingDateTimes,
+      trainingDurationMinutes,
+      trainingFieldId: trainingFieldSelection.trainingFieldId,
+      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+      trainingFieldSelections,
       trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       notifications,
     });
@@ -479,6 +579,10 @@ export async function PUT(
     trainingDates,
     trainingTime,
     trainingDateTimes,
+    trainingDurationMinutes,
+    trainingFieldId: trainingFieldSelection.trainingFieldId,
+    trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+    trainingFieldSelections,
     trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
   });
 }

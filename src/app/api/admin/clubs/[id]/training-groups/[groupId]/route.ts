@@ -6,12 +6,20 @@ import {
   getTodayIsoDateInTimeZone,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingDurationMinutes,
   normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
+import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import {
+  clubHasTrainingFields,
+  parseTrainingFieldSelection,
+  parseTrainingFieldSelectionsByDate,
+  verifyTrainingFieldSelectionsByDate,
+} from "@/lib/trainingFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -176,13 +184,21 @@ export async function PATCH(
     trainingDates?: unknown;
     trainingTime?: unknown;
     trainingDateTimes?: unknown;
+    trainingDurationMinutes?: unknown;
+    trainingFieldId?: unknown;
+    trainingFieldPieceIds?: unknown;
+    trainingFieldSelections?: unknown;
   };
   const hasNameField = Object.prototype.hasOwnProperty.call(payload, "name");
   const hasTeamGroupsField = Object.prototype.hasOwnProperty.call(payload, "teamGroups");
   const hasTrainingDatesField = Object.prototype.hasOwnProperty.call(payload, "trainingDates");
   const hasTrainingTimeField = Object.prototype.hasOwnProperty.call(payload, "trainingTime");
   const hasTrainingDateTimesField = Object.prototype.hasOwnProperty.call(payload, "trainingDateTimes");
-  if (!hasNameField && !hasTeamGroupsField && !hasTrainingDatesField && !hasTrainingTimeField && !hasTrainingDateTimesField) {
+  const hasTrainingDurationField = Object.prototype.hasOwnProperty.call(payload, "trainingDurationMinutes");
+  const hasTrainingFieldField = Object.prototype.hasOwnProperty.call(payload, "trainingFieldId");
+  const hasTrainingFieldPieceField = Object.prototype.hasOwnProperty.call(payload, "trainingFieldPieceIds");
+  const hasTrainingFieldSelectionsField = Object.prototype.hasOwnProperty.call(payload, "trainingFieldSelections");
+  if (!hasNameField && !hasTeamGroupsField && !hasTrainingDatesField && !hasTrainingTimeField && !hasTrainingDateTimesField && !hasTrainingDurationField && !hasTrainingFieldField && !hasTrainingFieldPieceField && !hasTrainingFieldSelectionsField) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -199,6 +215,10 @@ export async function PATCH(
         trainingDates: true,
         trainingTime: true,
         trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
       },
     });
 
@@ -249,7 +269,54 @@ export async function PATCH(
         );
       }
     }
+    let nextTrainingDurationMinutes = group.trainingDurationMinutes;
+    if (hasTrainingDurationField) {
+      try {
+        nextTrainingDurationMinutes = normalizeTrainingDurationMinutes(payload.trainingDurationMinutes);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training duration." },
+          { status: 400 },
+        );
+      }
+    }
+    let nextTrainingFieldId = group.trainingFieldId ?? null;
+    let nextTrainingFieldPieceIds = group.trainingFieldPieceIds ?? [];
+    if (hasTrainingFieldField || hasTrainingFieldPieceField) {
+      try {
+        const selection = parseTrainingFieldSelection({
+          trainingFieldId: hasTrainingFieldField ? payload.trainingFieldId : nextTrainingFieldId,
+          trainingFieldPieceIds: hasTrainingFieldPieceField ? payload.trainingFieldPieceIds : nextTrainingFieldPieceIds,
+        });
+        nextTrainingFieldId = selection.trainingFieldId;
+        nextTrainingFieldPieceIds = selection.trainingFieldPieceIds;
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training field." },
+          { status: 400 },
+        );
+      }
+    }
     const finalTrainingDates = hasTrainingDatesField ? (nextTrainingDates ?? []) : (group.trainingDates ?? []);
+    const nextTrainingFieldSelections = parseTrainingFieldSelectionsByDate({
+      trainingFieldSelections: hasTrainingFieldSelectionsField ? payload.trainingFieldSelections : group.trainingFieldSelections,
+      trainingDates: finalTrainingDates,
+      fallback: { trainingFieldId: nextTrainingFieldId, trainingFieldPieceIds: nextTrainingFieldPieceIds },
+    });
+    if (finalTrainingDates.length > 0) {
+      const hasTrainingFields = await clubHasTrainingFields(clubId);
+      if (hasTrainingFields && !nextTrainingFieldId) {
+        return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
+      }
+      try {
+        await verifyTrainingFieldSelectionsByDate(clubId, nextTrainingFieldSelections);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training field." },
+          { status: 400 },
+        );
+      }
+    }
     const fallbackTrainingTime: string | null = hasTrainingTimeField ? (nextTrainingTime ?? null) : (group.trainingTime ?? null);
     const rawTrainingDateTimes = hasTrainingDateTimesField ? payload.trainingDateTimes : group.trainingDateTimes;
     let finalTrainingDateTimes: Record<string, string> = {};
@@ -259,6 +326,17 @@ export async function PATCH(
           rawTrainingDateTimes,
           trainingDates: finalTrainingDates,
           fallbackTrainingTime,
+        });
+        await assertNoTrainingFieldConflict({
+          clubId,
+          trainingDates: finalTrainingDates,
+          trainingDateTimes: finalTrainingDateTimes,
+          trainingDurationMinutes: nextTrainingDurationMinutes,
+          trainingFieldId: nextTrainingFieldId,
+          trainingFieldPieceIds: nextTrainingFieldPieceIds,
+          trainingFieldSelections: nextTrainingFieldSelections,
+          exclude: { type: "trainingGroup", id: groupId },
+          excludeTeamGroups: nextTeamGroups,
         });
       } catch (error) {
         return NextResponse.json(
@@ -275,6 +353,10 @@ export async function PATCH(
       trainingDates?: string[];
       trainingTime?: string | null;
       trainingDateTimes?: Record<string, string>;
+      trainingDurationMinutes?: number;
+      trainingFieldId?: string | null;
+      trainingFieldPieceIds?: string[];
+      trainingFieldSelections?: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }>;
       trainingWeekdays?: number[];
       trainingWindowDays?: number;
     } = {
@@ -290,6 +372,14 @@ export async function PATCH(
       updateData.trainingTime = finalTrainingTime;
       updateData.trainingDateTimes = finalTrainingDateTimes;
     }
+    if (hasTrainingDurationField) {
+      updateData.trainingDurationMinutes = nextTrainingDurationMinutes;
+    }
+    if (hasTrainingFieldField || hasTrainingFieldPieceField || hasTrainingFieldSelectionsField) {
+      updateData.trainingFieldId = nextTrainingFieldId;
+      updateData.trainingFieldPieceIds = nextTrainingFieldPieceIds;
+      updateData.trainingFieldSelections = nextTrainingFieldSelections;
+    }
 
     const updated = await prisma.clubTrainingScheduleGroup.update({
       where: { id: groupId },
@@ -301,6 +391,10 @@ export async function PATCH(
         trainingDates: true,
         trainingTime: true,
         trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
         trainingWeekdays: true,
         createdAt: true,
         updatedAt: true,

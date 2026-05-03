@@ -72,6 +72,14 @@ export function normalizeTrainingTime(raw: unknown): string | null {
   return value;
 }
 
+export function normalizeTrainingDurationMinutes(raw: unknown): number {
+  const parsed = Number.parseInt(String(raw ?? "").trim(), 10);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1440) {
+    throw new Error("Invalid trainingDurationMinutes. Use minutes between 1 and 1440.");
+  }
+  return parsed;
+}
+
 export function getWeekdayMondayFirst(isoDate: string, timeZone: string): number {
   const probe = new Date(`${isoDate}T12:00:00.000Z`);
   const formatter = new Intl.DateTimeFormat("en-US", {

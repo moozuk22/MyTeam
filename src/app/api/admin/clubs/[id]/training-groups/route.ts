@@ -6,12 +6,15 @@ import {
   getTodayIsoDateInTimeZone,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingDurationMinutes,
   normalizeTrainingTime,
 } from "@/lib/training";
 import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
+import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,6 +142,10 @@ export async function GET(
         trainingDates: true,
         trainingTime: true,
         trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
         trainingWeekdays: true,
         createdAt: true,
         updatedAt: true,
@@ -179,10 +186,22 @@ export async function POST(
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
   const rawTrainingTime = (body as { trainingTime?: unknown }).trainingTime;
   const rawTrainingDateTimes = (body as { trainingDateTimes?: unknown }).trainingDateTimes;
+  const rawTrainingDurationMinutes = (body as { trainingDurationMinutes?: unknown }).trainingDurationMinutes;
+  const rawTrainingFieldId = (body as { trainingFieldId?: unknown }).trainingFieldId;
+  const rawTrainingFieldPieceId = (body as { trainingFieldPieceIds?: unknown }).trainingFieldPieceIds;
   const hasExplicitTrainingDates = Array.isArray(rawTrainingDates) && rawTrainingDates.length > 0;
   let trainingTime: string | null = null;
+  let trainingDurationMinutes = 60;
+  let trainingFieldSelection = { trainingFieldId: null as string | null, trainingFieldPieceIds: [] as string[] };
   try {
     trainingTime = normalizeTrainingTime(rawTrainingTime);
+    trainingDurationMinutes = rawTrainingDurationMinutes === undefined
+      ? 60
+      : normalizeTrainingDurationMinutes(rawTrainingDurationMinutes);
+    trainingFieldSelection = parseTrainingFieldSelection({
+      trainingFieldId: rawTrainingFieldId,
+      trainingFieldPieceIds: rawTrainingFieldPieceId,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Invalid training time." },
@@ -202,11 +221,32 @@ export async function POST(
   }
   let trainingDateTimes: Record<string, string> = {};
   if (trainingDates.length > 0) {
+    const hasTrainingFields = await clubHasTrainingFields(id);
+    if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
+      return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
+    }
+    try {
+      await verifyTrainingFieldSelection(id, trainingFieldSelection);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Invalid training field." },
+        { status: 400 },
+      );
+    }
     try {
       trainingDateTimes = buildTrainingDateTimes({
         rawTrainingDateTimes,
         trainingDates,
         fallbackTrainingTime: trainingTime,
+      });
+      await assertNoTrainingFieldConflict({
+        clubId: id,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        excludeTeamGroups: teamGroups,
       });
     } catch (error) {
       return NextResponse.json(
@@ -243,6 +283,9 @@ export async function POST(
           trainingDates,
           trainingTime: persistedTrainingTime,
           trainingDateTimes,
+          trainingDurationMinutes,
+          trainingFieldId: trainingFieldSelection.trainingFieldId,
+          trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
           trainingWeekdays,
           trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
         },
@@ -253,6 +296,10 @@ export async function POST(
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+          trainingFieldSelections: true,
           trainingWeekdays: true,
           createdAt: true,
           updatedAt: true,
@@ -272,6 +319,9 @@ export async function POST(
               trainingDates,
               trainingTime: persistedTrainingTime,
               trainingDateTimes,
+              trainingDurationMinutes,
+              trainingFieldId: trainingFieldSelection.trainingFieldId,
+              trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
               trainingWeekdays,
               trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
             },
@@ -281,6 +331,9 @@ export async function POST(
               trainingDates,
               trainingTime: persistedTrainingTime,
               trainingDateTimes,
+              trainingDurationMinutes,
+              trainingFieldId: trainingFieldSelection.trainingFieldId,
+              trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
               trainingWeekdays,
               trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
             },

@@ -128,6 +128,9 @@ export async function GET(
       trainingWeekdays: true,
       trainingWindowDays: true,
       trainingGroupMode: true,
+      trainingDurationMinutes: true,
+      trainingFieldId: true,
+      trainingFieldPieceIds: true,
     },
   });
   if (!club) {
@@ -148,6 +151,9 @@ export async function GET(
           trainingDateTimes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
         },
       })
     : null;
@@ -168,6 +174,9 @@ export async function GET(
           trainingDateTimes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
           players: { select: { playerId: true } },
         },
       })
@@ -191,6 +200,9 @@ export async function GET(
           trainingDateTimes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
         },
       });
 
@@ -214,6 +226,9 @@ export async function GET(
           trainingDateTimes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
         },
       })
     : null;
@@ -252,6 +267,38 @@ export async function GET(
       ? trainingGroup.trainingTime
       : trainingGroupOverride?.trainingTime ?? groupSchedule?.trainingTime ?? club.trainingTime,
   );
+  const resolvedTrainingDurationMinutes =
+    customTrainingGroup
+      ? customTrainingGroup.trainingDurationMinutes
+      : trainingGroup
+      ? trainingGroup.trainingDurationMinutes
+      : trainingGroupOverride?.trainingDurationMinutes ?? groupSchedule?.trainingDurationMinutes ?? club.trainingDurationMinutes;
+  const resolvedTrainingFieldId =
+    customTrainingGroup
+      ? customTrainingGroup.trainingFieldId
+      : trainingGroup
+      ? trainingGroup.trainingFieldId
+      : trainingGroupOverride?.trainingFieldId ?? groupSchedule?.trainingFieldId ?? club.trainingFieldId ?? null;
+  const resolvedTrainingFieldPieceIds =
+    customTrainingGroup
+      ? customTrainingGroup.trainingFieldPieceIds
+      : trainingGroup
+      ? trainingGroup.trainingFieldPieceIds
+      : trainingGroupOverride?.trainingFieldPieceIds ?? groupSchedule?.trainingFieldPieceIds ?? club.trainingFieldPieceIds ?? [];
+
+  const trainingField = resolvedTrainingFieldId
+    ? await prisma.field.findUnique({
+        where: { id: resolvedTrainingFieldId },
+        select: {
+          id: true,
+          name: true,
+          pieces: {
+            select: { id: true, name: true },
+            orderBy: { sortOrder: "asc" },
+          },
+        },
+      })
+    : null;
 
   const upcomingDates = getConfiguredTrainingDates({
     trainingDates: resolvedTrainingDates,
@@ -281,6 +328,10 @@ export async function GET(
       teamGroup,
       trainingGroupId: trainingGroup?.id ?? null,
       customTrainingGroupId: customTrainingGroup?.id ?? null,
+      trainingDurationMinutes: resolvedTrainingDurationMinutes,
+      trainingFieldId: resolvedTrainingFieldId,
+      trainingFieldPieceIds: resolvedTrainingFieldPieceIds,
+      trainingField,
     });
   }
 
@@ -372,6 +423,10 @@ export async function GET(
       weekday: getWeekdayMondayFirst(trainingDate, FIXED_TIME_ZONE),
       trainingTime: resolvedTrainingDateTimes[trainingDate] ?? resolvedDefaultTrainingTime,
       note: note?.note ?? "",
+      trainingDurationMinutes: resolvedTrainingDurationMinutes,
+      trainingFieldId: resolvedTrainingFieldId,
+      trainingFieldPieceIds: resolvedTrainingFieldPieceIds,
+      trainingField,
       stats: {
         total: totalPlayers,
         optedOut: playersWithStatus.filter((player) => player.optedOut).length,

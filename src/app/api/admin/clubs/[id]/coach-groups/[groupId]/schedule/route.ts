@@ -6,8 +6,17 @@ import {
   getTodayIsoDateInTimeZone,
   isIsoDate,
   isoDateToUtcMidnight,
+  normalizeTrainingDurationMinutes,
   normalizeTrainingTime,
 } from "@/lib/training";
+import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import {
+  clubHasTrainingFields,
+  normalizeStoredTrainingFieldSelections,
+  parseTrainingFieldSelection,
+  parseTrainingFieldSelectionsByDate,
+  verifyTrainingFieldSelectionsByDate,
+} from "@/lib/trainingFields";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,6 +94,10 @@ export async function GET(
       trainingDates: true,
       trainingDateTimes: true,
       trainingTime: true,
+      trainingDurationMinutes: true,
+      trainingFieldId: true,
+      trainingFieldPieceIds: true,
+      trainingFieldSelections: true,
       trainingWeekdays: true,
       trainingWindowDays: true,
     },
@@ -108,6 +121,14 @@ export async function GET(
   return NextResponse.json({
     trainingDates: resolvedDates,
     trainingTime: row.trainingTime ?? null,
+    trainingDurationMinutes: row.trainingDurationMinutes,
+    trainingFieldId: row.trainingFieldId,
+    trainingFieldPieceIds: row.trainingFieldPieceIds,
+    trainingFieldSelections: normalizeStoredTrainingFieldSelections(
+      row.trainingFieldSelections,
+      resolvedDates,
+      { trainingFieldId: row.trainingFieldId, trainingFieldPieceIds: row.trainingFieldPieceIds ?? [] },
+    ),
     trainingDateTimes: resolvedDateTimes,
     trainingWeekdays: row.trainingWeekdays,
     trainingWindowDays: row.trainingWindowDays,
@@ -139,14 +160,25 @@ export async function PUT(
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
   const rawTrainingTime = (body as { trainingTime?: unknown }).trainingTime;
   const rawTrainingDateTimes = (body as { trainingDateTimes?: unknown }).trainingDateTimes;
+  const rawTrainingDurationMinutes = (body as { trainingDurationMinutes?: unknown }).trainingDurationMinutes;
+  const rawTrainingFieldId = (body as { trainingFieldId?: unknown }).trainingFieldId;
+  const rawTrainingFieldPieceId = (body as { trainingFieldPieceIds?: unknown }).trainingFieldPieceIds;
+  const rawTrainingFieldSelections = (body as { trainingFieldSelections?: unknown }).trainingFieldSelections;
   const rawWeekdays = (body as { trainingWeekdays?: unknown }).trainingWeekdays;
   const rawWindowDays = (body as { trainingWindowDays?: unknown }).trainingWindowDays;
 
   let trainingTime: string | null = null;
+  let trainingDurationMinutes = 60;
+  let trainingFieldSelection = { trainingFieldId: null as string | null, trainingFieldPieceIds: [] as string[] };
   try {
     trainingTime = normalizeTrainingTime(rawTrainingTime);
+    trainingDurationMinutes = normalizeTrainingDurationMinutes(rawTrainingDurationMinutes);
+    trainingFieldSelection = parseTrainingFieldSelection({
+      trainingFieldId: rawTrainingFieldId,
+      trainingFieldPieceIds: rawTrainingFieldPieceId,
+    });
   } catch {
-    return NextResponse.json({ error: "Invalid trainingTime" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid trainingTime, trainingDurationMinutes, or training field" }, { status: 400 });
   }
 
   let trainingDates: string[] = [];
@@ -192,11 +224,34 @@ export async function PUT(
   }
 
   let trainingDateTimes: Record<string, string> = {};
+  let trainingFieldSelections: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> = {};
   try {
+    if (trainingDates.length > 0) {
+      const hasTrainingFields = await clubHasTrainingFields(clubId);
+      if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
+        return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
+      }
+      trainingFieldSelections = parseTrainingFieldSelectionsByDate({
+        trainingFieldSelections: rawTrainingFieldSelections,
+        trainingDates,
+        fallback: trainingFieldSelection,
+      });
+      await verifyTrainingFieldSelectionsByDate(clubId, trainingFieldSelections);
+    }
     trainingDateTimes = buildTrainingDateTimes({
       rawTrainingDateTimes,
       trainingDates,
       fallbackTrainingTime: trainingTime,
+    });
+    await assertNoTrainingFieldConflict({
+      clubId,
+      trainingDates,
+      trainingDateTimes,
+      trainingDurationMinutes,
+      trainingFieldId: trainingFieldSelection.trainingFieldId,
+      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+      trainingFieldSelections,
+      exclude: { type: "coachGroup", id: groupId },
     });
   } catch (err) {
     return NextResponse.json(
@@ -211,6 +266,10 @@ export async function PUT(
       trainingDates,
       trainingWeekdays,
       trainingTime,
+      trainingDurationMinutes,
+      trainingFieldId: trainingFieldSelection.trainingFieldId,
+      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+      trainingFieldSelections,
       trainingDateTimes,
       trainingWindowDays,
     },
@@ -233,6 +292,10 @@ export async function PUT(
   return NextResponse.json({
     trainingDates: resolvedDates,
     trainingTime,
+    trainingDurationMinutes,
+    trainingFieldId: trainingFieldSelection.trainingFieldId,
+    trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+    trainingFieldSelections,
     trainingDateTimes: resolvedDateTimes,
     trainingWeekdays,
     trainingWindowDays,
