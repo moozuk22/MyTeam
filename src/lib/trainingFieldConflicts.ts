@@ -182,6 +182,17 @@ function formatConflictMessage(input: {
   return `Теренът вече е зает на ${formatIsoDateForBgDisplay(input.date)} от ${startTime} до ${endTime} за ${input.label}.`;
 }
 
+function formatTimeConflictMessage(input: {
+  date: string;
+  startMinutes: number;
+  durationMinutes: number;
+  label: string;
+}): string {
+  const startTime = formatMinutesAsTime(input.startMinutes);
+  const endTime = formatMinutesAsTime(input.startMinutes + input.durationMinutes);
+  return `На ${formatIsoDateForBgDisplay(input.date)} вече има тренировка от ${startTime} до ${endTime} за ${input.label}.`;
+}
+
 async function loadSchedules(clubId: string, relevantDates: string[]): Promise<ExistingSchedule[]> {
   const [club, teamSchedules, trainingGroups, customGroups, coachGroups] = await Promise.all([
     prisma.club.findUnique({
@@ -340,6 +351,148 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
   return schedules;
 }
 
+async function loadAllSchedules(clubId: string, relevantDates: string[]): Promise<ExistingSchedule[]> {
+  const [club, teamSchedules, trainingGroups, customGroups, coachGroups] = await Promise.all([
+    prisma.club.findUnique({
+      where: { id: clubId },
+      select: {
+        trainingDates: true,
+        trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
+      },
+    }),
+    prisma.clubTrainingGroupSchedule.findMany({
+      where: { clubId, trainingDates: { hasSome: relevantDates } },
+      select: {
+        teamGroup: true,
+        trainingDates: true,
+        trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
+      },
+    }),
+    prisma.clubTrainingScheduleGroup.findMany({
+      where: { clubId, trainingDates: { hasSome: relevantDates } },
+      select: {
+        id: true,
+        name: true,
+        teamGroups: true,
+        trainingDates: true,
+        trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
+      },
+    }),
+    prisma.clubCustomTrainingGroup.findMany({
+      where: { clubId, trainingDates: { hasSome: relevantDates } },
+      select: {
+        id: true,
+        name: true,
+        trainingDates: true,
+        trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
+      },
+    }),
+    prisma.coachGroup.findMany({
+      where: { clubId, trainingDates: { hasSome: relevantDates } },
+      select: {
+        id: true,
+        name: true,
+        trainingDates: true,
+        trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
+      },
+    }),
+  ]);
+
+  const schedules: ExistingSchedule[] = [];
+
+  if (club && club.trainingDates.some((date) => relevantDates.includes(date))) {
+    schedules.push({
+      label: "клубен график",
+      type: "club",
+      trainingDates: club.trainingDates,
+      trainingDateTimes: club.trainingDateTimes,
+      trainingDurationMinutes: club.trainingDurationMinutes,
+      trainingFieldId: club.trainingFieldId,
+      trainingFieldPieceIds: club.trainingFieldPieceIds,
+      trainingFieldSelections: club.trainingFieldSelections,
+    });
+  }
+
+  for (const schedule of teamSchedules) {
+    schedules.push({
+      label: `набор ${schedule.teamGroup}`,
+      type: "teamGroup",
+      teamGroup: schedule.teamGroup,
+      trainingDates: schedule.trainingDates,
+      trainingDateTimes: schedule.trainingDateTimes,
+      trainingDurationMinutes: schedule.trainingDurationMinutes,
+      trainingFieldId: schedule.trainingFieldId,
+      trainingFieldPieceIds: schedule.trainingFieldPieceIds,
+      trainingFieldSelections: schedule.trainingFieldSelections,
+    });
+  }
+
+  for (const group of trainingGroups) {
+    schedules.push({
+      label: `сборен отбор ${group.name}`,
+      type: "trainingGroup",
+      id: group.id,
+      teamGroups: group.teamGroups,
+      trainingDates: group.trainingDates,
+      trainingDateTimes: group.trainingDateTimes,
+      trainingDurationMinutes: group.trainingDurationMinutes,
+      trainingFieldId: group.trainingFieldId,
+      trainingFieldPieceIds: group.trainingFieldPieceIds,
+      trainingFieldSelections: group.trainingFieldSelections,
+    });
+  }
+
+  for (const group of customGroups) {
+    schedules.push({
+      label: `персонализирана група ${group.name}`,
+      type: "customGroup",
+      id: group.id,
+      trainingDates: group.trainingDates,
+      trainingDateTimes: group.trainingDateTimes,
+      trainingDurationMinutes: group.trainingDurationMinutes,
+      trainingFieldId: group.trainingFieldId,
+      trainingFieldPieceIds: group.trainingFieldPieceIds,
+      trainingFieldSelections: group.trainingFieldSelections,
+    });
+  }
+
+  for (const group of coachGroups) {
+    schedules.push({
+      label: `треньорска група ${group.name}`,
+      type: "coachGroup",
+      id: group.id,
+      trainingDates: group.trainingDates,
+      trainingDateTimes: group.trainingDateTimes,
+      trainingDurationMinutes: group.trainingDurationMinutes,
+      trainingFieldId: group.trainingFieldId,
+      trainingFieldPieceIds: group.trainingFieldPieceIds,
+      trainingFieldSelections: group.trainingFieldSelections,
+    });
+  }
+
+  return schedules;
+}
+
 export async function assertNoTrainingFieldConflict(input: TrainingFieldConflictInput): Promise<void> {
   const hasAnySelectedField = input.trainingFieldId || Object.values(input.trainingFieldSelections ?? {}).some(
     (selection) => selection.trainingFieldId,
@@ -378,6 +531,46 @@ export async function assertNoTrainingFieldConflict(input: TrainingFieldConflict
       }
       if (overlaps(nextStart, input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
         throw new Error(formatConflictMessage({
+          date,
+          startMinutes: existingStart,
+          durationMinutes: schedule.trainingDurationMinutes,
+          label: schedule.label,
+        }));
+      }
+    }
+  }
+}
+
+export async function assertNoTrainingTimeConflict(input: {
+  clubId: string;
+  trainingDates: string[];
+  trainingDateTimes: Record<string, string>;
+  trainingDurationMinutes: number;
+  exclude?: TrainingFieldConflictInput["exclude"];
+  excludeTeamGroups?: number[];
+}): Promise<void> {
+  if (input.trainingDates.length === 0) return;
+
+  const relevantDates = Array.from(new Set(input.trainingDates));
+  const schedules = await loadAllSchedules(input.clubId, relevantDates);
+  const excludedTeamGroups = new Set(input.excludeTeamGroups ?? []);
+
+  for (const schedule of schedules) {
+    if (
+      isSameExcludedSchedule(schedule, input.exclude) ||
+      isExcludedTeamGroupSchedule(schedule, excludedTeamGroups)
+    ) {
+      continue;
+    }
+
+    const scheduleDateTimes = normalizeStoredDateTimes(schedule.trainingDateTimes);
+    for (const date of relevantDates) {
+      if (!schedule.trainingDates.includes(date)) continue;
+      const nextStart = parseTimeToMinutes(input.trainingDateTimes[date] ?? "");
+      const existingStart = parseTimeToMinutes(scheduleDateTimes[date] ?? "");
+      if (nextStart === null || existingStart === null) continue;
+      if (overlaps(nextStart, input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
+        throw new Error(formatTimeConflictMessage({
           date,
           startMinutes: existingStart,
           durationMinutes: schedule.trainingDurationMinutes,

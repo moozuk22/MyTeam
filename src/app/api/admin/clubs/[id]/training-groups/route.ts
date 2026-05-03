@@ -13,7 +13,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
 import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
 
 export const runtime = "nodejs";
@@ -244,15 +244,25 @@ export async function POST(
         trainingDates,
         fallbackTrainingTime: trainingTime,
       });
-      await assertNoTrainingFieldConflict({
-        clubId: id,
-        trainingDates,
-        trainingDateTimes,
-        trainingDurationMinutes,
-        trainingFieldId: trainingFieldSelection.trainingFieldId,
-        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
-        excludeTeamGroups: teamGroups,
-      });
+      if (hasTrainingFields) {
+        await assertNoTrainingFieldConflict({
+          clubId: id,
+          trainingDates,
+          trainingDateTimes,
+          trainingDurationMinutes,
+          trainingFieldId: trainingFieldSelection.trainingFieldId,
+          trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+          excludeTeamGroups: teamGroups,
+        });
+      } else {
+        await assertNoTrainingTimeConflict({
+          clubId: id,
+          trainingDates,
+          trainingDateTimes,
+          trainingDurationMinutes,
+          excludeTeamGroups: teamGroups,
+        });
+      }
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Invalid training date times." },

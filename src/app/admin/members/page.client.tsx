@@ -4530,10 +4530,11 @@ function AdminMembersPageContent() {
         setTrainingAttendanceError("Custom training group not found.");
         return;
       }
+      const activeIds = new Set(members.filter((m) => m.isActive).map((m) => m.id));
       setTrainingGroupEditError("");
       setTrainingGroupEditId(group.id);
       setTrainingGroupEditName(group.name);
-      setTrainingGroupEditPlayerIds(group.playerIds);
+      setTrainingGroupEditPlayerIds(group.playerIds.filter((id) => activeIds.has(id)));
       setCustomGroupEditSearch("");
       setTrainingGroupEditOpen(true);
       return;

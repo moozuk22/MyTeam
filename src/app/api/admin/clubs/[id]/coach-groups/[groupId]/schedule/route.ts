@@ -9,7 +9,7 @@ import {
   normalizeTrainingDurationMinutes,
   normalizeTrainingTime,
 } from "@/lib/training";
-import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
 import {
   clubHasTrainingFields,
   normalizeStoredTrainingFieldSelections,
@@ -248,16 +248,26 @@ export async function PUT(
       trainingDates,
       fallbackTrainingTime: trainingTime,
     });
-    await assertNoTrainingFieldConflict({
-      clubId,
-      trainingDates,
-      trainingDateTimes,
-      trainingDurationMinutes,
-      trainingFieldId: trainingFieldSelection.trainingFieldId,
-      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
-      trainingFieldSelections,
-      exclude: { type: "coachGroup", id: groupId },
-    });
+    if (hasTrainingFields) {
+      await assertNoTrainingFieldConflict({
+        clubId,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
+        exclude: { type: "coachGroup", id: groupId },
+      });
+    } else {
+      await assertNoTrainingTimeConflict({
+        clubId,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        exclude: { type: "coachGroup", id: groupId },
+      });
+    }
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Invalid trainingDateTimes" },

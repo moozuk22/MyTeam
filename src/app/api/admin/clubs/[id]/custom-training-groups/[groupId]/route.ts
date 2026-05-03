@@ -13,7 +13,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
 import {
   clubHasTrainingFields,
   parseTrainingFieldSelection,
@@ -256,16 +256,26 @@ export async function PATCH(
         }
       }
       try {
-        await assertNoTrainingFieldConflict({
-          clubId,
-          trainingDates: nextTrainingDates,
-          trainingDateTimes: nextTrainingDateTimes,
-          trainingDurationMinutes: nextTrainingDurationMinutes,
-          trainingFieldId: nextTrainingFieldId,
-          trainingFieldPieceIds: nextTrainingFieldPieceIds,
-          trainingFieldSelections: nextTrainingFieldSelections,
-          exclude: { type: "customGroup", id: groupId },
-        });
+        if (hasTrainingFields) {
+          await assertNoTrainingFieldConflict({
+            clubId,
+            trainingDates: nextTrainingDates,
+            trainingDateTimes: nextTrainingDateTimes,
+            trainingDurationMinutes: nextTrainingDurationMinutes,
+            trainingFieldId: nextTrainingFieldId,
+            trainingFieldPieceIds: nextTrainingFieldPieceIds,
+            trainingFieldSelections: nextTrainingFieldSelections,
+            exclude: { type: "customGroup", id: groupId },
+          });
+        } else {
+          await assertNoTrainingTimeConflict({
+            clubId,
+            trainingDates: nextTrainingDates,
+            trainingDateTimes: nextTrainingDateTimes,
+            trainingDurationMinutes: nextTrainingDurationMinutes,
+            exclude: { type: "customGroup", id: groupId },
+          });
+        }
       } catch (error) {
         return NextResponse.json(
           { error: error instanceof Error ? error.message : "Invalid training field schedule." },

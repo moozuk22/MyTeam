@@ -14,7 +14,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
 import {
   clubHasTrainingFields,
   normalizeStoredTrainingFieldSelections,
@@ -392,19 +392,32 @@ export async function PUT(
         trainingDates,
         fallbackTrainingTime: trainingTime,
       });
-      await assertNoTrainingFieldConflict({
-        clubId: id,
-        trainingDates,
-        trainingDateTimes,
-        trainingDurationMinutes,
-        trainingFieldId: trainingFieldSelection.trainingFieldId,
-        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
-        trainingFieldSelections,
-        exclude: teamGroup === null
-          ? { type: "club" }
-          : { type: "teamGroup", teamGroup },
-        excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
-      });
+      if (hasTrainingFields) {
+        await assertNoTrainingFieldConflict({
+          clubId: id,
+          trainingDates,
+          trainingDateTimes,
+          trainingDurationMinutes,
+          trainingFieldId: trainingFieldSelection.trainingFieldId,
+          trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+          trainingFieldSelections,
+          exclude: teamGroup === null
+            ? { type: "club" }
+            : { type: "teamGroup", teamGroup },
+          excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
+        });
+      } else {
+        await assertNoTrainingTimeConflict({
+          clubId: id,
+          trainingDates,
+          trainingDateTimes,
+          trainingDurationMinutes,
+          exclude: teamGroup === null
+            ? { type: "club" }
+            : { type: "teamGroup", teamGroup },
+          excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
+        });
+      }
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Invalid training date times." },
