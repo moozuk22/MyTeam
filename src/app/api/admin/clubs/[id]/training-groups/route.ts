@@ -220,18 +220,23 @@ export async function POST(
     }
   }
   let trainingDateTimes: Record<string, string> = {};
+  const hasTrainingFields = trainingDates.length > 0 ? await clubHasTrainingFields(id) : false;
+  if (!hasTrainingFields) {
+    trainingFieldSelection = { trainingFieldId: null, trainingFieldPieceIds: [] };
+  }
   if (trainingDates.length > 0) {
-    const hasTrainingFields = await clubHasTrainingFields(id);
     if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
       return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
     }
-    try {
-      await verifyTrainingFieldSelection(id, trainingFieldSelection);
-    } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Invalid training field." },
-        { status: 400 },
-      );
+    if (hasTrainingFields) {
+      try {
+        await verifyTrainingFieldSelection(id, trainingFieldSelection);
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "Invalid training field." },
+          { status: 400 },
+        );
+      }
     }
     try {
       trainingDateTimes = buildTrainingDateTimes({

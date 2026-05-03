@@ -8657,7 +8657,8 @@ function AdminMembersPageContent() {
                       </div>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysFieldStep && effectiveTrainingDaysActiveStep === "field" && trainingFields.length === 0 && (
-                      <div style={{ display: "flex", justifyContent: "center", marginTop: "8px", order: 3 }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginTop: "8px", order: 3 }}>
+                        <p style={{ margin: 0, textAlign: "center", opacity: 0.6, fontSize: "0.9em" }}>Изборът на терен не е задължителен.</p>
                         <button
                             type="button"
                             className="amp-btn amp-btn--ghost"

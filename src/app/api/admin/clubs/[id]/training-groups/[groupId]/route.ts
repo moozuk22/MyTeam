@@ -298,23 +298,32 @@ export async function PATCH(
       }
     }
     const finalTrainingDates = hasTrainingDatesField ? (nextTrainingDates ?? []) : (group.trainingDates ?? []);
+    let hasTrainingFields = false;
+    if (finalTrainingDates.length > 0 || hasTrainingFieldField || hasTrainingFieldPieceField || hasTrainingFieldSelectionsField) {
+      hasTrainingFields = await clubHasTrainingFields(clubId);
+      if (!hasTrainingFields) {
+        nextTrainingFieldId = null;
+        nextTrainingFieldPieceIds = [];
+      }
+    }
     const nextTrainingFieldSelections = parseTrainingFieldSelectionsByDate({
       trainingFieldSelections: hasTrainingFieldSelectionsField ? payload.trainingFieldSelections : group.trainingFieldSelections,
       trainingDates: finalTrainingDates,
       fallback: { trainingFieldId: nextTrainingFieldId, trainingFieldPieceIds: nextTrainingFieldPieceIds },
     });
     if (finalTrainingDates.length > 0) {
-      const hasTrainingFields = await clubHasTrainingFields(clubId);
       if (hasTrainingFields && !nextTrainingFieldId) {
         return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
       }
-      try {
-        await verifyTrainingFieldSelectionsByDate(clubId, nextTrainingFieldSelections);
-      } catch (error) {
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "Invalid training field." },
-          { status: 400 },
-        );
+      if (hasTrainingFields) {
+        try {
+          await verifyTrainingFieldSelectionsByDate(clubId, nextTrainingFieldSelections);
+        } catch (error) {
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : "Invalid training field." },
+            { status: 400 },
+          );
+        }
       }
     }
     const fallbackTrainingTime: string | null = hasTrainingTimeField ? (nextTrainingTime ?? null) : (group.trainingTime ?? null);

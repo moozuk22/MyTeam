@@ -226,8 +226,11 @@ export async function PUT(
   let trainingDateTimes: Record<string, string> = {};
   let trainingFieldSelections: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> = {};
   try {
+    const hasTrainingFields = trainingDates.length > 0 ? await clubHasTrainingFields(clubId) : false;
+    if (!hasTrainingFields) {
+      trainingFieldSelection = { trainingFieldId: null, trainingFieldPieceIds: [] };
+    }
     if (trainingDates.length > 0) {
-      const hasTrainingFields = await clubHasTrainingFields(clubId);
       if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
         return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
       }
@@ -236,7 +239,9 @@ export async function PUT(
         trainingDates,
         fallback: trainingFieldSelection,
       });
-      await verifyTrainingFieldSelectionsByDate(clubId, trainingFieldSelections);
+      if (hasTrainingFields) {
+        await verifyTrainingFieldSelectionsByDate(clubId, trainingFieldSelections);
+      }
     }
     trainingDateTimes = buildTrainingDateTimes({
       rawTrainingDateTimes,

@@ -226,12 +226,17 @@ export async function POST(
       trainingFieldPieceIds: rawTrainingFieldPieceId,
     });
     trainingDates = normalizeTrainingDates(rawTrainingDates);
+    const hasTrainingFields = trainingDates.length > 0 ? await clubHasTrainingFields(id) : false;
+    if (!hasTrainingFields) {
+      trainingFieldSelection = { trainingFieldId: null, trainingFieldPieceIds: [] };
+    }
     if (trainingDates.length > 0) {
-      const hasTrainingFields = await clubHasTrainingFields(id);
       if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
         throw new Error("Треньорът трябва да избере терен.");
       }
-      await verifyTrainingFieldSelection(id, trainingFieldSelection);
+      if (hasTrainingFields) {
+        await verifyTrainingFieldSelection(id, trainingFieldSelection);
+      }
       trainingDateTimes = buildTrainingDateTimes({
         rawTrainingDateTimes,
         trainingDates,

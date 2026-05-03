@@ -228,23 +228,32 @@ export async function PATCH(
         );
       }
     }
+    let hasTrainingFields = false;
+    if (nextTrainingDates.length > 0 || hasTrainingField || hasTrainingFieldPiece || hasTrainingFieldSelections) {
+      hasTrainingFields = await clubHasTrainingFields(clubId);
+      if (!hasTrainingFields) {
+        nextTrainingFieldId = null;
+        nextTrainingFieldPieceIds = [];
+      }
+    }
     const nextTrainingFieldSelections = parseTrainingFieldSelectionsByDate({
       trainingFieldSelections: hasTrainingFieldSelections ? payload.trainingFieldSelections : existing.trainingFieldSelections,
       trainingDates: nextTrainingDates,
       fallback: { trainingFieldId: nextTrainingFieldId, trainingFieldPieceIds: nextTrainingFieldPieceIds },
     });
     if (nextTrainingDates.length > 0) {
-      const hasTrainingFields = await clubHasTrainingFields(clubId);
       if (hasTrainingFields && !nextTrainingFieldId) {
         return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
       }
-      try {
-        await verifyTrainingFieldSelectionsByDate(clubId, nextTrainingFieldSelections);
-      } catch (error) {
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "Invalid training field." },
-          { status: 400 },
-        );
+      if (hasTrainingFields) {
+        try {
+          await verifyTrainingFieldSelectionsByDate(clubId, nextTrainingFieldSelections);
+        } catch (error) {
+          return NextResponse.json(
+            { error: error instanceof Error ? error.message : "Invalid training field." },
+            { status: 400 },
+          );
+        }
       }
       try {
         await assertNoTrainingFieldConflict({
@@ -274,14 +283,20 @@ export async function PATCH(
       return NextResponse.json({ error: "В тази група няма избрани активни играчи." }, { status: 400 });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      if (hasPlayerIds) {
-        const players = await tx.player.findMany({
-          where: { id: { in: playerIds }, clubId, isActive: true },
-          select: { id: true },
-        });
-        if (players.length !== playerIds.length) throw new Error("INVALID_PLAYERS");
+    if (hasPlayerIds) {
+      const validPlayers = await prisma.player.findMany({
+        where: { id: { in: playerIds }, clubId, isActive: true },
+        select: { id: true },
+      });
+      if (validPlayers.length !== playerIds.length) {
+        return NextResponse.json(
+          { error: "Избраните играчи трябва да са активни и да принадлежат към този клуб." },
+          { status: 400 },
+        );
       }
+    }
+
+    await prisma.$transaction(async (tx) => {
       await tx.clubCustomTrainingGroup.update({
         where: { id: groupId },
         data: {
@@ -311,31 +326,32 @@ export async function PATCH(
           });
         }
       }
-      return tx.clubCustomTrainingGroup.findUniqueOrThrow({
-        where: { id: groupId },
-        select: {
-          id: true,
-          name: true,
-          trainingDates: true,
-          trainingTime: true,
-          trainingDateTimes: true,
-          trainingDurationMinutes: true,
-          trainingFieldId: true,
-          trainingFieldPieceIds: true,
-          trainingFieldSelections: true,
-          coachGroupId: true,
-          trainingWeekdays: true,
-          createdAt: true,
-          updatedAt: true,
-          players: {
-            orderBy: { player: { fullName: "asc" } },
-            select: {
-              playerId: true,
-              player: { select: { fullName: true, teamGroup: true } },
-            },
+    }, { timeout: 15000 });
+
+    const updated = await prisma.clubCustomTrainingGroup.findUniqueOrThrow({
+      where: { id: groupId },
+      select: {
+        id: true,
+        name: true,
+        trainingDates: true,
+        trainingTime: true,
+        trainingDateTimes: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+        trainingFieldSelections: true,
+        coachGroupId: true,
+        trainingWeekdays: true,
+        createdAt: true,
+        updatedAt: true,
+        players: {
+          orderBy: { player: { fullName: "asc" } },
+          select: {
+            playerId: true,
+            player: { select: { fullName: true, teamGroup: true } },
           },
         },
-      });
+      },
     });
 
     let notifications = null;
@@ -350,9 +366,6 @@ export async function PATCH(
 
     return NextResponse.json({ ...serializeGroup(updated), notifications });
   } catch (error) {
-    if (error instanceof Error && error.message === "INVALID_PLAYERS") {
-      return NextResponse.json({ error: "Избраните играчи трябва да са активни и да принадлежат към този клуб." }, { status: 400 });
-    }
     console.error("Custom training groups PATCH error:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Internal Server Error" }, { status: 500 });
   }

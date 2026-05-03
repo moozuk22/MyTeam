@@ -358,10 +358,13 @@ export async function PUT(
       maxDays: TRAINING_SELECTION_WINDOW_DAYS,
     });
   }
+  const hasTrainingFields = trainingDates.length > 0 ? await clubHasTrainingFields(id) : false;
+  if (!hasTrainingFields) {
+    trainingFieldSelection = { trainingFieldId: null, trainingFieldPieceIds: [] };
+  }
   let trainingDateTimes: Record<string, string> = {};
   let trainingFieldSelections: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> = {};
   if (trainingDates.length > 0) {
-    const hasTrainingFields = await clubHasTrainingFields(id);
     if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
       return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
     }
@@ -374,7 +377,9 @@ export async function PUT(
       if (hasTrainingFields && trainingDates.some((date) => !trainingFieldSelections[date]?.trainingFieldId)) {
         return NextResponse.json({ error: "Треньорът трябва да избере терен за всеки тренировъчен ден." }, { status: 400 });
       }
-      await verifyTrainingFieldSelectionsByDate(id, trainingFieldSelections);
+      if (hasTrainingFields) {
+        await verifyTrainingFieldSelectionsByDate(id, trainingFieldSelections);
+      }
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Invalid training field." },
