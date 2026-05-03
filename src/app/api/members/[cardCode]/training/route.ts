@@ -148,6 +148,7 @@ async function getMemberTrainingContext(cardCode: string) {
               trainingDates: true,
               trainingDateTimes: true,
               trainingTime: true,
+              trainingDurationMinutes: true,
               trainingWeekdays: true,
               trainingWindowDays: true,
               trainingGroupMode: true,
@@ -160,6 +161,7 @@ async function getMemberTrainingContext(cardCode: string) {
                   trainingDates: true,
                   trainingDateTimes: true,
                   trainingTime: true,
+                  trainingDurationMinutes: true,
                   trainingWeekdays: true,
                   trainingWindowDays: true,
                 },
@@ -171,6 +173,7 @@ async function getMemberTrainingContext(cardCode: string) {
               trainingDates: true,
               trainingDateTimes: true,
               trainingTime: true,
+              trainingDurationMinutes: true,
               trainingWeekdays: true,
               trainingWindowDays: true,
             },
@@ -207,6 +210,7 @@ async function getMemberTrainingContext(cardCode: string) {
           trainingDates: true,
           trainingDateTimes: true,
           trainingTime: true,
+          trainingDurationMinutes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -231,6 +235,7 @@ async function getMemberTrainingContext(cardCode: string) {
           trainingDates: true,
           trainingDateTimes: true,
           trainingTime: true,
+          trainingDurationMinutes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
         },
@@ -282,6 +287,14 @@ async function getMemberTrainingContext(cardCode: string) {
           card.player.club.trainingTime ??
           null,
   );
+  const scheduleDurationMinutes =
+    hasCoachGroupSchedule
+      ? coachGroupSchedule!.trainingDurationMinutes
+      : isCustomGroupMode
+        ? customGroup?.trainingDurationMinutes ?? card.player.club.trainingDurationMinutes
+        : trainingGroupOverride?.trainingDurationMinutes ??
+          groupSchedule?.trainingDurationMinutes ??
+          card.player.club.trainingDurationMinutes;
 
   return {
     cardCode: card.cardCode,
@@ -294,6 +307,7 @@ async function getMemberTrainingContext(cardCode: string) {
     upcomingDates,
     trainingDateTimes: scheduleDateTimes,
     fallbackTrainingTime: scheduleFallbackTime,
+    trainingDurationMinutes: scheduleDurationMinutes,
   };
 }
 
@@ -373,6 +387,7 @@ export async function GET(
       optOutReasonCode: optedOutByDate.get(date)?.reasonCode ?? null,
       optOutReasonText: optedOutByDate.get(date)?.reasonText ?? null,
       trainingTime: context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
+      trainingDurationMinutes: context.trainingDurationMinutes,
       note: noteByDate.get(date) ?? "",
     })),
   });

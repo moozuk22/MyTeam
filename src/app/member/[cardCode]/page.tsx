@@ -59,6 +59,7 @@ interface TrainingDayStatus {
   optOutReasonCode?: TrainingOptOutReasonCode | null;
   optOutReasonText?: string | null;
   trainingTime?: string;
+  trainingDurationMinutes?: number;
   note: string;
 }
 
@@ -238,6 +239,15 @@ function getTrainingDateTimeMs(dateIso: string, trainingTime?: string): number {
       : "00:00";
   const parsed = new Date(`${dateIso}T${normalizedTime}:00`);
   return parsed.getTime();
+}
+
+function formatTrainingDuration(minutes?: number): string {
+  if (!Number.isInteger(minutes) || !minutes || minutes < 1) {
+    return "";
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
 export default function MemberCardPage({
@@ -591,6 +601,9 @@ export default function MemberCardPage({
                   : null,
               optOutReasonText: String(raw.optOutReasonText ?? "").trim() || null,
               trainingTime: String(raw.trainingTime ?? "").trim(),
+              trainingDurationMinutes: Number.isInteger(Number(raw.trainingDurationMinutes))
+                ? Number(raw.trainingDurationMinutes)
+                : undefined,
               note: String(raw.note ?? ""),
             } satisfies TrainingDayStatus;
           })
@@ -2254,6 +2267,11 @@ export default function MemberCardPage({
                       {trainingDetailsItem.trainingTime?.trim() && (
                         <p className="training-note-date training-note-time" style={{ marginTop: "6px", opacity: 0.9 }}>
                           {`Час: ${trainingDetailsItem.trainingTime}`}
+                        </p>
+                      )}
+                      {formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes) && (
+                        <p className="training-note-date training-note-time" style={{ marginTop: "6px", opacity: 0.9 }}>
+                          {`Продължителност: ${formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes)}`}
                         </p>
                       )}
                       {trainingDetailsItem.note?.trim() && (
