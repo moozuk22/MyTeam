@@ -1471,6 +1471,45 @@
   margin: 8px 0 10px;
 }
 
+.amp-training-calendar--attendance .amp-training-month-title {
+  display: none;
+}
+
+.amp-training-month-nav {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+}
+
+.amp-training-month-nav-title {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.amp-training-month-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.amp-training-month-nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.amp-training-month-nav-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .amp-edit-help {
   color: rgba(255, 255, 255, 0.75);
   font-size: 12px;

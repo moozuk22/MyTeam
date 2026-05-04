@@ -75,6 +75,28 @@ import type {
 } from "./_components/members-page-components";
 
 /* ── Main Page ── */
+function getMonthKeyFromIsoDate(date: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date.slice(0, 7) : getTodayIsoDate().slice(0, 7);
+}
+
+function addMonthsToMonthKey(monthKey: string, delta: number) {
+  const [year, month] = monthKey.split("-").map((value) => Number.parseInt(value, 10));
+  const base = new Date(Date.UTC(Number.isInteger(year) ? year : 1970, Number.isInteger(month) ? month - 1 : 0, 1));
+  base.setUTCMonth(base.getUTCMonth() + delta);
+  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function getCalendarDatesForMonth(monthKey: string) {
+  const [year, month] = monthKey.split("-").map((value) => Number.parseInt(value, 10));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return [];
+  }
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return Array.from({ length: daysInMonth }, (_, index) =>
+    `${year}-${String(month).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
+  );
+}
+
 function AdminMembersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -205,6 +227,7 @@ function AdminMembersPageContent() {
   const [trainingAttendanceLoading, setTrainingAttendanceLoading] = useState(false);
   const [trainingAttendanceError, setTrainingAttendanceError] = useState("");
   const [trainingAttendanceDate, setTrainingAttendanceDate] = useState(getTodayIsoDate());
+  const [trainingAttendanceMonth, setTrainingAttendanceMonth] = useState(getTodayIsoDate().slice(0, 7));
   const [trainingAttendancePlayers, setTrainingAttendancePlayers] = useState<TrainingAttendancePlayer[]>([]);
   const [trainingAttendanceStats, setTrainingAttendanceStats] = useState({
     total: 0,
@@ -293,7 +316,8 @@ function AdminMembersPageContent() {
   const schedulerCalendarMonths = buildCalendarMonths(schedulerCalendarDates);
   const trainingUpcomingDateSet = new Set(trainingUpcomingDates.map((item) => item.date));
   const trainingUpcomingByDate = new Map(trainingUpcomingDates.map((item) => [item.date, item]));
-  const trainingAttendanceCalendarMonths = buildCalendarMonths(trainingUpcomingDates.map((item) => item.date));
+  const trainingAttendanceCalendarDates = getCalendarDatesForMonth(trainingAttendanceMonth);
+  const trainingAttendanceCalendarMonths = buildCalendarMonths(trainingAttendanceCalendarDates);
   const todayIsoDate = getTodayIsoDate();
   const clubNotificationTeamGroups = Array.from(
     new Set(
@@ -3032,6 +3056,7 @@ function AdminMembersPageContent() {
     groupScopeOverride?: string,
     trainingGroupIdOverride?: string,
     viewOverride?: "teamGroup" | "trainingGroups",
+    monthOverride?: string,
   ) => {
     if (!clubId) return;
     const resolvedView = viewOverride ?? trainingAttendanceView;
@@ -3050,6 +3075,8 @@ function AdminMembersPageContent() {
       if (date) {
         search.set("date", date);
       }
+      const requestedMonth = monthOverride ?? (date ? getMonthKeyFromIsoDate(date) : trainingAttendanceMonth);
+      search.set("month", requestedMonth);
       if (teamGroupFilter !== null) {
         search.set("teamGroup", String(teamGroupFilter));
       }
@@ -3242,7 +3269,9 @@ function AdminMembersPageContent() {
 
   const openTrainingAttendance = async () => {
     if (!clubId) return;
+    const currentMonth = getTodayIsoDate().slice(0, 7);
     setTrainingAttendanceOpen(true);
+    setTrainingAttendanceMonth(currentMonth);
     setPostTeamGroupSavePromptOpen(false);
     setTrainingAttendanceView("trainingGroups");
     setTrainingDayDetailsOpen(false);
@@ -3257,7 +3286,7 @@ function AdminMembersPageContent() {
         : (groups[0]?.id ?? "");
     setSelectedTrainingGroupId(resolvedGroupId);
     if (resolvedGroupId) {
-      await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
+      await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups", currentMonth);
     } else {
       // No training groups — fall back to first standalone team group
       if (isCustomTrainingGroupMode) {
@@ -3272,10 +3301,10 @@ function AdminMembersPageContent() {
         const yearStr = String(firstStandalone);
         setTrainingAttendanceView("teamGroup");
         setTrainingGroupScope(yearStr);
-        await fetchTrainingAttendance(undefined, yearStr, undefined, "teamGroup");
+        await fetchTrainingAttendance(undefined, yearStr, undefined, "teamGroup", currentMonth);
       } else if (resolvedTrainingGroupScope) {
         setTrainingAttendanceView("teamGroup");
-        await fetchTrainingAttendance(undefined, resolvedTrainingGroupScope, undefined, "teamGroup");
+        await fetchTrainingAttendance(undefined, resolvedTrainingGroupScope, undefined, "teamGroup", currentMonth);
       } else {
         setTrainingAttendancePlayers([]);
         setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
@@ -3338,6 +3367,18 @@ function AdminMembersPageContent() {
       return;
     }
     await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
+  };
+
+  const handleTrainingAttendanceMonthChange = async (delta: number) => {
+    const nextMonth = addMonthsToMonthKey(trainingAttendanceMonth, delta);
+    setTrainingAttendanceMonth(nextMonth);
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingAttendanceError("");
+    setTrainingNoteTargetDates([]);
+    await fetchTrainingAttendance(undefined, undefined, undefined, undefined, nextMonth);
   };
 
   const handleSelectedTrainingGroupChange = async (nextGroupId: string) => {
@@ -3430,10 +3471,12 @@ function AdminMembersPageContent() {
   };
 
   const openTrainingDayDetails = async (date: string) => {
+    const month = getMonthKeyFromIsoDate(date);
     setTrainingDayDetailsOpening(true);
     setTrainingAttendanceDate(date);
+    setTrainingAttendanceMonth(month);
     try {
-      await fetchTrainingAttendance(date);
+      await fetchTrainingAttendance(date, undefined, undefined, undefined, month);
       setTrainingDayDetailsOpen(true);
     } finally {
       setTrainingDayDetailsOpening(false);
@@ -3659,7 +3702,7 @@ function AdminMembersPageContent() {
     const source = new EventSource(streamUrl, { withCredentials: true });
 
     const handleUpdate = () => {
-      void fetchTrainingAttendance(trainingAttendanceDate);
+      void fetchTrainingAttendance(trainingAttendanceDate, undefined, undefined, undefined, trainingAttendanceMonth);
     };
 
     source.addEventListener("attendance-update", handleUpdate);
@@ -3668,7 +3711,7 @@ function AdminMembersPageContent() {
       source.removeEventListener("attendance-update", handleUpdate);
       source.close();
     };
-  }, [trainingAttendanceOpen, clubId, trainingAttendanceDate, selectedTeamGroup, trainingAttendanceView, selectedTrainingGroupId]);
+  }, [trainingAttendanceOpen, clubId, trainingAttendanceDate, trainingAttendanceMonth, selectedTeamGroup, trainingAttendanceView, selectedTrainingGroupId]);
 
   return (
     <main className="amp-page">
@@ -4947,6 +4990,29 @@ function AdminMembersPageContent() {
                       </div>
                     )}
                     <div className="amp-training-calendar amp-training-calendar--attendance">
+                      <div className="amp-training-month-nav">
+                        <button
+                          type="button"
+                          className="amp-training-month-nav-btn"
+                          onClick={() => void handleTrainingAttendanceMonthChange(-1)}
+                          disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
+                          aria-label="Предишен месец"
+                        >
+                          ‹
+                        </button>
+                        <span className="amp-training-month-nav-title">
+                          {trainingAttendanceCalendarMonths[0]?.label ?? trainingAttendanceMonth}
+                        </span>
+                        <button
+                          type="button"
+                          className="amp-training-month-nav-btn"
+                          onClick={() => void handleTrainingAttendanceMonthChange(1)}
+                          disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
+                          aria-label="Следващ месец"
+                        >
+                          ›
+                        </button>
+                      </div>
                       {trainingAttendanceCalendarMonths.map((month) => (
                         <div key={month.key} className="amp-training-month">
                           <div className="amp-training-month-title">{month.label}</div>

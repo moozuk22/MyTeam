@@ -6,6 +6,7 @@ import { publishTrainingAttendanceUpdated } from "@/lib/trainingAttendanceEvents
 import { sendPushToMember } from "@/lib/push/service";
 import {
   getConfiguredTrainingDates,
+  getTodayIsoDateInTimeZone,
   getWeekdayMondayFirst,
   isIsoDate,
   isoDateToUtcMidnight,
@@ -82,6 +83,59 @@ function parseOptionalCustomTrainingGroupId(raw: unknown): string | null {
   return value ? value : null;
 }
 
+function parseMonthKey(raw: string | null, fallbackDate: string) {
+  const value = raw?.trim() ?? "";
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    return value;
+  }
+  return fallbackDate.slice(0, 7);
+}
+
+function getDatesInMonth(monthKey: string) {
+  const [year, month] = monthKey.split("-").map((value) => Number.parseInt(value, 10));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return [];
+  }
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return Array.from({ length: daysInMonth }, (_, index) =>
+    `${year}-${String(month).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
+  );
+}
+
+function getConfiguredTrainingDatesForMonth(input: {
+  trainingDates?: string[] | null;
+  weekdays?: number[] | null;
+  monthKey: string;
+  timeZone: string;
+}): string[] {
+  const monthDates = getDatesInMonth(input.monthKey);
+  if (monthDates.length === 0) {
+    return [];
+  }
+  const monthDateSet = new Set(monthDates);
+
+  if (Array.isArray(input.trainingDates) && input.trainingDates.length > 0) {
+    return Array.from(
+      new Set(
+        input.trainingDates
+          .map((value) => String(value).trim())
+          .filter((value) => isIsoDate(value) && monthDateSet.has(value)),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  }
+
+  const weekdaysSet = new Set(
+    (Array.isArray(input.weekdays) ? input.weekdays : [])
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 1 && value <= 7),
+  );
+  if (weekdaysSet.size === 0) {
+    return [];
+  }
+
+  return monthDates.filter((date) => weekdaysSet.has(getWeekdayMondayFirst(date, input.timeZone)));
+}
+
 async function verifySession(request: NextRequest) {
   const token = request.cookies.get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
@@ -99,6 +153,8 @@ export async function GET(
 
   const { id } = await params;
   const requestedDate = request.nextUrl.searchParams.get("date")?.trim() ?? "";
+  const requestedMonth = request.nextUrl.searchParams.get("month");
+  const monthKey = parseMonthKey(requestedMonth, requestedDate || getTodayIsoDateInTimeZone(FIXED_TIME_ZONE));
   let teamGroup: number | null = null;
   let trainingGroupId: string | null = null;
   let customTrainingGroupId: string | null = null;
@@ -300,13 +356,20 @@ export async function GET(
       })
     : null;
 
-  const upcomingDates = getConfiguredTrainingDates({
-    trainingDates: resolvedTrainingDates,
-    weekdays: resolvedTrainingWeekdays,
-    windowDays: resolvedTrainingWindowDays,
-    timeZone: FIXED_TIME_ZONE,
-    maxDays: TRAINING_SELECTION_WINDOW_DAYS,
-  });
+  const upcomingDates = requestedMonth
+    ? getConfiguredTrainingDatesForMonth({
+        trainingDates: resolvedTrainingDates,
+        weekdays: resolvedTrainingWeekdays,
+        monthKey,
+        timeZone: FIXED_TIME_ZONE,
+      })
+    : getConfiguredTrainingDates({
+        trainingDates: resolvedTrainingDates,
+        weekdays: resolvedTrainingWeekdays,
+        windowDays: resolvedTrainingWindowDays,
+        timeZone: FIXED_TIME_ZONE,
+        maxDays: TRAINING_SELECTION_WINDOW_DAYS,
+      });
   const trainingDate =
     requestedDate && upcomingDates.includes(requestedDate)
       ? requestedDate
