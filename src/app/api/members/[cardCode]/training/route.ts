@@ -12,6 +12,7 @@ import {
   normalizeTrainingTime,
   utcDateToIsoDate,
 } from "@/lib/training";
+import { updateTrainingSessionPlayerAttendance } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -421,23 +422,34 @@ export async function POST(
     return NextResponse.json({ error: parsedReason.error }, { status: 400 });
   }
 
-  await prisma.trainingOptOut.upsert({
-    where: {
-      playerId_trainingDate: {
+  await prisma.$transaction(async (tx) => {
+    await tx.trainingOptOut.upsert({
+      where: {
+        playerId_trainingDate: {
+          playerId: context.playerId,
+          trainingDate: isoDateToUtcMidnight(trainingDate),
+        },
+      },
+      update: {
+        reasonCode: parsedReason.code,
+        reasonText: parsedReason.text,
+      },
+      create: {
         playerId: context.playerId,
         trainingDate: isoDateToUtcMidnight(trainingDate),
+        reasonCode: parsedReason.code,
+        reasonText: parsedReason.text,
       },
-    },
-    update: {
-      reasonCode: parsedReason.code,
-      reasonText: parsedReason.text,
-    },
-    create: {
+    });
+    await updateTrainingSessionPlayerAttendance({
+      tx,
+      clubId: context.clubId,
       playerId: context.playerId,
-      trainingDate: isoDateToUtcMidnight(trainingDate),
+      trainingDate,
+      optedOut: true,
       reasonCode: parsedReason.code,
       reasonText: parsedReason.text,
-    },
+    });
   });
 
   let coachPush = { total: 0, sent: 0, failed: 0, deactivated: 0 };
@@ -497,11 +509,20 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid trainingDate" }, { status: 400 });
   }
 
-  await prisma.trainingOptOut.deleteMany({
-    where: {
+  await prisma.$transaction(async (tx) => {
+    await tx.trainingOptOut.deleteMany({
+      where: {
+        playerId: context.playerId,
+        trainingDate: isoDateToUtcMidnight(trainingDate),
+      },
+    });
+    await updateTrainingSessionPlayerAttendance({
+      tx,
+      clubId: context.clubId,
       playerId: context.playerId,
-      trainingDate: isoDateToUtcMidnight(trainingDate),
-    },
+      trainingDate,
+      optedOut: false,
+    });
   });
 
   let coachPush = { total: 0, sent: 0, failed: 0, deactivated: 0 };

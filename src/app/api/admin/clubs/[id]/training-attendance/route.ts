@@ -13,7 +13,7 @@ import {
   normalizeTrainingTime,
   utcDateToIsoDate,
 } from "@/lib/training";
-import { getTrainingSessionScopeKey } from "@/lib/trainingSessions";
+import { getTrainingSessionScopeKey, updateTrainingSessionPlayerAttendance } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -860,8 +860,10 @@ export async function PATCH(
 
     const trainingDateAsDate = isoDateToUtcMidnight(trainingDate);
 
-    if (optedOut) {
-      await prisma.trainingOptOut.upsert({
+    const coachReasonText = "Промяна направена от треньор";
+    await prisma.$transaction(async (tx) => {
+      if (optedOut) {
+        await tx.trainingOptOut.upsert({
         where: {
           playerId_trainingDate: {
             playerId: player.id,
@@ -878,15 +880,25 @@ export async function PATCH(
           reasonCode: "other",
           reasonText: "Промяна направена от треньор",
         },
-      });
-    } else {
-      await prisma.trainingOptOut.deleteMany({
+        });
+      } else {
+        await tx.trainingOptOut.deleteMany({
         where: {
           playerId: player.id,
           trainingDate: trainingDateAsDate,
         },
+        });
+      }
+      await updateTrainingSessionPlayerAttendance({
+        tx,
+        clubId,
+        playerId: player.id,
+        trainingDate,
+        optedOut,
+        reasonCode: "other",
+        reasonText: coachReasonText,
       });
-    }
+    });
 
     const firstCardCode = player.cards[0]?.cardCode ?? null;
     const formattedDate = formatBgDate(trainingDate);

@@ -235,6 +235,7 @@ model Player {
   club                 Club                            @relation(fields: [clubId], references: [id], onDelete: Cascade)
   pushSubscriptions    PushSubscription[]
   trainingOptOuts      TrainingOptOut[]
+  trainingSessionRows  TrainingSessionPlayer[]
   discountUsages       PartnerDiscountUsage[]
   customTrainingGroups ClubCustomTrainingGroupPlayer[]
   coachGroupId         String?                         @map("coach_group_id") @db.Uuid
@@ -304,11 +305,32 @@ model TrainingSession {
   createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   club                    Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  players                 TrainingSessionPlayer[]
 
   @@unique([clubId, scopeKey, trainingDate])
   @@index([clubId, trainingDate])
   @@index([clubId, scopeKey, trainingDate])
   @@map("training_sessions")
+}
+
+model TrainingSessionPlayer {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trainingSessionId String          @map("training_session_id") @db.Uuid
+  playerId          String?         @map("player_id") @db.Uuid
+  playerName        String          @map("player_name")
+  teamGroup         Int?            @map("team_group")
+  present           Boolean         @default(true)
+  reasonCode        String?         @map("reason_code")
+  reasonText        String?         @map("reason_text")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  trainingSession   TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  player            Player?         @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@unique([trainingSessionId, playerId])
+  @@index([playerId])
+  @@index([trainingSessionId])
+  @@map("training_session_players")
 }
 
 model Image {

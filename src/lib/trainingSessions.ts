@@ -12,7 +12,18 @@ type TrainingFieldSelectionByDate = Record<string, { trainingFieldId: string | n
 type TrainingSessionWriter = {
   trainingSession: {
     deleteMany(args: Prisma.TrainingSessionDeleteManyArgs): Promise<Prisma.BatchPayload>;
-    upsert(args: Prisma.TrainingSessionUpsertArgs): Promise<unknown>;
+    upsert(args: Prisma.TrainingSessionUpsertArgs): Promise<{ id: string }>;
+  };
+  trainingSessionPlayer: {
+    deleteMany(args: Prisma.TrainingSessionPlayerDeleteManyArgs): Promise<Prisma.BatchPayload>;
+    createMany(args: Prisma.TrainingSessionPlayerCreateManyArgs): Promise<Prisma.BatchPayload>;
+    updateMany(args: Prisma.TrainingSessionPlayerUpdateManyArgs): Promise<Prisma.BatchPayload>;
+  };
+  trainingOptOut: {
+    findMany(args: Prisma.TrainingOptOutFindManyArgs): Promise<Array<{ playerId: string; trainingDate: Date; reasonCode: string | null; reasonText: string | null }>>;
+  };
+  player: {
+    findMany(args: Prisma.PlayerFindManyArgs): Promise<Array<{ id: string; fullName: string; teamGroup: number | null }>>;
   };
 };
 
@@ -70,7 +81,7 @@ export async function syncFutureTrainingSessions(input: {
 
   for (const date of futureDates) {
     const fieldSelection = input.trainingFieldSelections?.[date];
-    await input.tx.trainingSession.upsert({
+    const session = await input.tx.trainingSession.upsert({
       where: {
         clubId_scopeKey_trainingDate: {
           clubId: input.clubId,
@@ -96,8 +107,87 @@ export async function syncFutureTrainingSessions(input: {
         trainingFieldPieceIds: fieldSelection?.trainingFieldPieceIds ?? input.trainingFieldPieceIds,
         status: "scheduled",
       },
+      select: { id: true },
     });
+    const players = await getExpectedPlayersForScope(input.tx, input.clubId, input.scope);
+    const optOuts = players.length > 0
+      ? await input.tx.trainingOptOut.findMany({
+          where: {
+            playerId: { in: players.map((player) => player.id) },
+            trainingDate: isoDateToUtcMidnight(date),
+          },
+          select: { playerId: true, trainingDate: true, reasonCode: true, reasonText: true },
+        })
+      : [];
+    const optOutByPlayerId = new Map(optOuts.map((item) => [item.playerId, item]));
+    await input.tx.trainingSessionPlayer.deleteMany({
+      where: { trainingSessionId: session.id },
+    });
+    if (players.length > 0) {
+      await input.tx.trainingSessionPlayer.createMany({
+        data: players.map((player) => {
+          const optOut = optOutByPlayerId.get(player.id);
+          return {
+            trainingSessionId: session.id,
+            playerId: player.id,
+            playerName: player.fullName,
+            teamGroup: player.teamGroup,
+            present: !optOut,
+            reasonCode: optOut?.reasonCode ?? null,
+            reasonText: optOut?.reasonText ?? null,
+          };
+        }),
+      });
+    }
   }
+}
+
+async function getExpectedPlayersForScope(
+  tx: Pick<TrainingSessionWriter, "player">,
+  clubId: string,
+  scope: TrainingSessionScope,
+) {
+  return tx.player.findMany({
+    where: {
+      clubId,
+      isActive: true,
+      ...(scope.type === "teamGroup" ? { teamGroup: scope.teamGroup } : {}),
+      ...(scope.type === "trainingGroup" ? { teamGroup: { in: scope.teamGroups ?? [] } } : {}),
+      ...(scope.type === "customGroup" ? { customTrainingGroups: { some: { groupId: scope.id } } } : {}),
+      ...(scope.type === "coachGroup" ? { coachGroupId: scope.id } : {}),
+    },
+    select: {
+      id: true,
+      fullName: true,
+      teamGroup: true,
+    },
+    orderBy: { fullName: "asc" },
+  });
+}
+
+export async function updateTrainingSessionPlayerAttendance(input: {
+  tx: Pick<TrainingSessionWriter, "trainingSessionPlayer">;
+  clubId: string;
+  playerId: string;
+  trainingDate: string;
+  optedOut: boolean;
+  reasonCode?: string | null;
+  reasonText?: string | null;
+}) {
+  await input.tx.trainingSessionPlayer.updateMany({
+    where: {
+      playerId: input.playerId,
+      trainingSession: {
+        clubId: input.clubId,
+        trainingDate: isoDateToUtcMidnight(input.trainingDate),
+      },
+    },
+    data: {
+      present: !input.optedOut,
+      reasonCode: input.optedOut ? input.reasonCode ?? null : null,
+      reasonText: input.optedOut ? input.reasonText ?? null : null,
+    },
+  });
 }
 
 export async function deleteFutureTrainingSessionsForScope(input: {
