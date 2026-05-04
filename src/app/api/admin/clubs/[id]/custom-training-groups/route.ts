@@ -15,6 +15,7 @@ import {
 } from "@/lib/push/trainingScheduleNotifications";
 import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
 import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
+import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -302,6 +303,17 @@ export async function POST(
           data: playerIds.map((playerId) => ({ groupId: group.id, playerId })),
         });
       }
+      await syncFutureTrainingSessions({
+        tx,
+        clubId: id,
+        scope: { type: "customGroup", id: group.id },
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        todayIso: getTodayIsoDateInTimeZone(FIXED_TIME_ZONE),
+      });
       return tx.clubCustomTrainingGroup.findUniqueOrThrow({
         where: { id: group.id },
         select: {

@@ -17,6 +17,7 @@ import {
   parseTrainingFieldSelectionsByDate,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
+import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -293,6 +294,22 @@ export async function PUT(
   if (result.count === 0) {
     return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
   }
+
+  const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+  await prisma.$transaction((tx) =>
+    syncFutureTrainingSessions({
+      tx,
+      clubId,
+      scope: { type: "coachGroup", id: groupId },
+      trainingDates,
+      trainingDateTimes,
+      trainingDurationMinutes,
+      trainingFieldId: trainingFieldSelection.trainingFieldId,
+      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+      trainingFieldSelections,
+      todayIso,
+    }),
+  );
 
   const resolvedDates = getConfiguredTrainingDates({
     trainingDates,

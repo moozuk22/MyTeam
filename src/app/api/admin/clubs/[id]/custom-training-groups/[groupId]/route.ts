@@ -20,6 +20,7 @@ import {
   parseTrainingFieldSelectionsByDate,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
+import { deleteFutureTrainingSessionsForScope, syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -132,7 +133,19 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id: clubId, groupId } = await params;
   try {
-    const deleted = await prisma.clubCustomTrainingGroup.deleteMany({ where: { id: groupId, clubId } });
+    const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+    const deleted = await prisma.$transaction(async (tx) => {
+      const result = await tx.clubCustomTrainingGroup.deleteMany({ where: { id: groupId, clubId } });
+      if (result.count > 0) {
+        await deleteFutureTrainingSessionsForScope({
+          tx,
+          clubId,
+          scope: { type: "customGroup", id: groupId },
+          todayIso,
+        });
+      }
+      return result;
+    });
     if (deleted.count === 0) return NextResponse.json({ error: "Training group not found." }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -363,6 +376,31 @@ export async function PATCH(
         },
       },
     });
+    if (
+      hasTrainingDates ||
+      hasTrainingTime ||
+      hasTrainingDateTimes ||
+      hasTrainingDuration ||
+      hasTrainingField ||
+      hasTrainingFieldPiece ||
+      hasTrainingFieldSelections
+    ) {
+      const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+      await prisma.$transaction((tx) =>
+        syncFutureTrainingSessions({
+          tx,
+          clubId,
+          scope: { type: "customGroup", id: groupId },
+          trainingDates: updated.trainingDates ?? [],
+          trainingDateTimes: normalizeStoredTrainingDateTimes(updated.trainingDateTimes, updated.trainingDates ?? []),
+          trainingDurationMinutes: updated.trainingDurationMinutes,
+          trainingFieldId: updated.trainingFieldId,
+          trainingFieldPieceIds: updated.trainingFieldPieceIds,
+          trainingFieldSelections: updated.trainingFieldSelections as Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> | undefined,
+          todayIso,
+        }),
+      );
+    }
 
     let notifications = null;
     if (hasTrainingDates && shouldNotifyForTrainingDatesChange(existing.trainingDates ?? [], updated.trainingDates ?? [])) {

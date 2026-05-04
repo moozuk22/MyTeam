@@ -22,6 +22,7 @@ import {
   parseTrainingFieldSelectionsByDate,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
+import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -569,6 +570,21 @@ export async function PUT(
         trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       },
     });
+    const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+    await prisma.$transaction((tx) =>
+      syncFutureTrainingSessions({
+        tx,
+        clubId: id,
+        scope: { type: "teamGroup", teamGroup },
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
+        todayIso,
+      }),
+    );
 
     const groupsContainingTeamGroup = await prisma.clubTrainingScheduleGroup.findMany({
       where: {
@@ -629,6 +645,22 @@ export async function PUT(
       notifications,
     });
   }
+
+  const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+  await prisma.$transaction((tx) =>
+    syncFutureTrainingSessions({
+      tx,
+      clubId: id,
+      scope: { type: "club" },
+      trainingDates,
+      trainingDateTimes,
+      trainingDurationMinutes,
+      trainingFieldId: trainingFieldSelection.trainingFieldId,
+      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+      trainingFieldSelections,
+      todayIso,
+    }),
+  );
 
   return NextResponse.json({
     ...updated,

@@ -13,6 +13,7 @@ import {
   normalizeTrainingTime,
   utcDateToIsoDate,
 } from "@/lib/training";
+import { getTrainingSessionScopeKey } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -342,9 +343,70 @@ export async function GET(
       ? trainingGroup.trainingFieldPieceIds
       : trainingGroupOverride?.trainingFieldPieceIds ?? groupSchedule?.trainingFieldPieceIds ?? club.trainingFieldPieceIds ?? [];
 
-  const trainingField = resolvedTrainingFieldId
+  const scopeKey = getTrainingSessionScopeKey(
+    customTrainingGroup
+      ? { type: "customGroup", id: customTrainingGroup.id }
+      : trainingGroup
+        ? { type: "trainingGroup", id: trainingGroup.id }
+        : teamGroup !== null
+          ? { type: "teamGroup", teamGroup }
+          : { type: "club" },
+  );
+  const monthDates = requestedMonth ? getDatesInMonth(monthKey) : [];
+  const storedSessions = requestedMonth && monthDates.length > 0
+    ? await prisma.trainingSession.findMany({
+        where: {
+          clubId: id,
+          scopeKey,
+          trainingDate: {
+            gte: isoDateToUtcMidnight(monthDates[0]),
+            lte: isoDateToUtcMidnight(monthDates[monthDates.length - 1]),
+          },
+          status: {
+            not: "cancelled",
+          },
+        },
+        orderBy: { trainingDate: "asc" },
+        select: {
+          trainingDate: true,
+          trainingTime: true,
+          trainingDurationMinutes: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+        },
+      })
+    : [];
+  const storedSessionByDate = new Map(storedSessions.map((session) => [utcDateToIsoDate(session.trainingDate), session]));
+  const storedSessionDates = storedSessions.map((session) => utcDateToIsoDate(session.trainingDate));
+
+  const upcomingDates = storedSessionDates.length > 0
+    ? storedSessionDates
+    : requestedMonth
+      ? getConfiguredTrainingDatesForMonth({
+          trainingDates: resolvedTrainingDates,
+          weekdays: resolvedTrainingWeekdays,
+          monthKey,
+          timeZone: FIXED_TIME_ZONE,
+        })
+      : getConfiguredTrainingDates({
+          trainingDates: resolvedTrainingDates,
+          weekdays: resolvedTrainingWeekdays,
+          windowDays: resolvedTrainingWindowDays,
+          timeZone: FIXED_TIME_ZONE,
+          maxDays: TRAINING_SELECTION_WINDOW_DAYS,
+        });
+  const trainingDate =
+    requestedDate && upcomingDates.includes(requestedDate)
+      ? requestedDate
+      : upcomingDates[0] || "";
+  const selectedSession = trainingDate ? storedSessionByDate.get(trainingDate) : null;
+  const effectiveTrainingFieldId = selectedSession?.trainingFieldId ?? resolvedTrainingFieldId;
+  const effectiveTrainingFieldPieceIds = selectedSession?.trainingFieldPieceIds ?? resolvedTrainingFieldPieceIds;
+  const effectiveTrainingDurationMinutes = selectedSession?.trainingDurationMinutes ?? resolvedTrainingDurationMinutes;
+
+  const trainingField = effectiveTrainingFieldId
     ? await prisma.field.findUnique({
-        where: { id: resolvedTrainingFieldId },
+        where: { id: effectiveTrainingFieldId },
         select: {
           id: true,
           name: true,
@@ -355,25 +417,6 @@ export async function GET(
         },
       })
     : null;
-
-  const upcomingDates = requestedMonth
-    ? getConfiguredTrainingDatesForMonth({
-        trainingDates: resolvedTrainingDates,
-        weekdays: resolvedTrainingWeekdays,
-        monthKey,
-        timeZone: FIXED_TIME_ZONE,
-      })
-    : getConfiguredTrainingDates({
-        trainingDates: resolvedTrainingDates,
-        weekdays: resolvedTrainingWeekdays,
-        windowDays: resolvedTrainingWindowDays,
-        timeZone: FIXED_TIME_ZONE,
-        maxDays: TRAINING_SELECTION_WINDOW_DAYS,
-      });
-  const trainingDate =
-    requestedDate && upcomingDates.includes(requestedDate)
-      ? requestedDate
-      : upcomingDates[0] || "";
   if (!trainingDate) {
     return NextResponse.json({
       clubId: club.id,
@@ -391,9 +434,9 @@ export async function GET(
       teamGroup,
       trainingGroupId: trainingGroup?.id ?? null,
       customTrainingGroupId: customTrainingGroup?.id ?? null,
-      trainingDurationMinutes: resolvedTrainingDurationMinutes,
-      trainingFieldId: resolvedTrainingFieldId,
-      trainingFieldPieceIds: resolvedTrainingFieldPieceIds,
+      trainingDurationMinutes: effectiveTrainingDurationMinutes,
+      trainingFieldId: effectiveTrainingFieldId,
+      trainingFieldPieceIds: effectiveTrainingFieldPieceIds,
       trainingField,
     });
   }
@@ -484,11 +527,11 @@ export async function GET(
       customTrainingGroupId: customTrainingGroup?.id ?? null,
       trainingDate,
       weekday: getWeekdayMondayFirst(trainingDate, FIXED_TIME_ZONE),
-      trainingTime: resolvedTrainingDateTimes[trainingDate] ?? resolvedDefaultTrainingTime,
+      trainingTime: selectedSession?.trainingTime ?? resolvedTrainingDateTimes[trainingDate] ?? resolvedDefaultTrainingTime,
       note: note?.note ?? "",
-      trainingDurationMinutes: resolvedTrainingDurationMinutes,
-      trainingFieldId: resolvedTrainingFieldId,
-      trainingFieldPieceIds: resolvedTrainingFieldPieceIds,
+      trainingDurationMinutes: effectiveTrainingDurationMinutes,
+      trainingFieldId: effectiveTrainingFieldId,
+      trainingFieldPieceIds: effectiveTrainingFieldPieceIds,
       trainingField,
       stats: {
         total: totalPlayers,
@@ -499,7 +542,7 @@ export async function GET(
       upcomingDates: upcomingDates.map((date) => ({
         date,
         weekday: getWeekdayMondayFirst(date, FIXED_TIME_ZONE),
-        trainingTime: resolvedTrainingDateTimes[date] ?? resolvedDefaultTrainingTime,
+        trainingTime: storedSessionByDate.get(date)?.trainingTime ?? resolvedTrainingDateTimes[date] ?? resolvedDefaultTrainingTime,
         stats: {
           total: totalPlayers,
           optedOut: optedOutCountByDate.get(date) ?? 0,

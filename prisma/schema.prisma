@@ -49,6 +49,7 @@ model Club {
   adminPushSubscriptions  AdminPushSubscription[]
   adminNotifications      AdminNotification[]
   trainingNotes           TrainingNote[]
+  trainingSessions        TrainingSession[]
   trainingGroupSchedules  ClubTrainingGroupSchedule[]
   trainingScheduleGroups  ClubTrainingScheduleGroup[]
   customTrainingGroups    ClubCustomTrainingGroup[]
@@ -284,6 +285,30 @@ model TrainingNote {
   @@unique([clubId, trainingDate])
   @@index([trainingDate])
   @@map("training_notes")
+}
+
+model TrainingSession {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId                  String   @map("club_id") @db.Uuid
+  scopeType               String   @map("scope_type")
+  scopeKey                String   @map("scope_key")
+  scopeId                 String?  @map("scope_id") @db.Uuid
+  teamGroup               Int?     @map("team_group")
+  teamGroups              Int[]    @default([]) @map("team_groups")
+  trainingDate            DateTime @map("training_date") @db.Date
+  trainingTime            String?  @map("training_time")
+  trainingDurationMinutes Int      @default(60) @map("training_duration_minutes")
+  trainingFieldId         String?  @map("training_field_id") @db.Uuid
+  trainingFieldPieceIds   String[] @default([]) @map("training_field_piece_ids") @db.Uuid
+  status                  String   @default("scheduled")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  club                    Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, scopeKey, trainingDate])
+  @@index([clubId, trainingDate])
+  @@index([clubId, scopeKey, trainingDate])
+  @@map("training_sessions")
 }
 
 model Image {

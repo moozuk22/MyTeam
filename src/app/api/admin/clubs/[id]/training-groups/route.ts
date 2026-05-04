@@ -15,6 +15,7 @@ import {
 } from "@/lib/push/trainingScheduleNotifications";
 import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
 import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
+import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -322,6 +323,18 @@ export async function POST(
       });
 
       if (hasExplicitTrainingDates) {
+        await syncFutureTrainingSessions({
+          tx,
+          clubId: id,
+          scope: { type: "trainingGroup", id: created.id, teamGroups },
+          trainingDates,
+          trainingDateTimes,
+          trainingDurationMinutes,
+          trainingFieldId: trainingFieldSelection.trainingFieldId,
+          trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+          todayIso: getTodayIsoDateInTimeZone(FIXED_TIME_ZONE),
+        });
+
         for (const teamGroup of teamGroups) {
           await tx.clubTrainingGroupSchedule.upsert({
             where: {
