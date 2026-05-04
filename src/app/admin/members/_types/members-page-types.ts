@@ -45,6 +45,9 @@ interface ClubOption {
   secondReminderDay?: number | null;
   secondReminderHour?: number | null;
   secondReminderMinute?: number | null;
+  thirdReminderDay?: number | null;
+  thirdReminderHour?: number | null;
+  thirdReminderMinute?: number | null;
   overdueHour?: number;
   overdueMinute?: number;
   trainingDates?: string[];

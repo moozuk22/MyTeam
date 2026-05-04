@@ -171,6 +171,7 @@ function AdminMembersPageContent() {
   const [schedulerSettingsSaving, setSchedulerSettingsSaving] = useState(false);
   const [schedulerSettingsError, setSchedulerSettingsError] = useState("");
   const [secondReminderEnabled, setSecondReminderEnabled] = useState(false);
+  const [thirdReminderEnabled, setThirdReminderEnabled] = useState(false);
   const [schedulerForm, setSchedulerForm] = useState({
     reminderDay: "25",
     overdueDay: "1",
@@ -179,6 +180,9 @@ function AdminMembersPageContent() {
     secondReminderDay: "",
     secondReminderHour: "10",
     secondReminderMinute: "0",
+    thirdReminderDay: "",
+    thirdReminderHour: "10",
+    thirdReminderMinute: "0",
     overdueHour: "10",
     overdueMinute: "0",
     trainingDates: [] as string[],
@@ -194,6 +198,7 @@ function AdminMembersPageContent() {
   const [trainingTimeMode, setTrainingTimeMode] = useState<TrainingTimeMode>("all");
   const reminderTimeValue = `${schedulerForm.reminderHour.padStart(2, "0")}:${schedulerForm.reminderMinute.padStart(2, "0")}`;
   const secondReminderTimeValue = `${schedulerForm.secondReminderHour.padStart(2, "0")}:${schedulerForm.secondReminderMinute.padStart(2, "0")}`;
+  const thirdReminderTimeValue = `${schedulerForm.thirdReminderHour.padStart(2, "0")}:${schedulerForm.thirdReminderMinute.padStart(2, "0")}`;
   const overdueTimeValue = `${schedulerForm.overdueHour.padStart(2, "0")}:${schedulerForm.overdueMinute.padStart(2, "0")}`;
   const [trainingAttendanceOpen, setTrainingAttendanceOpen] = useState(false);
   const [trainingAttendanceView, setTrainingAttendanceView] = useState<"teamGroup" | "trainingGroups" | "today">("teamGroup");
@@ -1722,11 +1727,42 @@ function AdminMembersPageContent() {
 
   const disableSecondReminder = () => {
     setSecondReminderEnabled(false);
+    setThirdReminderEnabled(false);
     setSchedulerForm((prev) => ({
       ...prev,
       secondReminderDay: "",
       secondReminderHour: "10",
       secondReminderMinute: "0",
+      thirdReminderDay: "",
+      thirdReminderHour: "10",
+      thirdReminderMinute: "0",
+    }));
+  };
+
+  const enableThirdReminder = () => {
+    setThirdReminderEnabled(true);
+    setSchedulerForm((prev) => {
+      const usedDays = [
+        Number.parseInt(prev.reminderDay, 10),
+        Number.parseInt(prev.secondReminderDay, 10),
+      ].filter((day) => Number.isInteger(day) && day >= 1 && day <= 28);
+      const fallbackDay = Array.from({ length: 28 }, (_, index) => index + 1).find((day) => !usedDays.includes(day)) ?? 27;
+      return {
+        ...prev,
+        thirdReminderDay: prev.thirdReminderDay || String(fallbackDay),
+        thirdReminderHour: prev.thirdReminderHour || "10",
+        thirdReminderMinute: prev.thirdReminderMinute || "0",
+      };
+    });
+  };
+
+  const disableThirdReminder = () => {
+    setThirdReminderEnabled(false);
+    setSchedulerForm((prev) => ({
+      ...prev,
+      thirdReminderDay: "",
+      thirdReminderHour: "10",
+      thirdReminderMinute: "0",
     }));
   };
 
@@ -1771,6 +1807,10 @@ function AdminMembersPageContent() {
         Number.isInteger(payload.secondReminderDay) &&
         Number.isInteger(payload.secondReminderHour) &&
         Number.isInteger(payload.secondReminderMinute);
+      const hasThirdReminder =
+        Number.isInteger(payload.thirdReminderDay) &&
+        Number.isInteger(payload.thirdReminderHour) &&
+        Number.isInteger(payload.thirdReminderMinute);
       setSchedulerForm({
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
@@ -1779,6 +1819,9 @@ function AdminMembersPageContent() {
         secondReminderDay: hasSecondReminder ? String(payload.secondReminderDay) : "",
         secondReminderHour: hasSecondReminder ? String(payload.secondReminderHour) : "10",
         secondReminderMinute: hasSecondReminder ? String(payload.secondReminderMinute) : "0",
+        thirdReminderDay: hasThirdReminder ? String(payload.thirdReminderDay) : "",
+        thirdReminderHour: hasThirdReminder ? String(payload.thirdReminderHour) : "10",
+        thirdReminderMinute: hasThirdReminder ? String(payload.thirdReminderMinute) : "0",
         overdueHour: String(payload.overdueHour ?? 10),
         overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: resolvedTrainingDates,
@@ -1788,6 +1831,7 @@ function AdminMembersPageContent() {
         trainingFieldPieceIds: Array.isArray(payload.trainingFieldPieceIds) ? payload.trainingFieldPieceIds.map(String) : [],
       });
       setSecondReminderEnabled(hasSecondReminder);
+      setThirdReminderEnabled(hasThirdReminder);
       setTrainingDateTimes(resolvedDateTimes);
       setTrainingTimeMode(inferTrainingTimeMode(resolvedTrainingDates, resolvedDateTimes));
     } catch (error) {
@@ -2489,6 +2533,10 @@ function AdminMembersPageContent() {
         Number.isInteger(payload.secondReminderDay) &&
         Number.isInteger(payload.secondReminderHour) &&
         Number.isInteger(payload.secondReminderMinute);
+      const hasThirdReminder =
+        Number.isInteger(payload.thirdReminderDay) &&
+        Number.isInteger(payload.thirdReminderHour) &&
+        Number.isInteger(payload.thirdReminderMinute);
       setSchedulerForm({
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
@@ -2497,6 +2545,9 @@ function AdminMembersPageContent() {
         secondReminderDay: hasSecondReminder ? String(payload.secondReminderDay) : "",
         secondReminderHour: hasSecondReminder ? String(payload.secondReminderHour) : "10",
         secondReminderMinute: hasSecondReminder ? String(payload.secondReminderMinute) : "0",
+        thirdReminderDay: hasThirdReminder ? String(payload.thirdReminderDay) : "",
+        thirdReminderHour: hasThirdReminder ? String(payload.thirdReminderHour) : "10",
+        thirdReminderMinute: hasThirdReminder ? String(payload.thirdReminderMinute) : "0",
         overdueHour: String(payload.overdueHour ?? 10),
         overdueMinute: String(payload.overdueMinute ?? 0),
         trainingDates: resolvedTrainingDates,
@@ -2506,6 +2557,7 @@ function AdminMembersPageContent() {
         trainingFieldPieceIds: Array.isArray(payload.trainingFieldPieceIds) ? payload.trainingFieldPieceIds.map(String) : [],
       });
       setSecondReminderEnabled(hasSecondReminder);
+      setThirdReminderEnabled(hasThirdReminder);
       setTrainingDaysInitialDates(resolvedTrainingDates);
       setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(payload.trainingDurationMinutes));
       setTrainingDaysInitialFieldId(normalizeOptionalId(payload.trainingFieldId) ?? "");
@@ -2546,6 +2598,9 @@ function AdminMembersPageContent() {
         secondReminderDay: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderDay, 10) : null,
         secondReminderHour: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderHour, 10) : null,
         secondReminderMinute: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderMinute, 10) : null,
+        thirdReminderDay: thirdReminderEnabled ? Number.parseInt(schedulerForm.thirdReminderDay, 10) : null,
+        thirdReminderHour: thirdReminderEnabled ? Number.parseInt(schedulerForm.thirdReminderHour, 10) : null,
+        thirdReminderMinute: thirdReminderEnabled ? Number.parseInt(schedulerForm.thirdReminderMinute, 10) : null,
         overdueHour: Number.parseInt(schedulerForm.overdueHour, 10),
         overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
         trainingDates: schedulerForm.trainingDates,
@@ -2840,6 +2895,9 @@ function AdminMembersPageContent() {
           secondReminderDay: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderDay, 10) : null,
           secondReminderHour: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderHour, 10) : null,
           secondReminderMinute: secondReminderEnabled ? Number.parseInt(schedulerForm.secondReminderMinute, 10) : null,
+          thirdReminderDay: thirdReminderEnabled ? Number.parseInt(schedulerForm.thirdReminderDay, 10) : null,
+          thirdReminderHour: thirdReminderEnabled ? Number.parseInt(schedulerForm.thirdReminderHour, 10) : null,
+          thirdReminderMinute: thirdReminderEnabled ? Number.parseInt(schedulerForm.thirdReminderMinute, 10) : null,
           overdueHour: Number.parseInt(schedulerForm.overdueHour, 10),
           overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
           trainingDates: schedulerForm.trainingDates,
@@ -6852,6 +6910,78 @@ function AdminMembersPageContent() {
                           Премахни второто напомняне
                         </button>
                       </div>
+                    </>
+                  )}
+                  {secondReminderEnabled && (
+                    <>
+                      <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--third" style={{ textAlign: "center" }}>
+                        <span className="amp-lbl" style={{ textAlign: "center" }}>Трето напомняне (по избор)</span>
+                      </div>
+                      {!thirdReminderEnabled ? (
+                        <div className="amp-edit-field amp-edit-field--full amp-scheduler-third-toggle" style={{ textAlign: "center" }}>
+                          <span className="amp-lbl" style={{ textAlign: "center" }}>Трето месечно напомняне</span>
+                          <button
+                            className="amp-btn amp-btn--ghost amp-btn--compact"
+                            style={{ width: "100%", justifyContent: "center" }}
+                            type="button"
+                            onClick={enableThirdReminder}
+                            disabled={schedulerSettingsSaving}
+                          >
+                            Добави трето напомняне
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <label className="amp-edit-field amp-scheduler-third-day" style={{ textAlign: "center" }}>
+                            <span className="amp-lbl" style={{ textAlign: "center" }}>Ден трето месечно напомняне (1-28)</span>
+                            <input
+                              className="amp-edit-input"
+                              style={{ textAlign: "center" }}
+                              inputMode="numeric"
+                              value={schedulerForm.thirdReminderDay}
+                              onChange={(e) =>
+                                setSchedulerForm((prev) => ({
+                                  ...prev,
+                                  thirdReminderDay: e.target.value.replace(/\D/g, ""),
+                                }))
+                              }
+                              disabled={schedulerSettingsSaving}
+                            />
+                          </label>
+                          <label className="amp-edit-field amp-scheduler-third-time" style={{ textAlign: "center" }}>
+                            <span className="amp-lbl" style={{ textAlign: "center" }}>Час за трето месечно напомняне</span>
+                            <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
+                              <input
+                                className="amp-inner-time-input"
+                                type="time"
+                                step={60}
+                                value={thirdReminderTimeValue}
+                                onChange={(e) => {
+                                  const [hour = "0", minute = "0"] = e.target.value.split(":");
+                                  setSchedulerForm((prev) => ({
+                                    ...prev,
+                                    thirdReminderHour: hour.replace(/\D/g, ""),
+                                    thirdReminderMinute: minute.replace(/\D/g, ""),
+                                  }));
+                                }}
+                                disabled={schedulerSettingsSaving}
+                              />
+                            </div>
+                          </label>
+                          <div className="amp-edit-field amp-edit-field--full amp-scheduler-third-remove" style={{ textAlign: "center" }}>
+                            <span className="amp-lbl" style={{ textAlign: "center" }}>Опция</span>
+                            <button
+                              className="amp-btn amp-btn--ghost amp-btn--compact"
+                              style={{ width: "100%", justifyContent: "center" }}
+                              type="button"
+                              onClick={disableThirdReminder}
+                              disabled={schedulerSettingsSaving}
+                            >
+                              Премахни третото напомняне
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                   <div className="amp-edit-field amp-edit-field--full amp-scheduler-section-title amp-scheduler-section-title--overdue" style={{ textAlign: "center" }}>

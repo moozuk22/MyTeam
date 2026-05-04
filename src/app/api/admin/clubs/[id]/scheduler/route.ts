@@ -124,6 +124,9 @@ export async function GET(
       secondReminderDay: true,
       secondReminderHour: true,
       secondReminderMinute: true,
+      thirdReminderDay: true,
+      thirdReminderHour: true,
+      thirdReminderMinute: true,
       overdueHour: true,
       overdueMinute: true,
       trainingDates: true,
@@ -246,6 +249,9 @@ export async function PUT(
   const secondReminderDayRaw = (body as { secondReminderDay?: unknown }).secondReminderDay;
   const secondReminderHourRaw = (body as { secondReminderHour?: unknown }).secondReminderHour;
   const secondReminderMinuteRaw = (body as { secondReminderMinute?: unknown }).secondReminderMinute;
+  const thirdReminderDayRaw = (body as { thirdReminderDay?: unknown }).thirdReminderDay;
+  const thirdReminderHourRaw = (body as { thirdReminderHour?: unknown }).thirdReminderHour;
+  const thirdReminderMinuteRaw = (body as { thirdReminderMinute?: unknown }).thirdReminderMinute;
   const overdueHour = Number.parseInt(String((body as { overdueHour?: unknown }).overdueHour ?? ""), 10);
   const overdueMinute = Number.parseInt(String((body as { overdueMinute?: unknown }).overdueMinute ?? ""), 10);
   const rawTrainingDates = (body as { trainingDates?: unknown }).trainingDates;
@@ -309,6 +315,33 @@ export async function PUT(
     }
     if (!Number.isInteger(secondReminderMinute) || secondReminderMinute < 0 || secondReminderMinute > 59) {
       return NextResponse.json({ error: "\u0412\u0442\u043e\u0440\u0438\u0442\u0435 \u043c\u0438\u043d\u0443\u0442\u0438 \u0442\u0440\u044f\u0431\u0432\u0430 \u0434\u0430 \u0441\u0430 \u043c\u0435\u0436\u0434\u0443 0 \u0438 59." }, { status: 400 });
+    }
+  }
+  const hasThirdReminder =
+    (thirdReminderDayRaw !== undefined && thirdReminderDayRaw !== null && String(thirdReminderDayRaw).trim() !== "") ||
+    (thirdReminderHourRaw !== undefined && thirdReminderHourRaw !== null && String(thirdReminderHourRaw).trim() !== "") ||
+    (thirdReminderMinuteRaw !== undefined && thirdReminderMinuteRaw !== null && String(thirdReminderMinuteRaw).trim() !== "");
+  let thirdReminderDay: number | null = null;
+  let thirdReminderHour: number | null = null;
+  let thirdReminderMinute: number | null = null;
+  if (hasThirdReminder) {
+    if (!hasSecondReminder) {
+      return NextResponse.json({ error: "Трето напомняне може да се добави само след второ напомняне." }, { status: 400 });
+    }
+    thirdReminderDay = Number.parseInt(String(thirdReminderDayRaw ?? ""), 10);
+    thirdReminderHour = Number.parseInt(String(thirdReminderHourRaw ?? ""), 10);
+    thirdReminderMinute = Number.parseInt(String(thirdReminderMinuteRaw ?? ""), 10);
+    if (!Number.isInteger(thirdReminderDay) || thirdReminderDay < 1 || thirdReminderDay > 28) {
+      return NextResponse.json({ error: "Третият ден за месечно напомняне трябва да е между 1 и 28." }, { status: 400 });
+    }
+    if (thirdReminderDay === reminderDay || thirdReminderDay === secondReminderDay) {
+      return NextResponse.json({ error: "Третият ден за напомняне трябва да е различен от другите напомняния." }, { status: 400 });
+    }
+    if (!Number.isInteger(thirdReminderHour) || thirdReminderHour < 0 || thirdReminderHour > 23) {
+      return NextResponse.json({ error: "Третият час трябва да е между 0 и 23." }, { status: 400 });
+    }
+    if (!Number.isInteger(thirdReminderMinute) || thirdReminderMinute < 0 || thirdReminderMinute > 59) {
+      return NextResponse.json({ error: "Третите минути трябва да са между 0 и 59." }, { status: 400 });
     }
   }
   if (!Number.isInteger(overdueHour) || overdueHour < 0 || overdueHour > 23) {
@@ -456,6 +489,9 @@ export async function PUT(
       secondReminderDay,
       secondReminderHour,
       secondReminderMinute,
+      thirdReminderDay,
+      thirdReminderHour,
+      thirdReminderMinute,
       overdueHour,
       overdueMinute,
       reminderTz: FIXED_TIME_ZONE,
@@ -483,6 +519,9 @@ export async function PUT(
       secondReminderDay: true,
       secondReminderHour: true,
       secondReminderMinute: true,
+      thirdReminderDay: true,
+      thirdReminderHour: true,
+      thirdReminderMinute: true,
       overdueHour: true,
       overdueMinute: true,
       trainingDates: true,

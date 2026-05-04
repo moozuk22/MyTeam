@@ -1294,16 +1294,36 @@
   order: 24;
 }
 
-.amp-scheduler-section-title--overdue {
+.amp-scheduler-section-title--third {
   order: 30;
 }
 
-.amp-scheduler-overdue-day {
+.amp-scheduler-third-toggle {
   order: 31;
 }
 
-.amp-scheduler-overdue-time {
+.amp-scheduler-third-day {
   order: 32;
+}
+
+.amp-scheduler-third-time {
+  order: 33;
+}
+
+.amp-scheduler-third-remove {
+  order: 34;
+}
+
+.amp-scheduler-section-title--overdue {
+  order: 40;
+}
+
+.amp-scheduler-overdue-day {
+  order: 41;
+}
+
+.amp-scheduler-overdue-time {
+  order: 42;
 }
 
 .amp-training-calendar {

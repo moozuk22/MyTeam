@@ -66,6 +66,9 @@ function getClubReminderSchedules(club: {
   secondReminderDay: number | null;
   secondReminderHour: number | null;
   secondReminderMinute: number | null;
+  thirdReminderDay: number | null;
+  thirdReminderHour: number | null;
+  thirdReminderMinute: number | null;
 }): ReminderSchedule[] {
   const primary: ReminderSchedule = {
     day: Number.isInteger(club.reminderDay) ? club.reminderDay : DEFAULT_RUN_DAY,
@@ -74,26 +77,33 @@ function getClubReminderSchedules(club: {
   };
 
   const schedules: ReminderSchedule[] = [primary];
-  if (
-    Number.isInteger(club.secondReminderDay) &&
-    Number.isInteger(club.secondReminderHour) &&
-    Number.isInteger(club.secondReminderMinute)
-  ) {
-    const secondary: ReminderSchedule = {
+  const optionalSchedules: ReminderSchedule[] = [
+    {
       day: club.secondReminderDay as number,
       hour: club.secondReminderHour as number,
       minute: club.secondReminderMinute as number,
-    };
+    },
+    {
+      day: club.thirdReminderDay as number,
+      hour: club.thirdReminderHour as number,
+      minute: club.thirdReminderMinute as number,
+    },
+  ];
+
+  for (const schedule of optionalSchedules) {
     if (
-      secondary.day >= 1 &&
-      secondary.day <= 28 &&
-      secondary.hour >= 0 &&
-      secondary.hour <= 23 &&
-      secondary.minute >= 0 &&
-      secondary.minute <= 59 &&
-      secondary.day !== primary.day
+      Number.isInteger(schedule.day) &&
+      schedule.day >= 1 &&
+      schedule.day <= 28 &&
+      Number.isInteger(schedule.hour) &&
+      schedule.hour >= 0 &&
+      schedule.hour <= 23 &&
+      Number.isInteger(schedule.minute) &&
+      schedule.minute >= 0 &&
+      schedule.minute <= 59 &&
+      !schedules.some((existing) => existing.day === schedule.day)
     ) {
-      schedules.push(secondary);
+      schedules.push(schedule);
     }
   }
 
@@ -150,6 +160,9 @@ export async function runMonthlyMembershipPaymentReminder(
       secondReminderDay: true,
       secondReminderHour: true,
       secondReminderMinute: true,
+      thirdReminderDay: true,
+      thirdReminderHour: true,
+      thirdReminderMinute: true,
     },
   });
 
