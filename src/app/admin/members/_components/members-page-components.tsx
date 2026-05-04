@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   AttendanceReportData,
@@ -1387,6 +1387,7 @@ function MemberDetailModal({
   onRequestDelete,
   onRequestEdit,
   actionMode = "active",
+  isCoach = false,
   onRequestReactivate,
   onRequestPermanentDelete,
   isReactivating = false,
@@ -1399,6 +1400,7 @@ function MemberDetailModal({
   onRequestDelete: (member: Member) => void;
   onRequestEdit: (member: Member) => void;
   actionMode?: "active" | "inactive";
+  isCoach?: boolean;
   onRequestReactivate?: (member: Member) => void;
   onRequestPermanentDelete?: (member: Member) => void;
   isReactivating?: boolean;
@@ -1415,6 +1417,14 @@ function MemberDetailModal({
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<MemberNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [coachNoteLoading, setCoachNoteLoading] = useState(false);
+  const [coachNoteSaving, setCoachNoteSaving] = useState(false);
+  const [coachNoteError, setCoachNoteError] = useState("");
+  const [coachNote, setCoachNote] = useState("");
+  const [coachNoteUpdatedAt, setCoachNoteUpdatedAt] = useState<string | null>(null);
+  const [coachNoteEditing, setCoachNoteEditing] = useState(false);
+  const [coachNoteDraft, setCoachNoteDraft] = useState("");
+  const coachNoteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const paymentHistory = [...(member.paymentLogs ?? [])].sort(
     (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
@@ -1516,6 +1526,99 @@ function MemberDetailModal({
       cancelled = true;
     };
   }, [memberClubId, memberId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCoachNote = async () => {
+      if (!isCoach || !memberId) {
+        setCoachNote("");
+        setCoachNoteUpdatedAt(null);
+        setCoachNoteError("");
+        setCoachNoteEditing(false);
+        setCoachNoteDraft("");
+        return;
+      }
+
+      setCoachNoteLoading(true);
+      setCoachNoteError("");
+      setCoachNoteEditing(false);
+      setCoachNoteDraft("");
+      try {
+        const response = await fetch(
+          `/api/admin/members/${encodeURIComponent(memberId)}/coach-note`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
+        }
+        const payload = (await response.json()) as { note?: unknown; updatedAt?: unknown; warning?: unknown };
+        if (cancelled) return;
+        setCoachNote(typeof payload.note === "string" ? payload.note : "");
+        setCoachNoteUpdatedAt(typeof payload.updatedAt === "string" ? payload.updatedAt : null);
+        if (typeof payload.warning === "string" && payload.warning.includes("coach_note")) {
+          setCoachNoteError("Бележките не са активирани (липсва поле в базата).");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCoachNoteError(err instanceof Error ? err.message : "Грешка");
+        }
+      } finally {
+        if (!cancelled) setCoachNoteLoading(false);
+      }
+    };
+
+    void loadCoachNote();
+    return () => {
+      cancelled = true;
+    };
+  }, [isCoach, memberId]);
+
+  useEffect(() => {
+    if (coachNoteEditing) coachNoteTextareaRef.current?.focus();
+  }, [coachNoteEditing]);
+
+  const saveCoachNote = async () => {
+    if (!isCoach || !memberId) return;
+    const noteToSave = coachNoteEditing ? coachNoteDraft : coachNote;
+    setCoachNoteSaving(true);
+    setCoachNoteError("");
+    try {
+      const response = await fetch(`/api/admin/members/${encodeURIComponent(memberId)}/coach-note`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: noteToSave }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
+      }
+      const payload = (await response.json()) as { note?: unknown; updatedAt?: unknown };
+      const next = typeof payload.note === "string" ? payload.note : noteToSave;
+      setCoachNote(next);
+      setCoachNoteDraft(next);
+      setCoachNoteUpdatedAt(typeof payload.updatedAt === "string" ? payload.updatedAt : new Date().toISOString());
+      setCoachNoteEditing(false);
+    } catch (err) {
+      setCoachNoteError(err instanceof Error ? err.message : "Грешка");
+    } finally {
+      setCoachNoteSaving(false);
+    }
+  };
+
+  const startCoachNoteEdit = () => {
+    if (coachNoteLoading || coachNoteSaving) return;
+    setCoachNoteDraft(coachNote);
+    setCoachNoteEditing(true);
+    setCoachNoteError("");
+  };
+
+  const cancelCoachNoteEdit = () => {
+    setCoachNoteDraft(coachNote);
+    setCoachNoteEditing(false);
+    setCoachNoteError("");
+  };
 
   return (
     <div className="amp-overlay" onClick={onClose}>
@@ -1640,6 +1743,108 @@ function MemberDetailModal({
                 </div>
               </div>
             )}
+
+            {isCoach && actionMode === "active" ? (
+              <div className="amp-info-cell amp-info-cell--full">
+                <div style={{ width: "100%" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "10px",
+                      marginBottom: "8px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                      <p className="amp-lbl" style={{ margin: 0 }}>
+                        Бележка от треньор
+                      </p>
+                      {!coachNoteLoading && (
+                        <button
+                          type="button"
+                          className="amp-member-bell-btn"
+                          onClick={() => (coachNoteEditing ? cancelCoachNoteEdit() : startCoachNoteEdit())}
+                          disabled={coachNoteSaving || !!coachNoteError?.includes("липсва поле")}
+                          aria-label={coachNoteEditing ? "Отказ" : "Редактирай бележка"}
+                          title={coachNoteEditing ? "Отказ" : "Редактирай"}
+                        >
+                          {coachNoteEditing ? <XIcon /> : <PencilIcon />}
+                        </button>
+                      )}
+                    </div>
+                    {coachNoteUpdatedAt ? (
+                      <span style={{ fontSize: "12px", opacity: 0.8 }}>
+                        Последна промяна: {new Date(coachNoteUpdatedAt).toLocaleString("bg-BG")}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {coachNoteLoading ? (
+                    <p className="amp-empty" style={{ margin: 0 }}>Зареждане...</p>
+                  ) : coachNoteEditing ? (
+                    <>
+                      <textarea
+                        ref={coachNoteTextareaRef}
+                        className="amp-edit-input"
+                        value={coachNoteDraft}
+                        onChange={(e) => setCoachNoteDraft(e.target.value)}
+                        placeholder="Напиши инструкции/наблюдения за играча..."
+                        rows={10}
+                        style={{
+                          width: "100%",
+                          minHeight: "100px",
+                          resize: "vertical",
+                          paddingTop: "12px",
+                          paddingBottom: "12px",
+                        }}
+                        disabled={coachNoteSaving}
+                      />
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "10px", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost amp-btn--compact"
+                          onClick={() => void saveCoachNote()}
+                          disabled={coachNoteSaving}
+                        >
+                          {coachNoteSaving ? "Запис..." : "Запази"}
+                        </button>
+                        {coachNoteError ? (
+                          <span className="amp-confirm-error" style={{ margin: 0 }}>{coachNoteError}</span>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="amp-edit-input"
+                        style={{
+                          width: "100%",
+                          minHeight: "100px",
+                          padding: "12px 14px",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          opacity: coachNote.trim() ? 1 : 0.55,
+                          fontStyle: coachNote.trim() ? "normal" : "italic",
+                          cursor: "default",
+                          boxSizing: "border-box",
+                        }}
+                        onDoubleClick={() => startCoachNoteEdit()}
+                        role="presentation"
+                      >
+                        {coachNote.trim()
+                          ? coachNote
+                          : "Напиши инструкции/наблюдения за играча... (кликни молива за редакция)"}
+                      </div>
+                      {coachNoteError ? (
+                        <p className="amp-confirm-error" style={{ marginTop: "8px", marginBottom: 0 }}>{coachNoteError}</p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="amp-acc">
