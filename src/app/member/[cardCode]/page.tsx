@@ -16,6 +16,8 @@ interface MemberProfile {
   clubLogoUrl?: string | null;
   avatarUrl?: string | null;
   jerseyNumber?: string | null;
+  parentPhone?: string | null;
+  playerPhone?: string | null;
   birthDate?: string | null;
   isActive?: boolean;
   team_group?: number | null;
@@ -297,6 +299,8 @@ export default function MemberCardPage({
     birthDate: "",
     teamGroup: "",
     jerseyNumber: "",
+    parentPhone: "",
+    playerPhone: "",
   });
 
   // Notifications
@@ -796,6 +800,8 @@ export default function MemberCardPage({
       birthDate: member.birthDate ? new Date(member.birthDate).toISOString().slice(0, 10) : "",
       teamGroup: member.team_group !== null && member.team_group !== undefined ? String(member.team_group) : "",
       jerseyNumber: member.jerseyNumber ?? "",
+      parentPhone: member.parentPhone ?? "",
+      playerPhone: member.playerPhone ?? "",
     });
     setEditImageFile(null);
     setEditImagePreviewUrl("");
@@ -1226,6 +1232,9 @@ export default function MemberCardPage({
       return;
     }
 
+    const parentPhone = editForm.parentPhone.trim() || null;
+    const playerPhone = editForm.playerPhone.trim() || null;
+
     setEditSaving(true);
     setEditError("");
     try {
@@ -1247,6 +1256,8 @@ export default function MemberCardPage({
           birthDate: editForm.birthDate.trim() || null,
           teamGroup,
           jerseyNumber: editForm.jerseyNumber.trim() || null,
+          parentPhone,
+          playerPhone,
           ...(uploadedImagePath ? { imageUrl: uploadedImagePath } : {}),
         }),
       });
@@ -2517,6 +2528,38 @@ export default function MemberCardPage({
                   <input
                     value={editForm.jerseyNumber}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, jerseyNumber: e.target.value }))}
+                    style={{
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.22)",
+                      borderRadius: "10px",
+                      padding: "10px 12px",
+                      color: "#fff",
+                    }}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: "6px" }}>
+                  <span className="pm-info-lbl">Телефон на родител</span>
+                  <input
+                    type="tel"
+                    value={editForm.parentPhone}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, parentPhone: e.target.value }))}
+                    placeholder="+359..."
+                    style={{
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.22)",
+                      borderRadius: "10px",
+                      padding: "10px 12px",
+                      color: "#fff",
+                    }}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: "6px" }}>
+                  <span className="pm-info-lbl">Телефон на играч</span>
+                  <input
+                    type="tel"
+                    value={editForm.playerPhone}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, playerPhone: e.target.value }))}
+                    placeholder="+359..."
                     style={{
                       background: "rgba(255,255,255,0.08)",
                       border: "1px solid rgba(255,255,255,0.22)",

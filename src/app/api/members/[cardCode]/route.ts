@@ -8,6 +8,7 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { cloudinary } from "@/lib/cloudinary";
 import { publishMemberUpdated } from "@/lib/memberEvents";
 import { isCurrentMonthWaived } from "@/lib/paymentStatus";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -255,6 +256,8 @@ export async function GET(
         isActive: card.isActive,
         team_group: card.player.teamGroup,
         jerseyNumber: card.player.jerseyNumber,
+        parentPhone: card.player.parentPhone,
+        playerPhone: card.player.playerPhone,
         birthDate: card.player.birthDate,
         status: pausedThisMonth ? "paused" : card.player.status,
         firstBillingMonth: card.player.firstBillingMonth,
@@ -323,9 +326,11 @@ export async function PUT(
     const hasBirthDate = Object.prototype.hasOwnProperty.call(body, "birthDate");
     const hasTeamGroup = Object.prototype.hasOwnProperty.call(body, "teamGroup");
     const hasJerseyNumber = Object.prototype.hasOwnProperty.call(body, "jerseyNumber");
+    const hasParentPhone = Object.prototype.hasOwnProperty.call(body, "parentPhone");
+    const hasPlayerPhone = Object.prototype.hasOwnProperty.call(body, "playerPhone");
     const hasImageUrl = Object.prototype.hasOwnProperty.call(body, "imageUrl");
 
-    if (!hasFullName && !hasBirthDate && !hasTeamGroup && !hasJerseyNumber && !hasImageUrl) {
+    if (!hasFullName && !hasBirthDate && !hasTeamGroup && !hasJerseyNumber && !hasParentPhone && !hasPlayerPhone && !hasImageUrl) {
       return NextResponse.json({ error: "No editable fields provided" }, { status: 400 });
     }
 
@@ -348,6 +353,8 @@ export async function PUT(
       birthDate?: Date | null;
       teamGroup?: number | null;
       jerseyNumber?: string | null;
+      parentPhone?: string | null;
+      playerPhone?: string | null;
     } = {};
 
     if (hasFullName) {
@@ -390,6 +397,28 @@ export async function PUT(
         rawJerseyNumber === null || rawJerseyNumber === undefined || String(rawJerseyNumber).trim() === ""
           ? null
           : String(rawJerseyNumber).trim();
+    }
+
+    if (hasParentPhone) {
+      const raw = normalizePhone((body as { parentPhone?: unknown }).parentPhone);
+      if (!raw) {
+        data.parentPhone = null;
+      } else if (!isValidPhone(raw)) {
+        return NextResponse.json({ error: "Невалиден телефон на родител" }, { status: 400 });
+      } else {
+        data.parentPhone = raw;
+      }
+    }
+
+    if (hasPlayerPhone) {
+      const raw = normalizePhone((body as { playerPhone?: unknown }).playerPhone);
+      if (!raw) {
+        data.playerPhone = null;
+      } else if (!isValidPhone(raw)) {
+        return NextResponse.json({ error: "Невалиден телефон на играч" }, { status: 400 });
+      } else {
+        data.playerPhone = raw;
+      }
     }
 
     const nextImageUrl = hasImageUrl
