@@ -4238,6 +4238,7 @@ function AdminMembersPageContent() {
           member={selectedMember}
           onClose={() => setSelectedMember(null)}
           actionMode={selectedMember.isActive ? "active" : "inactive"}
+          isCoach={isCoach}
           onRequestEdit={openEditMember}
           onRequestDelete={(member) => {
             setDeleteError("");

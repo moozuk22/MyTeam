@@ -228,6 +228,7 @@ model Player {
   teamGroup            Int?                            @map("team_group")
   lastPaymentDate      DateTime?                       @map("last_payment_date") @db.Timestamptz(6)
   isActive             Boolean                         @default(true) @map("is_active")
+  coachNote            String?                         @map("coach_note")
   cards                Card[]
   images               Image[]
   paymentLogs          PaymentLog[]
