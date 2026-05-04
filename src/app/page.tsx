@@ -2065,7 +2065,7 @@ export default function Home() {
             <h2 style={{ fontSize: 42, fontWeight: 800, textAlign: "center", marginBottom: 8 }}>
               <span style={{ background: "linear-gradient(135deg, #39FF14, #00D4FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Абонаменти</span>
             </h2>
-            <p style={{ color: "#FF3E3E", fontWeight: 700, fontSize: 18, textAlign: "center", marginBottom: 20, width: "100%" }}>* Свободни места: 5 от общо 10 отбора</p>
+            <p style={{ color: "#FF3E3E", fontWeight: 700, fontSize: 18, textAlign: "center", marginBottom: 20, width: "100%" }}>* Свободни места: 3 от общо 10 отбора</p>
             <div className="new-pricing-grid">
 
               {/* LEFT: Subscription Levels Table */}
