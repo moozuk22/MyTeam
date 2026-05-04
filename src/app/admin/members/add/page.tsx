@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
+import { isValidPhone } from "@/lib/phone";
 import "./page.css";
 
 interface ClubData {
@@ -23,6 +24,8 @@ function AddMemberPageContent() {
   const [status, setStatus] = useState<"paid" | "warning" | "overdue">("warning");
   const [clubData, setClubData] = useState<ClubData | null>(null);
   const [jerseyNumber, setJerseyNumber] = useState("");
+  const [parentPhone, setParentPhone] = useState("");
+  const [playerPhone, setPlayerPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [firstBillingMonth, setFirstBillingMonth] = useState("");
   const [avatarUrl] = useState("");
@@ -127,6 +130,18 @@ function AddMemberPageContent() {
       setError("Birth date is required.");
       return;
     }
+    if (!parentPhone.trim()) {
+      setError("Parent phone is required.");
+      return;
+    }
+    if (!isValidPhone(parentPhone)) {
+      setError("Parent phone is invalid.");
+      return;
+    }
+    if (playerPhone.trim() && !isValidPhone(playerPhone)) {
+      setError("Player phone is invalid.");
+      return;
+    }
     if (clubData?.billingStatus === "active" && !firstBillingMonth.trim()) {
       setError("First billing month is required for active billing clubs.");
       return;
@@ -154,10 +169,12 @@ function AddMemberPageContent() {
         status,
         clubId,
         birthDate: birthDate.trim(),
+        parentPhone: parentPhone.trim(),
       };
       if (coachGroupId) payload.coachGroupId = coachGroupId;
 
       if (jerseyNumber.trim()) payload.jerseyNumber = jerseyNumber.trim();
+      if (playerPhone.trim()) payload.playerPhone = playerPhone.trim();
       if (firstBillingMonth.trim()) payload.firstBillingMonth = firstBillingMonth.trim();
       if (resolvedAvatarUrl) payload.avatarUrl = resolvedAvatarUrl;
       if (resolvedImagePath) payload.imageUrl = resolvedImagePath;
@@ -293,6 +310,31 @@ function AddMemberPageContent() {
                 value={birthDate}
                 onChange={(e) => setBirthDate(e.target.value)}
                 className="add-member-input"
+              />
+            </div>
+
+            <div className="add-member-field">
+              <label className="add-member-label">
+                Телефон на родител <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>
+              </label>
+              <input
+                type="tel"
+                required
+                value={parentPhone}
+                onChange={(e) => setParentPhone(e.target.value)}
+                className="add-member-input"
+                placeholder="+359..."
+              />
+            </div>
+
+            <div className="add-member-field">
+              <label className="add-member-label">Телефон на играч</label>
+              <input
+                type="tel"
+                value={playerPhone}
+                onChange={(e) => setPlayerPhone(e.target.value)}
+                className="add-member-input"
+                placeholder="По желание"
               />
             </div>
 

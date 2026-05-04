@@ -1286,6 +1286,16 @@ function MemberDetailModalLegacy({
               <span className="amp-val">{activeCardCode}</span>
             </div>
 
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Телефон родител:</span>
+              <span className="amp-val">{member.parentPhone ?? "Не е посочен"}</span>
+            </div>
+
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Телефон играч:</span>
+              <span className="amp-val">{member.playerPhone ?? "Не е посочен"}</span>
+            </div>
+
             {/* Row 3 full: Последно плащане */}
             <div className="amp-info-cell amp-info-cell--full">
               <CalendarIcon />
@@ -1557,6 +1567,16 @@ function MemberDetailModal({
             <div className="amp-info-cell">
               <span className="amp-lbl">Активна карта:</span>
               <span className="amp-val">{activeCardCode}</span>
+            </div>
+
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Телефон родител:</span>
+              <span className="amp-val">{member.parentPhone ?? "Не е посочен"}</span>
+            </div>
+
+            <div className="amp-info-cell">
+              <span className="amp-lbl">Телефон играч:</span>
+              <span className="amp-val">{member.playerPhone ?? "Не е посочен"}</span>
             </div>
 
             <div className="amp-info-cell amp-info-cell--full">

@@ -7,6 +7,7 @@ import {
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
 import { normalizeToMonthStart } from "@/lib/paymentStatus";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,28 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const parentPhone = normalizePhone(body.parentPhone);
+    if (!parentPhone) {
+      return NextResponse.json(
+        { error: "parentPhone is required" },
+        { status: 400 }
+      );
+    }
+    if (!isValidPhone(parentPhone)) {
+      return NextResponse.json(
+        { error: "parentPhone is invalid" },
+        { status: 400 }
+      );
+    }
+    const playerPhoneRaw = normalizePhone(body.playerPhone);
+    if (playerPhoneRaw && !isValidPhone(playerPhoneRaw)) {
+      return NextResponse.json(
+        { error: "playerPhone is invalid" },
+        { status: 400 }
+      );
+    }
+    const playerPhone = playerPhoneRaw || null;
 
     let clubId = String(body.clubId ?? "").trim();
     if (!clubId) {
@@ -166,6 +189,8 @@ export async function POST(request: NextRequest) {
             fullName,
             status,
             jerseyNumber,
+            parentPhone,
+            playerPhone,
             birthDate,
             teamGroup,
             lastPaymentDate,
@@ -301,6 +326,8 @@ export async function GET(request: NextRequest) {
         fullName: true,
         status: true,
         jerseyNumber: true,
+        parentPhone: true,
+        playerPhone: true,
         birthDate: true,
         teamGroup: true,
         lastPaymentDate: true,

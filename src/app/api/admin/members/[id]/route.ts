@@ -11,6 +11,7 @@ import {
   isCurrentMonthWaived,
   normalizeToMonthStart,
 } from "@/lib/paymentStatus";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 
 export const runtime = "nodejs";
@@ -113,12 +114,16 @@ export async function PUT(
     const fullName = fullNameRaw || [firstNameRaw, secondNameRaw].filter(Boolean).join(" ").trim();
     const clubIdRaw = body.clubId;
     const jerseyNumberRaw = body.jerseyNumber;
+    const parentPhoneRaw = body.parentPhone;
+    const playerPhoneRaw = body.playerPhone;
     const teamGroupRaw = body.teamGroup;
     const statusRaw = String(body.status ?? "").trim();
     const birthDateRaw = body.birthDate;
     const avatarUrlRaw = body.avatarUrl;
     const imageUrlRaw = body.imageUrl;
     const hasImageUrl = Object.prototype.hasOwnProperty.call(body, "imageUrl");
+    const hasParentPhone = Object.prototype.hasOwnProperty.call(body, "parentPhone");
+    const hasPlayerPhone = Object.prototype.hasOwnProperty.call(body, "playerPhone");
     const hasFirstBillingMonth = Object.prototype.hasOwnProperty.call(body, "firstBillingMonth");
 
     if (!fullName) {
@@ -126,6 +131,15 @@ export async function PUT(
         { error: "fullName is required" },
         { status: 400 }
       );
+    }
+
+    const nextParentPhone = normalizePhone(parentPhoneRaw);
+    if (hasParentPhone && nextParentPhone && !isValidPhone(nextParentPhone)) {
+      return NextResponse.json({ error: "parentPhone is invalid" }, { status: 400 });
+    }
+    const nextPlayerPhone = normalizePhone(playerPhoneRaw);
+    if (hasPlayerPhone && nextPlayerPhone && !isValidPhone(nextPlayerPhone)) {
+      return NextResponse.json({ error: "playerPhone is invalid" }, { status: 400 });
     }
 
     const existingPlayer = await prisma.player.findUnique({
@@ -226,6 +240,22 @@ export async function PUT(
           jerseyNumberRaw === null || jerseyNumberRaw === undefined || jerseyNumberRaw === ""
             ? null
             : String(jerseyNumberRaw),
+        ...(hasParentPhone
+          ? {
+              parentPhone:
+                parentPhoneRaw === null || parentPhoneRaw === undefined || parentPhoneRaw === ""
+                  ? null
+                  : nextParentPhone,
+            }
+          : {}),
+        ...(hasPlayerPhone
+          ? {
+              playerPhone:
+                playerPhoneRaw === null || playerPhoneRaw === undefined || playerPhoneRaw === ""
+                  ? null
+                  : nextPlayerPhone,
+            }
+          : {}),
         teamGroup,
         birthDate,
         ...(shouldSwitchAdminImage

@@ -68,6 +68,8 @@ interface Member {
   teamGroup: number | null;
   coachGroupId: string | null;
   jerseyNumber: string | null;
+  parentPhone: string | null;
+  playerPhone: string | null;
   avatarUrl: string | null;
   imageUrl: string | null;
   imagePublicId: string | null;

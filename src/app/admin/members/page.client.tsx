@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
+import { isValidPhone } from "@/lib/phone";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import "./page.css";
 
@@ -156,6 +157,8 @@ function AdminMembersPageContent() {
     clubId: "",
     teamGroup: "",
     jerseyNumber: "",
+    parentPhone: "",
+    playerPhone: "",
     birthDate: "",
     avatarUrl: "",
     imageUrl: "",
@@ -816,6 +819,8 @@ function AdminMembersPageContent() {
       clubId: member.club?.id ?? "",
       teamGroup: member.teamGroup !== null ? String(member.teamGroup) : "",
       jerseyNumber: member.jerseyNumber ?? "",
+      parentPhone: member.parentPhone ?? "",
+      playerPhone: member.playerPhone ?? "",
       birthDate: member.birthDate ? new Date(member.birthDate).toISOString().slice(0, 10) : "",
       avatarUrl: member.avatarUrl ?? "",
       imageUrl: member.imageUrl ?? "",
@@ -856,6 +861,15 @@ function AdminMembersPageContent() {
       return;
     }
 
+    if (editForm.parentPhone.trim() && !isValidPhone(editForm.parentPhone)) {
+      setEditError("Parent phone is invalid.");
+      return;
+    }
+    if (editForm.playerPhone.trim() && !isValidPhone(editForm.playerPhone)) {
+      setEditError("Player phone is invalid.");
+      return;
+    }
+
     setIsSavingEdit(true);
     setEditError("");
     try {
@@ -882,6 +896,8 @@ function AdminMembersPageContent() {
           clubId: editForm.clubId,
           teamGroup: parsedTeamGroup,
           jerseyNumber: editForm.jerseyNumber.trim() || null,
+          parentPhone: editForm.parentPhone.trim() || null,
+          playerPhone: editForm.playerPhone.trim() || null,
           birthDate: editForm.birthDate.trim() || null,
           avatarUrl: resolvedAvatarUrl,
           imageUrl: resolvedImageUrl,
@@ -4291,6 +4307,24 @@ function AdminMembersPageContent() {
                     className="amp-edit-input"
                     value={editForm.jerseyNumber}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, jerseyNumber: e.target.value }))}
+                  />
+                </label>
+                <label className="amp-edit-field">
+                  <span className="amp-lbl">Телефон на родител</span>
+                  <input
+                    className="amp-edit-input"
+                    type="tel"
+                    value={editForm.parentPhone}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, parentPhone: e.target.value }))}
+                  />
+                </label>
+                <label className="amp-edit-field">
+                  <span className="amp-lbl">Телефон на играч</span>
+                  <input
+                    className="amp-edit-input"
+                    type="tel"
+                    value={editForm.playerPhone}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, playerPhone: e.target.value }))}
                   />
                 </label>
                 <label className="amp-edit-field">

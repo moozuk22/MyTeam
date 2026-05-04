@@ -222,6 +222,8 @@ model Player {
   createdAt            DateTime                        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime                        @default(now()) @map("updated_at") @db.Timestamptz(6)
   jerseyNumber         String?                         @map("jersey_number")
+  parentPhone          String?                         @map("parent_phone")
+  playerPhone          String?                         @map("player_phone")
   birthDate            DateTime?                       @map("birth_date") @db.Date
   teamGroup            Int?                            @map("team_group")
   lastPaymentDate      DateTime?                       @map("last_payment_date") @db.Timestamptz(6)
