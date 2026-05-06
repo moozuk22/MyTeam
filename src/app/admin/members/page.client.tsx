@@ -5044,7 +5044,7 @@ function AdminMembersPageContent() {
                     onClick={() => void handleTrainingAttendanceViewChange("today")}
                     disabled={trainingAttendanceLoading || trainingWeekLoading || trainingNoteSaving || trainingDaysEditorSaving}
                 >
-                  Днес
+                  Тази седмица
                 </button>
                 <button
                   type="button"
