@@ -301,6 +301,15 @@ function AdminMembersPageContent() {
   const [pendingTeamGroupWarningGroups, setPendingTeamGroupWarningGroups] = useState<Array<{ id: string; name: string }>>([]);
   const [importSheetsOpen, setImportSheetsOpen] = useState(false);
   const [importPhotosOpen, setImportPhotosOpen] = useState(false);
+  const [notifyPanelOpen, setNotifyPanelOpen] = useState(false);
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [notifySelectedIds, setNotifySelectedIds] = useState<Set<string>>(new Set());
+  const [notifySearchTerm, setNotifySearchTerm] = useState("");
+  const [notifyGroupFilter, setNotifyGroupFilter] = useState("all");
+  const [notifyCoachGroupFilter, setNotifyCoachGroupFilter] = useState("");
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [notifyError, setNotifyError] = useState("");
+  const [notifySuccess, setNotifySuccess] = useState("");
   const [trainingScheduleGroupsLoading, setTrainingScheduleGroupsLoading] = useState(false);
   const [trainingScheduleGroups, setTrainingScheduleGroups] = useState<TrainingScheduleGroup[]>([]);
   const [customTrainingGroups, setCustomTrainingGroups] = useState<CustomTrainingGroup[]>([]);
@@ -1681,6 +1690,53 @@ function AdminMembersPageContent() {
       (m.club?.name ?? "").toLowerCase().includes(q)
     );
   });
+
+  const notifyVisibleMembers = useMemo(() => {
+    let list = members.filter((m) => m.isActive);
+    if (!coachGroupId && notifyCoachGroupFilter) {
+      list = list.filter((m) => m.coachGroupId === notifyCoachGroupFilter);
+    }
+    if (notifyGroupFilter !== "all") {
+      list = isCustomTrainingGroupMode
+        ? list.filter((m) =>
+            (customTrainingGroups.find((g) => g.id === notifyGroupFilter)?.playerIds ?? []).includes(m.id)
+          )
+        : list.filter((m) => String(m.teamGroup) === notifyGroupFilter);
+    }
+    if (notifySearchTerm.trim()) {
+      const q = notifySearchTerm.trim().toLowerCase();
+      list = list.filter((m) => m.fullName.toLowerCase().includes(q));
+    }
+    return list;
+  }, [members, notifyGroupFilter, notifySearchTerm, notifyCoachGroupFilter, coachGroupId, isCustomTrainingGroupMode, customTrainingGroups]);
+
+  const handleSendNotify = async () => {
+    if (!notifyMessage.trim() || notifySelectedIds.size === 0) return;
+    setNotifyBusy(true);
+    setNotifyError("");
+    setNotifySuccess("");
+    try {
+      const res = await fetch("/api/admin/members/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberIds: Array.from(notifySelectedIds),
+          message: notifyMessage.trim(),
+          clubId,
+          ...(coachGroupId ? { coachGroupId } : {}),
+        }),
+      });
+      const data = (await res.json()) as { success?: boolean; sent?: number; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Грешка");
+      setNotifySuccess(`Изпратено до ${data.sent ?? 0} членове.`);
+      setNotifySelectedIds(new Set());
+      setNotifyMessage("");
+    } catch (err) {
+      setNotifyError(err instanceof Error ? err.message : "Грешка");
+    } finally {
+      setNotifyBusy(false);
+    }
+  };
 
   const handleDownloadMemberLinks = async () => {
     if (!isAdmin || typeof window === "undefined" || typeof document === "undefined") {
@@ -3927,6 +3983,26 @@ function AdminMembersPageContent() {
                 <span>Изтрий</span>
               </button>
             </>
+          )}
+          {(isAdmin || isCoach) && clubId && (
+            <button
+              className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+              type="button"
+              onClick={() => {
+                setNotifyPanelOpen(true);
+                setNotifyMessage("");
+                setNotifySelectedIds(new Set());
+                setNotifySearchTerm(searchTerm);
+                setNotifyGroupFilter(selectedGroup);
+                setNotifyCoachGroupFilter("");
+                setNotifyBusy(false);
+                setNotifyError("");
+                setNotifySuccess("");
+              }}
+            >
+              <BellIcon />
+              <span>Съобщение</span>
+            </button>
           )}
         </div>
         {(isClubPushSupported || (isClubIPhone && !isClubStandalone)) && clubId && (
@@ -7151,6 +7227,173 @@ function AdminMembersPageContent() {
           onClose={() => setImportPhotosOpen(false)}
           onImported={() => void refreshMembersList()}
         />
+      )}
+
+      {notifyPanelOpen && (
+        <div
+          className="amp-overlay amp-overlay--confirm"
+          onClick={() => { if (!notifyBusy) setNotifyPanelOpen(false); }}
+        >
+          <div
+            className="amp-modal amp-modal--confirm amp-modal--notify"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Изпрати съобщение</span>
+              <button
+                className="amp-modal-close"
+                onClick={() => setNotifyPanelOpen(false)}
+                disabled={notifyBusy}
+                aria-label="Затвори"
+                type="button"
+              >
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              {isAdmin && !coachGroupId && coachGroups.length > 0 && (
+                <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
+                  <span className="amp-lbl">Група треньор</span>
+                  <select
+                    className="amp-edit-input"
+                    value={notifyCoachGroupFilter}
+                    onChange={(e) => {
+                      setNotifyCoachGroupFilter(e.target.value);
+                      setNotifySelectedIds(new Set());
+                    }}
+                    disabled={notifyBusy}
+                  >
+                    <option value="">Всички</option>
+                    {coachGroups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {groupOptions.length > 0 && (
+                <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
+                  <span className="amp-lbl">Отбор / група</span>
+                  <select
+                    className="amp-edit-input"
+                    value={notifyGroupFilter}
+                    onChange={(e) => {
+                      setNotifyGroupFilter(e.target.value);
+                      setNotifySelectedIds(new Set());
+                    }}
+                    disabled={notifyBusy}
+                  >
+                    <option value="all">Всички</option>
+                    {isCustomTrainingGroupMode
+                      ? customTrainingGroups.map((g) => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))
+                      : groupOptions.map((g) => (
+                          <option key={g} value={String(g)}>{g}</option>
+                        ))}
+                  </select>
+                </label>
+              )}
+              <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
+                <span className="amp-lbl">Търсене</span>
+                <input
+                  className="amp-edit-input"
+                  type="search"
+                  placeholder="Търси по име..."
+                  value={notifySearchTerm}
+                  onChange={(e) => setNotifySearchTerm(e.target.value)}
+                  disabled={notifyBusy}
+                />
+              </label>
+              <div className="amp-notify-count" style={{ marginBottom: "8px" }}>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost amp-btn--compact"
+                  style={{ marginRight: "8px" }}
+                  disabled={notifyBusy || notifyVisibleMembers.length === 0}
+                  onClick={() => setNotifySelectedIds(new Set(notifyVisibleMembers.map((m) => m.id)))}
+                >
+                  Избери всички видими ({notifyVisibleMembers.length})
+                </button>
+                <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)" }}>
+                  Избрани: {notifySelectedIds.size} от {notifyVisibleMembers.length} видими
+                </span>
+              </div>
+              <div className="amp-notify-player-list">
+                {notifyVisibleMembers.length === 0 ? (
+                  <p style={{ padding: "12px", fontSize: "13px", color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+                    Няма играчи
+                  </p>
+                ) : (
+                  notifyVisibleMembers.map((m) => (
+                    <label
+                      key={m.id}
+                      className={`amp-notify-player-item${notifySelectedIds.has(m.id) ? " amp-notify-player-item--selected" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={notifySelectedIds.has(m.id)}
+                        disabled={notifyBusy}
+                        onChange={(e) => {
+                          setNotifySelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(m.id);
+                            else next.delete(m.id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span className="amp-notify-player-name">{m.fullName}</span>
+                      {m.teamGroup !== null && (
+                        <span className="amp-notify-player-group">{m.teamGroup}</span>
+                      )}
+                    </label>
+                  ))
+                )}
+              </div>
+              <label className="amp-edit-field" style={{ marginTop: "16px" }}>
+                <span className="amp-lbl">Съобщение</span>
+                <textarea
+                  className="amp-edit-input amp-notify-textarea"
+                  placeholder="Въведете съобщение..."
+                  value={notifyMessage}
+                  maxLength={300}
+                  rows={4}
+                  onChange={(e) => setNotifyMessage(e.target.value)}
+                  disabled={notifyBusy}
+                  style={{ height: "auto", resize: "vertical", padding: "8px 10px" }}
+                />
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", textAlign: "right", display: "block" }}>
+                  {notifyMessage.length}/300
+                </span>
+              </label>
+              {notifyError && (
+                <p className="amp-confirm-error" style={{ marginTop: "8px" }}>{notifyError}</p>
+              )}
+              {notifySuccess && (
+                <p style={{ color: "#9cff9c", fontSize: "13px", fontWeight: 600, marginTop: "8px" }}>{notifySuccess}</p>
+              )}
+              <div className="amp-modal-actions" style={{ marginTop: "16px" }}>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => setNotifyPanelOpen(false)}
+                  disabled={notifyBusy}
+                >
+                  Затвори
+                </button>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--primary"
+                  disabled={notifyBusy || notifySelectedIds.size === 0 || !notifyMessage.trim()}
+                  onClick={() => void handleSendNotify()}
+                >
+                  {notifyBusy ? "Изпращане..." : `Изпрати до ${notifySelectedIds.size}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

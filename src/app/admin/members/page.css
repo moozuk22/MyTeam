@@ -3990,3 +3990,78 @@
     color: #cc0000 !important;
   }
 }
+
+/* ── Notify modal ── */
+.amp-modal--notify {
+  max-width: 560px;
+}
+
+.amp-notify-player-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 4px 0;
+  background: rgba(255, 255, 255, 0.02);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(50, 205, 50, 0.2) transparent;
+}
+
+.amp-notify-player-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.amp-notify-player-item:last-child {
+  border-bottom: none;
+}
+
+.amp-notify-player-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.amp-notify-player-item--selected {
+  background: rgba(50, 205, 50, 0.07);
+}
+
+.amp-notify-player-item--selected:hover {
+  background: rgba(50, 205, 50, 0.11);
+}
+
+.amp-notify-player-item input[type="checkbox"] {
+  accent-color: #32cd32;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.amp-notify-player-name {
+  flex: 1;
+  font-size: 13px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.amp-notify-player-group {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.amp-notify-count {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
