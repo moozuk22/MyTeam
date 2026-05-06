@@ -166,6 +166,15 @@ interface TrainingTodaySessionItem {
   };
 }
 
+interface TrainingWeekSessionItem {
+  id: string;
+  date: string;
+  trainingTime: string | null;
+  scopeType: "teamGroup" | "trainingGroup";
+  label: string;
+  teamGroups: number[];
+}
+
 interface AttendanceReportPlayer {
   id: string;
   fullName: string;
@@ -262,6 +271,7 @@ export type {
   TrainingTimeMode,
   TrainingDaysStep,
   TrainingTodaySessionItem,
+  TrainingWeekSessionItem,
   AttendanceReportPlayer,
   AttendanceReportData,
   MemberNotification,

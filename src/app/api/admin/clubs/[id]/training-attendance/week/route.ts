@@ -1,0 +1,274 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { verifyAdminToken } from "@/lib/adminAuth";
+import { getConfiguredTrainingDates, getTodayIsoDateInTimeZone } from "@/lib/training";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const FIXED_TIME_ZONE = "Europe/Sofia";
+const TRAINING_SELECTION_WINDOW_DAYS = 30;
+const WEEK_DAYS = 7;
+
+function isTransientPrismaConnectionError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const maybeError = error as { code?: unknown };
+  const code = typeof maybeError.code === "string" ? maybeError.code : "";
+  return code === "P1001" || code === "P2024";
+}
+
+async function verifySession(request: NextRequest) {
+  const token = request.cookies.get("admin_session")?.value;
+  const session = token ? await verifyAdminToken(token) : null;
+  return session;
+}
+
+function hasTrainingOnDate(input: {
+  date: string;
+  trainingDates?: string[] | null;
+  weekdays?: number[] | null;
+  windowDays?: number;
+}) {
+  const configured = getConfiguredTrainingDates({
+    trainingDates: input.trainingDates ?? [],
+    weekdays: input.weekdays ?? [],
+    windowDays: input.windowDays ?? TRAINING_SELECTION_WINDOW_DAYS,
+    timeZone: FIXED_TIME_ZONE,
+    maxDays: TRAINING_SELECTION_WINDOW_DAYS,
+  });
+  return configured.includes(input.date);
+}
+
+function resolveTime(
+  date: string,
+  trainingTime: string | null,
+  trainingDateTimes: unknown,
+): string | null {
+  if (trainingDateTimes && typeof trainingDateTimes === "object" && !Array.isArray(trainingDateTimes)) {
+    const dtMap = trainingDateTimes as Record<string, unknown>;
+    const v = dtMap[date];
+    if (typeof v === "string" && /^\d{2}:\d{2}$/.test(v)) return v;
+  }
+  if (typeof trainingTime === "string" && /^\d{2}:\d{2}$/.test(trainingTime)) return trainingTime;
+  return null;
+}
+
+function getSevenDates(todayIso: string): string[] {
+  return Array.from({ length: WEEK_DAYS }, (_, i) => {
+    const d = new Date(`${todayIso}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+type WeekSession = {
+  id: string;
+  date: string;
+  trainingTime: string | null;
+  scopeType: "teamGroup" | "trainingGroup";
+  label: string;
+  teamGroups: number[];
+};
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await verifySession(request);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+  const dates = getSevenDates(todayIso);
+
+  try {
+    const [club, teamSchedules, trainingGroups, customTrainingGroups] = await Promise.all([
+      prisma.club.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          trainingDates: true,
+          trainingWeekdays: true,
+          trainingWindowDays: true,
+          trainingTime: true,
+          trainingDateTimes: true,
+          trainingGroupMode: true,
+        },
+      }),
+      prisma.clubTrainingGroupSchedule.findMany({
+        where: { clubId: id },
+        select: {
+          teamGroup: true,
+          trainingDates: true,
+          trainingWeekdays: true,
+          trainingWindowDays: true,
+          trainingTime: true,
+          trainingDateTimes: true,
+        },
+      }),
+      prisma.clubTrainingScheduleGroup.findMany({
+        where: { clubId: id },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          teamGroups: true,
+          trainingDates: true,
+          trainingWeekdays: true,
+          trainingWindowDays: true,
+          trainingTime: true,
+          trainingDateTimes: true,
+        },
+      }),
+      prisma.clubCustomTrainingGroup.findMany({
+        where: { clubId: id },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          trainingDates: true,
+          trainingWeekdays: true,
+          trainingWindowDays: true,
+          trainingTime: true,
+          trainingDateTimes: true,
+        },
+      }),
+    ]);
+
+    if (!club) {
+      return NextResponse.json({ error: "Club not found" }, { status: 404 });
+    }
+
+    const sessions: WeekSession[] = [];
+
+    if (club.trainingGroupMode === "custom_group") {
+      for (const date of dates) {
+        for (const group of customTrainingGroups) {
+          const hasTraining = hasTrainingOnDate({
+            date,
+            trainingDates: group.trainingDates,
+            weekdays: group.trainingWeekdays,
+            windowDays: group.trainingWindowDays,
+          });
+          if (!hasTraining) continue;
+          sessions.push({
+            id: `${date}-custom-${group.id}`,
+            date,
+            trainingTime: resolveTime(date, group.trainingTime, group.trainingDateTimes),
+            scopeType: "trainingGroup",
+            label: group.name || "Custom group",
+            teamGroups: [],
+          });
+        }
+      }
+
+      sessions.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.label.localeCompare(b.label, "bg");
+      });
+
+      return NextResponse.json({ dates, sessions });
+    }
+
+    const teamScheduleByGroup = new Map<number, (typeof teamSchedules)[number]>();
+    for (const schedule of teamSchedules) {
+      teamScheduleByGroup.set(schedule.teamGroup, schedule);
+    }
+
+    const trainingGroupOverrideByTeamGroup = new Map<number, (typeof trainingGroups)[number]>();
+    for (const group of trainingGroups) {
+      const hasExplicitDates = Array.isArray(group.trainingDates) && group.trainingDates.length > 0;
+      if (!hasExplicitDates) continue;
+      for (const teamGroup of group.teamGroups ?? []) {
+        if (!Number.isInteger(teamGroup) || trainingGroupOverrideByTeamGroup.has(teamGroup)) continue;
+        trainingGroupOverrideByTeamGroup.set(teamGroup, group);
+      }
+    }
+
+    const allTeamGroups = Array.from(
+      new Set([
+        ...teamSchedules.map((item) => item.teamGroup),
+        ...trainingGroups.flatMap((item) => item.teamGroups ?? []),
+      ]),
+    )
+      .filter((value) => Number.isInteger(value))
+      .sort((a, b) => a - b);
+
+    for (const date of dates) {
+      const coveredTeamGroups = new Set<number>();
+
+      for (const group of trainingGroups) {
+        const normalizedGroups = Array.from(
+          new Set((group.teamGroups ?? []).filter((v) => Number.isInteger(v))),
+        ).sort((a, b) => a - b);
+        if (normalizedGroups.length === 0) continue;
+
+        const hasTraining = hasTrainingOnDate({
+          date,
+          trainingDates: group.trainingDates,
+          weekdays: group.trainingWeekdays,
+          windowDays: group.trainingWindowDays,
+        });
+        if (!hasTraining) continue;
+
+        for (const tg of normalizedGroups) coveredTeamGroups.add(tg);
+        sessions.push({
+          id: `${date}-group-${group.id}`,
+          date,
+          trainingTime: resolveTime(date, group.trainingTime, group.trainingDateTimes),
+          scopeType: "trainingGroup",
+          label: group.name || "Сборен отбор",
+          teamGroups: normalizedGroups,
+        });
+      }
+
+      for (const teamGroup of allTeamGroups) {
+        if (coveredTeamGroups.has(teamGroup)) continue;
+        const groupSchedule = teamScheduleByGroup.get(teamGroup);
+        const override = trainingGroupOverrideByTeamGroup.get(teamGroup);
+        const hasTraining = hasTrainingOnDate({
+          date,
+          trainingDates: override?.trainingDates ?? groupSchedule?.trainingDates ?? club.trainingDates,
+          weekdays: override?.trainingWeekdays ?? groupSchedule?.trainingWeekdays ?? club.trainingWeekdays,
+          windowDays: override?.trainingWindowDays ?? groupSchedule?.trainingWindowDays ?? club.trainingWindowDays,
+        });
+        if (!hasTraining) continue;
+
+        const resolvedSchedule = groupSchedule ?? null;
+        sessions.push({
+          id: `${date}-team-${teamGroup}`,
+          date,
+          trainingTime: resolveTime(
+            date,
+            resolvedSchedule?.trainingTime ?? club.trainingTime,
+            resolvedSchedule?.trainingDateTimes ?? club.trainingDateTimes,
+          ),
+          scopeType: "teamGroup",
+          label: `Отбор ${teamGroup}`,
+          teamGroups: [teamGroup],
+        });
+      }
+    }
+
+    sessions.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      if (a.scopeType !== b.scopeType) return a.scopeType === "teamGroup" ? -1 : 1;
+      return a.label.localeCompare(b.label, "bg");
+    });
+
+    return NextResponse.json({ dates, sessions });
+  } catch (error) {
+    console.error("Training attendance week GET error:", error);
+    if (isTransientPrismaConnectionError(error)) {
+      return NextResponse.json(
+        { error: "Database temporarily unavailable. Please retry in a few seconds." },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
