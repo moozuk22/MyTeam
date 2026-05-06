@@ -1697,18 +1697,25 @@ function AdminMembersPageContent() {
       list = list.filter((m) => m.coachGroupId === notifyCoachGroupFilter);
     }
     if (notifyGroupFilter !== "all") {
-      list = isCustomTrainingGroupMode
-        ? list.filter((m) =>
-            (customTrainingGroups.find((g) => g.id === notifyGroupFilter)?.playerIds ?? []).includes(m.id)
-          )
-        : list.filter((m) => String(m.teamGroup) === notifyGroupFilter);
+      if (isCustomTrainingGroupMode) {
+        list = list.filter((m) =>
+          (customTrainingGroups.find((g) => g.id === notifyGroupFilter)?.playerIds ?? []).includes(m.id)
+        );
+      } else {
+        const tsg = trainingScheduleGroups.find((g) => g.id === notifyGroupFilter);
+        if (tsg) {
+          list = list.filter((m) => m.teamGroup !== null && tsg.teamGroups.includes(m.teamGroup));
+        } else {
+          list = list.filter((m) => String(m.teamGroup) === notifyGroupFilter);
+        }
+      }
     }
     if (notifySearchTerm.trim()) {
       const q = notifySearchTerm.trim().toLowerCase();
       list = list.filter((m) => m.fullName.toLowerCase().includes(q));
     }
     return list;
-  }, [members, notifyGroupFilter, notifySearchTerm, notifyCoachGroupFilter, coachGroupId, isCustomTrainingGroupMode, customTrainingGroups]);
+  }, [members, notifyGroupFilter, notifySearchTerm, notifyCoachGroupFilter, coachGroupId, isCustomTrainingGroupMode, customTrainingGroups, trainingScheduleGroups]);
 
   const handleSendNotify = async () => {
     if (!notifyMessage.trim() || notifySelectedIds.size === 0) return;
@@ -7288,9 +7295,16 @@ function AdminMembersPageContent() {
                       ? customTrainingGroups.map((g) => (
                           <option key={g.id} value={g.id}>{g.name}</option>
                         ))
-                      : groupOptions.map((g) => (
-                          <option key={g} value={String(g)}>{g}</option>
-                        ))}
+                      : (
+                        <>
+                          {trainingScheduleGroups.map((g) => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                          ))}
+                          {groupOptions.map((g) => (
+                            <option key={g} value={String(g)}>{g}</option>
+                          ))}
+                        </>
+                      )}
                   </select>
                 </label>
               )}
