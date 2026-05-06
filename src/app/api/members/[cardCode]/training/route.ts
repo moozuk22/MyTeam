@@ -89,8 +89,8 @@ function buildCoachAttendancePayload(input: {
     url: input.coachGroupId
       ? `/admin/members?clubId=${encodeURIComponent(input.clubId)}&coachGroupId=${encodeURIComponent(input.coachGroupId)}`
       : `/admin/members?clubId=${encodeURIComponent(input.clubId)}`,
-    icon: "/myteam-logo.png",
-    badge: "/myteam-logo.png",
+    icon: "/myteam-logo.webp",
+    badge: "/myteam-logo.webp",
     tag: "training-attendance-updated",
     data: {
       type: "training_reminder",

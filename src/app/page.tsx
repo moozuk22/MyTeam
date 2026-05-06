@@ -119,13 +119,13 @@ const COMPARISON = {
 };
 
 const PARTNERS = [
-  { name: "Sport Depot", abbr: "SD", color: "#FF6B00", disc: "-10%", logo: "/sd-logo.png" }
+  { name: "Sport Depot", abbr: "SD", color: "#FF6B00", disc: "-10%", logo: "/sd-logo.webp" }
 ];
 
 const ALL_PARTNERS = [
-  { name: "Sport Depot", logo: "/sd-logo.png" },
-  { name: "Мебели НИКО", logo: "/niko-logo.png" },
-  { name: "Dalida Dance Show", logo: "/dalida-logo.png" },
+  { name: "Sport Depot", logo: "/sd-logo.webp" },
+  { name: "Мебели НИКО", logo: "/niko-logo.webp" },
+  { name: "Dalida Dance Show", logo: "/dalida-logo.webp" },
   { name: "Inline Body", logo: "/idb-logo.svg" }
 ];
 
@@ -1407,7 +1407,7 @@ function SuccessModal({ onClose }) {
       }}>
         <div style={{ marginBottom: 0 }}>
           <img
-            src="/myteam-logo.png"
+            src="/myteam-logo.webp"
             alt="MyTeam Logo"
             style={{ height: 36, margin: "0 auto" }}
           />
@@ -1464,12 +1464,12 @@ function SuccessModal({ onClose }) {
 }
 
 const CAROUSEL_IMAGES = [
-  { src: "/1.png", alt: "MyTeam Interface — Dashboard" },
-  { src: "/2.png", alt: "MyTeam Interface — Players Management" },
-  { src: "/3.png", alt: "MyTeam Interface — Reports & Analytics" },
-  { src: "/4.png", alt: "MyTeam Interface — Schedule" },
-  { src: "/5.png", alt: "MyTeam Interface — Smart Access" },
-  { src: "/6.png", alt: "MyTeam Interface — Smart" },
+  { src: "/1.webp", alt: "MyTeam Interface — Dashboard" },
+  { src: "/2.webp", alt: "MyTeam Interface — Players Management" },
+  { src: "/3.webp", alt: "MyTeam Interface — Reports & Analytics" },
+  { src: "/4.webp", alt: "MyTeam Interface — Schedule" },
+  { src: "/5.webp", alt: "MyTeam Interface — Smart Access" },
+  { src: "/6.webp", alt: "MyTeam Interface — Smart" },
 ];
 
 function Lightbox({ image, onClose }) {
@@ -2321,7 +2321,7 @@ export default function Home() {
 
         <div className="footer-container">
           <div className="footer-logo">
-            <img src="/myteam-logo.png" alt="MyTeam Logo" style={{ height: 50, width: "auto" }} />
+            <img src="/myteam-logo.webp" alt="MyTeam Logo" style={{ height: 50, width: "auto" }} />
           </div>
           <div className="footer-copyright">
             © 2026 MyTeam. Всички права запазени.
@@ -2358,7 +2358,7 @@ export default function Home() {
           <ChatBot scrollToContact={() => contactRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })} />
           <div className={`${showDockActions ? "" : "dock-hidden-actions"}`} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <a href="viber://chat?number=%2B359896495254" className="fab-circle viber-fab" title="Viber">
-              <img src="/viber.png" alt="Viber" style={{ width: 50, height: 50, objectFit: "contain" }} />
+              <img src="/viber.webp" alt="Viber" style={{ width: 50, height: 50, objectFit: "contain" }} />
             </a>
           </div>
         </div>

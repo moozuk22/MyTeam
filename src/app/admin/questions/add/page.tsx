@@ -43,7 +43,7 @@ export default function AddQuestionPage() {
     <div className="flex flex-col items-center container p-6 fade-in">
       <div className="flex flex-col items-center text-center mb-8">
         <img
-          src="/myteam-logo.png"
+          src="/myteam-logo.webp"
           alt="Logo"
           className="mb-3 mx-auto"
           style={{ width: '100px', height: '100px', objectFit: 'contain' }}

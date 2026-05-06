@@ -11,24 +11,24 @@ export const metadata: Metadata = {
   icons: {
     apple: [
       {
-        url: "/myteam-logo.png",
+        url: "/myteam-logo.webp",
       },
     ],
     shortcut: [
       {
-        url: "/myteam-logo.png",
+        url: "/myteam-logo.webp",
         sizes: "192x192",
         type: "image/png",
       },
     ],
     icon: [
       {
-        url: "/myteam-logo.png",
+        url: "/myteam-logo.webp",
         sizes: "192x192",
         type: "image/png",
       },
       {
-        url: "/myteam-logo.png",
+        url: "/myteam-logo.webp",
         sizes: "512x512",
         type: "image/png",
       },

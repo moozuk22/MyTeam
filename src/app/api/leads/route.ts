@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ??
     request.nextUrl.origin;
   const baseUrl = appBaseUrl.replace(/\/$/, "");
-  const logoUrl = `${baseUrl}/myteam-logo.png`;
+  const logoUrl = `${baseUrl}/myteam-logo.webp`;
   const videoUrl = `${baseUrl}/?video=1`;
 
   const emailSent = await sendSubmissionNotificationEmail(

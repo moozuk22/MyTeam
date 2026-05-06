@@ -270,7 +270,7 @@ export default function VipPage() {
                 <div className="new-div">
                   <div className="card-visual-side">
                     <div className="debit-card-mockup-v2">
-                      <img src="/myteam-logo.png" alt="MyTeam" className="card-logo-large" />
+                      <img src="/myteam-logo.webp" alt="MyTeam" className="card-logo-large" />
                       <div className="card-footer-info-v2">
                         <span className="card-holder-white">SMART CARD</span>
                         <div className="nfc-waves-only">
@@ -324,7 +324,7 @@ export default function VipPage() {
                 </div>
                 <div className="benefits-image-side">
                   <div className="coach-fade-overlay"></div>
-                  <img src="/coach.png" alt="Coach" className="coach-img" style={{ position: "absolute", left: "180px" }} />
+                  <img src="/coach.webp" alt="Coach" className="coach-img" style={{ position: "absolute", left: "180px" }} />
                 </div>
               </div>
 

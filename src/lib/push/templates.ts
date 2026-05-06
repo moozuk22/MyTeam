@@ -3,7 +3,7 @@ import type {
   PushNotificationPayload,
 } from "@/lib/push/types";
 
-const DEFAULT_ICON = "/myteam-logo.png";
+const DEFAULT_ICON = "/myteam-logo.webp";
 const DEFAULT_URL = "/";
 
 export function buildNotificationPayload(

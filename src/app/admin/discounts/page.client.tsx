@@ -240,7 +240,7 @@ export default function DiscountsPageClient() {
                 key={partner.id} 
                 className="partner-card"
                 style={{
-                  backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.9)), url(${partner.logoUrl || "/placeholder.png"})`,
+                  backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.9)), url(${partner.logoUrl || "/placeholder.webp"})`,
                   backgroundSize: "contain",
                   backgroundPosition: "center",
                   backgroundRepeat: "no-repeat",
@@ -334,7 +334,7 @@ export default function DiscountsPageClient() {
                 <div className="team-discounts" style={{ marginTop: "20px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
                   {team.configs.filter(c => c.isVisible).sort((a,b) => a.order - b.order).map(config => (
                     <div key={config.discountId} className="discount-tag" style={{ background: "rgba(50, 205, 50, 0.1)", color: "#32cd32", border: "1px solid rgba(50, 205, 50, 0.2)", padding: "6px 12px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                      <img src={config.discount?.logoUrl || "/placeholder.png"} alt="" style={{ width: "16px", height: "16px", objectFit: "contain" }} />
+                      <img src={config.discount?.logoUrl || "/placeholder.webp"} alt="" style={{ width: "16px", height: "16px", objectFit: "contain" }} />
                       <span style={{ fontWeight: "600", fontSize: "13px" }}>{config.discount?.name}</span>
                     </div>
                   ))}
@@ -636,7 +636,7 @@ export default function DiscountsPageClient() {
                     <div style={{ display: "flex", alignItems: "center", gap: "15px", pointerEvents: "none" }}>
                       <GripVertical size={16} style={{ color: isDragging ? "#32cd32" : "rgba(255,255,255,0.2)" }} />
                       <div className="partner-logo-wrap" style={{ width: "40px", height: "40px", margin: 0, background: "rgba(255,255,255,0.05)" }}>
-                        <img src={partner.logoUrl || "/placeholder.png"} alt="" className="partner-logo" />
+                        <img src={partner.logoUrl || "/placeholder.webp"} alt="" className="partner-logo" />
                       </div>
                       <div style={{ color: config.isVisible ? "#fff" : "rgba(255,255,255,0.3)", fontSize: "16px", fontWeight: "700" }}>
                         {partner.name}

@@ -380,7 +380,7 @@ export function PushNotificationsPanel({ cardCode }: PushNotificationsPanelProps
 
       const notification = new Notification("Local Notification Test", {
         body: "If you see this, OS/browser notification display is working.",
-        icon: "/myteam-logo.png",
+        icon: "/myteam-logo.webp",
       });
 
       notification.onclick = () => {
@@ -418,8 +418,8 @@ export function PushNotificationsPanel({ cardCode }: PushNotificationsPanelProps
       const registration = await navigator.serviceWorker.ready;
       await registration.showNotification("SW Notification Test", {
         body: "If you see this, service worker notifications are working.",
-        icon: "/myteam-logo.png",
-        badge: "/myteam-logo.png",
+        icon: "/myteam-logo.webp",
+        badge: "/myteam-logo.webp",
         tag: `sw-test-${Date.now()}`,
         data: { url: window.location.pathname },
       });

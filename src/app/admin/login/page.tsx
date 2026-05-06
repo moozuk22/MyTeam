@@ -49,7 +49,7 @@ function AdminLoginPageContent() {
 
       <div className="al-inner">
         <header className="al-header">
-          <img src="/myteam-logo.png" alt="Logo" className="al-logo" />
+          <img src="/myteam-logo.webp" alt="Logo" className="al-logo" />
           <h1 className="al-title">{"\u0410\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440\u0441\u043a\u0438 \u0432\u0445\u043e\u0434"}</h1>
           <div className="al-title-line" />
         </header>

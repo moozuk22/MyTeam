@@ -12,13 +12,13 @@ export async function GET() {
     theme_color: "#000000",
     icons: [
       {
-        src: "/myteam-logo.png",
+        src: "/myteam-logo.webp",
         sizes: "192x192",
         type: "image/png",
         purpose: "any maskable",
       },
       {
-        src: "/myteam-logo.png",
+        src: "/myteam-logo.webp",
         sizes: "512x512",
         type: "image/png",
         purpose: "any maskable",

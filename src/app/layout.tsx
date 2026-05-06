@@ -38,11 +38,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/myteam-logo.png", sizes: "192x192", type: "image/png" },
-      { url: "/myteam-logo.png", sizes: "512x512", type: "image/png" },
+      { url: "/myteam-logo.webp", sizes: "192x192", type: "image/png" },
+      { url: "/myteam-logo.webp", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/myteam-logo.png",
-    shortcut: "/myteam-logo.png",
+    apple: "/myteam-logo.webp",
+    shortcut: "/myteam-logo.webp",
   },
   robots: {
     index: true,
@@ -74,7 +74,7 @@ const structuredData = JSON.stringify({
   "@type": "Organization",
   "name": "My Team",
   "url": process.env.NEXT_PUBLIC_SITE_URL || "https://myteam.example",
-  "logo": `${process.env.NEXT_PUBLIC_SITE_URL || "https://myteam.example"}/myteam-logo.png`,
+  "logo": `${process.env.NEXT_PUBLIC_SITE_URL || "https://myteam.example"}/myteam-logo.webp`,
   "description": "MyTeam помага на спортни клубове да управляват членството, таксите и тренировките си."
 });
 

@@ -1701,7 +1701,7 @@ export default function MemberCardPage({
                     } as any}
                   >
                     <div className="sd-discount-logo-wrap">
-                      <img src={member.discounts[0].logoUrl || "/placeholder.png"} alt={member.discounts[0].name} className="sd-discount-logo" />
+                      <img src={member.discounts[0].logoUrl || "/placeholder.webp"} alt={member.discounts[0].name} className="sd-discount-logo" />
                     </div>
                     <span className="sd-discount-label">{member.discounts[0].name}</span>
                     {member.discounts[0].badgeText && (
@@ -2181,7 +2181,7 @@ export default function MemberCardPage({
                       } as any}
                     >
                       <div className="sd-discount-logo-wrap">
-                        <img src={discount.logoUrl || "/placeholder.png"} alt={discount.name} className="sd-discount-logo" />
+                        <img src={discount.logoUrl || "/placeholder.webp"} alt={discount.name} className="sd-discount-logo" />
                       </div>
                       <span className="sd-discount-label">{discount.name}</span>
                       {discount.badgeText && (

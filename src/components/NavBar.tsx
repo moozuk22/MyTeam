@@ -47,7 +47,7 @@ export default function NavBar() {
       <div className="navbar-container">
         <a href="/" className="navbar-logo">
           <img
-            src="/myteam-logo.png"
+            src="/myteam-logo.webp"
             alt="MyTeam Logo"
             className="nav-logo-img"
             onContextMenu={(e) => e.preventDefault()}
@@ -65,7 +65,7 @@ export default function NavBar() {
         {/* Full Screen Mobile Menu */}
         <div className={`nav-links-wrapper ${isMenuOpen ? "links-open" : ""}`}>
           <div className="mobile-menu-header">
-            <img src="/myteam-logo.png" alt="MyTeam Logo" className="mobile-nav-logo" />
+            <img src="/myteam-logo.webp" alt="MyTeam Logo" className="mobile-nav-logo" />
             <button className="close-menu-btn" onClick={() => setIsMenuOpen(false)}>
               <CloseX size={32} color="#fff" />
             </button>

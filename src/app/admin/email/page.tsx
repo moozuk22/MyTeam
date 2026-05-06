@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   manifest: "/api/manifest/admin/players",
   appleWebApp: { title: "My Team Admin" },
   icons: {
-    apple: [{ url: "/myteam-logo.png" }],
-    shortcut: [{ url: "/myteam-logo.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/myteam-logo.webp" }],
+    shortcut: [{ url: "/myteam-logo.webp", sizes: "192x192", type: "image/png" }],
     icon: [
-      { url: "/myteam-logo.png", sizes: "192x192", type: "image/png" },
-      { url: "/myteam-logo.png", sizes: "512x512", type: "image/png" },
+      { url: "/myteam-logo.webp", sizes: "192x192", type: "image/png" },
+      { url: "/myteam-logo.webp", sizes: "512x512", type: "image/png" },
     ],
   },
 };

@@ -59,7 +59,7 @@ export default function ZashtoPage() {
                 </div>
               </div>
               <div className="why-visual-col">
-                <div className="why-image-card" style={{ background: "url('/professional_pitch_history.png') center/cover" }} />
+                <div className="why-image-card" style={{ background: "url('/professional_pitch_history.webp') center/cover" }} />
                 <div className="why-experience-badge">
                   <div className="badge-icon">🏆</div>
                   <div className="badge-content">

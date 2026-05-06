@@ -75,7 +75,7 @@ export async function GET(
     console.error("Manifest icon route error:", error);
   }
 
-  const fallback = "/myteam-logo.png";
+  const fallback = "/myteam-logo.webp";
   try {
     const filePath = path.join(process.cwd(), "public", fallback.replace(/^\/+/, ""));
     const body = await readFile(filePath);

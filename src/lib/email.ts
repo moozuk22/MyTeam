@@ -96,7 +96,7 @@ export function buildLeadConfirmationContent(logoUrl: string, name: string, vide
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="width: 60px; height: 60px; border: 2px solid #333333; border-radius: 12px; text-align: center; vertical-align: middle;">
-                          <img src="https://img.icons8.com/ios-filled/50/7CFC00/clapperboard.png" alt="Video" width="30" height="30" style="display: inline-block;">
+                          <img src="https://img.icons8.com/ios-filled/50/7CFC00/clapperboard.webp" alt="Video" width="30" height="30" style="display: inline-block;">
                         </td>
                       </tr>
                     </table>
@@ -147,7 +147,7 @@ export function buildLeadConfirmationContent(logoUrl: string, name: string, vide
                     <table role="presentation" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="width: 60px; height: 60px; border: 2px solid #333333; border-radius: 50%; text-align: center; vertical-align: middle;">
-                          <img src="https://img.icons8.com/ios-filled/50/7CFC00/phone.png" alt="Phone" width="28" height="28" style="display: inline-block;">
+                          <img src="https://img.icons8.com/ios-filled/50/7CFC00/phone.webp" alt="Phone" width="28" height="28" style="display: inline-block;">
                         </td>
                       </tr>
                     </table>
@@ -196,17 +196,17 @@ export function buildLeadConfirmationContent(logoUrl: string, name: string, vide
               <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td width="33%" valign="top" style="text-align: center; padding: 10px; border-right: 1px solid #333333;">
-                    <img src="https://img.icons8.com/ios/50/7CFC00/time.png" alt="Time" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <img src="https://img.icons8.com/ios/50/7CFC00/time.webp" alt="Time" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
                     <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">СПЕСТЯВАТЕ ВРЕМЕ</p>
                     <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Автоматизация на графици, такси и още</p>
                   </td>
                   <td width="33%" valign="top" style="text-align: center; padding: 10px; border-right: 1px solid #333333;">
-                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/bar-chart.png" alt="Growth" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/bar-chart.webp" alt="Growth" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
                     <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">РАЗВИВАЙТЕ КЛУБА СИ</p>
                     <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Фокусирайте се върху спорта, ние върху администрацията</p>
                   </td>
                   <td width="33%" valign="top" style="text-align: center; padding: 10px;">
-                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/rocket.png" alt="Rocket" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/rocket.webp" alt="Rocket" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
                     <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">УВЕЛИЧАВАНЕ НА ЧЛЕНОВЕТЕ</p>
                     <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Искате групите Ви да са винаги пълни? MyTeam ще се погрижи и за това</p>
                   </td>
@@ -292,17 +292,17 @@ export function buildManualEmailContent(logoUrl: string, message: string) {
               <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td width="33%" valign="top" style="text-align: center; padding: 10px; border-right: 1px solid #333333;">
-                    <img src="https://img.icons8.com/ios/50/7CFC00/time.png" alt="Time" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <img src="https://img.icons8.com/ios/50/7CFC00/time.webp" alt="Time" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
                     <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">СПЕСТЯВАТЕ ВРЕМЕ</p>
                     <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Автоматизация на графици, такси и още</p>
                   </td>
                   <td width="33%" valign="top" style="text-align: center; padding: 10px; border-right: 1px solid #333333;">
-                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/bar-chart.png" alt="Growth" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/bar-chart.webp" alt="Growth" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
                     <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">РАЗВИВАЙТЕ КЛУБА СИ</p>
                     <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Фокусирайте се върху спорта, ние върху администрацията</p>
                   </td>
                   <td width="33%" valign="top" style="text-align: center; padding: 10px;">
-                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/rocket.png" alt="Rocket" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
+                    <img src="https://img.icons8.com/ios-filled/50/7CFC00/rocket.webp" alt="Rocket" width="40" height="40" style="display: block; margin: 0 auto 10px auto;">
                     <p style="margin: 0 0 5px 0; font-size: 11px; font-weight: bold; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">УВЕЛИЧАВАНЕ НА ЧЛЕНОВЕТЕ</p>
                     <p style="margin: 0; font-size: 11px; color: #888888; line-height: 1.4;">Искате групите Ви да са винаги пълни? MyTeam ще се погрижи и за това</p>
                   </td>

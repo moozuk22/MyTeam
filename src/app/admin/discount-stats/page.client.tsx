@@ -20,10 +20,10 @@ const PARTNER_BADGE_CLASS: Record<string, string> = {
 };
 
 const PARTNER_LOGOS: Record<string, string> = {
-  SPORT_DEPOT: "/sd-logo.png",
+  SPORT_DEPOT: "/sd-logo.webp",
   IDB: "/idb-logo.svg",
-  NIKO: "/niko-logo.png",
-  DALIDA: "/dalida-logo.png",
+  NIKO: "/niko-logo.webp",
+  DALIDA: "/dalida-logo.webp",
 };
 
 interface ClubRow {
