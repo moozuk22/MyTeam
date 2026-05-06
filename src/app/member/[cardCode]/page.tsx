@@ -161,6 +161,14 @@ const ArrowLeftIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
+const LogoutIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="m16 17 5-5-5-5" />
+    <path d="M21 12H9" />
+  </svg>
+);
+
 const XIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 6 6 18" />
@@ -267,6 +275,7 @@ export default function MemberCardPage({
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCoach, setIsCoach] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isEnablingPush, setIsEnablingPush] = useState(false);
   const [isPushEnabled, setIsPushEnabled] = useState(false);
   const [pushStatusMessage, setPushStatusMessage] = useState("");
@@ -1396,6 +1405,25 @@ export default function MemberCardPage({
       : trainingOptOutReasonCode !== "" &&
       (trainingOptOutReasonCode !== "other" || trainingOptOutReasonText.trim().length > 0);
 
+  const handleAdminLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/admin/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      setIsAdmin(false);
+      setIsCoach(false);
+      router.refresh();
+      setIsLoggingOut(false);
+    }
+  };
+
   const handleTrainingAttendanceConfirm = async (
     action: "attend" | "optOut",
     item: TrainingDayStatus,
@@ -1507,6 +1535,19 @@ export default function MemberCardPage({
             >
               <ArrowLeftIcon />
               Назад към играчи
+            </button>
+          )}
+
+          {(isAdmin || isCoach) && (
+            <button
+              type="button"
+              className="member-logout-btn"
+              onClick={() => void handleAdminLogout()}
+              disabled={isLoggingOut}
+              aria-label="Изход"
+            >
+              <LogoutIcon />
+              {isLoggingOut ? "Излизане..." : "Изход"}
             </button>
           )}
 

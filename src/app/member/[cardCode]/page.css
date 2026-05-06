@@ -43,6 +43,36 @@
   border-color: rgba(255, 255, 255, 0.34);
 }
 
+.member-logout-btn {
+  width: fit-content;
+  min-height: 34px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 77, 77, 0.48);
+  background: rgba(180, 25, 25, 0.82);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.member-logout-btn:hover:not(:disabled) {
+  background: rgba(210, 36, 36, 0.9);
+  border-color: rgba(255, 105, 105, 0.72);
+}
+
+.member-logout-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 /* ── Card shell ── */
 .card-shell {
   position: relative;
