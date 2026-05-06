@@ -22,10 +22,16 @@ export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
   applicationName: "My Team",
   title: "MyTeam – интелигентна платформа за управление на спортен клуб",
-  description: "Управлявайте членовете, таксите и тренировъчния график на Вашия клуб на едно място. Автоматично проследяване на плащания, смарт карти за достъп и партньорски отстъпки в Sport Depot. 30 дни безплатен период, без обвързване.",
+  description: "Управлявайте членството, плащанията и тренировъчния график на клуба. Автоматизация на такси, QR достъп и партньорски отстъпки.",
+  alternates: {
+    canonical: "/",
+    languages: {
+      bg: "/",
+    },
+  },
   openGraph: {
     title: "MyTeam – интелигентна платформа за управление на спортен клуб",
-    description: "Управлявайте членовете, таксите и тренировъчния график на Вашия клуб на едно място. Автоматично проследяване на плащания, смарт карти за достъп и партньорски отстъпки в Sport Depot. 30 дни безплатен период, без обвързване.",
+    description: "Управлявайте членството, плащанията и тренировъчния график на клуба. Автоматизация на такси, QR достъп и партньорски отстъпки.",
     locale: "bg_BG",
     type: "website",
   },
@@ -63,6 +69,15 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+const structuredData = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "My Team",
+  "url": process.env.NEXT_PUBLIC_SITE_URL || "https://myteam.example",
+  "logo": `${process.env.NEXT_PUBLIC_SITE_URL || "https://myteam.example"}/myteam-logo.png`,
+  "description": "MyTeam помага на спортни клубове да управляват членството, таксите и тренировките си."
+});
+
 export default function RootLayout({
   children,
 }: {
@@ -74,6 +89,10 @@ export default function RootLayout({
         <PwaClientBootstrap />
         <GDPRConsent />
         <MicrosoftClarity />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: structuredData }}
+        />
         {children}
       </body>
     </html>
