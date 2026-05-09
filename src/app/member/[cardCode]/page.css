@@ -636,6 +636,36 @@
   gap: 12px;
 }
 
+.member-training-modal .training-calendar-month-nav {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-training-modal .training-calendar-month-nav-title {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.member-training-modal .training-calendar-month-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.member-training-modal .training-calendar-month-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .member-training-modal .training-calendar-month {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
@@ -644,10 +674,7 @@
 }
 
 .member-training-modal .training-calendar-month-title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
+  display: none;
 }
 
 .member-training-modal .training-calendar-weekdays {
@@ -1462,6 +1489,10 @@
 }
 
 .member-action-btn {
+  color: #ffffff;
+}
+
+.below-card .member-action-btn {
   color: #ffffff;
 }
 
@@ -2440,6 +2471,21 @@
 
   .member-training-modal .training-calendar-month {
     padding: 8px;
+  }
+
+  .member-training-modal .training-calendar-month-nav {
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    gap: 6px;
+  }
+
+  .member-training-modal .training-calendar-month-nav-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 21px;
+  }
+
+  .member-training-modal .training-calendar-month-nav-title {
+    font-size: 12px;
   }
 
   .member-training-modal .training-calendar-month-title {

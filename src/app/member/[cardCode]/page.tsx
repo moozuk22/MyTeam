@@ -216,6 +216,28 @@ function toISOMonth(ym: { year: number; month: number }) {
   return `${ym.year}-${mm}-01T00:00:00.000Z`;
 }
 
+function buildTrainingCalendarMonth(year: number, month: number) {
+  const displayMonth = month + 1;
+  const daysInMonth = new Date(Date.UTC(year, displayMonth, 0)).getUTCDate();
+  const firstWeekday = new Date(Date.UTC(year, month, 1)).getUTCDay();
+  const leadingEmptyDays = (firstWeekday + 6) % 7;
+  const cells: Array<string | null> = Array.from({ length: leadingEmptyDays }, () => null);
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(`${year}-${String(displayMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return {
+    key: `${year}-${displayMonth}`,
+    label: `${MONTH_NAMES_BG_FULL[month] ?? ""} ${year}`,
+    cells,
+  };
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const normalized = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -366,6 +388,10 @@ export default function MemberCardPage({
   const [memberMatches, setMemberMatches] = useState<MemberMatch[]>([]);
   const [trainingSavingDate, setTrainingSavingDate] = useState<string | null>(null);
   const [trainingModalOpen, setTrainingModalOpen] = useState(false);
+  const [trainingCalendarMonth, setTrainingCalendarMonth] = useState(() => {
+    const today = new Date();
+    return { year: today.getFullYear(), month: today.getMonth() };
+  });
   const [trainingDetailsDate, setTrainingDetailsDate] = useState<string | null>(null);
   const [trainingNotePopupOpen, setTrainingNotePopupOpen] = useState(false);
   const [trainingAttendancePopupOpen, setTrainingAttendancePopupOpen] = useState(false);
@@ -427,48 +453,7 @@ export default function MemberCardPage({
   const trainingDetailsMatches = trainingDetailsDate ? (matchesByDate.get(trainingDetailsDate) ?? []) : [];
   const today = new Date();
   const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const trainingMonths = (() => {
-    const monthMap = new Map<string, { year: number; month: number }>();
-    for (const item of trainingDaysSorted) {
-      const [yearStr, monthStr] = item.date.split("-");
-      const year = Number.parseInt(yearStr ?? "", 10);
-      const month = Number.parseInt(monthStr ?? "", 10);
-      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-        continue;
-      }
-      monthMap.set(`${year}-${month}`, { year, month });
-    }
-    for (const m of memberMatches) {
-      const [yearStr, monthStr] = m.matchDate.split("-");
-      const year = Number.parseInt(yearStr ?? "", 10);
-      const month = Number.parseInt(monthStr ?? "", 10);
-      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-        continue;
-      }
-      monthMap.set(`${year}-${month}`, { year, month });
-    }
-
-    return [...monthMap.values()]
-      .sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year))
-      .map(({ year, month }) => {
-        const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-        const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-        const leadingEmptyDays = (firstWeekday + 6) % 7;
-        const cells: Array<string | null> = Array.from({ length: leadingEmptyDays }, () => null);
-        for (let day = 1; day <= daysInMonth; day += 1) {
-          cells.push(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
-        }
-        while (cells.length % 7 !== 0) {
-          cells.push(null);
-        }
-
-        return {
-          key: `${year}-${month}`,
-          label: `${MONTH_NAMES_BG_FULL[month - 1] ?? ""} ${year}`,
-          cells,
-        };
-      });
-  })();
+  const trainingMonths = [buildTrainingCalendarMonth(trainingCalendarMonth.year, trainingCalendarMonth.month)];
   const nextScheduleEvent =
     [
       ...trainingDaysSorted
@@ -702,6 +687,8 @@ export default function MemberCardPage({
     setTrainingError(null);
     setTrainingNotePopupOpen(false);
     setTrainingDetailsDate(trainingDaysSorted[0]?.date ?? null);
+    const today = new Date();
+    setTrainingCalendarMonth({ year: today.getFullYear(), month: today.getMonth() });
     setTrainingModalOpen(true);
     const [latestDays] = await Promise.all([fetchTrainingDays(), fetchMemberMatches()]);
     setTrainingDetailsDate(latestDays[0]?.date ?? null);
@@ -2292,6 +2279,27 @@ export default function MemberCardPage({
                   <>
                     <div className="training-layout">
                       <div className="training-calendar">
+                        <div className="training-calendar-month-nav">
+                          <button
+                            type="button"
+                            className="training-calendar-month-nav-btn"
+                            onClick={() => setTrainingCalendarMonth((current) => addMonths(current, -1))}
+                            aria-label="Предишен месец"
+                          >
+                            ‹
+                          </button>
+                          <span className="training-calendar-month-nav-title">
+                            {trainingMonths[0]?.label ?? ""}
+                          </span>
+                          <button
+                            type="button"
+                            className="training-calendar-month-nav-btn"
+                            onClick={() => setTrainingCalendarMonth((current) => addMonths(current, 1))}
+                            aria-label="Следващ месец"
+                          >
+                            ›
+                          </button>
+                        </div>
                         {trainingMonths.map((month) => (
                           <section key={month.key} className="training-calendar-month">
                             <h4 className="training-calendar-month-title">{month.label}</h4>
