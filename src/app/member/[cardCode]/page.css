@@ -334,6 +334,11 @@
   gap: 4px;
 }
 
+.training-next-card--match {
+  border-color: rgba(255, 149, 0, 0.36);
+  background: rgba(255, 149, 0, 0.1);
+}
+
 .training-next-title {
   margin: 0;
   font-size: 12px;
@@ -349,6 +354,10 @@
   letter-spacing: 0.02em;
   color: #32cd32;
   text-align: center;
+}
+
+.training-next-countdown--match {
+  color: #ff9500;
 }
 
 .training-next-hint {

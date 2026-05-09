@@ -469,23 +469,32 @@ export default function MemberCardPage({
         };
       });
   })();
-  const nextTrainingEntry =
-    trainingDaysSorted
-      .filter((item) => !item.optedOut)
-      .map((item) => ({
-        item,
-        targetMs: getTrainingDateTimeMs(item.date, item.trainingTime),
-      }))
+  const nextScheduleEvent =
+    [
+      ...trainingDaysSorted
+        .filter((item) => !item.optedOut)
+        .map((item) => ({
+          type: "training" as const,
+          date: item.date,
+          time: item.trainingTime?.trim() || null,
+          targetMs: getTrainingDateTimeMs(item.date, item.trainingTime),
+        })),
+      ...memberMatches.map((match) => ({
+        type: "match" as const,
+        date: match.matchDate,
+        time: match.matchTime?.trim() || null,
+        opponent: match.opponent,
+        targetMs: getTrainingDateTimeMs(match.matchDate, match.matchTime),
+      })),
+    ]
       .filter((entry) => Number.isFinite(entry.targetMs))
       .sort((a, b) => a.targetMs - b.targetMs)
       .find((entry) => entry.targetMs >= countdownNowMs) ?? null;
-  const nextTrainingDate = nextTrainingEntry?.item.date ?? null;
-  const nextTrainingTime = nextTrainingEntry?.item.trainingTime?.trim() || null;
-  const nextTrainingCountdown = (() => {
-    if (!nextTrainingEntry) {
+  const nextScheduleCountdown = (() => {
+    if (!nextScheduleEvent) {
       return null;
     }
-    const diffMs = Math.max(0, nextTrainingEntry.targetMs - countdownNowMs);
+    const diffMs = Math.max(0, nextScheduleEvent.targetMs - countdownNowMs);
     const totalSeconds = Math.floor(diffMs / 1000);
     const days = Math.floor(totalSeconds / (24 * 60 * 60));
     const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
@@ -738,7 +747,7 @@ export default function MemberCardPage({
   }, [normalizedCardCode]);
 
   useEffect(() => {
-    void fetchTrainingDays();
+    void Promise.all([fetchTrainingDays(), fetchMemberMatches()]);
   }, [normalizedCardCode]);
 
   useEffect(() => {
@@ -798,7 +807,7 @@ export default function MemberCardPage({
       }
 
       if (type === "training-updated") {
-        void fetchTrainingDays();
+        void Promise.all([fetchTrainingDays(), fetchMemberMatches()]);
       }
 
       if (type === "notification-created") {
@@ -1913,14 +1922,15 @@ export default function MemberCardPage({
 
           {canPublicEdit && (trainingLoading ? (
             <p className="training-next-hint">Зареждане на следваща тренировка...</p>
-          ) : nextTrainingDate && nextTrainingCountdown ? (
-            <div className="training-next-card">
+          ) : nextScheduleEvent && nextScheduleCountdown ? (
+            <div className={`training-next-card${nextScheduleEvent.type === "match" ? " training-next-card--match" : ""}`}>
               <p className="training-next-title">
-                Следваща тренировка: {formatIsoDateForBgDisplay(nextTrainingDate)}
-                {nextTrainingTime ? ` ${nextTrainingTime}` : ""}
+                {nextScheduleEvent.type === "match" ? "Следващ мач" : "Следваща тренировка"}: {formatIsoDateForBgDisplay(nextScheduleEvent.date)}
+                {nextScheduleEvent.time ? ` ${nextScheduleEvent.time}` : ""}
+                {nextScheduleEvent.type === "match" && nextScheduleEvent.opponent ? ` срещу ${nextScheduleEvent.opponent}` : ""}
               </p>
-              <p className="training-next-countdown">
-                {`${String(nextTrainingCountdown.days).padStart(2, "0")}:${String(nextTrainingCountdown.hours).padStart(2, "0")}:${String(nextTrainingCountdown.minutes).padStart(2, "0")}:${String(nextTrainingCountdown.seconds).padStart(2, "0")}`}
+              <p className={`training-next-countdown${nextScheduleEvent.type === "match" ? " training-next-countdown--match" : ""}`}>
+                {`${String(nextScheduleCountdown.days).padStart(2, "0")}:${String(nextScheduleCountdown.hours).padStart(2, "0")}:${String(nextScheduleCountdown.minutes).padStart(2, "0")}:${String(nextScheduleCountdown.seconds).padStart(2, "0")}`}
               </p>
             </div>
           ) : (
