@@ -1986,6 +1986,13 @@
   white-space: nowrap;
 }
 
+.amp-training-day-match--location {
+  min-height: 10px;
+  line-height: 1.45;
+  padding-bottom: 0;
+  overflow: visible;
+}
+
 .amp-training-date-btn--active .amp-training-day-match {
   color: #fed7aa;
 }

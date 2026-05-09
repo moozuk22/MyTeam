@@ -5442,7 +5442,7 @@ function AdminMembersPageContent() {
                                     {matchesForDate[0]?.matchTime && (
                                       <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
                                     )}
-                                    <span className="amp-training-day-match">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
+                                    <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
                                   </button>
                                 );
                               }
@@ -5464,7 +5464,7 @@ function AdminMembersPageContent() {
                                     <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
                                   )}
                                   {hasTrainingAndMatch && (
-                                    <span className="amp-training-day-match">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
+                                    <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
                                   )}
                                   {!hasTrainingAndMatch && trainingTimeLabel && (
                                     <span className="amp-training-day-time">{trainingTimeLabel}</span>
@@ -7607,7 +7607,7 @@ function AdminMembersPageContent() {
                                 {matchesForDate[0]?.matchTime && (
                                   <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
                                 )}
-                                <span className="amp-training-day-match">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
+                                <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
                               </span>
                             );
                           }
@@ -7629,7 +7629,7 @@ function AdminMembersPageContent() {
                                 <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
                               )}
                               {hasTrainingAndMatch && (
-                                <span className="amp-training-day-match">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
+                                <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
                               )}
                               {!hasTrainingAndMatch && trainingTimeLabel && (
                                 <span className="amp-training-day-time">{trainingTimeLabel}</span>
