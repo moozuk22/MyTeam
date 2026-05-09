@@ -171,7 +171,32 @@ interface TrainingWeekSessionItem {
   date: string;
   trainingTime: string | null;
   scopeType: "teamGroup" | "trainingGroup";
+  eventType?: "training" | "match";
   label: string;
+  teamGroups: number[];
+  location?: string;
+  scopeLabel?: string;
+  isHome?: boolean;
+}
+
+interface ClubMatch {
+  id: string;
+  opponent: string;
+  location: string;
+  matchDate: string;
+  matchTime: string;
+  durationMinutes: number;
+  isHome: boolean;
+  teamGroups: number[];
+}
+
+interface MatchFormState {
+  opponent: string;
+  location: string;
+  matchDate: string;
+  matchTime: string;
+  durationMinutes: number;
+  isHome: boolean;
   teamGroups: number[];
 }
 
@@ -272,6 +297,8 @@ export type {
   TrainingDaysStep,
   TrainingTodaySessionItem,
   TrainingWeekSessionItem,
+  ClubMatch,
+  MatchFormState,
   AttendanceReportPlayer,
   AttendanceReportData,
   MemberNotification,

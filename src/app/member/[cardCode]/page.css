@@ -658,6 +658,7 @@
 }
 
 .member-training-modal .training-calendar-cell {
+  position: relative;
   aspect-ratio: 1 / 1;
   min-height: 30px;
   padding: 2px 1px;
@@ -691,10 +692,56 @@
   transform: translateY(-1px);
 }
 
+.member-training-modal .training-calendar-cell--has-match {
+  border-color: rgba(249, 115, 22, 0.55);
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+}
+
+.member-training-modal .training-calendar-cell--has-match::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(50, 205, 50, 0.9);
+}
+
+.member-training-modal .training-calendar-cell--opted-out.training-calendar-cell--has-match {
+  border-color: rgba(249, 115, 22, 0.45);
+  background: rgba(249, 115, 22, 0.16);
+  color: #fdba74;
+}
+
+.member-training-modal .training-calendar-cell--opted-out.training-calendar-cell--has-match::after {
+  background: rgba(50, 205, 50, 0.9);
+}
+
 .member-training-modal .training-calendar-cell--opted-out {
   border-color: rgba(255, 107, 107, 0.45);
   background: rgba(255, 107, 107, 0.16);
   color: #ffd1d1;
+}
+
+.training-calendar-cell--match {
+  background: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.35);
+  color: #fdba74;
+}
+
+.member-training-modal .training-calendar-cell--match {
+  border-color: rgba(249, 115, 22, 0.55);
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+  cursor: pointer;
+}
+
+.member-training-modal .training-calendar-cell--match:hover {
+  background: rgba(249, 115, 22, 0.28);
+  border-color: rgba(249, 115, 22, 0.75);
+  transform: translateY(-1px);
 }
 
 .member-training-modal .training-calendar-cell--today {
@@ -704,6 +751,197 @@
 .member-training-modal .training-calendar-day-number {
   font-size: 10px;
   font-weight: 700;
+}
+
+.member-match-list {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+}
+
+.member-match-list-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(253, 186, 116, 0.8);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.member-match-list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.member-match-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  flex-wrap: wrap;
+}
+
+.member-match-date,
+.member-match-time {
+  font-weight: 700;
+  color: #fdba74;
+  white-space: nowrap;
+}
+
+.member-match-opponent {
+  font-weight: 600;
+  flex: 1;
+  min-width: 80px;
+}
+
+.member-match-location {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  flex: 1;
+  min-width: 60px;
+}
+
+/* ── Match details popup ────────────────────────────────── */
+.member-match-details-popup {
+  max-width: 320px;
+  padding: 20px;
+  border-color: rgba(249, 115, 22, 0.35);
+  box-shadow: 0 0 40px rgba(249, 115, 22, 0.1), 0 20px 50px rgba(0, 0, 0, 0.7);
+}
+
+.member-match-details-popup::before {
+  background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.7), transparent);
+}
+
+.member-match-details-popup::after {
+  background: radial-gradient(ellipse at top, rgba(249, 115, 22, 0.06), transparent 60%);
+}
+
+.member-match-details-popup .pm-header {
+  margin-bottom: 4px;
+}
+
+.member-match-details-popup .pm-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fdba74;
+  margin: 0;
+}
+
+.match-details-date {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 0 16px;
+  text-transform: capitalize;
+}
+
+.match-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.match-details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.match-details-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.match-details-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: right;
+}
+
+.match-details-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.match-details-badge--home {
+  background: rgba(50, 205, 50, 0.15);
+  border: 1px solid rgba(50, 205, 50, 0.4);
+  color: #9eff9e;
+}
+
+.match-details-badge--away {
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  color: #fdba74;
+}
+
+/* ── Match section inside training popup ────────────────── */
+.training-popup-match-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.training-popup-match-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(253, 186, 116, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 8px;
+}
+
+.training-popup-match-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.28);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-align: left;
+}
+
+.training-popup-match-row:hover {
+  background: rgba(249, 115, 22, 0.18);
+  border-color: rgba(249, 115, 22, 0.5);
+}
+
+.training-popup-match-opponent {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.training-popup-match-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fdba74;
+  white-space: nowrap;
 }
 
 .member-training-modal .training-calendar-time {
@@ -784,73 +1022,306 @@
   margin: 0;
 }
 
-.member-training-attendance-popup .training-note-date {
-  font-size: 15px;
-  line-height: 1.35;
+.member-day-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
 }
 
-.member-training-attendance-popup .training-note-time {
-  font-size: 16px;
+.member-day-tab {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
   font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.member-day-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.member-day-tab--active {
+  border-color: rgba(50, 205, 50, 0.65);
+  background: rgba(50, 205, 50, 0.16);
+  color: #9eff9e;
+  box-shadow: inset 0 0 0 1px rgba(50, 205, 50, 0.18);
+}
+
+.member-day-tab--match.member-day-tab--active {
+  border-color: rgba(249, 115, 22, 0.65);
+  background: rgba(249, 115, 22, 0.16);
+  color: #fdba74;
+  box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.18);
+}
+
+.training-attendance-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.member-day-match-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.member-day-match-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.member-day-match-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.member-day-match-opponent {
+  min-width: 0;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.training-attendance-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.training-attendance-info-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.training-attendance-info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: right;
+}
+
+.member-training-field-visual {
+  display: grid;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.member-training-field-name {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.member-training-field-name--selected {
+  color: #ffffff;
+  text-decoration: underline;
+  text-decoration-color: #32cd32;
+  text-underline-offset: 3px;
+}
+
+.member-training-field-pitch {
+  position: relative;
+  display: grid;
+  min-height: 86px;
+  aspect-ratio: 3 / 1;
+  overflow: hidden;
+  border: 2px solid rgba(50, 205, 50, 0.86);
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(32, 142, 50, 0.9) 0 12.5%,
+    rgba(26, 122, 43, 0.9) 12.5% 25%,
+    rgba(32, 142, 50, 0.9) 25% 37.5%,
+    rgba(26, 122, 43, 0.9) 37.5% 50%,
+    rgba(32, 142, 50, 0.9) 50% 62.5%,
+    rgba(26, 122, 43, 0.9) 62.5% 75%,
+    rgba(32, 142, 50, 0.9) 75% 87.5%,
+    rgba(26, 122, 43, 0.9) 87.5% 100%
+  );
+  box-shadow: 0 0 0 1px rgba(50, 205, 50, 0.55), 0 0 22px rgba(50, 205, 50, 0.24);
+}
+
+.member-training-field-pitch::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.member-training-field-pitch::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px transparent, 0 -43px 0 -11px rgba(255, 255, 255, 0.7);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.member-training-field-piece {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.68);
+  background: rgba(0, 0, 0, 0.48);
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.member-training-field-piece:first-child {
+  border-left: 0;
+}
+
+.member-training-field-piece--selected {
+  background: rgba(50, 205, 50, 0.18);
+  box-shadow: inset 0 0 0 2px #32cd32;
+  color: #ffffff;
+}
+
+.training-attendance-note-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.training-attendance-note-label {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.training-attendance-note-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.training-attendance-choice-label {
+  margin: 0 0 10px 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .training-attendance-buttons {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
+  gap: 10px;
+}
+
+.training-attend-btn,
+.training-optout-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 12px 16px !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
 }
 
 .training-attend-btn {
-  background: rgba(50, 205, 50, 0.15) !important;
-  border: 1px solid rgba(50, 205, 50, 0.4) !important;
-  color: #ffffff !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  padding: 12px 16px !important;
-  border-radius: 8px !important;
-  transition: all 0.2s ease !important;
+  background: rgba(50, 205, 50, 0.1) !important;
+  border: 1px solid rgba(50, 205, 50, 0.3) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
 }
 
 .training-attend-btn:hover:not(:disabled) {
-  background: rgba(50, 205, 50, 0.25) !important;
-  border-color: rgba(50, 205, 50, 0.6) !important;
+  background: rgba(50, 205, 50, 0.2) !important;
+  border-color: rgba(50, 205, 50, 0.55) !important;
+  color: #ffffff !important;
   transform: translateY(-1px);
 }
 
-.training-attend-btn:disabled {
-  opacity: 1 !important;
-  cursor: not-allowed;
+.training-attend-btn.training-btn-selected {
+  background: rgba(50, 205, 50, 0.22) !important;
+  border: 2px solid rgba(50, 205, 50, 0.8) !important;
   color: #ffffff !important;
-  background: rgba(50, 205, 50, 0.08) !important;
-  border: 2px solid rgba(50, 205, 50, 0.85) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 14px rgba(50, 205, 50, 0.18) !important;
+  cursor: default;
+}
+
+.training-attend-btn:disabled:not(.training-btn-selected) {
+  opacity: 0.4 !important;
+  cursor: not-allowed;
 }
 
 .training-optout-btn {
-  background: rgba(255, 107, 107, 0.15) !important;
-  border: 1px solid rgba(255, 107, 107, 0.4) !important;
-  color: #ffffff !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  padding: 12px 16px !important;
-  border-radius: 8px !important;
-  transition: all 0.2s ease !important;
+  background: rgba(255, 107, 107, 0.1) !important;
+  border: 1px solid rgba(255, 107, 107, 0.3) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
 }
 
 .training-optout-btn:hover:not(:disabled) {
-  background: rgba(255, 107, 107, 0.25) !important;
-  border-color: rgba(255, 107, 107, 0.6) !important;
+  background: rgba(255, 107, 107, 0.2) !important;
+  border-color: rgba(255, 107, 107, 0.55) !important;
+  color: #ffffff !important;
   transform: translateY(-1px);
 }
 
-.training-optout-btn:disabled {
-  opacity: 1 !important;
-  cursor: not-allowed;
+.training-optout-btn.training-btn-selected {
+  background: rgba(255, 107, 107, 0.22) !important;
+  border: 2px solid rgba(255, 107, 107, 0.8) !important;
   color: #ffffff !important;
-  background: rgba(255, 107, 107, 0.08) !important;
-  border: 2px solid rgba(255, 107, 107, 0.85) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 14px rgba(255, 107, 107, 0.18) !important;
+  cursor: default;
+}
+
+.training-optout-btn:disabled:not(.training-btn-selected) {
+  opacity: 0.4 !important;
+  cursor: not-allowed;
 }
 
 /* Confirmation modal styles */

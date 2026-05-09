@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { uploadImage } from "@/lib/uploadImage";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
@@ -63,6 +63,20 @@ interface TrainingDayStatus {
   trainingTime?: string;
   trainingDurationMinutes?: number;
   note: string;
+  trainingFieldName?: string | null;
+  trainingFieldPieces?: string[];
+  trainingFieldPieceNames?: string[];
+}
+
+interface MemberMatch {
+  id: string;
+  opponent: string;
+  location: string;
+  matchDate: string;
+  matchTime: string;
+  isHome: boolean;
+  durationMinutes: number | null;
+  teamGroups: number[];
 }
 
 type TrainingOptOutReasonCode = "injury" | "sick" | "other";
@@ -349,11 +363,15 @@ export default function MemberCardPage({
   const [trainingWindowDays, setTrainingWindowDays] = useState(30);
   const [trainingLoading, setTrainingLoading] = useState(false);
   const [trainingError, setTrainingError] = useState<string | null>(null);
+  const [memberMatches, setMemberMatches] = useState<MemberMatch[]>([]);
   const [trainingSavingDate, setTrainingSavingDate] = useState<string | null>(null);
   const [trainingModalOpen, setTrainingModalOpen] = useState(false);
   const [trainingDetailsDate, setTrainingDetailsDate] = useState<string | null>(null);
   const [trainingNotePopupOpen, setTrainingNotePopupOpen] = useState(false);
   const [trainingAttendancePopupOpen, setTrainingAttendancePopupOpen] = useState(false);
+  const [trainingDayPopupTab, setTrainingDayPopupTab] = useState<"training" | "match">("training");
+  const [matchDetailsPopupOpen, setMatchDetailsPopupOpen] = useState(false);
+  const [matchDetailsMatch, setMatchDetailsMatch] = useState<MemberMatch | null>(null);
   const [trainingConfirmModalOpen, setTrainingConfirmModalOpen] = useState(false);
   const [trainingConfirmAction, setTrainingConfirmAction] = useState<"attend" | "optOut" | null>(null);
   const [trainingOptOutReasonCode, setTrainingOptOutReasonCode] = useState<TrainingOptOutReasonCode | "">("");
@@ -399,13 +417,29 @@ export default function MemberCardPage({
   const trainingDaysSorted = [...trainingDays].sort((a, b) => a.date.localeCompare(b.date));
   const trainingDaysWithNotes = trainingDaysSorted.filter((item) => item.note.trim().length > 0);
   const trainingByDate = new Map(trainingDaysSorted.map((item) => [item.date, item]));
+  const matchesByDate = new Map<string, MemberMatch[]>();
+  for (const m of memberMatches) {
+    const existing = matchesByDate.get(m.matchDate) ?? [];
+    existing.push(m);
+    matchesByDate.set(m.matchDate, existing);
+  }
   const trainingDetailsItem = trainingDetailsDate ? trainingByDate.get(trainingDetailsDate) ?? null : null;
+  const trainingDetailsMatches = trainingDetailsDate ? (matchesByDate.get(trainingDetailsDate) ?? []) : [];
   const today = new Date();
   const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const trainingMonths = (() => {
     const monthMap = new Map<string, { year: number; month: number }>();
     for (const item of trainingDaysSorted) {
       const [yearStr, monthStr] = item.date.split("-");
+      const year = Number.parseInt(yearStr ?? "", 10);
+      const month = Number.parseInt(monthStr ?? "", 10);
+      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        continue;
+      }
+      monthMap.set(`${year}-${month}`, { year, month });
+    }
+    for (const m of memberMatches) {
+      const [yearStr, monthStr] = m.matchDate.split("-");
       const year = Number.parseInt(yearStr ?? "", 10);
       const month = Number.parseInt(monthStr ?? "", 10);
       if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
@@ -617,6 +651,13 @@ export default function MemberCardPage({
               trainingDurationMinutes: Number.isInteger(Number(raw.trainingDurationMinutes))
                 ? Number(raw.trainingDurationMinutes)
                 : undefined,
+              trainingFieldName: String(raw.trainingFieldName ?? "").trim() || null,
+              trainingFieldPieces: Array.isArray(raw.trainingFieldPieces)
+                ? raw.trainingFieldPieces.map((name) => String(name ?? "").trim()).filter(Boolean)
+                : [],
+              trainingFieldPieceNames: Array.isArray(raw.trainingFieldPieceNames)
+                ? raw.trainingFieldPieceNames.map((name) => String(name ?? "").trim()).filter(Boolean)
+                : [],
               note: String(raw.note ?? ""),
             } satisfies TrainingDayStatus;
           })
@@ -636,12 +677,24 @@ export default function MemberCardPage({
     }
   };
 
+  const fetchMemberMatches = async () => {
+    try {
+      const res = await fetch(`/api/members/${normalizedCardCode}/matches`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json() as { matches?: MemberMatch[] };
+        setMemberMatches(data.matches ?? []);
+      }
+    } catch {
+      // non-critical — calendar still shows trainings
+    }
+  };
+
   const openTrainingModal = async () => {
     setTrainingError(null);
     setTrainingNotePopupOpen(false);
     setTrainingDetailsDate(trainingDaysSorted[0]?.date ?? null);
     setTrainingModalOpen(true);
-    const latestDays = await fetchTrainingDays();
+    const [latestDays] = await Promise.all([fetchTrainingDays(), fetchMemberMatches()]);
     setTrainingDetailsDate(latestDays[0]?.date ?? null);
   };
 
@@ -1698,7 +1751,7 @@ export default function MemberCardPage({
                       "--theme-color-main": (member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`,
                       "--theme-color-shadow": `${(member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`}99`,
                       "--theme-color-border": `${(member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`}cc`
-                    } as any}
+                    } as CSSProperties & Record<"--theme-color-main" | "--theme-color-shadow" | "--theme-color-border", string>}
                   >
                     <div className="sd-discount-logo-wrap">
                       <img src={member.discounts[0].logoUrl || "/placeholder.webp"} alt={member.discounts[0].name} className="sd-discount-logo" />
@@ -1801,6 +1854,7 @@ export default function MemberCardPage({
                           className={`training-calendar-cell training-calendar-cell--training${trainingItem.optedOut ? " training-calendar-cell--opted-out" : ""}${isToday ? " training-calendar-cell--today" : ""}`}
                           onClick={() => {
                             setTrainingDetailsDate(trainingItem.date);
+                            setTrainingDayPopupTab("training");
                             setTrainingAttendancePopupOpen(true);
                           }}
                           disabled={Boolean(trainingSavingDate)}
@@ -2178,7 +2232,7 @@ export default function MemberCardPage({
                         "--theme-color-main": themeColor,
                         "--theme-color-shadow": `${themeColor}99`,
                         "--theme-color-border": `${themeColor}cc`
-                      } as any}
+                      } as CSSProperties & Record<"--theme-color-main" | "--theme-color-shadow" | "--theme-color-border", string>}
                     >
                       <div className="sd-discount-logo-wrap">
                         <img src={discount.logoUrl || "/placeholder.webp"} alt={discount.name} className="sd-discount-logo" />
@@ -2245,9 +2299,11 @@ export default function MemberCardPage({
                                 }
 
                                 const trainingItem = trainingByDate.get(cellDate);
+                                const dayMatches = matchesByDate.get(cellDate) ?? [];
+                                const hasMatch = dayMatches.length > 0;
                                 const dayNumber = cellDate.slice(8, 10);
                                 const isToday = cellDate === todayDateKey;
-                                if (!trainingItem) {
+                                if (!trainingItem && !hasMatch) {
                                   return (
                                     <span
                                       key={cellDate}
@@ -2257,24 +2313,42 @@ export default function MemberCardPage({
                                     </span>
                                   );
                                 }
+                                if (!trainingItem && hasMatch) {
+                                  return (
+                                    <button
+                                      key={cellDate}
+                                      type="button"
+                                      className={`training-calendar-cell training-calendar-cell--match${isToday ? " training-calendar-cell--today" : ""}`}
+                                      onClick={() => {
+                                        setMatchDetailsMatch(dayMatches[0]!);
+                                        setMatchDetailsPopupOpen(true);
+                                      }}
+                                      aria-label={`Мач: ${dayMatches[0]!.opponent}, ${new Date(`${cellDate}T12:00:00.000Z`).toLocaleDateString("bg-BG", { day: "2-digit", month: "2-digit" })}`}
+                                    >
+                                      <span className="training-calendar-day-number">{dayNumber}</span>
+                                      <span className="training-calendar-time">{dayMatches[0]!.matchTime}</span>
+                                    </button>
+                                  );
+                                }
 
-                                const isOptedOut = trainingItem.optedOut;
-                                const trainingTimeLabel = trainingItem.trainingTime?.trim() ?? "";
-                                const dateLabel = new Date(`${trainingItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                                const isOptedOut = trainingItem!.optedOut;
+                                const trainingTimeLabel = trainingItem!.trainingTime?.trim() ?? "";
+                                const dateLabel = new Date(`${trainingItem!.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
                                   day: "2-digit",
                                   month: "2-digit",
                                 });
                                 return (
                                   <button
                                     key={cellDate}
-                                    className={`training-calendar-cell training-calendar-cell--training${isOptedOut ? " training-calendar-cell--opted-out" : ""}${isToday ? " training-calendar-cell--today" : ""}`}
+                                    className={`training-calendar-cell training-calendar-cell--training${isOptedOut ? " training-calendar-cell--opted-out" : ""}${isToday ? " training-calendar-cell--today" : ""}${hasMatch ? " training-calendar-cell--has-match" : ""}`}
                                     onClick={() => {
-                                      setTrainingDetailsDate(trainingItem.date);
+                                      setTrainingDetailsDate(trainingItem!.date);
+                                      setTrainingDayPopupTab("training");
                                       setTrainingAttendancePopupOpen(true);
                                     }}
                                     disabled={Boolean(trainingSavingDate)}
                                     type="button"
-                                    aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem.weekday] ?? "-"} ${dateLabel}${trainingTimeLabel ? ` ${trainingTimeLabel}` : ""}`}
+                                    aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem!.weekday] ?? "-"} ${dateLabel}${trainingTimeLabel ? ` ${trainingTimeLabel}` : ""}`}
                                     aria-pressed={!isOptedOut}
                                   >
                                     <span className="training-calendar-day-number">{dayNumber}</span>
@@ -2292,6 +2366,21 @@ export default function MemberCardPage({
                     </div>
                   </>
                 )}
+                {memberMatches.length > 0 && (
+                  <div className="member-match-list">
+                    <p className="member-match-list-title">Предстоящи мачове</p>
+                    <ul className="member-match-list-items">
+                      {memberMatches.map((m) => (
+                        <li key={m.id} className="member-match-list-item">
+                          <span className="member-match-date">{m.matchDate.slice(8)}.{m.matchDate.slice(5, 7)}</span>
+                          <span className="member-match-time">{m.matchTime}</span>
+                          <span className="member-match-opponent">{m.opponent}</span>
+                          <span className="member-match-location">{m.location}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {trainingError && <p className="training-error">{trainingError}</p>}
                 {trainingAttendancePopupOpen && trainingDetailsItem && (
                   <div
@@ -2306,62 +2395,176 @@ export default function MemberCardPage({
                         <XIcon size={16} />
                       </button>
                       <div className="pm-header">
-                        <h2 className="pm-title">Присъствие</h2>
+                        <h2 className="pm-title">{trainingDetailsMatches.length > 0 ? "Детайли за деня" : "Присъствие"}</h2>
                       </div>
                       <div className="pm-divider" />
-                      <p className="training-note-date">
-                        {new Date(`${trainingDetailsItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}
-                      </p>
-                      {trainingDetailsItem.trainingTime?.trim() && (
-                        <p className="training-note-date training-note-time" style={{ marginTop: "6px", opacity: 0.9 }}>
-                          {`Час: ${trainingDetailsItem.trainingTime}`}
-                        </p>
-                      )}
-                      {formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes) && (
-                        <p className="training-note-date training-note-time" style={{ marginTop: "6px", opacity: 0.9 }}>
-                          {`Продължителност: ${formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes)}`}
-                        </p>
-                      )}
-                      {trainingDetailsItem.note?.trim() && (
-                        <div className="training-note-display" style={{ marginTop: "16px", padding: "12px", background: "rgba(255,255,255,0.05)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
-                          <p style={{ margin: "0 0 6px 0", fontSize: "12px", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>Описание</p>
-                          <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.4, color: "rgba(255,255,255,0.9)" }}>{trainingDetailsItem.note}</p>
+                      {trainingDetailsMatches.length > 0 && (
+                        <div className="member-day-tabs" aria-label="Детайли за деня">
+                          <button
+                            type="button"
+                            className={`member-day-tab${trainingDayPopupTab === "training" ? " member-day-tab--active" : ""}`}
+                            onClick={() => setTrainingDayPopupTab("training")}
+                          >
+                            Тренировка
+                          </button>
+                          <button
+                            type="button"
+                            className={`member-day-tab member-day-tab--match${trainingDayPopupTab === "match" ? " member-day-tab--active" : ""}`}
+                            onClick={() => setTrainingDayPopupTab("match")}
+                          >
+                            Мач
+                          </button>
                         </div>
                       )}
-                      <div className="training-attendance-buttons">
-                        <button
-                          className="pm-btn training-attend-btn"
-                          type="button"
-                          onClick={() => {
-                            if (!trainingDetailsItem.optedOut) return;
-                            setTrainingOptOutReasonCode("");
-                            setTrainingOptOutReasonText("");
-                            setTrainingConfirmAction("attend");
-                            setTrainingConfirmModalOpen(true);
-                          }}
-                          disabled={!trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
-                        >
-                          {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Присъствам"}
-                        </button>
-                        <button
-                          className="pm-btn training-optout-btn"
-                          type="button"
-                          onClick={() => {
-                            if (trainingDetailsItem.optedOut) return;
-                            setTrainingOptOutReasonCode("");
-                            setTrainingOptOutReasonText("");
-                            setTrainingConfirmAction("optOut");
-                            setTrainingConfirmModalOpen(true);
-                          }}
-                          disabled={trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
-                        >
-                          {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Отсъствам"}
-                        </button>
-                      </div>
+                      {trainingDayPopupTab === "training" ? (
+                        <>
+                          <div className="training-attendance-info-card">
+                            <div className="training-attendance-info-row">
+                              <span className="training-attendance-info-label">Дата</span>
+                              <span className="training-attendance-info-value">
+                                {new Date(`${trainingDetailsItem.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                                  weekday: "long",
+                                  day: "2-digit",
+                                  month: "long",
+                                })}
+                              </span>
+                            </div>
+                            {trainingDetailsItem.trainingTime?.trim() && (
+                              <div className="training-attendance-info-row">
+                                <span className="training-attendance-info-label">Час</span>
+                                <span className="training-attendance-info-value">{trainingDetailsItem.trainingTime}</span>
+                              </div>
+                            )}
+                            {formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes) && (
+                              <div className="training-attendance-info-row">
+                                <span className="training-attendance-info-label">Продължителност</span>
+                                <span className="training-attendance-info-value">{formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes)}</span>
+                              </div>
+                            )}
+                            {trainingDetailsItem.trainingFieldName && (() => {
+                              const pieces = trainingDetailsItem.trainingFieldPieces?.length
+                                ? trainingDetailsItem.trainingFieldPieces
+                                : trainingDetailsItem.trainingFieldPieceNames?.length
+                                  ? trainingDetailsItem.trainingFieldPieceNames
+                                  : ["Цял терен"];
+                              const selectedPieces = trainingDetailsItem.trainingFieldPieceNames ?? [];
+                              const isWholeFieldSelected = selectedPieces.length === 0;
+                              return (
+                                <div className="member-training-field-visual">
+                                  <div
+                                    className={`member-training-field-name${isWholeFieldSelected ? " member-training-field-name--selected" : ""}`}
+                                  >
+                                    {trainingDetailsItem.trainingFieldName}
+                                  </div>
+                                  <div
+                                    className="member-training-field-pitch"
+                                    style={{ gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))` }}
+                                    aria-label={`Терен ${trainingDetailsItem.trainingFieldName}`}
+                                  >
+                                    {pieces.map((piece, index) => {
+                                      const isSelected = isWholeFieldSelected || selectedPieces.includes(piece);
+                                      return (
+                                        <div
+                                          key={`${piece}-${index}`}
+                                          className={`member-training-field-piece${isSelected ? " member-training-field-piece--selected" : ""}`}
+                                        >
+                                          {piece}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          {trainingDetailsItem.note?.trim() && (
+                            <div className="training-attendance-note-card">
+                              <p className="training-attendance-note-label">Описание</p>
+                              <p className="training-attendance-note-text">{trainingDetailsItem.note}</p>
+                            </div>
+                          )}
+                          <p className="training-attendance-choice-label">Заявка</p>
+                          <div className="training-attendance-buttons">
+                            <button
+                              className={`pm-btn training-attend-btn${!trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                              type="button"
+                              onClick={() => {
+                                if (!trainingDetailsItem.optedOut) return;
+                                setTrainingOptOutReasonCode("");
+                                setTrainingOptOutReasonText("");
+                                setTrainingConfirmAction("attend");
+                                setTrainingConfirmModalOpen(true);
+                              }}
+                              disabled={!trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                            >
+                              {!trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              )}
+                              {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Присъствам"}
+                            </button>
+                            <button
+                              className={`pm-btn training-optout-btn${trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                              type="button"
+                              onClick={() => {
+                                if (trainingDetailsItem.optedOut) return;
+                                setTrainingOptOutReasonCode("");
+                                setTrainingOptOutReasonText("");
+                                setTrainingConfirmAction("optOut");
+                                setTrainingConfirmModalOpen(true);
+                              }}
+                              disabled={trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                            >
+                              {trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              )}
+                              {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Отсъствам"}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="member-day-match-panel">
+                          {trainingDetailsMatches.map((match) => (
+                            <div key={match.id} className="member-day-match-card">
+                              <div className="member-day-match-card-header">
+                                <span className="member-day-match-opponent">{match.opponent}</span>
+                                <span className={`match-details-badge${match.isHome ? " match-details-badge--home" : " match-details-badge--away"}`}>
+                                  {match.isHome ? "Домакин" : "Гост"}
+                                </span>
+                              </div>
+                              <div className="match-details-body">
+                                <div className="match-details-row">
+                                  <span className="match-details-label">Дата</span>
+                                  <span className="match-details-value">
+                                    {new Date(`${match.matchDate}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                                      weekday: "long",
+                                      day: "2-digit",
+                                      month: "long",
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="match-details-row">
+                                  <span className="match-details-label">Час</span>
+                                  <span className="match-details-value">{match.matchTime}</span>
+                                </div>
+                                <div className="match-details-row">
+                                  <span className="match-details-label">Място</span>
+                                  <span className="match-details-value">{match.location}</span>
+                                </div>
+                                {match.durationMinutes && (
+                                  <div className="match-details-row">
+                                    <span className="match-details-label">Продължителност</span>
+                                    <span className="match-details-value">{match.durationMinutes} мин</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2381,6 +2584,56 @@ export default function MemberCardPage({
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {matchDetailsPopupOpen && matchDetailsMatch && (
+          <div
+            className="pm-overlay"
+            onClick={() => setMatchDetailsPopupOpen(false)}
+          >
+            <div className="pm-modal member-match-details-popup" onClick={(e) => e.stopPropagation()}>
+              <button className="pm-close" onClick={() => setMatchDetailsPopupOpen(false)}>
+                <XIcon size={16} />
+              </button>
+              <div className="pm-header">
+                <h2 className="pm-title">Мач</h2>
+              </div>
+              <p className="match-details-date">
+                {new Date(`${matchDetailsMatch.matchDate}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+              <div className="match-details-body">
+                <div className="match-details-row">
+                  <span className="match-details-label">Противник</span>
+                  <span className="match-details-value">{matchDetailsMatch.opponent}</span>
+                </div>
+                <div className="match-details-row">
+                  <span className="match-details-label">Час</span>
+                  <span className="match-details-value">{matchDetailsMatch.matchTime}</span>
+                </div>
+                <div className="match-details-row">
+                  <span className="match-details-label">Място</span>
+                  <span className="match-details-value">{matchDetailsMatch.location}</span>
+                </div>
+                <div className="match-details-row">
+                  <span className="match-details-label">Домакин/Гост</span>
+                  <span className={`match-details-badge${matchDetailsMatch.isHome ? " match-details-badge--home" : " match-details-badge--away"}`}>
+                    {matchDetailsMatch.isHome ? "Домакин" : "Гост"}
+                  </span>
+                </div>
+                {matchDetailsMatch.durationMinutes && (
+                  <div className="match-details-row">
+                    <span className="match-details-label">Продължителност</span>
+                    <span className="match-details-value">{matchDetailsMatch.durationMinutes} мин</span>
                   </div>
                 )}
               </div>
