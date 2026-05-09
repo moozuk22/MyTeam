@@ -13,7 +13,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, checkTrainingAwayMatchConflict } from "@/lib/trainingFieldConflicts";
 import {
   clubHasTrainingFields,
   parseTrainingFieldSelection,
@@ -339,6 +339,7 @@ export async function PATCH(
     const fallbackTrainingTime: string | null = hasTrainingTimeField ? (nextTrainingTime ?? null) : (group.trainingTime ?? null);
     const rawTrainingDateTimes = hasTrainingDateTimesField ? payload.trainingDateTimes : group.trainingDateTimes;
     let finalTrainingDateTimes: Record<string, string> = {};
+    let trainingMatchWarning: string | null = null;
     if (finalTrainingDates.length > 0) {
       try {
         finalTrainingDateTimes = buildTrainingDateTimes({
@@ -358,16 +359,18 @@ export async function PATCH(
             exclude: { type: "trainingGroup", id: groupId },
             excludeTeamGroups: nextTeamGroups,
           });
-        } else {
-          await assertNoTrainingTimeConflict({
-            clubId,
-            trainingDates: finalTrainingDates,
-            trainingDateTimes: finalTrainingDateTimes,
-            trainingDurationMinutes: nextTrainingDurationMinutes,
-            exclude: { type: "trainingGroup", id: groupId },
-            excludeTeamGroups: nextTeamGroups,
-          });
         }
+        await assertNoTrainingTimeConflict({
+          clubId,
+          trainingDates: finalTrainingDates,
+          trainingDateTimes: finalTrainingDateTimes,
+          trainingDurationMinutes: nextTrainingDurationMinutes,
+          exclude: { type: "trainingGroup", id: groupId },
+          excludeTeamGroups: nextTeamGroups,
+        });
+        const matchConflict = await checkTrainingAwayMatchConflict({ clubId, trainingDates: finalTrainingDates, trainingDateTimes: finalTrainingDateTimes, durationMinutes: nextTrainingDurationMinutes, teamGroups: nextTeamGroups });
+        if (matchConflict.blocking) return NextResponse.json({ error: matchConflict.blocking }, { status: 400 });
+        trainingMatchWarning = matchConflict.warning;
       } catch (error) {
         return NextResponse.json(
           { error: error instanceof Error ? error.message : "Invalid training date times." },
@@ -441,19 +444,21 @@ export async function PATCH(
       hasTeamGroupsField
     ) {
       const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
-      await prisma.$transaction((tx) =>
-        syncFutureTrainingSessions({
-          tx,
-          clubId,
-          scope: { type: "trainingGroup", id: groupId, teamGroups: updated.teamGroups },
-          trainingDates: updated.trainingDates ?? [],
-          trainingDateTimes: normalizeStoredTrainingDateTimes(updated.trainingDateTimes, updated.trainingDates ?? []),
-          trainingDurationMinutes: updated.trainingDurationMinutes,
-          trainingFieldId: updated.trainingFieldId,
-          trainingFieldPieceIds: updated.trainingFieldPieceIds,
-          trainingFieldSelections: updated.trainingFieldSelections as Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> | undefined,
-          todayIso,
-        }),
+      await prisma.$transaction(
+        (tx) =>
+          syncFutureTrainingSessions({
+            tx,
+            clubId,
+            scope: { type: "trainingGroup", id: groupId, teamGroups: updated.teamGroups },
+            trainingDates: updated.trainingDates ?? [],
+            trainingDateTimes: normalizeStoredTrainingDateTimes(updated.trainingDateTimes, updated.trainingDates ?? []),
+            trainingDurationMinutes: updated.trainingDurationMinutes,
+            trainingFieldId: updated.trainingFieldId,
+            trainingFieldPieceIds: updated.trainingFieldPieceIds,
+            trainingFieldSelections: updated.trainingFieldSelections as Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> | undefined,
+            todayIso,
+          }),
+        { timeout: 30000 },
       );
     }
 
@@ -474,6 +479,7 @@ export async function PATCH(
       ...updated,
       trainingDateTimes: normalizeStoredTrainingDateTimes(updated.trainingDateTimes, updated.trainingDates ?? []),
       notifications,
+      ...(trainingMatchWarning ? { warning: trainingMatchWarning } : {}),
     });
   } catch (error) {
     console.error("Training groups PATCH error:", error);

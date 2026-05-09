@@ -68,9 +68,31 @@ type WeekSession = {
   date: string;
   trainingTime: string | null;
   scopeType: "teamGroup" | "trainingGroup";
+  eventType: "training" | "match";
   label: string;
   teamGroups: number[];
+  location?: string;
+  scopeLabel?: string;
+  isHome?: boolean;
 };
+
+function formatTeamGroupsLabel(teamGroups: number[]): string {
+  if (teamGroups.length === 0) return "Всички";
+  return `Набор ${teamGroups.join("/")}`;
+}
+
+function resolveMatchScopeLabel(
+  teamGroups: number[],
+  trainingGroups: Array<{ name: string; teamGroups: number[] }>,
+): string {
+  if (teamGroups.length === 0) return "Всички";
+  const normalized = [...teamGroups].sort((a, b) => a - b);
+  const matchingTrainingGroup = trainingGroups.find((group) => {
+    const groupTeamGroups = [...(group.teamGroups ?? [])].sort((a, b) => a - b);
+    return groupTeamGroups.length === normalized.length && groupTeamGroups.every((value, index) => value === normalized[index]);
+  });
+  return matchingTrainingGroup?.name || formatTeamGroupsLabel(normalized);
+}
 
 export async function GET(
   request: NextRequest,
@@ -86,7 +108,7 @@ export async function GET(
   const dates = getSevenDates(todayIso);
 
   try {
-    const [club, teamSchedules, trainingGroups, customTrainingGroups] = await Promise.all([
+    const [club, teamSchedules, trainingGroups, customTrainingGroups, clubMatches] = await Promise.all([
       prisma.club.findUnique({
         where: { id },
         select: {
@@ -137,6 +159,10 @@ export async function GET(
           trainingDateTimes: true,
         },
       }),
+      prisma.clubMatch.findMany({
+        where: { clubId: id, matchDate: { in: dates } },
+        select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, teamGroups: true, isHome: true },
+      }),
     ]);
 
     if (!club) {
@@ -160,10 +186,26 @@ export async function GET(
             date,
             trainingTime: resolveTime(date, group.trainingTime, group.trainingDateTimes),
             scopeType: "trainingGroup",
+            eventType: "training",
             label: group.name || "Custom group",
             teamGroups: [],
           });
         }
+      }
+
+      for (const match of clubMatches) {
+        sessions.push({
+          id: `match-${match.id}`,
+          date: match.matchDate,
+          trainingTime: match.matchTime,
+          scopeType: "teamGroup",
+          eventType: "match",
+          label: match.opponent,
+          teamGroups: match.teamGroups,
+          location: match.location,
+          scopeLabel: resolveMatchScopeLabel(match.teamGroups, []),
+          isHome: match.isHome,
+        });
       }
 
       sessions.sort((a, b) => {
@@ -221,6 +263,7 @@ export async function GET(
           date,
           trainingTime: resolveTime(date, group.trainingTime, group.trainingDateTimes),
           scopeType: "trainingGroup",
+          eventType: "training",
           label: group.name || "Сборен отбор",
           teamGroups: normalizedGroups,
         });
@@ -248,14 +291,31 @@ export async function GET(
             resolvedSchedule?.trainingDateTimes ?? club.trainingDateTimes,
           ),
           scopeType: "teamGroup",
+          eventType: "training",
           label: `Отбор ${teamGroup}`,
           teamGroups: [teamGroup],
         });
       }
     }
 
+    for (const match of clubMatches) {
+      sessions.push({
+        id: `match-${match.id}`,
+        date: match.matchDate,
+        trainingTime: match.matchTime,
+        scopeType: "teamGroup",
+        eventType: "match",
+        label: match.opponent,
+        teamGroups: match.teamGroups,
+        location: match.location,
+        scopeLabel: resolveMatchScopeLabel(match.teamGroups, trainingGroups),
+        isHome: match.isHome,
+      });
+    }
+
     sessions.sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
+      if (a.eventType !== b.eventType) return a.eventType === "training" ? -1 : 1;
       if (a.scopeType !== b.scopeType) return a.scopeType === "teamGroup" ? -1 : 1;
       return a.label.localeCompare(b.label, "bg");
     });

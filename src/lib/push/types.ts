@@ -2,6 +2,7 @@ export type NotificationTemplateType =
   | "visit_registered"
   | "membership_almost_finished"
   | "training_reminder"
+  | "match_schedule"
   | "trainer_message"
   | "monthly_membership_payment_reminder"
   | "monthly_overdue_payment_reminder"

@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { isoDateToUtcMidnight } from "@/lib/training";
+import { isoDateToUtcMidnight, utcDateToIsoDate } from "@/lib/training";
 
 type TrainingSessionScope =
   | { type: "club" }
@@ -79,6 +79,33 @@ export async function syncFutureTrainingSessions(input: {
     },
   });
 
+  if (futureDates.length === 0) return;
+
+  // Fetch players once for the entire scope — same result for every date.
+  const players = await getExpectedPlayersForScope(input.tx, input.clubId, input.scope);
+
+  // Fetch all opt-outs for all future dates in one query instead of one per date.
+  const allOptOuts = players.length > 0
+    ? await input.tx.trainingOptOut.findMany({
+        where: {
+          playerId: { in: players.map((p) => p.id) },
+          trainingDate: { in: futureDates.map((date) => isoDateToUtcMidnight(date)) },
+        },
+        select: { playerId: true, trainingDate: true, reasonCode: true, reasonText: true },
+      })
+    : [];
+
+  const optOutsByDate = new Map<string, Map<string, typeof allOptOuts[number]>>();
+  for (const optOut of allOptOuts) {
+    const dateIso = utcDateToIsoDate(optOut.trainingDate);
+    let byPlayer = optOutsByDate.get(dateIso);
+    if (!byPlayer) {
+      byPlayer = new Map();
+      optOutsByDate.set(dateIso, byPlayer);
+    }
+    byPlayer.set(optOut.playerId, optOut);
+  }
+
   for (const date of futureDates) {
     const fieldSelection = input.trainingFieldSelections?.[date];
     const session = await input.tx.trainingSession.upsert({
@@ -109,17 +136,7 @@ export async function syncFutureTrainingSessions(input: {
       },
       select: { id: true },
     });
-    const players = await getExpectedPlayersForScope(input.tx, input.clubId, input.scope);
-    const optOuts = players.length > 0
-      ? await input.tx.trainingOptOut.findMany({
-          where: {
-            playerId: { in: players.map((player) => player.id) },
-            trainingDate: isoDateToUtcMidnight(date),
-          },
-          select: { playerId: true, trainingDate: true, reasonCode: true, reasonText: true },
-        })
-      : [];
-    const optOutByPlayerId = new Map(optOuts.map((item) => [item.playerId, item]));
+    const optOutByPlayerId = optOutsByDate.get(date) ?? new Map();
     await input.tx.trainingSessionPlayer.deleteMany({
       where: { trainingSessionId: session.id },
     });

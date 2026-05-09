@@ -1,0 +1,53 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { getTodayIsoDateInTimeZone } from "@/lib/training";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const FIXED_TIME_ZONE = "Europe/Sofia";
+const MATCH_WINDOW_DAYS = 60;
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ cardCode: string }> },
+) {
+  const { cardCode } = await params;
+  const normalizedCardCode = cardCode.trim().toUpperCase();
+
+  const card = await prisma.card.findFirst({
+    where: { cardCode: normalizedCardCode, isActive: true },
+    select: {
+      player: {
+        select: {
+          clubId: true,
+          teamGroup: true,
+        },
+      },
+    },
+  });
+
+  if (!card?.player) {
+    return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  }
+
+  const { clubId, teamGroup } = card.player;
+
+  const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+  const endDate = new Date(`${todayIso}T00:00:00.000Z`);
+  endDate.setUTCDate(endDate.getUTCDate() + MATCH_WINDOW_DAYS - 1);
+  const endIso = endDate.toISOString().slice(0, 10);
+
+  const allMatches = await prisma.clubMatch.findMany({
+    where: { clubId, matchDate: { gte: todayIso, lte: endIso } },
+    orderBy: [{ matchDate: "asc" }, { matchTime: "asc" }],
+    select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
+  });
+
+  // include match if it has no team filter OR the player's team group is listed
+  const matches = allMatches.filter(
+    (m) => m.teamGroups.length === 0 || (teamGroup !== null && m.teamGroups.includes(teamGroup)),
+  );
+
+  return NextResponse.json({ matches });
+}

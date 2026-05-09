@@ -14,7 +14,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, checkTrainingAwayMatchConflict } from "@/lib/trainingFieldConflicts";
 import {
   clubHasTrainingFields,
   normalizeStoredTrainingFieldSelections,
@@ -398,6 +398,7 @@ export async function PUT(
   }
   let trainingDateTimes: Record<string, string> = {};
   let trainingFieldSelections: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> = {};
+  let schedulerMatchWarning: string | null = null;
   if (trainingDates.length > 0) {
     if (hasTrainingFields && !trainingFieldSelection.trainingFieldId) {
       return NextResponse.json({ error: "Треньорът трябва да избере терен." }, { status: 400 });
@@ -440,18 +441,20 @@ export async function PUT(
             : { type: "teamGroup", teamGroup },
           excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
         });
-      } else {
-        await assertNoTrainingTimeConflict({
-          clubId: id,
-          trainingDates,
-          trainingDateTimes,
-          trainingDurationMinutes,
-          exclude: teamGroup === null
-            ? { type: "club" }
-            : { type: "teamGroup", teamGroup },
-          excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
-        });
       }
+      await assertNoTrainingTimeConflict({
+        clubId: id,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        exclude: teamGroup === null
+          ? { type: "club" }
+          : { type: "teamGroup", teamGroup },
+        excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
+      });
+      const matchConflict = await checkTrainingAwayMatchConflict({ clubId: id, trainingDates, trainingDateTimes, durationMinutes: trainingDurationMinutes, teamGroups: teamGroup !== null ? [teamGroup] : [] });
+      if (matchConflict.blocking) return NextResponse.json({ error: matchConflict.blocking }, { status: 400 });
+      schedulerMatchWarning = matchConflict.warning;
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Invalid training date times." },
@@ -571,19 +574,21 @@ export async function PUT(
       },
     });
     const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
-    await prisma.$transaction((tx) =>
-      syncFutureTrainingSessions({
-        tx,
-        clubId: id,
-        scope: { type: "teamGroup", teamGroup },
-        trainingDates,
-        trainingDateTimes,
-        trainingDurationMinutes,
-        trainingFieldId: trainingFieldSelection.trainingFieldId,
-        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
-        trainingFieldSelections,
-        todayIso,
-      }),
+    await prisma.$transaction(
+      (tx) =>
+        syncFutureTrainingSessions({
+          tx,
+          clubId: id,
+          scope: { type: "teamGroup", teamGroup },
+          trainingDates,
+          trainingDateTimes,
+          trainingDurationMinutes,
+          trainingFieldId: trainingFieldSelection.trainingFieldId,
+          trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+          trainingFieldSelections,
+          todayIso,
+        }),
+      { timeout: 30000 },
     );
 
     const groupsContainingTeamGroup = await prisma.clubTrainingScheduleGroup.findMany({
@@ -643,23 +648,26 @@ export async function PUT(
       trainingFieldSelections,
       trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
       notifications,
+      ...(schedulerMatchWarning ? { warning: schedulerMatchWarning } : {}),
     });
   }
 
   const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
-  await prisma.$transaction((tx) =>
-    syncFutureTrainingSessions({
-      tx,
-      clubId: id,
-      scope: { type: "club" },
-      trainingDates,
-      trainingDateTimes,
-      trainingDurationMinutes,
-      trainingFieldId: trainingFieldSelection.trainingFieldId,
-      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
-      trainingFieldSelections,
-      todayIso,
-    }),
+  await prisma.$transaction(
+    (tx) =>
+      syncFutureTrainingSessions({
+        tx,
+        clubId: id,
+        scope: { type: "club" },
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
+        todayIso,
+      }),
+    { timeout: 30000 },
   );
 
   return NextResponse.json({
@@ -673,5 +681,6 @@ export async function PUT(
     trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
     trainingFieldSelections,
     trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
+    ...(schedulerMatchWarning ? { warning: schedulerMatchWarning } : {}),
   });
 }

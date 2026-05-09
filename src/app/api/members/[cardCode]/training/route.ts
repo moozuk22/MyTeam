@@ -153,6 +153,9 @@ async function getMemberTrainingContext(cardCode: string) {
               trainingWeekdays: true,
               trainingWindowDays: true,
               trainingGroupMode: true,
+              trainingFieldId: true,
+              trainingFieldPieceIds: true,
+              trainingFieldSelections: true,
             },
           },
           customTrainingGroups: {
@@ -165,6 +168,9 @@ async function getMemberTrainingContext(cardCode: string) {
                   trainingDurationMinutes: true,
                   trainingWeekdays: true,
                   trainingWindowDays: true,
+                  trainingFieldId: true,
+                  trainingFieldPieceIds: true,
+                  trainingFieldSelections: true,
                 },
               },
             },
@@ -177,6 +183,9 @@ async function getMemberTrainingContext(cardCode: string) {
               trainingDurationMinutes: true,
               trainingWeekdays: true,
               trainingWindowDays: true,
+              trainingFieldId: true,
+              trainingFieldPieceIds: true,
+              trainingFieldSelections: true,
             },
           },
         },
@@ -214,6 +223,9 @@ async function getMemberTrainingContext(cardCode: string) {
           trainingDurationMinutes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+          trainingFieldSelections: true,
         },
       });
 
@@ -239,6 +251,9 @@ async function getMemberTrainingContext(cardCode: string) {
           trainingDurationMinutes: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
+          trainingFieldId: true,
+          trainingFieldPieceIds: true,
+          trainingFieldSelections: true,
         },
       });
 
@@ -297,6 +312,12 @@ async function getMemberTrainingContext(cardCode: string) {
           groupSchedule?.trainingDurationMinutes ??
           card.player.club.trainingDurationMinutes;
 
+  const scheduleFieldSource = hasCoachGroupSchedule
+    ? coachGroupSchedule!
+    : isCustomGroupMode
+      ? customGroup ?? card.player.club
+      : trainingGroupOverride ?? groupSchedule ?? card.player.club;
+
   return {
     cardCode: card.cardCode,
     playerId: card.playerId,
@@ -309,7 +330,44 @@ async function getMemberTrainingContext(cardCode: string) {
     trainingDateTimes: scheduleDateTimes,
     fallbackTrainingTime: scheduleFallbackTime,
     trainingDurationMinutes: scheduleDurationMinutes,
+    scheduleFieldId: scheduleFieldSource.trainingFieldId ?? null,
+    scheduleFieldPieceIds: scheduleFieldSource.trainingFieldPieceIds ?? [],
+    scheduleFieldSelections: scheduleFieldSource.trainingFieldSelections,
   };
+}
+
+function resolveFieldSelectionsForDate(
+  fieldId: string | null,
+  fieldPieceIds: string[],
+  fieldSelections: unknown,
+  date: string,
+): { fieldId: string | null; fieldPieceIds: string[] } {
+  if (fieldSelections && typeof fieldSelections === "object" && !Array.isArray(fieldSelections)) {
+    const sel = (fieldSelections as Record<string, unknown>)[date];
+    if (sel && typeof sel === "object" && !Array.isArray(sel)) {
+      const s = sel as Record<string, unknown>;
+      const id = typeof s.trainingFieldId === "string" && s.trainingFieldId.trim() ? s.trainingFieldId.trim() : null;
+      const pieces = Array.isArray(s.trainingFieldPieceIds)
+        ? (s.trainingFieldPieceIds as unknown[]).map((p) => String(p ?? "").trim()).filter(Boolean)
+        : [];
+      return { fieldId: id, fieldPieceIds: pieces };
+    }
+  }
+  return { fieldId, fieldPieceIds };
+}
+
+function hasAnyStoredFieldSelection(fieldSelections: unknown) {
+  if (!fieldSelections || typeof fieldSelections !== "object" || Array.isArray(fieldSelections)) {
+    return false;
+  }
+
+  return Object.values(fieldSelections as Record<string, unknown>).some((rawSelection) => {
+    if (!rawSelection || typeof rawSelection !== "object" || Array.isArray(rawSelection)) {
+      return false;
+    }
+    const selection = rawSelection as Record<string, unknown>;
+    return typeof selection.trainingFieldId === "string" && selection.trainingFieldId.trim().length > 0;
+  });
 }
 
 export async function GET(
@@ -334,7 +392,7 @@ export async function GET(
   }
 
   const trainingDatesAsUtc = context.upcomingDates.map((value) => isoDateToUtcMidnight(value));
-  const [optOutRows, noteRows] = await Promise.all([
+  const [optOutRows, noteRows, sessionRows] = await Promise.all([
     prisma.trainingOptOut.findMany({
       where: {
         playerId: context.playerId,
@@ -360,7 +418,50 @@ export async function GET(
         note: true,
       },
     }),
+    prisma.trainingSession.findMany({
+      where: {
+        clubId: context.clubId,
+        status: {
+          not: "cancelled",
+        },
+        trainingDate: {
+          in: trainingDatesAsUtc,
+        },
+        players: {
+          some: {
+            playerId: context.playerId,
+          },
+        },
+      },
+      select: {
+        trainingDate: true,
+        trainingTime: true,
+        trainingDurationMinutes: true,
+        trainingFieldId: true,
+        trainingFieldPieceIds: true,
+      },
+    }),
   ]);
+
+  const sessionByDate = new Map(sessionRows.map((session) => [utcDateToIsoDate(session.trainingDate), session]));
+  const hasSessionFieldSelection = sessionRows.some((session) => Boolean(session.trainingFieldId));
+  const clubFields =
+    context.scheduleFieldId || hasAnyStoredFieldSelection(context.scheduleFieldSelections) || hasSessionFieldSelection
+      ? await prisma.field.findMany({
+          where: { clubId: context.clubId },
+          select: {
+            id: true,
+            name: true,
+            pieces: {
+              select: { id: true, name: true },
+              orderBy: { sortOrder: "asc" },
+            },
+          },
+        })
+      : [];
+
+  const fieldById = new Map(clubFields.map((f) => [f.id, f]));
+
   const optedOutByDate = new Map(
     optOutRows.map((item) => [
       utcDateToIsoDate(item.trainingDate),
@@ -381,16 +482,37 @@ export async function GET(
     cardCode: context.cardCode,
     trainingWeekdays: context.trainingWeekdays,
     trainingWindowDays: context.trainingWindowDays,
-    dates: context.upcomingDates.map((date) => ({
-      date,
-      weekday: getWeekdayMondayFirst(date, FIXED_TIME_ZONE),
-      optedOut: optedOutByDate.has(date),
-      optOutReasonCode: optedOutByDate.get(date)?.reasonCode ?? null,
-      optOutReasonText: optedOutByDate.get(date)?.reasonText ?? null,
-      trainingTime: context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
-      trainingDurationMinutes: context.trainingDurationMinutes,
-      note: noteByDate.get(date) ?? "",
-    })),
+    dates: context.upcomingDates.map((date) => {
+      const session = sessionByDate.get(date);
+      const scheduleFieldSelection = resolveFieldSelectionsForDate(
+        context.scheduleFieldId,
+        context.scheduleFieldPieceIds,
+        context.scheduleFieldSelections,
+        date,
+      );
+      const fieldId = session?.trainingFieldId ?? scheduleFieldSelection.fieldId;
+      const fieldPieceIds = session?.trainingFieldPieceIds ?? scheduleFieldSelection.fieldPieceIds;
+      const field = fieldId ? fieldById.get(fieldId) : null;
+      const fieldPieceNames = field?.pieces.map((piece) => piece.name) ?? [];
+      const pieceNames = field && fieldPieceIds.length > 0
+        ? fieldPieceIds
+            .map((pid) => field.pieces.find((p) => p.id === pid)?.name)
+            .filter((n): n is string => Boolean(n))
+        : [];
+      return {
+        date,
+        weekday: getWeekdayMondayFirst(date, FIXED_TIME_ZONE),
+        optedOut: optedOutByDate.has(date),
+        optOutReasonCode: optedOutByDate.get(date)?.reasonCode ?? null,
+        optOutReasonText: optedOutByDate.get(date)?.reasonText ?? null,
+        trainingTime: session?.trainingTime ?? context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
+        trainingDurationMinutes: session?.trainingDurationMinutes ?? context.trainingDurationMinutes,
+        note: noteByDate.get(date) ?? "",
+        trainingFieldName: field?.name ?? null,
+        trainingFieldPieces: fieldPieceNames,
+        trainingFieldPieceNames: pieceNames,
+      };
+    }),
   });
 }
 

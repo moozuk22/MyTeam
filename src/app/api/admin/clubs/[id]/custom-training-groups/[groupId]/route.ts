@@ -13,7 +13,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, checkTrainingAwayMatchConflict } from "@/lib/trainingFieldConflicts";
 import {
   clubHasTrainingFields,
   parseTrainingFieldSelection,
@@ -280,14 +280,17 @@ export async function PATCH(
             trainingFieldSelections: nextTrainingFieldSelections,
             exclude: { type: "customGroup", id: groupId },
           });
-        } else {
-          await assertNoTrainingTimeConflict({
-            clubId,
-            trainingDates: nextTrainingDates,
-            trainingDateTimes: nextTrainingDateTimes,
-            trainingDurationMinutes: nextTrainingDurationMinutes,
-            exclude: { type: "customGroup", id: groupId },
-          });
+        }
+        await assertNoTrainingTimeConflict({
+          clubId,
+          trainingDates: nextTrainingDates,
+          trainingDateTimes: nextTrainingDateTimes,
+          trainingDurationMinutes: nextTrainingDurationMinutes,
+          exclude: { type: "customGroup", id: groupId },
+        });
+        const matchConflict = await checkTrainingAwayMatchConflict({ clubId, trainingDates: nextTrainingDates, trainingDateTimes: nextTrainingDateTimes, durationMinutes: nextTrainingDurationMinutes, teamGroups: [], homeMatchesOnly: true });
+        if (matchConflict.blocking) {
+          throw new Error(matchConflict.blocking);
         }
       } catch (error) {
         return NextResponse.json(
@@ -386,19 +389,21 @@ export async function PATCH(
       hasTrainingFieldSelections
     ) {
       const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
-      await prisma.$transaction((tx) =>
-        syncFutureTrainingSessions({
-          tx,
-          clubId,
-          scope: { type: "customGroup", id: groupId },
-          trainingDates: updated.trainingDates ?? [],
-          trainingDateTimes: normalizeStoredTrainingDateTimes(updated.trainingDateTimes, updated.trainingDates ?? []),
-          trainingDurationMinutes: updated.trainingDurationMinutes,
-          trainingFieldId: updated.trainingFieldId,
-          trainingFieldPieceIds: updated.trainingFieldPieceIds,
-          trainingFieldSelections: updated.trainingFieldSelections as Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> | undefined,
-          todayIso,
-        }),
+      await prisma.$transaction(
+        (tx) =>
+          syncFutureTrainingSessions({
+            tx,
+            clubId,
+            scope: { type: "customGroup", id: groupId },
+            trainingDates: updated.trainingDates ?? [],
+            trainingDateTimes: normalizeStoredTrainingDateTimes(updated.trainingDateTimes, updated.trainingDates ?? []),
+            trainingDurationMinutes: updated.trainingDurationMinutes,
+            trainingFieldId: updated.trainingFieldId,
+            trainingFieldPieceIds: updated.trainingFieldPieceIds,
+            trainingFieldSelections: updated.trainingFieldSelections as Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> | undefined,
+            todayIso,
+          }),
+        { timeout: 30000 },
       );
     }
 

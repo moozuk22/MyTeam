@@ -1,0 +1,123 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { verifyAdminToken } from "@/lib/adminAuth";
+import { isIsoDate, isValidTrainingTime, getTodayIsoDateInTimeZone } from "@/lib/training";
+import { checkAwayMatchTrainingConflict } from "@/lib/trainingFieldConflicts";
+import { sendMatchScheduleNotifications } from "@/lib/push/matchScheduleNotifications";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const FIXED_TIME_ZONE = "Europe/Sofia";
+const MATCH_WINDOW_DAYS = 60;
+
+async function verifySession(request: NextRequest) {
+  const token = request.cookies.get("admin_session")?.value;
+  return token ? await verifyAdminToken(token) : null;
+}
+
+function normalizeTeamGroups(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const unique = Array.from(
+    new Set(
+      raw
+        .map((v) => Number.parseInt(String(v ?? "").trim(), 10))
+        .filter((v) => Number.isInteger(v) && v >= 0),
+    ),
+  );
+  return unique.sort((a, b) => a - b);
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await verifySession(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
+  const endDate = new Date(`${todayIso}T00:00:00.000Z`);
+  endDate.setUTCDate(endDate.getUTCDate() + MATCH_WINDOW_DAYS - 1);
+  const endIso = endDate.toISOString().slice(0, 10);
+
+  const matches = await prisma.clubMatch.findMany({
+    where: {
+      clubId: id,
+      matchDate: { gte: todayIso, lte: endIso },
+    },
+    orderBy: [{ matchDate: "asc" }, { matchTime: "asc" }],
+    select: {
+      id: true,
+      opponent: true,
+      location: true,
+      matchDate: true,
+      matchTime: true,
+      durationMinutes: true,
+      isHome: true,
+      teamGroups: true,
+    },
+  });
+
+  return NextResponse.json({ matches });
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await verifySession(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  const club = await prisma.club.findUnique({ where: { id }, select: { id: true } });
+  if (!club) return NextResponse.json({ error: "Club not found" }, { status: 404 });
+
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+
+  const opponent = String(body.opponent ?? "").trim();
+  if (!opponent) return NextResponse.json({ error: "Съперник е задължителен." }, { status: 400 });
+  if (opponent.length > 200) return NextResponse.json({ error: "Съперник е твърде дълъг." }, { status: 400 });
+
+  const location = String(body.location ?? "").trim();
+  if (!location) return NextResponse.json({ error: "Място е задължително." }, { status: 400 });
+  if (location.length > 200) return NextResponse.json({ error: "Място е твърде дълго." }, { status: 400 });
+
+  const matchDate = String(body.matchDate ?? "").trim();
+  if (!isIsoDate(matchDate)) return NextResponse.json({ error: "Невалидна дата." }, { status: 400 });
+
+  const matchTime = String(body.matchTime ?? "").trim();
+  if (!isValidTrainingTime(matchTime)) return NextResponse.json({ error: "Невалиден час." }, { status: 400 });
+
+  const durationRaw = Number.parseInt(String(body.durationMinutes ?? "90").trim(), 10);
+  const durationMinutes = Number.isInteger(durationRaw) && durationRaw >= 1 && durationRaw <= 1440 ? durationRaw : 90;
+
+  const isHome = body.isHome !== false;
+
+  const teamGroups = normalizeTeamGroups(body.teamGroups);
+
+  let matchConflictWarning: string | null = null;
+  const conflict = await checkAwayMatchTrainingConflict({ clubId: id, matchDate, matchTime, durationMinutes, teamGroups, isHome });
+  if (conflict.blocking) return NextResponse.json({ error: conflict.blocking }, { status: 400 });
+  matchConflictWarning = conflict.warning;
+
+  const match = await prisma.clubMatch.create({
+    data: { clubId: id, opponent, location, matchDate, matchTime, durationMinutes, isHome, teamGroups },
+    select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
+  });
+
+  let notifications = null;
+  try {
+    notifications = await sendMatchScheduleNotifications({
+      clubId: id,
+      action: "created",
+      match,
+    });
+  } catch (error) {
+    console.error("Match schedule notifications failed:", error);
+  }
+
+  return NextResponse.json(matchConflictWarning ? { match, notifications, warning: matchConflictWarning } : { match, notifications }, { status: 201 });
+}

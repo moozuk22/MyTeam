@@ -156,6 +156,10 @@ function overlaps(startA: number, durationA: number, startB: number, durationB: 
   return startA < startB + durationB && startB < startA + durationA;
 }
 
+function matchTeamGroupsOverlap(a: number[], b: number[]): boolean {
+  return a.length === 0 || b.length === 0 || a.some((teamGroup) => b.includes(teamGroup));
+}
+
 function formatIsoDateForBgDisplay(isoDate: string): string {
   const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) {
@@ -632,4 +636,173 @@ export async function getOccupiedFieldResources(input: OccupiedResourcesInput): 
   }
 
   return resources;
+}
+
+export interface MatchConflictResult {
+  blocking: string | null;
+  warning: string | null;
+}
+
+export async function checkAwayMatchTrainingConflict(input: {
+  clubId: string;
+  matchDate: string;
+  matchTime: string;
+  durationMinutes: number;
+  teamGroups: number[];
+  isHome?: boolean;
+  excludeMatchId?: string;
+}): Promise<MatchConflictResult> {
+  const matchStart = parseTimeToMinutes(input.matchTime);
+  if (matchStart === null) return { blocking: null, warning: null };
+
+  const { clubId, matchDate, durationMinutes, teamGroups } = input;
+  const isHome = input.isHome === true;
+
+  const [teamSchedules, trainingGroups, customGroups, coachGroups, clubSchedule, existingMatches] = await Promise.all([
+    prisma.clubTrainingGroupSchedule.findMany({
+      where: { clubId, trainingDates: { has: matchDate } },
+      select: { teamGroup: true, trainingTime: true, trainingDateTimes: true, trainingDurationMinutes: true },
+    }),
+    prisma.clubTrainingScheduleGroup.findMany({
+      where: { clubId, trainingDates: { has: matchDate } },
+      select: { name: true, teamGroups: true, trainingTime: true, trainingDateTimes: true, trainingDurationMinutes: true },
+    }),
+    prisma.clubCustomTrainingGroup.findMany({
+      where: { clubId, trainingDates: { has: matchDate } },
+      select: { name: true, trainingTime: true, trainingDateTimes: true, trainingDurationMinutes: true },
+    }),
+    prisma.coachGroup.findMany({
+      where: { clubId, trainingDates: { has: matchDate } },
+      select: { name: true, trainingTime: true, trainingDateTimes: true, trainingDurationMinutes: true },
+    }),
+    prisma.club.findFirst({
+      where: { id: clubId, trainingDates: { has: matchDate } },
+      select: { trainingTime: true, trainingDateTimes: true, trainingDurationMinutes: true },
+    }),
+    prisma.clubMatch.findMany({
+      where: {
+        clubId,
+        matchDate,
+        ...(input.excludeMatchId ? { id: { not: input.excludeMatchId } } : {}),
+      },
+      select: { matchTime: true, durationMinutes: true, opponent: true, isHome: true, teamGroups: true },
+    }),
+  ]);
+
+  type Entry = { label: string; trainingTime: string | null; trainingDateTimes: unknown; trainingDurationMinutes: number };
+  const schedules: Entry[] = [];
+
+  for (const s of teamSchedules) {
+    if (!isHome && teamGroups.length > 0 && !teamGroups.includes(s.teamGroup)) continue;
+    schedules.push({ label: `набор ${s.teamGroup}`, trainingTime: s.trainingTime, trainingDateTimes: s.trainingDateTimes, trainingDurationMinutes: s.trainingDurationMinutes });
+  }
+
+  for (const g of trainingGroups) {
+    if (!isHome && teamGroups.length > 0 && g.teamGroups.length > 0 && !g.teamGroups.some((tg) => teamGroups.includes(tg))) continue;
+    schedules.push({ label: `сборен отбор ${g.name}`, trainingTime: g.trainingTime, trainingDateTimes: g.trainingDateTimes, trainingDurationMinutes: g.trainingDurationMinutes });
+  }
+
+  if (isHome) {
+    for (const g of customGroups) {
+      schedules.push({ label: `РїРµСЂСЃРѕРЅР°Р»РёР·РёСЂР°РЅР° РіСЂСѓРїР° ${g.name}`, trainingTime: g.trainingTime, trainingDateTimes: g.trainingDateTimes, trainingDurationMinutes: g.trainingDurationMinutes });
+    }
+    for (const g of coachGroups) {
+      schedules.push({ label: `С‚СЂРµРЅСЊРѕСЂСЃРєР° РіСЂСѓРїР° ${g.name}`, trainingTime: g.trainingTime, trainingDateTimes: g.trainingDateTimes, trainingDurationMinutes: g.trainingDurationMinutes });
+    }
+  }
+
+  if (clubSchedule) {
+    schedules.push({ label: "клубна тренировка", trainingTime: clubSchedule.trainingTime, trainingDateTimes: clubSchedule.trainingDateTimes, trainingDurationMinutes: clubSchedule.trainingDurationMinutes });
+  }
+
+  let warnLabel: string | null = null;
+
+  for (const sched of schedules) {
+    const dateTimes = normalizeStoredDateTimes(sched.trainingDateTimes);
+    const trainingTimeStr = dateTimes[matchDate] ?? sched.trainingTime ?? null;
+    if (!trainingTimeStr) { warnLabel ??= sched.label; continue; }
+    const trainingStart = parseTimeToMinutes(trainingTimeStr);
+    if (trainingStart === null) { warnLabel ??= sched.label; continue; }
+    if (overlaps(matchStart, durationMinutes, trainingStart, sched.trainingDurationMinutes)) {
+      const startTime = formatMinutesAsTime(trainingStart);
+      const endTime = formatMinutesAsTime(trainingStart + sched.trainingDurationMinutes);
+      return {
+        blocking: `Мачът се застъпва с тренировка на ${formatIsoDateForBgDisplay(matchDate)} от ${startTime} до ${endTime} за ${sched.label}.`,
+        warning: null,
+      };
+    }
+    warnLabel ??= sched.label;
+  }
+
+  for (const match of existingMatches) {
+    const existingStart = parseTimeToMinutes(match.matchTime);
+    if (existingStart === null) continue;
+    if (overlaps(matchStart, durationMinutes, existingStart, match.durationMinutes)) {
+      const startTime = formatMinutesAsTime(existingStart);
+      const endTime = formatMinutesAsTime(existingStart + match.durationMinutes);
+      if (matchTeamGroupsOverlap(teamGroups, match.teamGroups)) {
+        return {
+          blocking: `Match overlaps with another match for the same team on ${formatIsoDateForBgDisplay(matchDate)} from ${startTime} to ${endTime} against ${match.opponent}.`,
+          warning: null,
+        };
+      }
+      if (isHome && match.isHome) {
+        return {
+          blocking: `Match overlaps with a home match on ${formatIsoDateForBgDisplay(matchDate)} from ${startTime} to ${endTime} against ${match.opponent}.`,
+          warning: null,
+        };
+      }
+    }
+  }
+
+  if (warnLabel !== null) {
+    return { blocking: null, warning: `На ${formatIsoDateForBgDisplay(matchDate)} вече е насрочена тренировка за ${warnLabel}.` };
+  }
+  return { blocking: null, warning: null };
+}
+
+export async function checkTrainingAwayMatchConflict(input: {
+  clubId: string;
+  trainingDates: string[];
+  trainingDateTimes: Record<string, string>;
+  durationMinutes: number;
+  teamGroups: number[];
+  homeMatchesOnly?: boolean;
+}): Promise<MatchConflictResult> {
+  if (input.trainingDates.length === 0) return { blocking: null, warning: null };
+
+  const { clubId, trainingDates, trainingDateTimes, durationMinutes, teamGroups } = input;
+
+  const matches = await prisma.clubMatch.findMany({
+    where: { clubId, matchDate: { in: trainingDates } },
+    select: { matchDate: true, matchTime: true, durationMinutes: true, teamGroups: true, opponent: true, isHome: true },
+  });
+
+  const relevant = matches.filter((m) =>
+    m.isHome || (!input.homeMatchesOnly && matchTeamGroupsOverlap(teamGroups, m.teamGroups)),
+  );
+
+  let warnMatch: { date: string; opponent: string } | null = null;
+
+  for (const match of relevant) {
+    const trainingTime = trainingDateTimes[match.matchDate];
+    if (!trainingTime) { warnMatch ??= { date: match.matchDate, opponent: match.opponent }; continue; }
+    const trainingStart = parseTimeToMinutes(trainingTime);
+    const matchStart = parseTimeToMinutes(match.matchTime);
+    if (trainingStart === null || matchStart === null) { warnMatch ??= { date: match.matchDate, opponent: match.opponent }; continue; }
+    if (overlaps(trainingStart, durationMinutes, matchStart, match.durationMinutes)) {
+      const startTime = formatMinutesAsTime(matchStart);
+      const endTime = formatMinutesAsTime(matchStart + match.durationMinutes);
+      return {
+        blocking: `Тренировката се застъпва с мач на ${formatIsoDateForBgDisplay(match.matchDate)} от ${startTime} до ${endTime} срещу ${match.opponent}.`,
+        warning: null,
+      };
+    }
+    warnMatch ??= { date: match.matchDate, opponent: match.opponent };
+  }
+
+  if (warnMatch !== null) {
+    return { blocking: null, warning: `На ${formatIsoDateForBgDisplay(warnMatch.date)} вече е насрочен мач срещу ${warnMatch.opponent}.` };
+  }
+  return { blocking: null, warning: null };
 }

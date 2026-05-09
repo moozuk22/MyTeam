@@ -13,7 +13,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, checkTrainingAwayMatchConflict } from "@/lib/trainingFieldConflicts";
 import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
 import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
@@ -252,13 +252,16 @@ export async function POST(
           trainingFieldId: trainingFieldSelection.trainingFieldId,
           trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
         });
-      } else {
-        await assertNoTrainingTimeConflict({
-          clubId: id,
-          trainingDates,
-          trainingDateTimes,
-          trainingDurationMinutes,
-        });
+      }
+      await assertNoTrainingTimeConflict({
+        clubId: id,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+      });
+      const matchConflict = await checkTrainingAwayMatchConflict({ clubId: id, trainingDates, trainingDateTimes, durationMinutes: trainingDurationMinutes, teamGroups: [], homeMatchesOnly: true });
+      if (matchConflict.blocking) {
+        throw new Error(matchConflict.blocking);
       }
     }
   } catch (error) {
@@ -339,7 +342,7 @@ export async function POST(
           },
         },
       });
-    });
+    }, { timeout: 30000 });
 
     let notifications = null;
     if (shouldNotifyForTrainingDatesChange([], created.trainingDates ?? [])) {

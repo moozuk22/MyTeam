@@ -260,15 +260,14 @@ export async function PUT(
         trainingFieldSelections,
         exclude: { type: "coachGroup", id: groupId },
       });
-    } else {
-      await assertNoTrainingTimeConflict({
-        clubId,
-        trainingDates,
-        trainingDateTimes,
-        trainingDurationMinutes,
-        exclude: { type: "coachGroup", id: groupId },
-      });
     }
+    await assertNoTrainingTimeConflict({
+      clubId,
+      trainingDates,
+      trainingDateTimes,
+      trainingDurationMinutes,
+      exclude: { type: "coachGroup", id: groupId },
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Invalid trainingDateTimes" },
@@ -296,19 +295,21 @@ export async function PUT(
   }
 
   const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
-  await prisma.$transaction((tx) =>
-    syncFutureTrainingSessions({
-      tx,
-      clubId,
-      scope: { type: "coachGroup", id: groupId },
-      trainingDates,
-      trainingDateTimes,
-      trainingDurationMinutes,
-      trainingFieldId: trainingFieldSelection.trainingFieldId,
-      trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
-      trainingFieldSelections,
-      todayIso,
-    }),
+  await prisma.$transaction(
+    (tx) =>
+      syncFutureTrainingSessions({
+        tx,
+        clubId,
+        scope: { type: "coachGroup", id: groupId },
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        trainingFieldId: trainingFieldSelection.trainingFieldId,
+        trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
+        todayIso,
+      }),
+    { timeout: 30000 },
   );
 
   const resolvedDates = getConfiguredTrainingDates({

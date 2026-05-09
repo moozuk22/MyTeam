@@ -13,7 +13,7 @@ import {
   sendTrainingScheduleNotifications,
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
-import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, checkTrainingAwayMatchConflict } from "@/lib/trainingFieldConflicts";
 import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
 import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
@@ -221,6 +221,7 @@ export async function POST(
     }
   }
   let trainingDateTimes: Record<string, string> = {};
+  let trainingMatchWarning: string | null = null;
   const hasTrainingFields = trainingDates.length > 0 ? await clubHasTrainingFields(id) : false;
   if (!hasTrainingFields) {
     trainingFieldSelection = { trainingFieldId: null, trainingFieldPieceIds: [] };
@@ -255,15 +256,17 @@ export async function POST(
           trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
           excludeTeamGroups: teamGroups,
         });
-      } else {
-        await assertNoTrainingTimeConflict({
-          clubId: id,
-          trainingDates,
-          trainingDateTimes,
-          trainingDurationMinutes,
-          excludeTeamGroups: teamGroups,
-        });
       }
+      await assertNoTrainingTimeConflict({
+        clubId: id,
+        trainingDates,
+        trainingDateTimes,
+        trainingDurationMinutes,
+        excludeTeamGroups: teamGroups,
+      });
+      const matchConflict = await checkTrainingAwayMatchConflict({ clubId: id, trainingDates, trainingDateTimes, durationMinutes: trainingDurationMinutes, teamGroups });
+      if (matchConflict.blocking) return NextResponse.json({ error: matchConflict.blocking }, { status: 400 });
+      trainingMatchWarning = matchConflict.warning;
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Invalid training date times." },
@@ -370,7 +373,7 @@ export async function POST(
       }
 
       return created;
-    });
+    }, { timeout: 30000 });
 
     let notifications = null;
     if (shouldNotifyForTrainingDatesChange([], group.trainingDates ?? [])) {
@@ -387,6 +390,7 @@ export async function POST(
         ...group,
         trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
         notifications,
+        ...(trainingMatchWarning ? { warning: trainingMatchWarning } : {}),
       },
       { status: 201 },
     );

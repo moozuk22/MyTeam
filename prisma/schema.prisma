@@ -60,6 +60,7 @@ model Club {
   firstBillingMonth       DateTime?                   @map("first_billing_month") @db.Timestamptz(6)
   billingActivatedAt      DateTime?                   @map("billing_activated_at") @db.Timestamptz(6)
   discountConfigs         TeamDiscountConfig[]
+  matches                 ClubMatch[]
 
   @@map("clubs")
 }
@@ -334,6 +335,25 @@ model TrainingSessionPlayer {
   @@index([playerId])
   @@index([trainingSessionId])
   @@map("training_session_players")
+}
+
+model ClubMatch {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId          String   @map("club_id") @db.Uuid
+  opponent        String
+  location        String
+  matchDate       String   @map("match_date")
+  matchTime       String   @map("match_time")
+  durationMinutes Int      @default(90) @map("duration_minutes")
+  isHome          Boolean  @default(true) @map("is_home")
+  teamGroups      Int[]    @default([]) @map("team_groups")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  club            Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([clubId])
+  @@index([matchDate])
+  @@map("club_matches")
 }
 
 model Image {
