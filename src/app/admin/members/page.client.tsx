@@ -5609,7 +5609,7 @@ function AdminMembersPageContent() {
                       }}
                       disabled={trainingNoteSaving || trainingDaysEditorSaving}
                     >
-                      Насрочи събитие
+                      Насрочи график
                     </button>
                     <button
                       className="amp-btn amp-btn--primary"

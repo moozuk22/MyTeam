@@ -1908,7 +1908,7 @@ export default function MemberCardPage({
           </>)}
 
           <button className="add-btn member-action-btn training-schedule-btn" onClick={() => void openTrainingModal()}>
-            Тренировъчен график
+            График
           </button>
 
           {canPublicEdit && (trainingLoading ? (
