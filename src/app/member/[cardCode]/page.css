@@ -562,6 +562,9 @@
 }
 
 .member-training-modal {
+  background:
+    linear-gradient(135deg, rgba(50, 205, 50, 0.05), transparent),
+    linear-gradient(135deg, #0d0d0d, #1a1a1a, #0d0d0d);
   max-width: 512px;
   max-height: 90vh;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -585,11 +588,7 @@
 }
 
 .member-training-modal-tint {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(50, 205, 50, 0.05), transparent);
-  pointer-events: none;
-  border-radius: 10px;
+  display: none;
 }
 
 .member-training-modal .member-training-modal-title-gradient {
@@ -697,7 +696,9 @@
   color: #9eff9e;
 }
 
-.member-training-modal .training-calendar-cell--training:hover:not(:disabled) {
+.member-training-modal .training-calendar-cell--training:hover:not(:disabled):not(.training-calendar-cell--has-match):not(.training-calendar-cell--opted-out) {
+  border-color: rgba(50, 205, 50, 0.75);
+  background: rgba(50, 205, 50, 0.26);
   transform: translateY(-1px);
 }
 
@@ -705,6 +706,12 @@
   border-color: rgba(249, 115, 22, 0.55);
   background: rgba(249, 115, 22, 0.18);
   color: #fdba74;
+}
+
+.member-training-modal .training-calendar-cell--has-match:hover:not(:disabled) {
+  border-color: rgba(249, 115, 22, 0.75);
+  background: rgba(249, 115, 22, 0.28);
+  transform: translateY(-1px);
 }
 
 .member-training-modal .training-calendar-cell--has-match::after {
@@ -760,61 +767,6 @@
 .member-training-modal .training-calendar-day-number {
   font-size: 10px;
   font-weight: 700;
-}
-
-.member-match-list {
-  margin-top: 16px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(249, 115, 22, 0.08);
-  border: 1px solid rgba(249, 115, 22, 0.25);
-}
-
-.member-match-list-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: rgba(253, 186, 116, 0.8);
-  margin: 0 0 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.member-match-list-items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.member-match-list-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
-  flex-wrap: wrap;
-}
-
-.member-match-date,
-.member-match-time {
-  font-weight: 700;
-  color: #fdba74;
-  white-space: nowrap;
-}
-
-.member-match-opponent {
-  font-weight: 600;
-  flex: 1;
-  min-width: 80px;
-}
-
-.member-match-location {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  flex: 1;
-  min-width: 60px;
 }
 
 /* ── Match details popup ────────────────────────────────── */

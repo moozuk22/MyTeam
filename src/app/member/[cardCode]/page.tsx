@@ -2376,21 +2376,6 @@ export default function MemberCardPage({
                     </div>
                   </>
                 )}
-                {memberMatches.length > 0 && (
-                  <div className="member-match-list">
-                    <p className="member-match-list-title">Предстоящи мачове</p>
-                    <ul className="member-match-list-items">
-                      {memberMatches.map((m) => (
-                        <li key={m.id} className="member-match-list-item">
-                          <span className="member-match-date">{m.matchDate.slice(8)}.{m.matchDate.slice(5, 7)}</span>
-                          <span className="member-match-time">{m.matchTime}</span>
-                          <span className="member-match-opponent">{m.opponent}</span>
-                          <span className="member-match-location">{m.location}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
                 {trainingError && <p className="training-error">{trainingError}</p>}
                 {trainingAttendancePopupOpen && trainingDetailsItem && (
                   <div

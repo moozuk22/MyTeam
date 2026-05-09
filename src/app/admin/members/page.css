@@ -1587,6 +1587,11 @@
   color: #9eff9e;
 }
 
+.amp-training-date-btn--training:hover:not(:disabled):not(.amp-training-date-btn--active):not(.amp-training-date-btn--selected):not(.amp-training-date-btn--today):not(.amp-training-date-btn--training-match) {
+  border-color: rgba(50, 205, 50, 0.75);
+  background: rgba(50, 205, 50, 0.22);
+}
+
 .amp-training-date-btn--calendar-match-only {
   min-height: 30px;
   padding: 2px 1px;
@@ -1661,6 +1666,11 @@
   background: rgba(249, 115, 22, 0.14);
   box-shadow: none;
   color: #fdba74;
+}
+
+.amp-training-date-btn--training-match:hover:not(:disabled) {
+  border-color: rgba(249, 115, 22, 0.75);
+  background: rgba(249, 115, 22, 0.24);
 }
 
 .amp-training-date-btn:disabled {
