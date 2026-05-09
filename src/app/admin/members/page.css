@@ -759,7 +759,10 @@
 }
 
 .amp-modal {
-  background: linear-gradient(135deg, #0d0d0d, #1a1a1a, #0d0d0d);
+  --amp-modal-tint-bg: linear-gradient(135deg, rgba(50, 205, 50, 0.05), transparent);
+  background:
+    var(--amp-modal-tint-bg),
+    linear-gradient(135deg, #0d0d0d, #1a1a1a, #0d0d0d);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 10px;
   width: 100%;
@@ -789,11 +792,7 @@
 
 /* Green tint overlay */
 .amp-modal-tint {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(50, 205, 50, 0.05), transparent);
-  pointer-events: none;
-  border-radius: 10px;
+  display: none;
 }
 
 /* Title */
@@ -867,6 +866,7 @@
 
 /* ── Match view popup ───────────────────────────────────── */
 .amp-modal--match-view {
+  --amp-modal-tint-bg: linear-gradient(135deg, rgba(249, 115, 22, 0.05), transparent);
   max-width: 360px;
   border-color: rgba(249, 115, 22, 0.3);
   box-shadow: 0 0 40px rgba(249, 115, 22, 0.08), 0 25px 60px rgba(0, 0, 0, 0.7);
@@ -875,10 +875,6 @@
 .amp-modal--match-view::before {
   background: linear-gradient(90deg, rgba(249, 115, 22, 0.12), #ea580c 50%, rgba(249, 115, 22, 0.12));
   box-shadow: 0 0 16px rgba(249, 115, 22, 0.55);
-}
-
-.amp-modal--match-view .amp-modal-tint {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.05), transparent);
 }
 
 .amp-match-view-date {
