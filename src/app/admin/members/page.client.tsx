@@ -1477,6 +1477,7 @@ function AdminMembersPageContent() {
   }, [trainingGroupMode]);
 
   /* ── Derived ── */
+  const canManageMemberActions = !searchParams.has("coachGroupId");
   const groupOptions = [...new Set(
     members.filter((m) => m.isActive).map((m) => m.teamGroup).filter((g): g is number => g !== null)
   )].sort((a, b) => a - b);
@@ -4207,6 +4208,8 @@ function AdminMembersPageContent() {
               >
                 <span>Такси</span>
               </button>
+              {canManageMemberActions && (
+                <>
               <button
                 className="amp-edit-team-btn amp-btn--compact"
                 onClick={() => router.push(`/admin/teams/${encodeURIComponent(clubId)}/edit`)}
@@ -4224,6 +4227,8 @@ function AdminMembersPageContent() {
                 <TrashIcon />
                 <span>Изтрий</span>
               </button>
+                </>
+              )}
             </>
           )}
           {(isAdmin || isCoach) && clubId && (
@@ -4557,6 +4562,7 @@ function AdminMembersPageContent() {
           onClose={() => setSelectedMember(null)}
           actionMode={selectedMember.isActive ? "active" : "inactive"}
           isCoach={isCoach}
+          showManagementActions={canManageMemberActions}
           onRequestEdit={openEditMember}
           onRequestDelete={(member) => {
             setDeleteError("");
@@ -4825,7 +4831,7 @@ function AdminMembersPageContent() {
           error={deleteError}
         />
       )}
-      {isTeamDeleteConfirmOpen && isAdmin && clubId && (
+      {isTeamDeleteConfirmOpen && isAdmin && clubId && canManageMemberActions && (
         <ConfirmDeleteTeamModal
           teamName={clubName?.trim() || "този отбор"}
           isDeleting={isDeletingTeam}
@@ -7715,7 +7721,7 @@ function AdminMembersPageContent() {
           </div>
         </div>
       )}
-      {inactivePlayersOpen && (
+      {inactivePlayersOpen && canManageMemberActions && (
         <InactivePlayersModal
           members={inactiveMembers}
           isReactivating={Boolean(reactivatingMemberId)}

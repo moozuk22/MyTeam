@@ -1202,6 +1202,7 @@ function MemberDetailModalLegacy({
   onRequestDelete,
   onRequestEdit,
   actionMode = "active",
+  showManagementActions = true,
   onRequestReactivate,
   onRequestPermanentDelete,
   isReactivating = false,
@@ -1212,6 +1213,7 @@ function MemberDetailModalLegacy({
   onRequestDelete: (member: Member) => void;
   onRequestEdit: (member: Member) => void;
   actionMode?: "active" | "inactive";
+  showManagementActions?: boolean;
   onRequestReactivate?: (member: Member) => void;
   onRequestPermanentDelete?: (member: Member) => void;
   isReactivating?: boolean;
@@ -1338,7 +1340,8 @@ function MemberDetailModalLegacy({
             </div>
           </div>
 
-          <div className="amp-modal-actions amp-modal-actions--end">
+          {showManagementActions && (
+            <div className="amp-modal-actions amp-modal-actions--end">
             {actionMode === "active" ? (
               <>
                 <button
@@ -1372,7 +1375,8 @@ function MemberDetailModalLegacy({
                 </button>
               </>
             )}
-          </div>
+            </div>
+          )}
 
         </div>
       </div>
@@ -1388,6 +1392,7 @@ function MemberDetailModal({
   onRequestEdit,
   actionMode = "active",
   isCoach = false,
+  showManagementActions = true,
   onRequestReactivate,
   onRequestPermanentDelete,
   isReactivating = false,
@@ -1401,6 +1406,7 @@ function MemberDetailModal({
   onRequestEdit: (member: Member) => void;
   actionMode?: "active" | "inactive";
   isCoach?: boolean;
+  showManagementActions?: boolean;
   onRequestReactivate?: (member: Member) => void;
   onRequestPermanentDelete?: (member: Member) => void;
   isReactivating?: boolean;
@@ -1873,7 +1879,8 @@ function MemberDetailModal({
             </div>
           </div>
 
-          <div className="amp-modal-actions amp-modal-actions--end">
+          {showManagementActions && (
+            <div className="amp-modal-actions amp-modal-actions--end">
             {actionMode === "active" ? (
               <>
                 <button className="amp-btn amp-btn--ghost" onClick={() => onRequestEdit(member)}>
@@ -1901,7 +1908,8 @@ function MemberDetailModal({
                 </button>
               </>
             )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
