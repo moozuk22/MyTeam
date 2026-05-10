@@ -1412,11 +1412,12 @@ function MemberDetailModal({
   isReactivating?: boolean;
   isDeletingPermanent?: boolean;
   coachGroups?: CoachGroup[];
-  onCoachGroupAssigned?: (memberId: string, coachGroupId: string | null) => void;
+  onCoachGroupAssigned?: (memberId: string, coachGroupIds: string[]) => void;
 }) {
   const s = getStatusMeta(member.status);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [assignCoachGroupValue, setAssignCoachGroupValue] = useState<string | null>(member.coachGroupId);
+  const [coachGroupsOpen, setCoachGroupsOpen] = useState(false);
+  const [assignCoachGroupValue, setAssignCoachGroupValue] = useState<string[]>([...member.coachGroupIds]);
   const [assignCoachGroupSaving, setAssignCoachGroupSaving] = useState(false);
   const [assignCoachGroupError, setAssignCoachGroupError] = useState("");
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
@@ -1701,51 +1702,76 @@ function MemberDetailModal({
             </div>
 
             {coachGroups && coachGroups.length > 0 && actionMode === "active" && (
-              <div className="amp-info-cell amp-info-cell--full">
-                <div style={{ width: "100%" }}>
-                  <p className="amp-lbl" style={{ marginBottom: "6px" }}>Треньорска група</p>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <select
-                      className="amp-edit-input"
-                      value={assignCoachGroupValue ?? ""}
-                      onChange={(e) => { setAssignCoachGroupValue(e.target.value || null); setAssignCoachGroupError(""); }}
-                      disabled={assignCoachGroupSaving}
-                      style={{ flex: 1 }}
-                    >
-                      <option value="">Без група</option>
-                      {coachGroups.map((g) => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="amp-btn amp-btn--ghost amp-btn--compact"
-                      disabled={assignCoachGroupSaving || assignCoachGroupValue === member.coachGroupId}
-                      onClick={async () => {
-                        setAssignCoachGroupSaving(true);
-                        setAssignCoachGroupError("");
-                        try {
-                          const response = await fetch(`/api/admin/members/${encodeURIComponent(member.id)}/coach-group`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ coachGroupId: assignCoachGroupValue }),
-                          });
-                          if (!response.ok) {
-                            const payload = await response.json().catch(() => ({}));
-                            throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
-                          }
-                          onCoachGroupAssigned?.(member.id, assignCoachGroupValue);
-                        } catch (err) {
-                          setAssignCoachGroupError(err instanceof Error ? err.message : "Грешка");
-                        } finally {
-                          setAssignCoachGroupSaving(false);
-                        }
-                      }}
-                    >
-                      {assignCoachGroupSaving ? "..." : "Запиши"}
-                    </button>
+              <div className="amp-info-cell amp-info-cell--full amp-info-cell--dropdown">
+                <button className="amp-info-cell-trigger" onClick={() => setCoachGroupsOpen(v => !v)}>
+                  <div className="amp-info-cell-trigger-text">
+                    <p className="amp-lbl">Треньорска група</p>
+                    <p className="amp-val">
+                      {assignCoachGroupValue.length === 0
+                        ? "Не е избрана"
+                        : coachGroups.filter(g => assignCoachGroupValue.includes(g.id)).map(g => g.name).join(", ")}
+                    </p>
                   </div>
-                  {assignCoachGroupError && <p className="amp-confirm-error" style={{ marginTop: "6px", marginBottom: 0 }}>{assignCoachGroupError}</p>}
+                  <span className={`amp-acc-chevron${coachGroupsOpen ? " open" : ""}`}><ChevronDownIcon /></span>
+                </button>
+                <div className={`amp-acc-body${coachGroupsOpen ? " open" : ""}`}>
+                  <div className="amp-acc-inner">
+                    <div className="amp-coach-group-picker">
+                      <div className="amp-coach-group-picker-list">
+                        {coachGroups.map((g) => (
+                          <label
+                            key={g.id}
+                            className={`amp-coach-group-option${assignCoachGroupValue.includes(g.id) ? " is-selected" : ""}${assignCoachGroupSaving ? " is-disabled" : ""}`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="amp-group-check-input"
+                              disabled={assignCoachGroupSaving}
+                              checked={assignCoachGroupValue.includes(g.id)}
+                              onChange={(e) => {
+                                setAssignCoachGroupError("");
+                                setAssignCoachGroupValue((prev) =>
+                                  e.target.checked ? [...prev, g.id] : prev.filter((id) => id !== g.id)
+                                );
+                              }}
+                            />
+                            <span className="amp-group-check-box" aria-hidden="true" />
+                            <span className="amp-coach-group-option-name">{g.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="amp-coach-group-picker-actions">
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost amp-btn--compact"
+                          disabled={assignCoachGroupSaving}
+                          onClick={async () => {
+                            setAssignCoachGroupSaving(true);
+                            setAssignCoachGroupError("");
+                            try {
+                              const response = await fetch(`/api/admin/members/${encodeURIComponent(member.id)}/coach-group`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ coachGroupIds: assignCoachGroupValue }),
+                              });
+                              if (!response.ok) {
+                                const payload = await response.json().catch(() => ({}));
+                                throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
+                              }
+                              onCoachGroupAssigned?.(member.id, assignCoachGroupValue);
+                            } catch (err) {
+                              setAssignCoachGroupError(err instanceof Error ? err.message : "Грешка");
+                            } finally {
+                              setAssignCoachGroupSaving(false);
+                            }
+                          }}
+                        >
+                          {assignCoachGroupSaving ? "..." : "Запиши"}
+                        </button>
+                      </div>
+                      {assignCoachGroupError && <p className="amp-confirm-error amp-coach-group-picker-error">{assignCoachGroupError}</p>}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

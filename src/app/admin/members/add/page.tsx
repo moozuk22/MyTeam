@@ -16,6 +16,20 @@ interface ClubData {
   firstBillingMonth?: string | null;
 }
 
+interface DuplicateMember {
+  id: string;
+  fullName: string;
+  birthDate: string | null;
+}
+
+function normalizePlayerName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("bg-BG");
+}
+
+function normalizeDateInput(value: string | null | undefined): string {
+  return value ? value.slice(0, 10) : "";
+}
+
 function AddMemberPageContent() {
   const searchParams = useSearchParams();
   const clubId = searchParams.get("clubId")?.trim() ?? "";
@@ -33,6 +47,7 @@ function AddMemberPageContent() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateMember | null>(null);
   const [isClubValidated, setIsClubValidated] = useState(false);
   const [isValidatingClubId, setIsValidatingClubId] = useState(true);
   const router = useRouter();
@@ -121,11 +136,44 @@ function AddMemberPageContent() {
     };
   }, [avatarFile]);
 
-  const handleCreateMember = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!isClubValidated) {
-      return;
+  const findActiveDuplicateMember = async (): Promise<DuplicateMember | null> => {
+    const params = new URLSearchParams({ clubId });
+    const response = await fetch(`/api/admin/members?${params.toString()}`, { cache: "no-store" });
+    if (!response.ok) {
+      return null;
     }
+
+    const members = await response.json();
+    if (!Array.isArray(members)) {
+      return null;
+    }
+
+    const normalizedFullName = normalizePlayerName(fullName);
+    const normalizedBirthDate = normalizeDateInput(birthDate);
+    const duplicate = members.find((member) => {
+      if (typeof member !== "object" || member === null) {
+        return false;
+      }
+      const raw = member as Record<string, unknown>;
+      return (
+        raw.isActive === true &&
+        normalizePlayerName(String(raw.fullName ?? "")) === normalizedFullName &&
+        normalizeDateInput(typeof raw.birthDate === "string" ? raw.birthDate : null) === normalizedBirthDate
+      );
+    }) as Record<string, unknown> | undefined;
+
+    if (!duplicate) {
+      return null;
+    }
+
+    return {
+      id: String(duplicate.id ?? ""),
+      fullName: String(duplicate.fullName ?? fullName),
+      birthDate: typeof duplicate.birthDate === "string" ? duplicate.birthDate : null,
+    };
+  };
+
+  const submitMember = async (skipDuplicateCheck = false) => {
     if (!birthDate.trim()) {
       setError("Birth date is required.");
       return;
@@ -146,8 +194,25 @@ function AddMemberPageContent() {
       setError("First billing month is required for active billing clubs.");
       return;
     }
+
     setIsSubmitting(true);
     setError("");
+
+    let confirmDuplicate = false;
+    try {
+      if (!skipDuplicateCheck) {
+        const duplicate = await findActiveDuplicateMember();
+        if (duplicate) {
+          setDuplicateWarning(duplicate);
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        confirmDuplicate = true;
+      }
+    } catch (duplicateCheckError) {
+      console.error("Failed to check duplicate player:", duplicateCheckError);
+    }
 
     try {
       let resolvedAvatarUrl = avatarUrl.trim();
@@ -164,7 +229,7 @@ function AddMemberPageContent() {
         resolvedImagePath = extractUploadPathFromCloudinaryUrl(uploaded.secure_url);
       }
 
-      const payload: Record<string, string> = {
+      const payload: Record<string, string | boolean> = {
         fullName: fullName.trim(),
         status,
         clubId,
@@ -179,6 +244,7 @@ function AddMemberPageContent() {
       if (resolvedAvatarUrl) payload.avatarUrl = resolvedAvatarUrl;
       if (resolvedImagePath) payload.imageUrl = resolvedImagePath;
       if (resolvedImagePublicId) payload.imagePublicId = resolvedImagePublicId;
+      if (confirmDuplicate) payload.confirmDuplicate = true;
 
       const response = await fetch("/api/admin/members", {
         method: "POST",
@@ -190,6 +256,10 @@ function AddMemberPageContent() {
         router.push(returnUrl);
       } else {
         const data = await response.json();
+        if (response.status === 409 && data?.error === "duplicate_player") {
+          setError("Вече има активен играч със същото име и дата на раждане. Потвърдете предупреждението и опитайте отново.");
+          return;
+        }
         setError(data.error || "Грешка при създаване на играч");
       }
     } catch (err) {
@@ -198,6 +268,19 @@ function AddMemberPageContent() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCreateMember = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!isClubValidated) {
+      return;
+    }
+    await submitMember(false);
+  };
+
+  const handleConfirmDuplicateCreate = async () => {
+    setDuplicateWarning(null);
+    await submitMember(true);
   };
 
   if (isValidatingClubId || !isClubValidated) {
@@ -426,6 +509,46 @@ function AddMemberPageContent() {
           </form>
         </div>
       </div>
+
+      {duplicateWarning && (
+        <div
+          className="add-member-modal-overlay"
+          onClick={() => !isSubmitting && setDuplicateWarning(null)}
+        >
+          <div className="add-member-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="add-member-modal-icon">!</div>
+            <h2 className="add-member-modal-title">Възможно дублиране на играч</h2>
+            <p className="add-member-modal-text">
+              Вече има активен играч със същото име и дата на раждане:
+            </p>
+            <div className="add-member-modal-player">
+              <strong>{duplicateWarning.fullName}</strong>
+              <span>{normalizeDateInput(duplicateWarning.birthDate) || birthDate}</span>
+            </div>
+            <p className="add-member-modal-subtext">
+              Сигурни ли сте, че искате да добавите играча отново?
+            </p>
+            <div className="add-member-modal-actions">
+              <button
+                type="button"
+                className="add-member-btn-cancel"
+                onClick={() => setDuplicateWarning(null)}
+                disabled={isSubmitting}
+              >
+                Отказ
+              </button>
+              <button
+                type="button"
+                className="add-member-btn-submit"
+                onClick={handleConfirmDuplicateCreate}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Създаване..." : "Добави отново"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

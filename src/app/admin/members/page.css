@@ -1220,6 +1220,118 @@
   grid-column: 1 / -1;
 }
 
+.amp-info-cell--dropdown {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  margin: -4px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.amp-info-cell-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 4px;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.amp-info-cell-trigger:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.amp-info-cell-trigger .amp-acc-chevron {
+  margin-left: auto;
+}
+
+.amp-info-cell-trigger-text {
+  text-align: left;
+  min-width: 0;
+}
+
+.amp-coach-group-picker {
+  padding: 8px 4px 4px;
+}
+
+.amp-coach-group-picker-list {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.amp-coach-group-option {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  margin: 0 !important;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.amp-coach-group-option:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.amp-coach-group-option:has(.amp-group-check-input:focus-visible) {
+  border-color: rgba(50, 205, 50, 0.65);
+  box-shadow: 0 0 0 2px rgba(50, 205, 50, 0.18);
+}
+
+.amp-coach-group-option.is-selected {
+  border-color: rgba(50, 205, 50, 0.42);
+  background: rgba(50, 205, 50, 0.11);
+  color: #e8ffe8;
+}
+
+.amp-coach-group-option.is-selected .amp-group-check-box {
+  border-color: rgba(50, 205, 50, 0.8);
+  background: rgba(50, 205, 50, 0.2);
+}
+
+.amp-coach-group-option.is-selected .amp-group-check-box::after {
+  border-left-color: #b9ffb9;
+  border-bottom-color: #b9ffb9;
+}
+
+.amp-coach-group-option.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.amp-coach-group-option-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.amp-coach-group-picker-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.amp-coach-group-picker-error {
+  margin: 7px 0 0;
+}
+
 .amp-lbl {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.4);

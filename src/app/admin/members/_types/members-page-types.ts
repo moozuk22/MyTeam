@@ -66,7 +66,7 @@ interface Member {
   nfcTagId: string;
   status: PlayerStatus;
   teamGroup: number | null;
-  coachGroupId: string | null;
+  coachGroupIds: string[];
   jerseyNumber: string | null;
   parentPhone: string | null;
   playerPhone: string | null;

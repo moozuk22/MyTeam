@@ -60,7 +60,7 @@ function normalizeMember(item: unknown): Member {
     nfcTagId,
     status,
     teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
-    coachGroupId: raw.coachGroupId ? String(raw.coachGroupId) : null,
+    coachGroupIds: Array.isArray(raw.coachGroupIds) ? (raw.coachGroupIds as unknown[]).map((v) => String(v ?? "")).filter(Boolean) : [],
     jerseyNumber: raw.jerseyNumber ? String(raw.jerseyNumber) : null,
     parentPhone: raw.parentPhone ? String(raw.parentPhone) : null,
     playerPhone: raw.playerPhone ? String(raw.playerPhone) : null,
