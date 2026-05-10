@@ -47,7 +47,7 @@ export async function getClubAdminNotifications(input: {
     where.playerId = input.playerId;
   }
   if (input.coachGroupId) {
-    where.player = { coachGroupId: input.coachGroupId };
+    where.player = { coachGroups: { some: { id: input.coachGroupId } } };
   }
   return await prismaAdmin.adminNotification.findMany({
     where,
@@ -77,7 +77,7 @@ export async function getClubAdminUnreadCount(input: {
     where.playerId = input.playerId;
   }
   if (input.coachGroupId) {
-    where.player = { coachGroupId: input.coachGroupId };
+    where.player = { coachGroups: { some: { id: input.coachGroupId } } };
   }
   return await prismaAdmin.adminNotification.count({ where });
 }
@@ -92,7 +92,7 @@ export async function markClubAdminNotificationsRead(input: {
     where.playerId = input.playerId;
   }
   if (input.coachGroupId) {
-    where.player = { coachGroupId: input.coachGroupId };
+    where.player = { coachGroups: { some: { id: input.coachGroupId } } };
   }
   return await prismaAdmin.adminNotification.updateMany({
     where,

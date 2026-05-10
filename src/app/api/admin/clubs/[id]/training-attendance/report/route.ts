@@ -185,7 +185,7 @@ export async function GET(
           id: playerId,
           clubId: id,
           isActive: true,
-          ...(coachGroupId ? { coachGroupId } : {}),
+          ...(coachGroupId ? { coachGroups: { some: { id: coachGroupId } } } : {}),
         },
         select: { id: true, fullName: true, teamGroup: true },
       });

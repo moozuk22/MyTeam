@@ -171,7 +171,7 @@ async function getExpectedPlayersForScope(
       ...(scope.type === "teamGroup" ? { teamGroup: scope.teamGroup } : {}),
       ...(scope.type === "trainingGroup" ? { teamGroup: { in: scope.teamGroups ?? [] } } : {}),
       ...(scope.type === "customGroup" ? { customTrainingGroups: { some: { groupId: scope.id } } } : {}),
-      ...(scope.type === "coachGroup" ? { coachGroupId: scope.id } : {}),
+      ...(scope.type === "coachGroup" ? { coachGroups: { some: { id: scope.id } } } : {}),
     },
     select: {
       id: true,

@@ -28,14 +28,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const rawCoachGroupId = (body as { coachGroupId?: unknown }).coachGroupId;
-  const coachGroupId =
-    rawCoachGroupId === null || rawCoachGroupId === undefined
-      ? null
-      : String(rawCoachGroupId).trim() || null;
+  const rawIds = (body as { coachGroupIds?: unknown }).coachGroupIds;
+  if (!Array.isArray(rawIds)) {
+    return NextResponse.json({ error: "coachGroupIds must be an array" }, { status: 400 });
+  }
 
-  if (coachGroupId !== null && !UUID_REGEX.test(coachGroupId)) {
-    return NextResponse.json({ error: "Invalid coachGroupId" }, { status: 400 });
+  const coachGroupIds = rawIds.map((v) => String(v ?? "").trim()).filter(Boolean);
+  for (const gid of coachGroupIds) {
+    if (!UUID_REGEX.test(gid)) {
+      return NextResponse.json({ error: `Invalid coachGroupId: ${gid}` }, { status: 400 });
+    }
   }
 
   const player = await prisma.player.findUnique({
@@ -47,20 +49,20 @@ export async function PATCH(
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  if (coachGroupId !== null) {
-    const groupExists = await prisma.coachGroup.findFirst({
-      where: { id: coachGroupId, clubId: player.clubId },
+  if (coachGroupIds.length > 0) {
+    const validGroups = await prisma.coachGroup.findMany({
+      where: { id: { in: coachGroupIds }, clubId: player.clubId },
       select: { id: true },
     });
-    if (!groupExists) {
-      return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
+    if (validGroups.length !== coachGroupIds.length) {
+      return NextResponse.json({ error: "One or more coach groups not found" }, { status: 404 });
     }
   }
 
   await prisma.player.update({
     where: { id },
-    data: { coachGroupId },
+    data: { coachGroups: { set: coachGroupIds.map((gid) => ({ id: gid })) } },
   });
 
-  return NextResponse.json({ success: true, id, coachGroupId });
+  return NextResponse.json({ success: true, id, coachGroupIds });
 }

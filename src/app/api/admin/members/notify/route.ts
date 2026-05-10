@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         id: { in: memberIds },
         clubId,
         isActive: true,
-        ...(coachGroupId ? { coachGroupId } : {}),
+        ...(coachGroupId ? { coachGroups: { some: { id: coachGroupId } } } : {}),
       },
       select: {
         id: true,

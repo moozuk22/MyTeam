@@ -17,6 +17,10 @@ type PlayerImageRecord = {
   isAdminView: boolean;
 };
 
+function normalizePlayerName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("bg-BG");
+}
+
 function getPrimaryPlayerImagePath(images: PlayerImageRecord[]): string | null {
   const adminImage = images.find((image) => image.isAdminView);
   return adminImage?.imageUrl ?? images[0]?.imageUrl ?? null;
@@ -152,6 +156,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid birthDate" }, { status: 400 });
     }
 
+    const confirmDuplicate = body.confirmDuplicate === true;
+    if (!confirmDuplicate) {
+      const duplicateCandidates = await prisma.player.findMany({
+        where: {
+          clubId,
+          birthDate,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          fullName: true,
+          birthDate: true,
+        },
+      });
+      const normalizedFullName = normalizePlayerName(fullName);
+      const duplicatePlayer = duplicateCandidates.find(
+        (player) => normalizePlayerName(player.fullName) === normalizedFullName,
+      );
+
+      if (duplicatePlayer) {
+        return NextResponse.json(
+          {
+            error: "duplicate_player",
+            message: "An active player with the same name and birth date already exists.",
+            duplicatePlayer,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const lastPaymentDate = parseDate(body.lastPaymentDate);
     if (body.lastPaymentDate && !lastPaymentDate) {
       return NextResponse.json({ error: "Invalid lastPaymentDate" }, { status: 400 });
@@ -175,6 +210,7 @@ export async function POST(request: NextRequest) {
       }
       coachGroupId = rawCoachGroupId;
     }
+    const coachGroupConnect = coachGroupId ? { connect: [{ id: coachGroupId }] } : undefined;
 
     let createdPlayer = null;
     let lastError: unknown = null;
@@ -194,7 +230,7 @@ export async function POST(request: NextRequest) {
             birthDate,
             teamGroup,
             lastPaymentDate,
-            coachGroupId,
+            coachGroups: coachGroupConnect,
             firstBillingMonth: resolvedFirstBillingMonth,
             ...(adminImagePath
               ? {
@@ -318,7 +354,7 @@ export async function GET(request: NextRequest) {
       prisma.player.findMany({
       where: {
         ...(clubId ? { clubId } : {}),
-        ...(coachGroupId ? { coachGroupId } : {}),
+        ...(coachGroupId ? { coachGroups: { some: { id: coachGroupId } } } : {}),
       },
       select: {
         id: true,
@@ -332,7 +368,7 @@ export async function GET(request: NextRequest) {
         teamGroup: true,
         lastPaymentDate: true,
         isActive: true,
-        coachGroupId: true,
+        coachGroups: { select: { id: true } },
         club: {
           select: {
             id: true,
@@ -389,9 +425,11 @@ export async function GET(request: NextRequest) {
     const normalizedPlayers = players.map((player) => {
       const imagePath = getPrimaryPlayerImagePath(player.images);
       const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
+      const { coachGroups, ...rest } = player;
       return {
-        ...player,
-        status: waivedDates.length > 0 ? "paused" : player.status,
+        ...rest,
+        coachGroupIds: coachGroups.map((g) => g.id),
+        status: waivedDates.length > 0 ? "paused" : rest.status,
         imageUrl: imagePath,
         avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
         imagePublicId: null,
