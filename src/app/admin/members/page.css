@@ -2525,6 +2525,7 @@
 
 .amp-coach-group-nav-list {
   display: flex;
+  flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
 }
