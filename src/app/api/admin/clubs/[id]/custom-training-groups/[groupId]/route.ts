@@ -344,7 +344,7 @@ export async function PATCH(
       });
       if (hasPlayerIds) {
         await tx.clubCustomTrainingGroupPlayer.deleteMany({
-          where: { OR: [{ groupId }, { playerId: { in: playerIds } }] },
+          where: { groupId },
         });
         if (playerIds.length > 0) {
           await tx.clubCustomTrainingGroupPlayer.createMany({
@@ -386,6 +386,7 @@ export async function PATCH(
       hasTrainingDuration ||
       hasTrainingField ||
       hasTrainingFieldPiece ||
+      hasPlayerIds ||
       hasTrainingFieldSelections
     ) {
       const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);

@@ -139,6 +139,33 @@ type CoachGroupSchedule = {
   trainingFieldSelections: unknown;
 };
 
+type CustomGroupSchedule = CoachGroupSchedule;
+
+function mergeScheduleDates(groups: Array<{ trainingDates: string[] }>) {
+  return [...new Set(groups.flatMap((g) => g.trainingDates))].sort();
+}
+
+function mergeScheduleWeekdays(groups: Array<{ trainingWeekdays: number[] }>) {
+  return [...new Set(groups.flatMap((g) => g.trainingWeekdays))];
+}
+
+function mergeStoredTrainingDateTimes(
+  groups: Array<{ trainingDates: string[]; trainingDateTimes: unknown }>,
+  trainingDates: string[],
+) {
+  const result: Record<string, string> = {};
+  const allowedDates = new Set(trainingDates);
+  for (const group of groups) {
+    const groupDateTimes = normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates);
+    for (const [date, time] of Object.entries(groupDateTimes)) {
+      if (allowedDates.has(date) && !result[date]) {
+        result[date] = time;
+      }
+    }
+  }
+  return result;
+}
+
 function resolveCoachGroupForDate(
   groups: CoachGroupSchedule[],
   date: string,
@@ -186,6 +213,7 @@ async function getMemberTrainingContext(cardCode: string) {
             select: {
               group: {
                 select: {
+                  id: true,
                   trainingDates: true,
                   trainingDateTimes: true,
                   trainingTime: true,
@@ -223,24 +251,26 @@ async function getMemberTrainingContext(cardCode: string) {
   }
 
   const isCustomGroupMode = card.player.club.trainingGroupMode === "custom_group";
-  const customGroup = isCustomGroupMode
-    ? card.player.customTrainingGroups[0]?.group ?? null
-    : null;
+  const scheduledCustomGroups: CustomGroupSchedule[] = isCustomGroupMode
+    ? card.player.customTrainingGroups
+        .map((item) => item.group)
+        .filter((g) => g.trainingDates.length > 0 || g.trainingWeekdays.length > 0)
+    : [];
+  const hasCustomGroupSchedule = scheduledCustomGroups.length > 0;
 
   const scheduledCoachGroups: CoachGroupSchedule[] = card.player.coachGroups.filter(
     (g) => g.trainingDates.length > 0 || g.trainingWeekdays.length > 0,
   );
-  const hasCoachGroupSchedule = scheduledCoachGroups.length > 0;
+  const hasCoachGroupSchedule = !hasCustomGroupSchedule && scheduledCoachGroups.length > 0;
 
   // Merge training dates and weekdays from all coach groups
-  const mergedCoachDates = hasCoachGroupSchedule
-    ? [...new Set(scheduledCoachGroups.flatMap((g) => g.trainingDates))].sort()
-    : [];
-  const mergedCoachWeekdays = hasCoachGroupSchedule
-    ? [...new Set(scheduledCoachGroups.flatMap((g) => g.trainingWeekdays))]
-    : [];
+  const mergedCoachDates = hasCoachGroupSchedule ? mergeScheduleDates(scheduledCoachGroups) : [];
+  const mergedCoachWeekdays = hasCoachGroupSchedule ? mergeScheduleWeekdays(scheduledCoachGroups) : [];
   // Use first scheduled coach group as primary source for time/duration/field
   const primaryCoachGroup = hasCoachGroupSchedule ? scheduledCoachGroups[0] : null;
+  const mergedCustomDates = hasCustomGroupSchedule ? mergeScheduleDates(scheduledCustomGroups) : [];
+  const mergedCustomWeekdays = hasCustomGroupSchedule ? mergeScheduleWeekdays(scheduledCustomGroups) : [];
+  const primaryCustomGroup = hasCustomGroupSchedule ? scheduledCustomGroups[0] : null;
 
   const groupSchedule = hasCoachGroupSchedule || card.player.teamGroup === null
     ? null
@@ -295,8 +325,10 @@ async function getMemberTrainingContext(cardCode: string) {
   const trainingWeekdays = (
     hasCoachGroupSchedule
       ? mergedCoachWeekdays
+      : hasCustomGroupSchedule
+        ? mergedCustomWeekdays
       : isCustomGroupMode
-        ? customGroup?.trainingWeekdays ?? []
+        ? []
         : trainingGroupOverride?.trainingWeekdays ?? groupSchedule?.trainingWeekdays ?? card.player.club.trainingWeekdays ?? []
   )
     .filter((value) => Number.isInteger(value) && value >= 1 && value <= 7)
@@ -306,33 +338,41 @@ async function getMemberTrainingContext(cardCode: string) {
   const upcomingDates = getConfiguredTrainingDates({
     trainingDates: hasCoachGroupSchedule
       ? mergedCoachDates
+      : hasCustomGroupSchedule
+        ? mergedCustomDates
       : isCustomGroupMode
-        ? customGroup?.trainingDates ?? []
+        ? []
         : trainingGroupOverride?.trainingDates ?? groupSchedule?.trainingDates ?? card.player.club.trainingDates ?? [],
     weekdays: trainingWeekdays,
     windowDays: hasCoachGroupSchedule
       ? (primaryCoachGroup?.trainingWindowDays ?? trainingWindowDays)
+      : hasCustomGroupSchedule
+        ? (primaryCustomGroup?.trainingWindowDays ?? trainingWindowDays)
       : isCustomGroupMode
-        ? customGroup?.trainingWindowDays ?? trainingWindowDays
+        ? trainingWindowDays
         : trainingGroupOverride?.trainingWindowDays ?? groupSchedule?.trainingWindowDays ?? card.player.club.trainingWindowDays ?? trainingWindowDays,
     timeZone: FIXED_TIME_ZONE,
     maxDays: TRAINING_SELECTION_WINDOW_DAYS,
   });
-  const scheduleDateTimes = normalizeStoredTrainingDateTimes(
-    hasCoachGroupSchedule
-      ? primaryCoachGroup!.trainingDateTimes
-      : isCustomGroupMode
-        ? customGroup?.trainingDateTimes
-        : trainingGroupOverride?.trainingDateTimes ??
-          groupSchedule?.trainingDateTimes ??
-          card.player.club.trainingDateTimes,
-    upcomingDates,
-  );
+  const scheduleDateTimes = hasCustomGroupSchedule
+    ? mergeStoredTrainingDateTimes(scheduledCustomGroups, upcomingDates)
+    : normalizeStoredTrainingDateTimes(
+        hasCoachGroupSchedule
+          ? primaryCoachGroup!.trainingDateTimes
+          : isCustomGroupMode
+            ? null
+            : trainingGroupOverride?.trainingDateTimes ??
+              groupSchedule?.trainingDateTimes ??
+              card.player.club.trainingDateTimes,
+        upcomingDates,
+      );
   const scheduleFallbackTime = safeNormalizeTrainingTime(
     hasCoachGroupSchedule
       ? primaryCoachGroup!.trainingTime
+      : hasCustomGroupSchedule
+        ? primaryCustomGroup?.trainingTime
       : isCustomGroupMode
-        ? customGroup?.trainingTime
+        ? null
         : trainingGroupOverride?.trainingTime ??
           groupSchedule?.trainingTime ??
           card.player.club.trainingTime ??
@@ -341,16 +381,20 @@ async function getMemberTrainingContext(cardCode: string) {
   const scheduleDurationMinutes =
     hasCoachGroupSchedule
       ? primaryCoachGroup!.trainingDurationMinutes
+      : hasCustomGroupSchedule
+        ? primaryCustomGroup?.trainingDurationMinutes ?? card.player.club.trainingDurationMinutes
       : isCustomGroupMode
-        ? customGroup?.trainingDurationMinutes ?? card.player.club.trainingDurationMinutes
+        ? card.player.club.trainingDurationMinutes
         : trainingGroupOverride?.trainingDurationMinutes ??
           groupSchedule?.trainingDurationMinutes ??
           card.player.club.trainingDurationMinutes;
 
   const scheduleFieldSource = hasCoachGroupSchedule
     ? primaryCoachGroup!
+    : hasCustomGroupSchedule
+      ? primaryCustomGroup!
     : isCustomGroupMode
-      ? customGroup ?? card.player.club
+      ? card.player.club
       : trainingGroupOverride ?? groupSchedule ?? card.player.club;
 
   return {

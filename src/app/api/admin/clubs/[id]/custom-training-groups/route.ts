@@ -301,7 +301,6 @@ export async function POST(
         select: { id: true },
       });
       if (playerIds.length > 0) {
-        await tx.clubCustomTrainingGroupPlayer.deleteMany({ where: { playerId: { in: playerIds } } });
         await tx.clubCustomTrainingGroupPlayer.createMany({
           data: playerIds.map((playerId) => ({ groupId: group.id, playerId })),
         });

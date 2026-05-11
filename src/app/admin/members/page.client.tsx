@@ -1617,18 +1617,11 @@ function AdminMembersPageContent() {
     acc[group.id] = group.playerIds.filter((id) => activeMemberIdSet.has(id)).length;
     return acc;
   }, {});
-  const customTrainingGroupAssignedPlayerIds = new Set(customTrainingGroups.flatMap((group) => group.playerIds));
-  const customTrainingGroupEditPlayerIdsSet = new Set(trainingGroupEditPlayerIds);
-  const customTrainingGroupEditOriginalPlayerIds = new Set(
-    customTrainingGroups.find((g) => g.id === trainingGroupEditId)?.playerIds ?? [],
-  );
   const availablePlayersForCustomGroupCreate = members.filter(
-    (member) => member.isActive && !customTrainingGroupAssignedPlayerIds.has(member.id),
+    (member) => member.isActive,
   );
   const availablePlayersForCustomGroupEdit = members.filter(
-    (member) =>
-      member.isActive &&
-      (!customTrainingGroupAssignedPlayerIds.has(member.id) || customTrainingGroupEditOriginalPlayerIds.has(member.id)),
+    (member) => member.isActive,
   );
   const filteredPlayersForCustomGroupCreate = customGroupCreateSearch.trim()
     ? availablePlayersForCustomGroupCreate.filter((m) =>

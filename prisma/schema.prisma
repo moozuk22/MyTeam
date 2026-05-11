@@ -257,8 +257,8 @@ model ClubCustomTrainingGroupPlayer {
   player    Player                  @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@id([groupId, playerId])
-  @@unique([playerId])
   @@index([groupId])
+  @@index([playerId])
   @@map("club_custom_training_group_players")
 }
 
