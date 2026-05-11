@@ -5732,7 +5732,41 @@ function AdminMembersPageContent() {
                     />
                   </label>
                   <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
-                    <span className="amp-lbl">Играчите в групата</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <span className="amp-lbl" style={{ margin: 0 }}>Играчите в групата</span>
+                      {availablePlayersForCustomGroupEdit.length > 0 ? (
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost amp-btn--compact"
+                          disabled={trainingGroupEditSaving}
+                          onClick={() => {
+                            const ids = availablePlayersForCustomGroupEdit.map((m) => m.id);
+                            const allSelected =
+                              ids.length > 0 && ids.every((id) => trainingGroupEditPlayerIds.includes(id));
+                            if (allSelected) {
+                              setTrainingGroupEditPlayerIds((prev) => prev.filter((id) => !ids.includes(id)));
+                            } else {
+                              setTrainingGroupEditPlayerIds((prev) => [...new Set([...prev, ...ids])]);
+                            }
+                          }}
+                        >
+                          {availablePlayersForCustomGroupEdit.every((m) =>
+                            trainingGroupEditPlayerIds.includes(m.id),
+                          )
+                            ? "Премахни всички"
+                            : "Избери всички"}
+                        </button>
+                      ) : null}
+                    </div>
                     <input
                       className="amp-edit-input"
                       type="search"
@@ -5890,7 +5924,41 @@ function AdminMembersPageContent() {
                     />
                   </label>
                   <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
-                    <span className="amp-lbl">Играчите в групата</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <span className="amp-lbl" style={{ margin: 0 }}>Играчите в групата</span>
+                      {availablePlayersForCustomGroupCreate.length > 0 ? (
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost amp-btn--compact"
+                          disabled={trainingGroupCreateSaving}
+                          onClick={() => {
+                            const ids = availablePlayersForCustomGroupCreate.map((m) => m.id);
+                            const allSelected =
+                              ids.length > 0 && ids.every((id) => trainingGroupCreatePlayerIds.includes(id));
+                            if (allSelected) {
+                              setTrainingGroupCreatePlayerIds((prev) => prev.filter((id) => !ids.includes(id)));
+                            } else {
+                              setTrainingGroupCreatePlayerIds((prev) => [...new Set([...prev, ...ids])]);
+                            }
+                          }}
+                        >
+                          {availablePlayersForCustomGroupCreate.every((m) =>
+                            trainingGroupCreatePlayerIds.includes(m.id),
+                          )
+                            ? "Премахни всички"
+                            : "Избери всички"}
+                        </button>
+                      ) : null}
+                    </div>
                     <input
                       className="amp-edit-input"
                       type="search"
