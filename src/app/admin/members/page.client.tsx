@@ -4037,7 +4037,17 @@ function AdminMembersPageContent() {
           {isAdmin && (
             <button
               className="amp-back-btn amp-btn--compact"
-              onClick={() => router.push("/admin/players")}
+              onClick={() => {
+                if (coachGroupId && clubId) {
+                  router.push(`/admin/members?clubId=${encodeURIComponent(clubId)}`);
+                  return;
+                }
+                if (clubId) {
+                  router.push(`/admin/members?clubId=${encodeURIComponent(clubId)}`);
+                  return;
+                }
+                router.push("/admin/players");
+              }}
             >
               <ArrowLeftIcon />
               <span>Назад</span>
@@ -4208,7 +4218,7 @@ function AdminMembersPageContent() {
               >
                 <span>Такси</span>
               </button>
-              {canManageMemberActions && (
+              {canManageMemberActions && !coachGroupId && (
                 <>
               <button
                 className="amp-edit-team-btn amp-btn--compact"

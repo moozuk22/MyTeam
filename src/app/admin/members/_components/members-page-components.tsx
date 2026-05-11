@@ -1823,7 +1823,7 @@ function MemberDetailModal({
                         value={coachNoteDraft}
                         onChange={(e) => setCoachNoteDraft(e.target.value)}
                         placeholder="Напиши инструкции/наблюдения за играча..."
-                        rows={10}
+                        rows={6}
                         style={{
                           width: "100%",
                           minHeight: "100px",
@@ -2094,11 +2094,11 @@ function PlayerCard({
             <span className="amp-badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
               {s.label}
             </span>
-            {coachGroupName && (
+            {/* {coachGroupName && (
               <span className="amp-badge" style={{ color: "#6366f1", background: "#ede9fe", border: "1px solid #c4b5fd", fontSize: "0.7rem" }}>
                 {coachGroupName}
               </span>
-            )}
+            )} */}
           </div>
         </div>
 
