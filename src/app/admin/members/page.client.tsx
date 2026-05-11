@@ -4678,68 +4678,6 @@ function AdminMembersPageContent() {
                     onChange={(e) => setEditForm((prev) => ({ ...prev, birthDate: e.target.value }))}
                   />
                 </label>
-                {isAdmin && coachGroups.length > 0 && (
-                  <div className="amp-edit-field">
-                    <span className="amp-lbl">Група треньор</span>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "6px" }}>
-                      {coachGroups.map((g) => {
-                        const currentIds = memberCoachGroupAssignValue ?? memberToEdit.coachGroupIds;
-                        return (
-                          <label key={g.id} style={{ display: "flex", alignItems: "center", gap: "6px", cursor: memberCoachGroupAssignSaving ? "not-allowed" : "pointer" }}>
-                            <input
-                              type="checkbox"
-                              disabled={memberCoachGroupAssignSaving}
-                              checked={currentIds.includes(g.id)}
-                              onChange={(e) => {
-                                const base = memberCoachGroupAssignValue ?? [...memberToEdit.coachGroupIds];
-                                setMemberCoachGroupAssignValue(
-                                  e.target.checked ? [...base, g.id] : base.filter((id) => id !== g.id)
-                                );
-                              }}
-                            />
-                            {g.name}
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      className="amp-btn amp-btn--ghost amp-btn--compact"
-                      disabled={memberCoachGroupAssignSaving}
-                      onClick={async () => {
-                        if (!memberToEdit) return;
-                        setMemberCoachGroupAssignSaving(true);
-                        setMemberCoachGroupAssignError("");
-                        try {
-                          const nextIds = memberCoachGroupAssignValue ?? memberToEdit.coachGroupIds;
-                          const response = await fetch(`/api/admin/members/${memberToEdit.id}/coach-group`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ coachGroupIds: nextIds }),
-                          });
-                          if (!response.ok) {
-                            const payload = await response.json().catch(() => ({}));
-                            throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
-                          }
-                          setMembers((prev) => prev.map((m) => m.id === memberToEdit.id ? { ...m, coachGroupIds: nextIds } : m));
-                          setSelectedMember((prev) => prev?.id === memberToEdit.id ? { ...prev, coachGroupIds: nextIds } : prev);
-                          setMemberToEdit((prev) => prev ? { ...prev, coachGroupIds: nextIds } : prev);
-                          setMemberCoachGroupAssignValue(null);
-                          void loadCoachGroups();
-                        } catch (err) {
-                          setMemberCoachGroupAssignError(err instanceof Error ? err.message : "Грешка");
-                        } finally {
-                          setMemberCoachGroupAssignSaving(false);
-                        }
-                      }}
-                    >
-                      Запази
-                    </button>
-                    {memberCoachGroupAssignError && (
-                      <p className="amp-error" style={{ marginTop: "4px" }}>{memberCoachGroupAssignError}</p>
-                    )}
-                  </div>
-                )}
                 <label className="amp-edit-field amp-edit-field--full">
                   <span className="amp-lbl">Текуща снимка</span>
                   {editAvatarPreviewUrl || editForm.avatarUrl ? (
