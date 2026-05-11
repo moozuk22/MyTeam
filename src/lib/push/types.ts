@@ -6,7 +6,8 @@ export type NotificationTemplateType =
   | "trainer_message"
   | "monthly_membership_payment_reminder"
   | "monthly_overdue_payment_reminder"
-  | "admin_message";
+  | "admin_message"
+  | "member_push_enabled";
 
 export interface PushNotificationPayload {
   title: string;

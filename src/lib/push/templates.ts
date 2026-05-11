@@ -86,6 +86,18 @@ export function buildNotificationPayload(
         tag: "admin-message",
         data: { type: input.type },
       };
+    case "member_push_enabled":
+      return {
+        title: "Известия са активирани",
+        body: memberPrefix
+          ? `${memberPrefix}Включи известия на телефона.`
+          : "Играч включи известия на телефона.",
+        url,
+        icon: DEFAULT_ICON,
+        badge: DEFAULT_ICON,
+        tag: "member-push-enabled",
+        data: { type: input.type },
+      };
     case "monthly_overdue_payment_reminder":
       return {
         title: "Просрочие",

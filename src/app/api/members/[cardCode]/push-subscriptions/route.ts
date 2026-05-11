@@ -5,6 +5,7 @@ import {
   deactivatePushSubscription,
   savePushSubscription,
 } from "@/lib/push/service";
+import { notifyMemberPushEnabled } from "@/lib/push/notifyMemberPushEnabled";
 import { parseBrowserPushSubscription } from "@/lib/push/validation";
 
 export const runtime = "nodejs";
@@ -51,12 +52,28 @@ export async function POST(
     const userAgent = request.headers.get("user-agent");
     const device = inferDeviceLabel(userAgent);
 
+    const existing = await prisma.pushSubscription.findUnique({
+      where: { endpoint: subscription.endpoint },
+      select: { playerId: true, isActive: true },
+    });
+
     const saved = await savePushSubscription({
       memberId: card.playerId,
       subscription,
       userAgent,
       device,
     });
+
+    const shouldNotifyAdmins =
+      !existing || !existing.isActive || existing.playerId !== card.playerId;
+
+    if (shouldNotifyAdmins) {
+      try {
+        await notifyMemberPushEnabled({ playerId: card.playerId });
+      } catch (notifyError) {
+        console.error("notifyMemberPushEnabled error:", notifyError);
+      }
+    }
 
     return NextResponse.json({
       success: true,
