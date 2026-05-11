@@ -267,6 +267,7 @@ export async function PUT(
       trainingDateTimes,
       trainingDurationMinutes,
       exclude: { type: "coachGroup", id: groupId },
+      ignoreFieldResourceSchedules: hasTrainingFields,
     });
   } catch (err) {
     return NextResponse.json(

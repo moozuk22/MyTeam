@@ -14,7 +14,13 @@ import {
   shouldNotifyForTrainingDatesChange,
 } from "@/lib/push/trainingScheduleNotifications";
 import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, checkTrainingAwayMatchConflict } from "@/lib/trainingFieldConflicts";
-import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
+import {
+  clubHasTrainingFields,
+  parseTrainingFieldSelection,
+  parseTrainingFieldSelectionsByDate,
+  verifyTrainingFieldSelection,
+  verifyTrainingFieldSelectionsByDate,
+} from "@/lib/trainingFields";
 import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
@@ -212,9 +218,11 @@ export async function POST(
   const rawTrainingDurationMinutes = (body as { trainingDurationMinutes?: unknown }).trainingDurationMinutes;
   const rawTrainingFieldId = (body as { trainingFieldId?: unknown }).trainingFieldId;
   const rawTrainingFieldPieceId = (body as { trainingFieldPieceIds?: unknown }).trainingFieldPieceIds;
+  const rawTrainingFieldSelections = (body as { trainingFieldSelections?: unknown }).trainingFieldSelections;
   let trainingTime: string | null = null;
   let trainingDurationMinutes = 60;
   let trainingFieldSelection = { trainingFieldId: null as string | null, trainingFieldPieceIds: [] as string[] };
+  let trainingFieldSelections: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }> = {};
   let trainingDates: string[] = [];
   let trainingDateTimes: Record<string, string> = {};
   try {
@@ -238,6 +246,14 @@ export async function POST(
       if (hasTrainingFields) {
         await verifyTrainingFieldSelection(id, trainingFieldSelection);
       }
+      trainingFieldSelections = parseTrainingFieldSelectionsByDate({
+        trainingFieldSelections: rawTrainingFieldSelections,
+        trainingDates,
+        fallback: trainingFieldSelection,
+      });
+      if (hasTrainingFields) {
+        await verifyTrainingFieldSelectionsByDate(id, trainingFieldSelections);
+      }
       trainingDateTimes = buildTrainingDateTimes({
         rawTrainingDateTimes,
         trainingDates,
@@ -251,6 +267,7 @@ export async function POST(
           trainingDurationMinutes,
           trainingFieldId: trainingFieldSelection.trainingFieldId,
           trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+          trainingFieldSelections,
         });
       }
       await assertNoTrainingTimeConflict({
@@ -258,6 +275,7 @@ export async function POST(
         trainingDates,
         trainingDateTimes,
         trainingDurationMinutes,
+        ignoreFieldResourceSchedules: hasTrainingFields,
       });
       const matchConflict = await checkTrainingAwayMatchConflict({ clubId: id, trainingDates, trainingDateTimes, durationMinutes: trainingDurationMinutes, teamGroups: [], homeMatchesOnly: true });
       if (matchConflict.blocking) {
@@ -295,6 +313,7 @@ export async function POST(
           trainingDurationMinutes,
           trainingFieldId: trainingFieldSelection.trainingFieldId,
           trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+          trainingFieldSelections,
           trainingWeekdays,
           trainingWindowDays: TRAINING_SELECTION_WINDOW_DAYS,
         },
@@ -314,6 +333,7 @@ export async function POST(
         trainingDurationMinutes,
         trainingFieldId: trainingFieldSelection.trainingFieldId,
         trainingFieldPieceIds: trainingFieldSelection.trainingFieldPieceIds,
+        trainingFieldSelections,
         todayIso: getTodayIsoDateInTimeZone(FIXED_TIME_ZONE),
       });
       return tx.clubCustomTrainingGroup.findUniqueOrThrow({

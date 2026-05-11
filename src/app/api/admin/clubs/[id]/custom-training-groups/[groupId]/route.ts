@@ -287,6 +287,7 @@ export async function PATCH(
           trainingDateTimes: nextTrainingDateTimes,
           trainingDurationMinutes: nextTrainingDurationMinutes,
           exclude: { type: "customGroup", id: groupId },
+          ignoreFieldResourceSchedules: hasTrainingFields,
         });
         const matchConflict = await checkTrainingAwayMatchConflict({ clubId, trainingDates: nextTrainingDates, trainingDateTimes: nextTrainingDateTimes, durationMinutes: nextTrainingDurationMinutes, teamGroups: [], homeMatchesOnly: true });
         if (matchConflict.blocking) {

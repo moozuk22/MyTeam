@@ -263,6 +263,7 @@ export async function POST(
         trainingDateTimes,
         trainingDurationMinutes,
         excludeTeamGroups: teamGroups,
+        ignoreFieldResourceSchedules: hasTrainingFields,
       });
       const matchConflict = await checkTrainingAwayMatchConflict({ clubId: id, trainingDates, trainingDateTimes, durationMinutes: trainingDurationMinutes, teamGroups });
       if (matchConflict.blocking) return NextResponse.json({ error: matchConflict.blocking }, { status: 400 });

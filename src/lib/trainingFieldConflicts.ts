@@ -552,6 +552,7 @@ export async function assertNoTrainingTimeConflict(input: {
   trainingDurationMinutes: number;
   exclude?: TrainingFieldConflictInput["exclude"];
   excludeTeamGroups?: number[];
+  ignoreFieldResourceSchedules?: boolean;
 }): Promise<void> {
   if (input.trainingDates.length === 0) return;
 
@@ -570,6 +571,9 @@ export async function assertNoTrainingTimeConflict(input: {
     const scheduleDateTimes = normalizeStoredDateTimes(schedule.trainingDateTimes);
     for (const date of relevantDates) {
       if (!schedule.trainingDates.includes(date)) continue;
+      if (input.ignoreFieldResourceSchedules && getFieldSelectionForDate(schedule, date).trainingFieldId) {
+        continue;
+      }
       const nextStart = parseTimeToMinutes(input.trainingDateTimes[date] ?? "");
       const existingStart = parseTimeToMinutes(scheduleDateTimes[date] ?? "");
       if (nextStart === null || existingStart === null) continue;

@@ -451,6 +451,7 @@ export async function PUT(
           ? { type: "club" }
           : { type: "teamGroup", teamGroup },
         excludeTeamGroups: teamGroup === null ? [] : [teamGroup],
+        ignoreFieldResourceSchedules: hasTrainingFields,
       });
       const matchConflict = await checkTrainingAwayMatchConflict({ clubId: id, trainingDates, trainingDateTimes, durationMinutes: trainingDurationMinutes, teamGroups: teamGroup !== null ? [teamGroup] : [] });
       if (matchConflict.blocking) return NextResponse.json({ error: matchConflict.blocking }, { status: 400 });

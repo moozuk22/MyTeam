@@ -367,6 +367,7 @@ export async function PATCH(
           trainingDurationMinutes: nextTrainingDurationMinutes,
           exclude: { type: "trainingGroup", id: groupId },
           excludeTeamGroups: nextTeamGroups,
+          ignoreFieldResourceSchedules: hasTrainingFields,
         });
         const matchConflict = await checkTrainingAwayMatchConflict({ clubId, trainingDates: finalTrainingDates, trainingDateTimes: finalTrainingDateTimes, durationMinutes: nextTrainingDurationMinutes, teamGroups: nextTeamGroups });
         if (matchConflict.blocking) return NextResponse.json({ error: matchConflict.blocking }, { status: 400 });
