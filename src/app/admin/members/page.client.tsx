@@ -1460,7 +1460,7 @@ function AdminMembersPageContent() {
     void fetchMembers();
     void fetchClubName();
     void loadCoachGroups();
-  }, [clubId, router]);
+  }, [clubId, coachGroupId, router]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -4032,10 +4032,6 @@ function AdminMembersPageContent() {
               className="amp-back-btn amp-btn--compact"
               onClick={() => {
                 if (coachGroupId && clubId) {
-                  router.push(`/admin/members?clubId=${encodeURIComponent(clubId)}`);
-                  return;
-                }
-                if (clubId) {
                   router.push(`/admin/members?clubId=${encodeURIComponent(clubId)}`);
                   return;
                 }
