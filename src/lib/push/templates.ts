@@ -90,8 +90,8 @@ export function buildNotificationPayload(
       return {
         title: "Известия са активирани",
         body: memberPrefix
-          ? `${memberPrefix}Включи известия на телефона.`
-          : "Играч включи известия на телефона.",
+          ? `${memberPrefix}Включи известия на телефона (PWA).`
+          : "Играч включи известия на телефона (PWA).",
         url,
         icon: DEFAULT_ICON,
         badge: DEFAULT_ICON,
