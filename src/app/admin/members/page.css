@@ -2611,6 +2611,14 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.amp-training-plans-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .amp-btn--danger {
   background: rgba(255, 77, 77, 0.18);
   border: 1px solid rgba(255, 77, 77, 0.5);

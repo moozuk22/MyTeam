@@ -61,6 +61,7 @@ model Club {
   billingActivatedAt      DateTime?                   @map("billing_activated_at") @db.Timestamptz(6)
   discountConfigs         TeamDiscountConfig[]
   matches                 ClubMatch[]
+  trainingPlans           TrainingPlan[]
 
   @@map("clubs")
 }
@@ -353,6 +354,23 @@ model ClubMatch {
   @@index([clubId])
   @@index([matchDate])
   @@map("club_matches")
+}
+
+model TrainingPlan {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId          String   @map("club_id") @db.Uuid
+  title           String
+  description     String?
+  layout          Json
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([clubId])
+  @@map("training_plans")
 }
 
 model Image {
