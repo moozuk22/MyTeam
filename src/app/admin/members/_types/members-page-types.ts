@@ -70,6 +70,8 @@ interface Member {
   status: PlayerStatus;
   teamGroup: number | null;
   coachGroupIds: string[];
+  /** Palette hex colors for custom training groups this player belongs to */
+  customTrainingGroupColors: string[];
   jerseyNumber: string | null;
   parentPhone: string | null;
   playerPhone: string | null;
@@ -126,6 +128,7 @@ interface TrainingScheduleGroup {
 interface CustomTrainingGroup {
   id: string;
   name: string;
+  color?: string | null;
   playerIds: string[];
   coachGroupId?: string | null;
   trainingDates: string[];
@@ -178,6 +181,8 @@ interface TrainingWeekSessionItem {
   eventType?: "training" | "match";
   label: string;
   teamGroups: number[];
+  /** Custom training group palette hex when `trainingGroupMode` is custom_group */
+  color?: string | null;
   location?: string;
   scopeLabel?: string;
   isHome?: boolean;

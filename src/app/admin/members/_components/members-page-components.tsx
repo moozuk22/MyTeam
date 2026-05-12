@@ -2080,19 +2080,23 @@ function PlayerCard({
     member.cards.find((card) => card.isActive)?.cardCode ||
     member.nfcTagId ||
     "";
+  const groupDots = member.customTrainingGroupColors ?? [];
 
   return (
     <div className="pc-card" onClick={onClick}>
       <div className="pc-shimmer" aria-hidden="true" />
       <div className="pc-content">
-        {/* Avatar */}
-        {member.avatarUrl ? (
-          <img src={member.avatarUrl} alt={member.fullName} className="pc-avatar pc-avatar--img" />
-        ) : (
-          <div className="pc-avatar" style={{ color: s.color, background: s.bg, borderColor: s.border }}>
-            <span className="pc-avatar-letter">{initial}</span>
-          </div>
-        )}
+        <div className="pc-avatar-stack">
+          {/* Avatar */}
+          {member.avatarUrl ? (
+            <img src={member.avatarUrl} alt={member.fullName} className="pc-avatar pc-avatar--img" />
+          ) : (
+            <div className="pc-avatar" style={{ color: s.color, background: s.bg, borderColor: s.border }}>
+              <span className="pc-avatar-letter">{initial}</span>
+            </div>
+          )}
+         
+        </div>
 
         {/* Name + badge */}
         <div className="pc-info">
@@ -2125,6 +2129,13 @@ function PlayerCard({
             >
               профил
             </button>
+          )}
+           {groupDots.length > 0 && (
+            <div className="pc-custom-group-dots" aria-label="Цветове на тренировъчни групи" title="Тренировъчни групи">
+              {groupDots.map((hex, dotIndex) => (
+                <span key={`${hex}-${dotIndex}`} className="pc-custom-group-dot" style={{ backgroundColor: hex }} />
+              ))}
+            </div>
           )}
 
         </div>

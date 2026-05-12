@@ -136,6 +136,7 @@ model ClubCustomTrainingGroup {
   id                      String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clubId                  String                          @map("club_id") @db.Uuid
   coachGroupId            String?                         @map("coach_group_id") @db.Uuid
+  color                   String?                         @map("color")
   name                    String
   trainingWeekdays        Int[]                           @default([]) @map("training_weekdays")
   trainingDates           String[]                        @default([]) @map("training_dates")

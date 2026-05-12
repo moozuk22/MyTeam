@@ -1,4 +1,5 @@
 import type { Member, MemberCard, PaymentLog, PlayerStatus, StatusMeta, TrainingFieldSelection, TrainingTimeMode } from "../_types/members-page-types";
+import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
 
 // Reports-related imports
 const MONTHS = ["Януари", "Февруари", "Март", "Април", "Май", "Юни", "Юли", "Август", "Септември", "Октомври", "Ноември", "Декември"];
@@ -61,6 +62,11 @@ function normalizeMember(item: unknown): Member {
     status,
     teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
     coachGroupIds: Array.isArray(raw.coachGroupIds) ? (raw.coachGroupIds as unknown[]).map((v) => String(v ?? "")).filter(Boolean) : [],
+    customTrainingGroupColors: Array.isArray(raw.customTrainingGroupColors)
+      ? (raw.customTrainingGroupColors as unknown[])
+          .map((v) => String(v ?? "").trim())
+          .filter((c) => isCustomTrainingGroupPaletteColor(c))
+      : [],
     jerseyNumber: raw.jerseyNumber ? String(raw.jerseyNumber) : null,
     parentPhone: raw.parentPhone ? String(raw.parentPhone) : null,
     playerPhone: raw.playerPhone ? String(raw.playerPhone) : null,
