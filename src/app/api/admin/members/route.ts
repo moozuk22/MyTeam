@@ -385,17 +385,13 @@ export async function GET(request: NextRequest) {
         paymentAmount: true,
         isActive: true,
         coachGroups: { select: { id: true } },
-        ...(clubId && isCustomGroupMode
-          ? {
-              customTrainingGroups: {
-                select: {
-                  group: {
-                    select: { color: true },
-                  },
-                },
-              },
-            }
-          : {}),
+        customTrainingGroups: {
+          select: {
+            group: {
+              select: { color: true },
+            },
+          },
+        },
         club: {
           select: {
             id: true,
