@@ -59,6 +59,7 @@ model Club {
   billingStatus           BillingStatus               @default(demo) @map("billing_status")
   firstBillingMonth       DateTime?                   @map("first_billing_month") @db.Timestamptz(6)
   billingActivatedAt      DateTime?                   @map("billing_activated_at") @db.Timestamptz(6)
+  defaultPaymentAmount    Decimal                     @default(0) @map("default_payment_amount") @db.Decimal(10, 2)
   discountConfigs         TeamDiscountConfig[]
   matches                 ClubMatch[]
   trainingPlans           TrainingPlan[]
@@ -245,6 +246,7 @@ model Player {
   customTrainingGroups ClubCustomTrainingGroupPlayer[]
   coachGroups          CoachGroup[]                    @relation("PlayerCoachGroups")
   firstBillingMonth    DateTime?                       @map("first_billing_month") @db.Timestamptz(6)
+  paymentAmount        Decimal                         @default(0) @map("payment_amount") @db.Decimal(10, 2)
 
   @@index([clubId])
   @@map("players")

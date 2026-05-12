@@ -35,6 +35,7 @@ import {
   CalendarIcon,
   ChartColumnIcon,
   PencilIcon,
+  ReceiptIcon,
   UsersIcon,
   ClipboardListIcon,
   DownloadIcon,
@@ -289,6 +290,7 @@ function AdminMembersPageContent() {
     parentPhone: "",
     playerPhone: "",
     birthDate: "",
+    paymentAmount: "",
     avatarUrl: "",
     imageUrl: "",
     imagePublicId: "",
@@ -297,6 +299,12 @@ function AdminMembersPageContent() {
   const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState("");
   const [clubName, setClubName] = useState("Всички отбори");
   const [clubBillingStatus, setClubBillingStatus] = useState<string>("");
+  const [clubDefaultPaymentAmount, setClubDefaultPaymentAmount] = useState("");
+  const [paymentAmountModalOpen, setPaymentAmountModalOpen] = useState(false);
+  const [paymentAmountForm, setPaymentAmountForm] = useState("");
+  const [paymentAmountSaving, setPaymentAmountSaving] = useState(false);
+  const [paymentAmountError, setPaymentAmountError] = useState("");
+  const [paymentAmountSuccess, setPaymentAmountSuccess] = useState("");
   const [clubLogoUrl, setClubLogoUrl] = useState<string | null>(null);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [attendanceDashboardOpen, setAttendanceDashboardOpen] = useState(false);
@@ -659,6 +667,61 @@ function AdminMembersPageContent() {
     setEditAvatarPreviewUrl("");
   };
 
+  const openPaymentAmountModal = () => {
+    setPaymentAmountForm(clubDefaultPaymentAmount || "");
+    setPaymentAmountError("");
+    setPaymentAmountSuccess("");
+    setPaymentAmountModalOpen(true);
+  };
+
+  const closePaymentAmountModal = () => {
+    if (paymentAmountSaving) return;
+    setPaymentAmountModalOpen(false);
+    setPaymentAmountError("");
+    setPaymentAmountSuccess("");
+  };
+
+  const handleSavePaymentAmount = async () => {
+    if (!clubId || paymentAmountSaving) return;
+
+    const normalizedPaymentAmount = paymentAmountForm.trim().replace(",", ".");
+    if (!normalizedPaymentAmount || !/^\d+(\.\d{1,2})?$/.test(normalizedPaymentAmount)) {
+      setPaymentAmountError("Въведете валидна сума с до 2 знака след десетичната запетая.");
+      return;
+    }
+
+    setPaymentAmountSaving(true);
+    setPaymentAmountError("");
+    setPaymentAmountSuccess("");
+
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/payment-amount`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentAmount: normalizedPaymentAmount }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setPaymentAmountError(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно запазване на месечната такса.",
+        );
+        return;
+      }
+
+      setClubDefaultPaymentAmount(normalizedPaymentAmount);
+      setPaymentAmountSuccess("Месечната такса е обновена за клуба и всички играчи.");
+      setMembers((prev) => prev.map((member) => ({ ...member, paymentAmount: normalizedPaymentAmount })));
+    } catch (error) {
+      console.error("Payment amount save error:", error);
+      setPaymentAmountError("Възникна грешка при запазване на месечната такса.");
+    } finally {
+      setPaymentAmountSaving(false);
+    }
+  };
+
   const handleEnableClubNotifications = async () => {
     setClubPushStatusMessage("");
     setClubPushErrorMessage("");
@@ -982,6 +1045,7 @@ function AdminMembersPageContent() {
       parentPhone: member.parentPhone ?? "",
       playerPhone: member.playerPhone ?? "",
       birthDate: member.birthDate ? new Date(member.birthDate).toISOString().slice(0, 10) : "",
+      paymentAmount: member.paymentAmount ?? "",
       avatarUrl: member.avatarUrl ?? "",
       imageUrl: member.imageUrl ?? "",
       imagePublicId: member.imagePublicId ?? "",
@@ -1029,6 +1093,11 @@ function AdminMembersPageContent() {
       setEditError("Player phone is invalid.");
       return;
     }
+    const normalizedPaymentAmount = !coachGroupId ? editForm.paymentAmount.trim().replace(",", ".") : "";
+    if (normalizedPaymentAmount && !/^\d+(\.\d{1,2})?$/.test(normalizedPaymentAmount)) {
+      setEditError("Месечната такса трябва да е положително число с до 2 знака след десетичната запетая.");
+      return;
+    }
 
     setIsSavingEdit(true);
     setEditError("");
@@ -1059,6 +1128,7 @@ function AdminMembersPageContent() {
           parentPhone: editForm.parentPhone.trim() || null,
           playerPhone: editForm.playerPhone.trim() || null,
           birthDate: editForm.birthDate.trim() || null,
+          ...(normalizedPaymentAmount ? { paymentAmount: normalizedPaymentAmount } : {}),
           avatarUrl: resolvedAvatarUrl,
           imageUrl: resolvedImageUrl,
           imagePublicId: resolvedImagePublicId,
@@ -1380,6 +1450,10 @@ function AdminMembersPageContent() {
 
           const billing = (selectedClub as Record<string, unknown>).billingStatus;
           setClubBillingStatus(typeof billing === "string" ? billing : "");
+          const defaultPaymentAmount = (selectedClub as Record<string, unknown>).defaultPaymentAmount;
+          setClubDefaultPaymentAmount(
+            defaultPaymentAmount === null || defaultPaymentAmount === undefined ? "" : String(defaultPaymentAmount),
+          );
 
           const logo = (selectedClub as Record<string, unknown>).imageUrl;
           if (typeof logo === "string" && logo) {
@@ -1390,6 +1464,7 @@ function AdminMembersPageContent() {
         } else {
           setClubName("Всички отбори");
           setClubBillingStatus("");
+          setClubDefaultPaymentAmount("");
           setClubLogoUrl(null);
         }
 
@@ -1448,6 +1523,10 @@ function AdminMembersPageContent() {
         setTrainingGroupModeDraft(selectedMode === "custom_group" ? "custom_group" : "team_group");
         const billing = (selectedClub as Record<string, unknown> | null)?.billingStatus;
         setClubBillingStatus(typeof billing === "string" ? billing : "");
+        const defaultPaymentAmount = (selectedClub as Record<string, unknown> | null)?.defaultPaymentAmount;
+        setClubDefaultPaymentAmount(
+          defaultPaymentAmount === null || defaultPaymentAmount === undefined ? "" : String(defaultPaymentAmount),
+        );
         const logo = (selectedClub as Record<string, unknown> | null)?.imageUrl;
         if (typeof logo === "string" && logo) {
           setClubLogoUrl(logo);
@@ -4222,6 +4301,16 @@ function AdminMembersPageContent() {
           )}
           {isAdmin && clubId && (
             <>
+              {!coachGroupId && (
+                <button
+                  className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+                  onClick={openPaymentAmountModal}
+                  type="button"
+                >
+                  <ReceiptIcon size={16} />
+                  <span>Месечна такса</span>
+                </button>
+              )}
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => router.push(`/admin/clubs/${encodeURIComponent(clubId)}/billing`)}
@@ -4696,6 +4785,19 @@ function AdminMembersPageContent() {
                     onChange={(e) => setEditForm((prev) => ({ ...prev, birthDate: e.target.value }))}
                   />
                 </label>
+                {!coachGroupId && (
+                  <label className="amp-edit-field">
+                    <span className="amp-lbl">Месечна такса</span>
+                    <input
+                      className="amp-edit-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.paymentAmount}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, paymentAmount: e.target.value }))}
+                    />
+                  </label>
+                )}
                 <label className="amp-edit-field amp-edit-field--full">
                   <span className="amp-lbl">Текуща снимка</span>
                   {editAvatarPreviewUrl || editForm.avatarUrl ? (
@@ -4780,6 +4882,71 @@ function AdminMembersPageContent() {
           onConfirm={handleConfirmAssignNewCard}
           isAssigning={isAssigningNewCard}
         />
+      )}
+      {paymentAmountModalOpen && isAdmin && clubId && !coachGroupId && (
+        <div className="amp-overlay" onClick={closePaymentAmountModal}>
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Месечна такса</span>
+              <button
+                className="amp-modal-close"
+                onClick={closePaymentAmountModal}
+                aria-label="Затвори"
+                disabled={paymentAmountSaving}
+              >
+                <XIcon />
+              </button>
+            </h2>
+
+            <div className="amp-modal-body">
+              <label className="amp-edit-field amp-edit-field--full">
+                <span className="amp-lbl">Сума за клуба</span>
+                <div className="amp-money-input-wrap">
+                  <span className="amp-money-input-icon">€</span>
+                  <input
+                    className="amp-edit-input amp-money-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={paymentAmountForm}
+                    onChange={(e) => {
+                      setPaymentAmountForm(e.target.value);
+                      setPaymentAmountError("");
+                      setPaymentAmountSuccess("");
+                    }}
+                    disabled={paymentAmountSaving}
+                  />
+                </div>
+              </label>
+              <p className="amp-confirm-text">
+                Тази сума ще бъде зададена като стандартна за клуба и ще се приложи за всички играчи.
+              </p>
+
+              {paymentAmountError && <p className="amp-confirm-error">{paymentAmountError}</p>}
+              {paymentAmountSuccess && <p className="amp-confirm-success">{paymentAmountSuccess}</p>}
+
+              <div className="amp-modal-actions">
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  type="button"
+                  onClick={closePaymentAmountModal}
+                  disabled={paymentAmountSaving}
+                >
+                  Отказ
+                </button>
+                <button
+                  className="amp-btn amp-btn--primary"
+                  type="button"
+                  onClick={handleSavePaymentAmount}
+                  disabled={paymentAmountSaving}
+                >
+                  {paymentAmountSaving ? "Запазване..." : "Запази"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       {memberToDelete && (
         <ConfirmDeleteModal

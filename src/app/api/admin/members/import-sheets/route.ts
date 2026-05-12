@@ -4,6 +4,7 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { getGoogleServiceAccountToken } from "@/lib/googleAuth";
 import { randomBytes } from "crypto";
 import { normalizeToMonthStart } from "@/lib/paymentStatus";
+import { parsePaymentAmount } from "@/lib/paymentAmount";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,6 +116,7 @@ async function createPlayerWithCard({
   teamGroup,
   jerseyNumber,
   firstBillingMonth,
+  paymentAmount,
 }: {
   clubId: string;
   fullName: string;
@@ -122,6 +124,7 @@ async function createPlayerWithCard({
   teamGroup: number | null;
   jerseyNumber: string | null;
   firstBillingMonth: Date | null;
+  paymentAmount: string;
 }) {
   let lastError: unknown = null;
   for (let i = 0; i < 5; i++) {
@@ -136,6 +139,7 @@ async function createPlayerWithCard({
           teamGroup: teamGroup ?? undefined,
           jerseyNumber: jerseyNumber ?? undefined,
           firstBillingMonth: firstBillingMonth ?? undefined,
+          paymentAmount,
           cards: { create: { cardCode, isActive: true } },
         },
       });
@@ -163,11 +167,11 @@ export async function GET(request: NextRequest) {
   }
 
   const clubId = searchParams.get("clubId") ?? "";
-  let clubBillingInfo: { billingStatus: string; firstBillingMonth: Date | null } | null = null;
+  let clubBillingInfo: { billingStatus: string; firstBillingMonth: Date | null; defaultPaymentAmount: unknown } | null = null;
   if (clubId) {
     const club = await prisma.club.findUnique({
       where: { id: clubId },
-      select: { billingStatus: true, firstBillingMonth: true },
+      select: { billingStatus: true, firstBillingMonth: true, defaultPaymentAmount: true },
     });
     if (club) clubBillingInfo = club;
   }
@@ -182,6 +186,7 @@ export async function GET(request: NextRequest) {
         ? {
             clubBillingStatus: clubBillingInfo.billingStatus,
             clubFirstBillingMonth: clubBillingInfo.firstBillingMonth,
+            clubDefaultPaymentAmount: clubBillingInfo.defaultPaymentAmount,
           }
         : {}),
     });
@@ -204,6 +209,7 @@ export async function POST(request: NextRequest) {
     spreadsheetId?: unknown;
     clubId?: unknown;
     firstBillingMonth?: unknown;
+    paymentAmount?: unknown;
   };
 
   const spreadsheetId = String(body.spreadsheetId ?? "").trim();
@@ -215,7 +221,7 @@ export async function POST(request: NextRequest) {
   // Verify club exists and fetch billing info
   const club = await prisma.club.findUnique({
     where: { id: clubId },
-    select: { id: true, billingStatus: true, firstBillingMonth: true },
+    select: { id: true, billingStatus: true, firstBillingMonth: true, defaultPaymentAmount: true },
   });
   if (!club) return NextResponse.json({ error: "Club not found" }, { status: 404 });
 
@@ -236,6 +242,17 @@ export async function POST(request: NextRequest) {
       );
     }
     resolvedFirstBillingMonth = club.firstBillingMonth;
+  }
+
+  const hasPaymentAmount = Object.prototype.hasOwnProperty.call(body, "paymentAmount");
+  const paymentAmount = hasPaymentAmount
+    ? parsePaymentAmount(body.paymentAmount)
+    : club.defaultPaymentAmount.toFixed(2);
+  if (paymentAmount === null) {
+    return NextResponse.json(
+      { error: "Invalid paymentAmount. Use a non-negative amount with up to 2 decimals." },
+      { status: 400 },
+    );
   }
 
   try {
@@ -261,6 +278,7 @@ export async function POST(request: NextRequest) {
           teamGroup: row.teamGroup,
           jerseyNumber: row.jerseyNumber,
           firstBillingMonth: resolvedFirstBillingMonth,
+          paymentAmount,
         });
         created++;
       } catch (err) {

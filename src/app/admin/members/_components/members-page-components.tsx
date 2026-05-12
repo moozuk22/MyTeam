@@ -833,6 +833,7 @@ function ReportsDialog({
               id: String(raw.id ?? ""),
               fullName: String(raw.fullName ?? ""),
               teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
+              paymentAmount: raw.paymentAmount === null || raw.paymentAmount === undefined ? null : String(raw.paymentAmount),
               paymentLogs,
               isActive: raw.isActive === false ? false : true,
             };
@@ -911,12 +912,19 @@ function ReportsDialog({
     return String(player.teamGroup ?? "") === group;
   });
 
+  const formatPaymentAmount = (value: string | null): string => {
+    if (!value) return "€0.00";
+    const parsed = Number(value.replace(",", "."));
+    return Number.isFinite(parsed) ? `€${parsed.toFixed(2)}` : "€0.00";
+  };
+
   const rows = groupFiltered.map((player) => {
     const paidDate = getPaymentDateForMonth(player);
     return {
       id: player.id,
       name: player.fullName,
       group: player.teamGroup,
+      amount: formatPaymentAmount(player.paymentAmount),
       date: paidDate ?? "—",
       paid: Boolean(paidDate),
       isActive: player.isActive !== false,
@@ -929,6 +937,7 @@ function ReportsDialog({
       id: player.id,
       name: player.fullName,
       group: player.teamGroup,
+      amount: formatPaymentAmount(player.paymentAmount),
       date: paidDate ?? "—",
       paid: Boolean(paidDate),
       isActive: player.isActive !== false,
@@ -996,12 +1005,13 @@ function ReportsDialog({
               <td>${idx + 1}</td>
               <td>${escapeHtml(row.name)}</td>
               <td>${row.group ?? "—"}</td>
+              <td>${escapeHtml(row.amount)}</td>
               <td>${escapeHtml(row.date)}</td>
               <td>${row.paid ? "Платено" : "Неплатено"}</td>
             </tr>
           `)
         .join("")
-      : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
+      : `<tr><td colspan="6" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
 
     doc.open();
     doc.write(`<!doctype html>
@@ -1039,6 +1049,7 @@ function ReportsDialog({
           <th>#</th>
           <th>Име</th>
           <th>Набор</th>
+          <th>Сума</th>
           <th>Дата на плащане</th>
           <th>Статус</th>
         </tr>

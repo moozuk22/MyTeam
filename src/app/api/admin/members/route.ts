@@ -8,6 +8,7 @@ import {
 } from "@/lib/cloudinaryImagePath";
 import { normalizeToMonthStart } from "@/lib/paymentStatus";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { parsePaymentAmount } from "@/lib/paymentAmount";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     const club = await prisma.club.findUnique({
       where: { id: clubId },
-      select: { id: true, billingStatus: true, firstBillingMonth: true },
+      select: { id: true, billingStatus: true, firstBillingMonth: true, defaultPaymentAmount: true },
     });
     if (!club) {
       return NextResponse.json({ error: "Club not found" }, { status: 404 });
@@ -132,6 +133,16 @@ export async function POST(request: NextRequest) {
 
     const rawStatus = String(body.status ?? "paid").trim().toLowerCase();
     const status = rawStatus === "warning" || rawStatus === "overdue" ? rawStatus : "paid";
+    const hasPaymentAmount = Object.prototype.hasOwnProperty.call(body, "paymentAmount");
+    const paymentAmount = hasPaymentAmount
+      ? parsePaymentAmount(body.paymentAmount)
+      : club.defaultPaymentAmount.toFixed(2);
+    if (paymentAmount === null) {
+      return NextResponse.json(
+        { error: "Invalid paymentAmount. Use a non-negative amount with up to 2 decimals." },
+        { status: 400 },
+      );
+    }
 
     const jerseyNumber = body.jerseyNumber ? String(body.jerseyNumber).trim() : null;
     const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : null;
@@ -232,6 +243,7 @@ export async function POST(request: NextRequest) {
             lastPaymentDate,
             coachGroups: coachGroupConnect,
             firstBillingMonth: resolvedFirstBillingMonth,
+            paymentAmount,
             ...(adminImagePath
               ? {
                   images: {
@@ -367,6 +379,7 @@ export async function GET(request: NextRequest) {
         birthDate: true,
         teamGroup: true,
         lastPaymentDate: true,
+        paymentAmount: true,
         isActive: true,
         coachGroups: { select: { id: true } },
         club: {

@@ -69,6 +69,7 @@ function normalizeMember(item: unknown): Member {
     imagePublicId: raw.imagePublicId ? String(raw.imagePublicId) : null,
     birthDate: raw.birthDate ? String(raw.birthDate) : null,
     lastPaymentDate: raw.lastPaymentDate ? String(raw.lastPaymentDate) : null,
+    paymentAmount: raw.paymentAmount === null || raw.paymentAmount === undefined ? null : String(raw.paymentAmount),
     club: clubRaw
       ? {
         id: String(clubRaw.id ?? ""),

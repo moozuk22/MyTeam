@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { normalizeToMonthStart, toYearMonth } from "@/lib/paymentStatus";
+import { parsePaymentAmount } from "@/lib/paymentAmount";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export async function POST(
     const firstBillingMonthRaw = String((body as { firstBillingMonth?: unknown }).firstBillingMonth ?? "").trim();
     const confirm = (body as { confirm?: unknown }).confirm;
     const playerStatusRaw = (body as { playerStatus?: unknown }).playerStatus;
+    const hasPaymentAmount = Object.prototype.hasOwnProperty.call(body, "paymentAmount");
     const playerStatus = (["keep", "paid", "warning", "overdue"] as const).includes(playerStatusRaw as never)
       ? (playerStatusRaw as "keep" | "paid" | "warning" | "overdue")
       : "warning";
@@ -45,7 +47,7 @@ export async function POST(
 
     const club = await prisma.club.findUnique({
       where: { id: clubId },
-      select: { id: true, billingStatus: true, firstBillingMonth: true },
+      select: { id: true, billingStatus: true, firstBillingMonth: true, defaultPaymentAmount: true },
     });
 
     if (!club) {
@@ -62,18 +64,34 @@ export async function POST(
       );
     }
 
+    const paymentAmount = hasPaymentAmount
+      ? parsePaymentAmount((body as { paymentAmount?: unknown }).paymentAmount)
+      : club.defaultPaymentAmount.toFixed(2);
+    if (paymentAmount === null) {
+      return NextResponse.json(
+        { error: "Invalid paymentAmount. Use a non-negative amount with up to 2 decimals." },
+        { status: 400 },
+      );
+    }
+
     const updatedClub = await prisma.club.update({
       where: { id: clubId },
       data: {
         billingStatus: "active",
         firstBillingMonth: firstBillingMonthDate,
         billingActivatedAt: new Date(),
+        defaultPaymentAmount: paymentAmount,
       },
     });
 
     const players = await prisma.player.findMany({
       where: { clubId, isActive: true },
       select: { id: true },
+    });
+
+    await prisma.player.updateMany({
+      where: { clubId },
+      data: { paymentAmount },
     });
 
     const statusUpdate = playerStatus !== "keep" ? { status: playerStatus } : {};

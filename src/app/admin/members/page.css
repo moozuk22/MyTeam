@@ -1487,6 +1487,13 @@
   font-weight: 600;
 }
 
+.amp-confirm-success {
+  margin: 0;
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .amp-edit-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2503,6 +2510,27 @@
 
 .amp-edit-input[type="date"] {
   color-scheme: dark;
+}
+
+.amp-money-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.amp-money-input-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.amp-money-input {
+  padding-left: 30px;
 }
 
 .amp-inner-time-input {

@@ -12,6 +12,7 @@ import {
   normalizeToMonthStart,
 } from "@/lib/paymentStatus";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { parsePaymentAmount } from "@/lib/paymentAmount";
 
 
 export const runtime = "nodejs";
@@ -125,6 +126,7 @@ export async function PUT(
     const hasParentPhone = Object.prototype.hasOwnProperty.call(body, "parentPhone");
     const hasPlayerPhone = Object.prototype.hasOwnProperty.call(body, "playerPhone");
     const hasFirstBillingMonth = Object.prototype.hasOwnProperty.call(body, "firstBillingMonth");
+    const hasPaymentAmount = Object.prototype.hasOwnProperty.call(body, "paymentAmount");
 
     if (!fullName) {
       return NextResponse.json(
@@ -215,6 +217,18 @@ export async function PUT(
       }
     }
 
+    let paymentAmountUpdate: string | undefined = undefined;
+    if (hasPaymentAmount) {
+      const parsed = parsePaymentAmount(body.paymentAmount);
+      if (parsed === null) {
+        return NextResponse.json(
+          { error: "Invalid paymentAmount. Use a non-negative amount with up to 2 decimals." },
+          { status: 400 },
+        );
+      }
+      paymentAmountUpdate = parsed;
+    }
+
     const nextImageUrl = hasImageUrl
       ? imageUrlRaw === null || imageUrlRaw === undefined || String(imageUrlRaw).trim() === ""
         ? null
@@ -274,6 +288,7 @@ export async function PUT(
           : {}),
         ...(status ? { status } : {}),
         ...(firstBillingMonthUpdate !== undefined ? { firstBillingMonth: firstBillingMonthUpdate } : {}),
+        ...(paymentAmountUpdate !== undefined ? { paymentAmount: paymentAmountUpdate } : {}),
       },
       include: {
         cards: { orderBy: { createdAt: "desc" } },

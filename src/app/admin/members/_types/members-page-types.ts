@@ -10,6 +10,7 @@ interface ReportPlayer {
   id: string;
   fullName: string;
   teamGroup: number | null;
+  paymentAmount: string | null;
   paymentLogs: ReportPaymentLog[];
   isActive?: boolean;
 }
@@ -58,6 +59,7 @@ interface ClubOption {
   trainingWindowDays?: number;
   trainingGroupMode?: "team_group" | "custom_group";
   billingStatus?: string;
+  defaultPaymentAmount?: string | number | null;
 }
 
 interface Member {
@@ -75,6 +77,7 @@ interface Member {
   imagePublicId: string | null;
   birthDate: string | null;
   lastPaymentDate: string | null;
+  paymentAmount: string | null;
   club?: MemberClub;
   paymentLogs: PaymentLog[];
   cards: MemberCard[];
