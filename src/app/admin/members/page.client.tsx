@@ -298,6 +298,7 @@ function AdminMembersPageContent() {
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState("");
   const [clubName, setClubName] = useState("Всички отбори");
+  const [clubSport, setClubSport] = useState("");
   const [clubBillingStatus, setClubBillingStatus] = useState<string>("");
   const [clubDefaultPaymentAmount, setClubDefaultPaymentAmount] = useState("");
   const [paymentAmountModalOpen, setPaymentAmountModalOpen] = useState(false);
@@ -1010,6 +1011,7 @@ function AdminMembersPageContent() {
                     ? (club as {
                       id?: unknown;
                       name?: unknown;
+                      sports?: unknown;
                       emblemUrl?: unknown;
                       imageUrl?: unknown;
                       imagePublicId?: unknown;
@@ -1019,6 +1021,7 @@ function AdminMembersPageContent() {
                 return {
                   id: String(item.id ?? ""),
                   name: rawName,
+                  sports: typeof item.sports === "string" ? item.sports : null,
                   emblemUrl: typeof item.emblemUrl === "string" ? item.emblemUrl : null,
                   imageUrl: typeof item.imageUrl === "string" ? item.imageUrl : null,
                   imagePublicId: typeof item.imagePublicId === "string" ? item.imagePublicId : null,
@@ -1444,6 +1447,8 @@ function AdminMembersPageContent() {
           }
 
           setClubName(selectedClub.name.trim());
+          const selectedSport = (selectedClub as Record<string, unknown>).sports;
+          setClubSport(typeof selectedSport === "string" ? selectedSport.trim() : "");
           const selectedMode = (selectedClub as Record<string, unknown>).trainingGroupMode;
           setTrainingGroupMode(selectedMode === "custom_group" ? "custom_group" : "team_group");
           setTrainingGroupModeDraft(selectedMode === "custom_group" ? "custom_group" : "team_group");
@@ -1518,6 +1523,8 @@ function AdminMembersPageContent() {
         if (selectedClub?.name) {
           setClubName(String(selectedClub.name));
         }
+        const selectedSport = (selectedClub as Record<string, unknown> | null)?.sports;
+        setClubSport(typeof selectedSport === "string" ? selectedSport.trim() : "");
         const selectedMode = (selectedClub as Record<string, unknown> | null)?.trainingGroupMode;
         setTrainingGroupMode(selectedMode === "custom_group" ? "custom_group" : "team_group");
         setTrainingGroupModeDraft(selectedMode === "custom_group" ? "custom_group" : "team_group");
@@ -2058,6 +2065,47 @@ function AdminMembersPageContent() {
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = filename;
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPlayersExcel = () => {
+    if (!isAdmin || typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const rows = members
+      .filter((member) => member.isActive)
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "bg"))
+      .map((member) => {
+        const cells = [
+          member.fullName,
+          clubSport,
+          formatBirthDateForExport(member.birthDate).replace(/-/g, ""),
+          member.jerseyNumber?.trim() ?? "",
+        ];
+        return `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+      })
+      .join("");
+
+    const html = `<!doctype html><html><head><meta charset="utf-8" /></head><body><table><thead><tr><th>Име, фамилия</th><th>спорт</th><th>роден</th><th>номер</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    const safeClub = (clubName || "club").trim().replace(/[\\/:*?"<>|]+/g, "-") || "club";
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `players-${safeClub}-${new Date().toISOString().slice(0, 10)}.xls`;
     anchor.style.display = "none";
     document.body.appendChild(anchor);
     anchor.click();
@@ -4203,6 +4251,12 @@ function AdminMembersPageContent() {
             <button className="amp-import-sheets-btn amp-btn--compact" onClick={() => setImportPhotosOpen(true)} type="button">
               <PhotoImportIcon />
               <span>Снимки</span>
+            </button>
+          )}
+          {isAdmin && clubId && (
+            <button className="amp-import-sheets-btn amp-btn--compact" onClick={handleDownloadPlayersExcel} type="button">
+              <DownloadIcon />
+              <span>Excel</span>
             </button>
           )}
           {isAdmin && (

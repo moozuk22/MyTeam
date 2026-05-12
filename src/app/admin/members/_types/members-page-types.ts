@@ -36,6 +36,7 @@ interface MemberClub {
 interface ClubOption {
   id: string;
   name: string;
+  sports?: string | null;
   emblemUrl?: string | null;
   imageUrl?: string | null;
   imagePublicId?: string | null;
