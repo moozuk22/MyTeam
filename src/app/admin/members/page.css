@@ -597,6 +597,31 @@
   font-weight: 700;
 }
 
+.pc-avatar-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pc-custom-group-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: 56px;
+}
+
+.pc-custom-group-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
 .pc-info {
   flex: 1;
   min-width: 0;
@@ -1330,6 +1355,53 @@
 
 .amp-coach-group-picker-error {
   margin: 7px 0 0;
+}
+
+.amp-custom-group-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  justify-content: flex-start;
+}
+
+.amp-custom-group-color-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.amp-custom-group-color-swatch:hover:not(:disabled) {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+
+.amp-custom-group-color-swatch.is-selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.amp-custom-group-color-swatch.is-taken {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.amp-custom-group-color-swatch:disabled:not(.is-selected) {
+  cursor: not-allowed;
+}
+
+.amp-custom-group-select-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
 }
 
 .amp-lbl {

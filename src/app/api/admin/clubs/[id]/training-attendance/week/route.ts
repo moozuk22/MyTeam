@@ -71,6 +71,7 @@ type WeekSession = {
   eventType: "training" | "match";
   label: string;
   teamGroups: number[];
+  color?: string | null;
   location?: string;
   scopeLabel?: string;
   isHome?: boolean;
@@ -152,6 +153,7 @@ export async function GET(
         select: {
           id: true,
           name: true,
+          color: true,
           trainingDates: true,
           trainingWeekdays: true,
           trainingWindowDays: true,
@@ -189,6 +191,7 @@ export async function GET(
             eventType: "training",
             label: group.name || "Custom group",
             teamGroups: [],
+            color: group.color ?? null,
           });
         }
       }

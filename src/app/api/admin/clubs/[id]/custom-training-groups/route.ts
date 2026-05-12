@@ -22,6 +22,8 @@ import {
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
 import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
+import { parseCustomTrainingGroupColorFromBody } from "@/lib/customTrainingGroupColors";
+import { isCustomTrainingGroupColorTakenInScope } from "@/lib/customTrainingGroupColorScope";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,6 +100,7 @@ function buildTrainingDateTimes(input: {
 function serializeGroup(group: {
   id: string;
   name: string;
+  color: string | null;
   trainingDates: string[];
   trainingTime: string | null;
   trainingDateTimes: unknown;
@@ -114,6 +117,7 @@ function serializeGroup(group: {
   return {
     id: group.id,
     name: group.name,
+    color: group.color,
     trainingDates: group.trainingDates,
     trainingTime: group.trainingTime,
     trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
@@ -154,6 +158,7 @@ export async function GET(
       select: {
         id: true,
         name: true,
+        color: true,
         trainingDates: true,
         trainingTime: true,
         trainingDateTimes: true,
@@ -209,6 +214,22 @@ export async function POST(
     if (!coachGroup) {
       return NextResponse.json({ error: "Треньорската група не е намерена." }, { status: 400 });
     }
+  }
+
+  let paletteColor: string;
+  try {
+    paletteColor = parseCustomTrainingGroupColorFromBody((body as { color?: unknown }).color);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Невалиден цвят." },
+      { status: 400 },
+    );
+  }
+  if (await isCustomTrainingGroupColorTakenInScope({ clubId: id, coachGroupId, color: paletteColor })) {
+    return NextResponse.json(
+      { error: "Този цвят вече се използва от друга група в тази треньорска група." },
+      { status: 400 },
+    );
   }
 
   const playerIds = normalizePlayerIds((body as { playerIds?: unknown }).playerIds);
@@ -306,6 +327,7 @@ export async function POST(
         data: {
           clubId: id,
           coachGroupId,
+          color: paletteColor,
           name,
           trainingDates,
           trainingTime: persistedTrainingTime,
@@ -341,6 +363,7 @@ export async function POST(
         select: {
           id: true,
           name: true,
+          color: true,
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,

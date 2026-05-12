@@ -9,6 +9,7 @@ import {
 import { normalizeToMonthStart } from "@/lib/paymentStatus";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { parsePaymentAmount } from "@/lib/paymentAmount";
+import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -321,19 +322,21 @@ export async function GET(request: NextRequest) {
   try {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const clubId = request.nextUrl.searchParams.get("clubId")?.trim() ?? "";
+    let isCustomGroupMode = false;
     if (clubId) {
       if (!uuidRegex.test(clubId)) {
         return NextResponse.json({ error: "Club not found" }, { status: 404 });
       }
 
-      const clubExists = await prisma.club.findUnique({
+      const clubRecord = await prisma.club.findUnique({
         where: { id: clubId },
-        select: { id: true },
+        select: { id: true, trainingGroupMode: true },
       });
 
-      if (!clubExists) {
+      if (!clubRecord) {
         return NextResponse.json({ error: "Club not found" }, { status: 404 });
       }
+      isCustomGroupMode = clubRecord.trainingGroupMode === "custom_group";
     }
 
     const coachGroupId = request.nextUrl.searchParams.get("coachGroupId")?.trim() ?? "";
@@ -382,6 +385,17 @@ export async function GET(request: NextRequest) {
         paymentAmount: true,
         isActive: true,
         coachGroups: { select: { id: true } },
+        ...(clubId && isCustomGroupMode
+          ? {
+              customTrainingGroups: {
+                select: {
+                  group: {
+                    select: { color: true },
+                  },
+                },
+              },
+            }
+          : {}),
         club: {
           select: {
             id: true,
@@ -438,10 +452,24 @@ export async function GET(request: NextRequest) {
     const normalizedPlayers = players.map((player) => {
       const imagePath = getPrimaryPlayerImagePath(player.images);
       const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
-      const { coachGroups, ...rest } = player;
+      const row = player as typeof player & {
+        customTrainingGroups?: Array<{ group: { color: string | null } }>;
+      };
+      const { coachGroups, customTrainingGroups, ...rest } = row;
+      const customTrainingGroupColors =
+        clubId && isCustomGroupMode && customTrainingGroups
+          ? Array.from(
+              new Set(
+                customTrainingGroups
+                  .map((link) => link.group.color)
+                  .filter((c): c is string => typeof c === "string" && isCustomTrainingGroupPaletteColor(c)),
+              ),
+            )
+          : [];
       return {
         ...rest,
         coachGroupIds: coachGroups.map((g) => g.id),
+        customTrainingGroupColors,
         status: waivedDates.length > 0 ? "paused" : rest.status,
         imageUrl: imagePath,
         avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),

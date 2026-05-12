@@ -1,12 +1,18 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
+import { Suspense, useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { isValidPhone } from "@/lib/phone";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import "./page.css";
+import {
+  CUSTOM_TRAINING_GROUP_COLOR_PALETTE,
+  isCustomTrainingGroupPaletteColor,
+  customTrainingGroupAccentRgba,
+  customTrainingGroupReadableOnAccent,
+} from "@/lib/customTrainingGroupColors";
 
 import {
   AttendanceDashboard,
@@ -88,6 +94,63 @@ function sortWeekSessionsForDay(a: TrainingWeekSessionItem, b: TrainingWeekSessi
   return a.label.localeCompare(b.label, "bg");
 }
 
+function customTrainingGroupCoachScopeKey(coachGroupIdFromUrl: string): string | null {
+  const trimmed = coachGroupIdFromUrl.trim();
+  return trimmed || null;
+}
+
+function CustomTrainingGroupColorPicker({
+  value,
+  onChange,
+  disabled,
+  coachScopeKey,
+  groups,
+  excludeGroupId,
+}: {
+  value: string;
+  onChange: (hex: string) => void;
+  disabled?: boolean;
+  coachScopeKey: string | null;
+  groups: CustomTrainingGroup[];
+  excludeGroupId?: string;
+}) {
+  const colorTakenByOther = (hex: string) =>
+    groups.some(
+      (g) =>
+        (g.coachGroupId ?? null) === coachScopeKey &&
+        isCustomTrainingGroupPaletteColor(g.color) &&
+        g.color === hex &&
+        (!excludeGroupId || g.id !== excludeGroupId),
+    );
+
+  return (
+    <div className="amp-edit-field" style={{ marginTop: 10 }}>
+      <span className="amp-lbl">Цвят на групата</span>
+      <div className="amp-custom-group-color-swatches" role="radiogroup" aria-label="Цвят на групата">
+        {CUSTOM_TRAINING_GROUP_COLOR_PALETTE.map((hex) => {
+          const taken = colorTakenByOther(hex);
+          const isSelected = value === hex;
+          const isDisabled = Boolean(disabled) || (taken && !isSelected);
+          return (
+            <button
+              key={hex}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={taken && !isSelected ? "Зает цвят" : `Цвят ${hex}`}
+              disabled={isDisabled}
+              title={taken && !isSelected ? "Този цвят вече се използва от друга група" : undefined}
+              className={`amp-custom-group-color-swatch${isSelected ? " is-selected" : ""}${taken && !isSelected ? " is-taken" : ""}`}
+              style={{ backgroundColor: hex }}
+              onClick={() => onChange(hex)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function WeeklyGrid({
   dates,
   sessions,
@@ -129,14 +192,39 @@ function WeeklyGrid({
                 <span className="amp-training-week-day-strip-date">{dateLine}</span>
               </header>
               <ul className="amp-training-week-session-rows" aria-label={`График за ${weekdayLong}`}>
-                {daySessions.map((session) => (
+                {daySessions.map((session) => {
+                  const accent =
+                    session.eventType !== "match" &&
+                    session.color &&
+                    isCustomTrainingGroupPaletteColor(session.color)
+                      ? session.color
+                      : null;
+                  const rowStyle: CSSProperties | undefined = accent
+                    ? {
+                        background: customTrainingGroupAccentRgba(accent, 0.1),
+                        borderColor: customTrainingGroupAccentRgba(accent, 0.38),
+                      }
+                    : undefined;
+                  const timeStyle: CSSProperties | undefined = accent
+                    ? { color: accent }
+                    : undefined;
+                  const badgeStyle: CSSProperties | undefined =
+                    accent && session.eventType !== "match"
+                      ? {
+                          background: accent,
+                          borderColor: customTrainingGroupAccentRgba(accent, 0.55),
+                          color: customTrainingGroupReadableOnAccent(accent),
+                        }
+                      : undefined;
+                  return (
                   <li
                     key={session.id}
                     className={`amp-training-week-session-row${
                       session.eventType === "match" ? " amp-training-week-session-row--match" : ""
                     }`}
+                    style={rowStyle}
                   >
-                    <span className="amp-training-week-session-row-time">
+                    <span className="amp-training-week-session-row-time" style={timeStyle}>
                       {session.trainingTime?.trim()
                         ? session.trainingTime.trim()
                         : "—"}
@@ -154,12 +242,14 @@ function WeeklyGrid({
                       className={`amp-training-week-session-row-badge${
                         session.eventType === "match" ? " amp-training-week-session-row-badge--match" : ""
                       }`}
+                      style={badgeStyle}
                       aria-hidden="true"
                     >
                       {session.eventType === "match" ? "М" : "Т"}
                     </span>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </section>
           );
@@ -397,6 +487,7 @@ function AdminMembersPageContent() {
   const [trainingGroupCreateGroups, setTrainingGroupCreateGroups] = useState<string[]>([]);
   const [trainingGroupCreateName, setTrainingGroupCreateName] = useState("");
   const [trainingGroupCreatePlayerIds, setTrainingGroupCreatePlayerIds] = useState<string[]>([]);
+  const [trainingGroupCreateColor, setTrainingGroupCreateColor] = useState("");
   const [customGroupCreateSearch, setCustomGroupCreateSearch] = useState("");
   const [trainingGroupEditOpen, setTrainingGroupEditOpen] = useState(false);
   const [trainingGroupEditSaving, setTrainingGroupEditSaving] = useState(false);
@@ -407,6 +498,7 @@ function AdminMembersPageContent() {
   const [trainingGroupEditName, setTrainingGroupEditName] = useState("");
   const [trainingGroupEditGroups, setTrainingGroupEditGroups] = useState<string[]>([]);
   const [trainingGroupEditPlayerIds, setTrainingGroupEditPlayerIds] = useState<string[]>([]);
+  const [trainingGroupEditColor, setTrainingGroupEditColor] = useState("");
   const [customGroupEditSearch, setCustomGroupEditSearch] = useState("");
   const [selectedTrainingGroupId, setSelectedTrainingGroupId] = useState("");
   const [postTeamGroupSavePromptOpen, setPostTeamGroupSavePromptOpen] = useState(false);
@@ -1634,6 +1726,20 @@ function AdminMembersPageContent() {
     ? (coachGroups.find((group) => group.id === coachGroupId)?.name.trim() ?? "")
     : "";
   const isCustomTrainingGroupMode = trainingGroupMode === "custom_group";
+  const customTrainingGroupCoachScope = useMemo(
+    () => customTrainingGroupCoachScopeKey(coachGroupId),
+    [coachGroupId],
+  );
+  const noFreeCustomTrainingGroupColor = useMemo(() => {
+    if (!isCustomTrainingGroupMode) return false;
+    const used = new Set(
+      customTrainingGroups
+        .filter((g) => (g.coachGroupId ?? null) === customTrainingGroupCoachScope)
+        .map((g) => g.color)
+        .filter(isCustomTrainingGroupPaletteColor),
+    );
+    return !CUSTOM_TRAINING_GROUP_COLOR_PALETTE.some((c) => !used.has(c));
+  }, [isCustomTrainingGroupMode, customTrainingGroups, customTrainingGroupCoachScope]);
   const trainingAttendanceMatchesByDate = new Map<string, ClubMatch[]>();
   for (const match of clubMatches) {
     const appliesToAll = match.teamGroups.length === 0;
@@ -1692,6 +1798,13 @@ function AdminMembersPageContent() {
       : trainingAttendanceView === "trainingGroups"
       ? (selectedTrainingGroupId || "")
       : `year:${resolvedTrainingGroupScope}`;
+  const selectedCustomTrainingGroupDotColor =
+    isCustomTrainingGroupMode && selectedTrainingGroupId
+      ? (() => {
+          const g = customTrainingGroups.find((item) => item.id === selectedTrainingGroupId);
+          return g?.color && isCustomTrainingGroupPaletteColor(g.color) ? g.color : null;
+        })()
+      : null;
   const selectedTeamGroupLinkedTrainingGroups =
     selectedTeamGroup === null
       ? []
@@ -2366,6 +2479,11 @@ function AdminMembersPageContent() {
               trainingFieldId: normalizeOptionalId(raw.trainingFieldId),
               trainingFieldPieceIds: Array.isArray(raw.trainingFieldPieceIds) ? raw.trainingFieldPieceIds.map(String) : [],
             }),
+            color:
+              typeof raw.color === "string" &&
+              isCustomTrainingGroupPaletteColor(raw.color.trim())
+                ? raw.color.trim()
+                : null,
           } satisfies CustomTrainingGroup;
         }).filter((group) => group.id && group.name)
         : [];
@@ -2480,6 +2598,15 @@ function AdminMembersPageContent() {
     setTrainingGroupCreateName("");
     setTrainingGroupCreatePlayerIds([]);
     setCustomGroupCreateSearch("");
+    const used = new Set(
+      customTrainingGroups
+        .filter((g) => (g.coachGroupId ?? null) === customTrainingGroupCoachScope)
+        .map((g) => g.color)
+        .filter(isCustomTrainingGroupPaletteColor),
+    );
+    const firstFree =
+      CUSTOM_TRAINING_GROUP_COLOR_PALETTE.find((c) => !used.has(c)) ?? CUSTOM_TRAINING_GROUP_COLOR_PALETTE[0];
+    setTrainingGroupCreateColor(firstFree);
     setTrainingGroupCreateOpen(true);
   };
 
@@ -2496,6 +2623,23 @@ function AdminMembersPageContent() {
       setTrainingGroupEditName(group.name);
       setTrainingGroupEditPlayerIds(group.playerIds.filter((id) => activeIds.has(id)));
       setCustomGroupEditSearch("");
+      const usedByOthers = new Set(
+        customTrainingGroups
+          .filter((item) => item.id !== group.id && (item.coachGroupId ?? null) === customTrainingGroupCoachScope)
+          .map((item) => item.color)
+          .filter(isCustomTrainingGroupPaletteColor),
+      );
+      const keepColor =
+        group.color &&
+        isCustomTrainingGroupPaletteColor(group.color) &&
+        !usedByOthers.has(group.color)
+          ? group.color
+          : null;
+      setTrainingGroupEditColor(
+        keepColor ??
+          CUSTOM_TRAINING_GROUP_COLOR_PALETTE.find((c) => !usedByOthers.has(c)) ??
+          CUSTOM_TRAINING_GROUP_COLOR_PALETTE[0],
+      );
       setTrainingGroupEditOpen(true);
       return;
     }
@@ -2522,6 +2666,12 @@ function AdminMembersPageContent() {
         if (!name) {
           throw new Error("Enter a group name.");
         }
+        if (noFreeCustomTrainingGroupColor) {
+          throw new Error("Няма свободни цветове за нова група в тази треньорска група.");
+        }
+        if (!isCustomTrainingGroupPaletteColor(trainingGroupCreateColor)) {
+          throw new Error("Изберете цвят от палитрата.");
+        }
         const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2529,6 +2679,7 @@ function AdminMembersPageContent() {
             name,
             playerIds: trainingGroupCreatePlayerIds,
             coachGroupId: coachGroupId || null,
+            color: trainingGroupCreateColor,
           }),
         });
         if (!response.ok) {
@@ -2537,6 +2688,7 @@ function AdminMembersPageContent() {
         }
         setTrainingGroupCreateOpen(false);
         await loadCustomTrainingGroups();
+        void refreshMembersList();
         return;
       }
       const selectedGroups = trainingGroupCreateGroups
@@ -2579,6 +2731,9 @@ function AdminMembersPageContent() {
         if (!name) {
           throw new Error("Enter a group name.");
         }
+        if (!isCustomTrainingGroupPaletteColor(trainingGroupEditColor)) {
+          throw new Error("Изберете цвят от палитрата.");
+        }
         const response = await fetch(
           `/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups/${encodeURIComponent(trainingGroupEditId)}`,
           {
@@ -2587,6 +2742,7 @@ function AdminMembersPageContent() {
             body: JSON.stringify({
               name,
               playerIds: trainingGroupEditPlayerIds,
+              color: trainingGroupEditColor,
             }),
           },
         );
@@ -2596,6 +2752,7 @@ function AdminMembersPageContent() {
         }
         setTrainingGroupEditOpen(false);
         const refreshedGroups = await loadCustomTrainingGroups();
+        void refreshMembersList();
         const fallbackId = refreshedGroups.some((group) => group.id === trainingGroupEditId)
           ? trainingGroupEditId
           : refreshedGroups[0]?.id ?? "";
@@ -3603,6 +3760,10 @@ function AdminMembersPageContent() {
               location: typeof raw.location === "string" ? raw.location : undefined,
               scopeLabel: typeof raw.scopeLabel === "string" ? raw.scopeLabel : undefined,
               isHome: typeof raw.isHome === "boolean" ? raw.isHome : undefined,
+              color: (() => {
+                const c = typeof raw.color === "string" ? raw.color.trim() : "";
+                return isCustomTrainingGroupPaletteColor(c) ? c : undefined;
+              })(),
             } satisfies TrainingWeekSessionItem;
           })
         : [];
@@ -5433,8 +5594,17 @@ function AdminMembersPageContent() {
                         type="button"
                         className="amp-btn amp-btn--primary"
                         onClick={openTrainingGroupCreateModal}
-                        disabled={trainingNoteSaving || trainingGroupCreateSaving}
+                        disabled={
+                          trainingNoteSaving ||
+                          trainingGroupCreateSaving ||
+                          (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
+                        }
                         style={{ width: "100%" }}
+                        title={
+                          isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor
+                            ? "Всички цветове са заети"
+                            : undefined
+                        }
                       >
                         {trainingGroupCreateSaving
                           ? "Запазване..."
@@ -5451,9 +5621,30 @@ function AdminMembersPageContent() {
                       <>
                         <label className="amp-edit-field" style={{ marginBottom: "12px", textAlign: "center" }}>
                           <span className="amp-lbl" style={{ textAlign: "center" }}>Група</span>
-                          <select
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "10px",
+                            }}
+                          >
+                            {selectedCustomTrainingGroupDotColor && (
+                              <span
+                                className="amp-custom-group-select-swatch"
+                                style={{ backgroundColor: selectedCustomTrainingGroupDotColor }}
+                                aria-hidden
+                              />
+                            )}
+                            <select
                             className="amp-edit-input"
-                            style={{ textAlign: "center", textAlignLast: "center", paddingLeft: "28px" }}
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              textAlign: "center",
+                              textAlignLast: "center",
+                              paddingLeft: "12px",
+                            }}
                             value={unifiedGroupScopeValue}
                             onChange={(e) => void handleUnifiedGroupChange(e.target.value)}
                             disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving || trainingScheduleGroupsLoading}
@@ -5473,6 +5664,7 @@ function AdminMembersPageContent() {
                               </option>
                             ))}
                           </select>
+                          </div>
                         </label>
                         {trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId && (
                           <div className="amp-training-group-actions">
@@ -5935,6 +6127,14 @@ function AdminMembersPageContent() {
                       disabled={trainingGroupEditSaving}
                     />
                   </label>
+                  <CustomTrainingGroupColorPicker
+                    value={trainingGroupEditColor}
+                    onChange={setTrainingGroupEditColor}
+                    disabled={trainingGroupEditSaving}
+                    coachScopeKey={customTrainingGroupCoachScope}
+                    groups={customTrainingGroups}
+                    excludeGroupId={trainingGroupEditId}
+                  />
                   <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
                     <div
                       style={{
@@ -6127,6 +6327,18 @@ function AdminMembersPageContent() {
                       disabled={trainingGroupCreateSaving}
                     />
                   </label>
+                  <CustomTrainingGroupColorPicker
+                    value={trainingGroupCreateColor}
+                    onChange={setTrainingGroupCreateColor}
+                    disabled={trainingGroupCreateSaving || noFreeCustomTrainingGroupColor}
+                    coachScopeKey={customTrainingGroupCoachScope}
+                    groups={customTrainingGroups}
+                  />
+                  {noFreeCustomTrainingGroupColor && (
+                    <p className="amp-empty amp-empty--modal" style={{ marginTop: 8 }}>
+                      Всички цветове са заети за тази треньорска група.
+                    </p>
+                  )}
                   <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
                     <div
                       style={{
@@ -6261,7 +6473,10 @@ function AdminMembersPageContent() {
                   type="button"
                   className="amp-btn amp-btn--primary"
                   onClick={() => void saveTrainingGroupFromModal()}
-                  disabled={trainingGroupCreateSaving}
+                  disabled={
+                    trainingGroupCreateSaving ||
+                    (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
+                  }
                 >
                   {trainingGroupCreateSaving
                     ? "Създаване..."
