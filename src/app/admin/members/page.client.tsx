@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
@@ -2227,7 +2227,7 @@ function AdminMembersPageContent() {
     }
   };
 
-  const loadCustomTrainingGroups = async (): Promise<CustomTrainingGroup[]> => {
+  const loadCustomTrainingGroups = useCallback(async (): Promise<CustomTrainingGroup[]> => {
     if (!clubId) return [];
     setTrainingScheduleGroupsLoading(true);
     try {
@@ -2292,7 +2292,21 @@ function AdminMembersPageContent() {
     } finally {
       setTrainingScheduleGroupsLoading(false);
     }
-  };
+  }, [clubId, coachGroupId]);
+
+  useEffect(() => {
+    if (!clubId) {
+      setCustomTrainingGroups([]);
+      return;
+    }
+
+    if (trainingGroupMode !== "custom_group") {
+      setCustomTrainingGroups([]);
+      return;
+    }
+
+    void loadCustomTrainingGroups();
+  }, [clubId, loadCustomTrainingGroups, trainingGroupMode]);
 
   const loadCoachGroups = async (): Promise<CoachGroup[]> => {
     if (!clubId) return [];
