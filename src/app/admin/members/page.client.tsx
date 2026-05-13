@@ -434,6 +434,7 @@ function AdminMembersPageContent() {
   const [trainingWeekSessions, setTrainingWeekSessions] = useState<TrainingWeekSessionItem[]>([]);
   const [trainingWeekDates, setTrainingWeekDates] = useState<string[]>([]);
   const [trainingWeekLoading, setTrainingWeekLoading] = useState(false);
+  const [weekColorFilter, setWeekColorFilter] = useState<string | null>(null);
   const [trainingNote, setTrainingNote] = useState("");
   const [trainingNoteSaving, setTrainingNoteSaving] = useState(false);
   const [trainingNoteTargetDates, setTrainingNoteTargetDates] = useState<string[]>([]);
@@ -1730,6 +1731,16 @@ function AdminMembersPageContent() {
     () => customTrainingGroupCoachScopeKey(coachGroupId),
     [coachGroupId],
   );
+  const weekSessionColorOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const s of trainingWeekSessions) {
+      if (s.color && isCustomTrainingGroupPaletteColor(s.color) && !seen.has(s.color)) {
+        const group = customTrainingGroups.find((g) => g.color === s.color);
+        seen.set(s.color, group?.name ?? "");
+      }
+    }
+    return Array.from(seen.entries()).map(([color, label]) => ({ color, label }));
+  }, [trainingWeekSessions, customTrainingGroups]);
   const noFreeCustomTrainingGroupColor = useMemo(() => {
     if (!isCustomTrainingGroupMode) return false;
     const used = new Set(
@@ -3791,6 +3802,7 @@ function AdminMembersPageContent() {
     setTrainingDaysEditorOpen(false);
     setTrainingDaysEditorError("");
     setTrainingNoteTargetDates([]);
+    setWeekColorFilter(null);
     await Promise.all([fetchTrainingWeekSessions(), fetchClubMatches()]);
   };
 
@@ -4444,10 +4456,8 @@ function AdminMembersPageContent() {
                 onClick={() => {
                   if (coachGroupId) {
                     void openTrainingAttendance();
-                  } else if (coachGroups.length > 1) {
+                  } else if (coachGroups.length >= 1) {
                     void openTrainingAttendance({ hideTeamsTab: true });
-                  } else if (coachGroups.length === 1) {
-                    window.location.href = `/admin/members?clubId=${encodeURIComponent(clubId)}&coachGroupId=${encodeURIComponent(coachGroups[0].id)}`;
                   } else {
                     void openTrainingAttendance();
                   }
@@ -5583,7 +5593,46 @@ function AdminMembersPageContent() {
                   ) : trainingWeekSessions.length === 0 ? (
                     <p className="amp-empty amp-empty--modal">Няма насрочени събития за следващите 7 дни.</p>
                   ) : (
-                    <WeeklyGrid dates={trainingWeekDates} sessions={trainingWeekSessions} todayIso={todayIsoDate} />
+                    <>
+                      {weekSessionColorOptions.length > 0 && (
+                        <div
+                          role="group"
+                          aria-label="Филтър по група"
+                          style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px", justifyContent: "center" }}
+                        >
+                          {weekSessionColorOptions.map(({ color, label }) => (
+                            <button
+                              key={color}
+                              type="button"
+                              aria-pressed={weekColorFilter === color}
+                              aria-label={label || color}
+                              title={label || undefined}
+                              onClick={() => setWeekColorFilter(weekColorFilter === color ? null : color)}
+                              style={{
+                                width: "28px",
+                                height: "28px",
+                                borderRadius: "50%",
+                                backgroundColor: color,
+                                border: weekColorFilter === color ? "3px solid #fff" : "2px solid rgba(255,255,255,0.18)",
+                                boxShadow: weekColorFilter === color ? `0 0 0 2px ${color}` : "none",
+                                cursor: "pointer",
+                                flexShrink: 0,
+                                transition: "box-shadow 0.15s, border-color 0.15s",
+                                padding: 0,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <WeeklyGrid
+                        dates={trainingWeekDates}
+                        sessions={weekColorFilter
+                          ? trainingWeekSessions.filter((s) => s.color === weekColorFilter || s.eventType === "match")
+                          : trainingWeekSessions
+                        }
+                        todayIso={todayIsoDate}
+                      />
+                    </>
                   )}
                 </div>
               ) : (
