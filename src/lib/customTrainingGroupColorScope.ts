@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 
-/** True if another custom training group in the same club + coach scope already uses this color. */
+/** True if another custom training group in the same club already uses this color. */
 export async function isCustomTrainingGroupColorTakenInScope(input: {
   clubId: string;
   coachGroupId: string | null;
@@ -10,7 +10,6 @@ export async function isCustomTrainingGroupColorTakenInScope(input: {
   const row = await prisma.clubCustomTrainingGroup.findFirst({
     where: {
       clubId: input.clubId,
-      coachGroupId: input.coachGroupId,
       color: input.color,
       ...(input.excludeGroupId ? { NOT: { id: input.excludeGroupId } } : {}),
     },

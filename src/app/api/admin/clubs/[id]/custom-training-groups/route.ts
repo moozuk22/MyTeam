@@ -227,7 +227,7 @@ export async function POST(
   }
   if (await isCustomTrainingGroupColorTakenInScope({ clubId: id, coachGroupId, color: paletteColor })) {
     return NextResponse.json(
-      { error: "Този цвят вече се използва от друга група в тази треньорска група." },
+      { error: "Този цвят вече се използва от друга група в този клуб." },
       { status: 400 },
     );
   }
