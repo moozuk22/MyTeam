@@ -25,6 +25,23 @@ type PlayerWithImages = {
   }>;
 };
 
+function getCloudinaryPublicIdFromImagePath(imagePath: string): string | null {
+  const trimmed = imagePath.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const uploadMarker = "/upload/";
+  const uploadIndex = trimmed.indexOf(uploadMarker);
+  const pathWithTransforms = uploadIndex >= 0
+    ? trimmed.slice(uploadIndex + uploadMarker.length)
+    : trimmed;
+
+  const pathWithoutTransforms = pathWithTransforms.replace(/^v\d+\//, "");
+  const pathWithoutExtension = pathWithoutTransforms.replace(/\.[a-z0-9]+$/i, "");
+  return pathWithoutExtension || null;
+}
+
 function normalizePlayerName(value: string): string {
   return value
     .replace(/\.[^/.]+$/u, "")
@@ -232,9 +249,12 @@ export async function POST(request: NextRequest) {
       }
 
       const player = candidates[0];
-      const currentAdminImage = player.images.find((image) => image.isAdminView)?.imageUrl ?? null;
+      const currentAdminImages = player.images
+        .filter((image) => image.isAdminView)
+        .map((image) => image.imageUrl)
+        .filter((imageUrl) => imageUrl.trim());
 
-      if (currentAdminImage && !overwrite) {
+      if (currentAdminImages.length > 0 && !overwrite) {
         skippedExisting += 1;
         continue;
       }
@@ -253,7 +273,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      if (currentAdminImage === nextImagePath) {
+      if (currentAdminImages.length === 1 && currentAdminImages[0] === nextImagePath) {
         unchanged += 1;
         continue;
       }
@@ -271,9 +291,16 @@ export async function POST(request: NextRequest) {
         }),
       ]);
 
-      if (currentAdminImage) {
+      for (const currentAdminImage of currentAdminImages) {
+        const publicId = getCloudinaryPublicIdFromImagePath(currentAdminImage);
+        if (!publicId) {
+          continue;
+        }
         try {
-          await cloudinary.uploader.destroy(currentAdminImage, { resource_type: "image", invalidate: true });
+          const result = await cloudinary.uploader.destroy(publicId, { resource_type: "image", invalidate: true });
+          if (result.result !== "ok" && result.result !== "not found") {
+            console.warn("Unexpected Cloudinary destroy result during photo import:", result);
+          }
         } catch {
           // non-fatal: image replaced in DB regardless
         }

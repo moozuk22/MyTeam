@@ -2643,7 +2643,6 @@ function ImportPhotosFromDriveModal({
   const [driveLoading, setDriveLoading] = useState(false);
   const [driveError, setDriveError] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string } | null>(null);
-  const [overwrite, setOverwrite] = useState(false);
   const [importResult, setImportResult] = useState<PhotoImportResult | null>(null);
   const [importError, setImportError] = useState("");
   const [detailsExpanded, setDetailsExpanded] = useState<"unmatched" | "ambiguous" | "failed" | null>(null);
@@ -2690,7 +2689,7 @@ function ImportPhotosFromDriveModal({
     setStep("confirm");
   }
 
-  async function runImport() {
+  async function runImport(overwriteExisting: boolean) {
     if (!selectedFolder) return;
     setStep("importing");
     setImportError("");
@@ -2698,7 +2697,7 @@ function ImportPhotosFromDriveModal({
       const res = await fetch("/api/admin/members/import-drive-photos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folderId: selectedFolder.id, clubId, overwrite }),
+        body: JSON.stringify({ folderId: selectedFolder.id, clubId, overwrite: overwriteExisting }),
       });
       const data = (await res.json()) as PhotoImportResult & { error?: string };
       if (!res.ok) {
@@ -2811,18 +2810,10 @@ function ImportPhotosFromDriveModal({
               <p className="amp-import-confirm-hint">
                 Снимките в тази папка ще бъдат съпоставени с играчите по име на файл.
               </p>
-              <label className="amp-import-overwrite-label">
-                <input
-                  type="checkbox"
-                  checked={overwrite}
-                  onChange={(e) => setOverwrite(e.target.checked)}
-                />
-                Презапиши съществуващи снимки
-              </label>
 
               {importError && <p className="amp-confirm-error" style={{ marginTop: 8 }}>{importError}</p>}
 
-              <div className="amp-modal-actions" style={{ marginTop: 16 }}>
+              <div className="amp-modal-actions amp-import-photo-actions" style={{ marginTop: 16 }}>
                 <button
                   className="amp-btn amp-btn--ghost"
                   type="button"
@@ -2833,9 +2824,16 @@ function ImportPhotosFromDriveModal({
                 <button
                   className="amp-btn amp-btn--primary"
                   type="button"
-                  onClick={() => void runImport()}
+                  onClick={() => void runImport(false)}
                 >
                   Импортирай снимките
+                </button>
+                <button
+                  className="amp-btn amp-btn--danger"
+                  type="button"
+                  onClick={() => void runImport(true)}
+                >
+                  Презапиши снимките
                 </button>
               </div>
             </div>
