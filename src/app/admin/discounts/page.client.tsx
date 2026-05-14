@@ -491,20 +491,49 @@ export default function DiscountsPageClient() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Цвят на темата (по подразбиране: #ff4d4d)</label>
+              <label className="form-label">Цвят на темата</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
+                {["#ff4d4d","#ff6d00","#ffca28","#c6ff00","#32cd32","#00e5ff","#2979ff","#651fff","#d500f9","#ff4081","#ffffff","#aaaaaa","#e53935","#f57c00","#fdd835","#69f0ae","#00bcd4","#1565c0","#6a1b9a","#ad1457","#ff6e40","#546e7a"].map(color => {
+                  const active = (editingPartner.themeColor || "").toLowerCase() === color.toLowerCase();
+                  return (
+                    <div
+                      key={color}
+                      onClick={() => setEditingPartner({ ...editingPartner, themeColor: color })}
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "8px",
+                        background: color,
+                        cursor: "pointer",
+                        border: active ? "2px solid #fff" : "2px solid transparent",
+                        boxShadow: active ? `0 0 0 2px ${color}` : "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        transition: "transform 0.15s",
+                      }}
+                      title={color}
+                    >
+                      {active && <Check size={14} color={color === "#ffffff" || color === "#ffca28" || color === "#c6ff00" || color === "#fdd835" ? "#000" : "#fff"} strokeWidth={3} />}
+                    </div>
+                  );
+                })}
+              </div>
               <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                <input 
+                <input
                   type="text"
-                  className="form-input" 
+                  className="form-input"
                   style={{ flex: 1, fontFamily: "monospace", fontSize: "14px" }}
-                  value={editingPartner.themeColor || ""} 
-                  onChange={e => setEditingPartner({...editingPartner, themeColor: e.target.value})}
+                  value={editingPartner.themeColor || ""}
+                  onChange={e => setEditingPartner({ ...editingPartner, themeColor: e.target.value })}
                   placeholder="#ff4d4d"
                 />
-                <div style={{ 
-                  width: "44px", 
-                  height: "44px", 
-                  borderRadius: "10px", 
+                <div style={{
+                  width: "47px",
+                  height: "47px",
+                  flexShrink: 0,
+                  borderRadius: "10px",
                   background: editingPartner.themeColor || "#ff4d4d",
                   border: "2px solid rgba(255,255,255,0.1)",
                   boxShadow: `0 0 15px ${(editingPartner.themeColor || "#ff4d4d")}44`
