@@ -46,6 +46,7 @@ export default function DiscountsPageClient() {
   const [dragY, setDragY] = useState(0);
   const [startY, setStartY] = useState(0);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [badgeIsText, setBadgeIsText] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -80,7 +81,9 @@ export default function DiscountsPageClient() {
       // Ensure badgeText is formatted with - and % if it's just a number
       const payload = {
         ...editingPartner,
-        badgeText: editingPartner.badgeText?.startsWith('-') ? editingPartner.badgeText : `-${editingPartner.badgeText}%`
+        badgeText: badgeIsText
+          ? (editingPartner.badgeText || null)
+          : (editingPartner.badgeText?.startsWith('-') ? editingPartner.badgeText : `-${editingPartner.badgeText}%`),
       };
 
       const res = await fetch(url, {
@@ -226,7 +229,7 @@ export default function DiscountsPageClient() {
             <h1 className="admin-title">Управление на отстъпки</h1>
             <p style={{ color: "#666", marginTop: "4px" }}>Настройте кои отстъпки да се виждат за всеки отбор.</p>
           </div>
-          <button className="add-btn" onClick={() => setEditingPartner({})}>
+          <button className="add-btn" onClick={() => { setEditingPartner({}); setBadgeIsText(false); }}>
             <Plus size={20} />
             Добави партньор
           </button>
@@ -282,7 +285,7 @@ export default function DiscountsPageClient() {
                     {partner.badgeText || "Няма отстъпка"}
                   </div>
                   <div style={{ marginTop: "24px", display: "flex", gap: "12px", justifyContent: "center" }}>
-                    <button className="order-btn" style={{ background: "rgba(50, 150, 255, 0.2)", color: "#4dabf7", width: "36px", height: "36px", borderRadius: "10px" }} onClick={() => setEditingPartner(partner)}><Edit2 size={18} /></button>
+                    <button className="order-btn" style={{ background: "rgba(50, 150, 255, 0.2)", color: "#4dabf7", width: "36px", height: "36px", borderRadius: "10px" }} onClick={() => { setEditingPartner(partner); setBadgeIsText(!/^-\d+%$/.test(partner.badgeText || "")); }}><Edit2 size={18} /></button>
                     <button className="order-btn" style={{ background: "rgba(255, 68, 68, 0.2)", color: "#ff6666", width: "36px", height: "36px", borderRadius: "10px" }} onClick={() => handleDeletePartner(partner.id)}><Trash2 size={18} /></button>
                   </div>
                 </div>
@@ -415,34 +418,54 @@ export default function DiscountsPageClient() {
               </div>
             </div>
             
-            <div className="form-group" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", maxWidth: "400px", margin: "0 auto 20px" }}>
-              <div>
-                <label className="form-label" style={{ textAlign: "center" }}>Отстъпка</label>
-                <div style={{ position: "relative" }}>
-                  <input 
-                    type="text"
-                    className="form-input" 
-                    style={{ paddingLeft: "30px", paddingRight: "30px", textAlign: "center", fontSize: "18px", fontWeight: "700" }}
-                    value={editingPartner.badgeText?.replace(/[^0-9]/g, '') || ""} 
-                    onChange={e => {
-                      const val = e.target.value.replace(/[^0-9]/g, '');
-                      setEditingPartner({...editingPartner, badgeText: val});
-                    }}
-                    placeholder="10"
+            <div className="form-group" style={{ maxWidth: "400px", margin: "0 auto 20px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label className="form-label">Отстъпка</label>
+                  {badgeIsText ? (
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ textAlign: "center", fontWeight: "700" }}
+                      value={editingPartner.badgeText || ""}
+                      onChange={e => setEditingPartner({ ...editingPartner, badgeText: e.target.value })}
+                      placeholder="Партньорска цена"
+                    />
+                  ) : (
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ paddingLeft: "28px", paddingRight: "28px", textAlign: "center", fontWeight: "700" }}
+                        value={editingPartner.badgeText?.replace(/[^0-9]/g, '') || ""}
+                        onChange={e => setEditingPartner({ ...editingPartner, badgeText: e.target.value.replace(/[^0-9]/g, '') })}
+                        placeholder="10"
+                      />
+                      <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#32cd32", fontWeight: "900", pointerEvents: "none" }}>-</span>
+                      <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "#32cd32", fontWeight: "900", pointerEvents: "none" }}>%</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="form-label">Валидна до</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    style={{ textAlign: "center" }}
+                    value={editingPartner.validUntil ? new Date(editingPartner.validUntil).toISOString().split('T')[0] : ""}
+                    onChange={e => setEditingPartner({ ...editingPartner, validUntil: e.target.value })}
                   />
-                  <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#32cd32", fontWeight: "900" }}>-</div>
-                  <div style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#32cd32", fontWeight: "900" }}>%</div>
                 </div>
               </div>
-              <div>
-                <label className="form-label" style={{ textAlign: "center" }}>Валидна до</label>
-                <input 
-                  type="date"
-                  className="form-input" 
-                  style={{ textAlign: "center" }}
-                  value={editingPartner.validUntil ? new Date(editingPartner.validUntil).toISOString().split('T')[0] : ""} 
-                  onChange={e => setEditingPartner({...editingPartner, validUntil: e.target.value})}
-                />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginTop: "10px" }}>
+                <span style={{ fontSize: "12px", color: badgeIsText ? "rgba(255,255,255,0.35)" : "#32cd32", fontWeight: "700", transition: "color 0.2s" }}>%</span>
+                <div
+                  onClick={() => { setBadgeIsText(!badgeIsText); setEditingPartner({ ...editingPartner, badgeText: "" }); }}
+                  style={{ width: "36px", height: "20px", background: badgeIsText ? "#32cd32" : "rgba(255,255,255,0.1)", borderRadius: "10px", position: "relative", cursor: "pointer", transition: "background 0.2s" }}
+                >
+                  <div style={{ width: "14px", height: "14px", background: badgeIsText ? "#000" : "rgba(255,255,255,0.5)", borderRadius: "50%", position: "absolute", top: "3px", left: badgeIsText ? "19px" : "3px", transition: "left 0.2s" }} />
+                </div>
+                <span style={{ fontSize: "12px", color: badgeIsText ? "#32cd32" : "rgba(255,255,255,0.35)", fontWeight: "700", transition: "color 0.2s" }}>Текст</span>
               </div>
             </div>
 
