@@ -1621,7 +1621,7 @@ function AdminMembersPageContent() {
   }, [trainingGroupMode]);
 
   /* ── Derived ── */
-  const canManageMemberActions = isAdmin || !searchParams.has("coachGroupId");
+  const canManageMemberActions = isAdmin || isCoach || !searchParams.has("coachGroupId");
   const groupOptions = [...new Set(
     members.filter((m) => m.isActive).map((m) => m.teamGroup).filter((g): g is number => g !== null)
   )].sort((a, b) => a - b);
