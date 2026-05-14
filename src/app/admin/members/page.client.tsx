@@ -1218,6 +1218,8 @@ function AdminMembersPageContent() {
       );
 
       closeEditModal();
+      await refreshMembersList();
+      router.refresh();
     } catch (error) {
       console.error("Error updating member:", error);
       setEditError("Възникна грешка при редактиране.");
@@ -4721,6 +4723,7 @@ function AdminMembersPageContent() {
                   key={m.id}
                   member={m}
                   onClick={() => setSelectedMember(m)}
+                  onEdit={openEditMember}
                   coachGroupName={!coachGroupId && m.coachGroupIds.length > 0 ? m.coachGroupIds.map((id) => coachGroups.find((g) => g.id === id)?.name ?? "").filter(Boolean).join(", ") : null}
                 />
               ))}

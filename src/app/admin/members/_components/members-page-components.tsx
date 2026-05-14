@@ -2056,6 +2056,7 @@ function ConfirmDeleteModal({
 function PlayerCard({
   member,
   onClick,
+  onEdit,
   actionMode = "profile",
   isActionLoading = false,
   onReactivate,
@@ -2065,6 +2066,7 @@ function PlayerCard({
 }: {
   member: Member;
   onClick: () => void;
+  onEdit?: (member: Member) => void;
   actionMode?: "profile" | "reactivate";
   isActionLoading?: boolean;
   onReactivate?: () => void;
@@ -2118,6 +2120,20 @@ function PlayerCard({
         </div>
 
         <div className="pc-actions">
+          {actionMode === "profile" && (
+            <button
+              type="button"
+              className="pc-edit-btn"
+              title="Редактирай"
+              aria-label={`Редактирай ${member.fullName}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit?.(member);
+              }}
+            >
+              <PencilIcon size={14} />
+            </button>
+          )}
           {actionMode === "profile" && cardCode && (
             <button
               type="button"

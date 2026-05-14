@@ -706,6 +706,26 @@
   box-shadow: 0 0 12px rgba(50, 205, 50, 0.25);
 }
 
+.pc-edit-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.pc-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.12);
+}
+
 .pc-reactivate-btn {
   border: 1px solid rgba(50, 205, 50, 0.45);
   border-radius: 10px;
