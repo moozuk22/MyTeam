@@ -1754,13 +1754,19 @@ export default function MemberCardPage({
                     </div>
                     <span className="sd-discount-label">{member.discounts[0].name}</span>
                     {member.discounts[0].badgeText && (
-                      <span 
+                      <span
                         className="sd-discount-badge"
-                        style={{ 
+                        style={{
                           background: (member.discounts[0].themeColor || "#ff4d4d").startsWith("#") ? (member.discounts[0].themeColor || "#ff4d4d") : `#${member.discounts[0].themeColor || "ff4d4d"}`
                         }}
                       >
-                        {member.discounts[0].badgeText}
+                        {/^-\d+%$/.test(member.discounts[0].badgeText) ? member.discounts[0].badgeText : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                          </svg>
+                        )}
                       </span>
                     )}
                   </div>
@@ -2094,7 +2100,9 @@ export default function MemberCardPage({
                     border: `1px solid ${(activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}`}33`
                   }}>
                     <span className="sd-highlight-value" style={{ color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` }}>{activeDiscount.badgeText}</span>
-                    <span className="sd-highlight-label" style={{ color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` }}>отстъпка</span>
+                    {/^-\d+%$/.test(activeDiscount.badgeText ?? "") && (
+                      <span className="sd-highlight-label" style={{ color: (activeDiscount.themeColor || "#ff4d4d").startsWith("#") ? (activeDiscount.themeColor || "#ff4d4d") : `#${activeDiscount.themeColor || "ff4d4d"}` }}>отстъпка</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -2242,7 +2250,13 @@ export default function MemberCardPage({
                             background: themeColor
                           }}
                         >
-                          {discount.badgeText}
+                          {/^-\d+%$/.test(discount.badgeText) ? discount.badgeText : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10"/>
+                              <line x1="12" y1="16" x2="12" y2="12"/>
+                              <line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                          )}
                         </span>
                       )}
                     </div>
