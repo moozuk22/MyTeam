@@ -4483,14 +4483,27 @@ function AdminMembersPageContent() {
                 <ClipboardListIcon />
                 <span>Присъствия</span>
               </button>
-              <button
-                className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
-                onClick={() => router.push(`/admin/training-plans?clubId=${encodeURIComponent(clubId)}`)}
-                type="button"
-              >
-                <ClipboardListIcon />
-                <span>Планове за тренировки</span>
-              </button>
+              {isCoach && !isAdmin ? (
+                <span className="amp-coming-soon-wrap" data-tooltip="Очаквайте скоро">
+                  <button
+                    className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
+                    type="button"
+                    disabled
+                  >
+                    <ClipboardListIcon />
+                    <span>Планове за тренировки</span>
+                  </button>
+                </span>
+              ) : (
+                <button
+                  className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
+                  onClick={() => router.push(`/admin/training-plans?clubId=${encodeURIComponent(clubId)}`)}
+                  type="button"
+                >
+                  <ClipboardListIcon />
+                  <span>Планове за тренировки</span>
+                </button>
+              )}
               {isAdmin && (
                 <button
                   className="amp-download-links-btn amp-btn--compact"

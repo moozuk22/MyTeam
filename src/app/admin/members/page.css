@@ -67,9 +67,14 @@
   margin-bottom: 24px;
 }
 
-.amp-buttons-grid>button {
+.amp-buttons-grid>button,
+.amp-buttons-grid>.amp-coming-soon-wrap {
   flex: 1 1 calc(50% - 4px);
   justify-content: center;
+}
+
+.amp-buttons-grid>.amp-coming-soon-wrap>button {
+  width: 100%;
 }
 
 .amp-back-btn {
@@ -1419,6 +1424,41 @@
 .amp-color-swatch-tooltip-wrap {
   position: relative;
   display: inline-flex;
+}
+
+.amp-coming-soon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.amp-coming-soon-wrap > button {
+  opacity: 0.45;
+}
+
+.amp-coming-soon-wrap::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 20, 0.95);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.amp-coming-soon-wrap:hover::after {
+  opacity: 1;
+  background: #1a1a1a;
+  color: #ffffff;
 }
 
 .amp-color-swatch-tooltip-wrap::after {
