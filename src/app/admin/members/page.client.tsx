@@ -114,37 +114,43 @@ function CustomTrainingGroupColorPicker({
   groups: CustomTrainingGroup[];
   excludeGroupId?: string;
 }) {
-  const colorTakenByOther = (hex: string) =>
-    groups.some(
+  const colorTakenByOther = (hex: string): string | null => {
+    const match = groups.find(
       (g) =>
         (g.coachGroupId ?? null) === coachScopeKey &&
         isCustomTrainingGroupPaletteColor(g.color) &&
         g.color === hex &&
         (!excludeGroupId || g.id !== excludeGroupId),
     );
+    return match ? match.name : null;
+  };
 
   return (
     <div className="amp-edit-field" style={{ marginTop: 10 }}>
       <span className="amp-lbl">Цвят на групата</span>
       <div className="amp-custom-group-color-swatches" role="radiogroup" aria-label="Цвят на групата">
         {CUSTOM_TRAINING_GROUP_COLOR_PALETTE.map((hex) => {
-          const taken = colorTakenByOther(hex);
+          const takenBy = colorTakenByOther(hex);
           const isSelected = value === hex;
-          const isDisabled = Boolean(disabled) || (taken && !isSelected);
-          return (
+          const isDisabled = Boolean(disabled) || (takenBy !== null && !isSelected);
+          const btn = (
             <button
               key={hex}
               type="button"
               role="radio"
               aria-checked={isSelected}
-              aria-label={taken && !isSelected ? "Зает цвят" : `Цвят ${hex}`}
+              aria-label={takenBy && !isSelected ? "Зает цвят" : `Цвят ${hex}`}
               disabled={isDisabled}
-              title={taken && !isSelected ? "Този цвят вече се използва от друга група" : undefined}
-              className={`amp-custom-group-color-swatch${isSelected ? " is-selected" : ""}${taken && !isSelected ? " is-taken" : ""}`}
+              className={`amp-custom-group-color-swatch${isSelected ? " is-selected" : ""}${takenBy && !isSelected ? " is-taken" : ""}`}
               style={{ backgroundColor: hex }}
               onClick={() => onChange(hex)}
             />
           );
+          return takenBy && !isSelected ? (
+            <span key={hex} className="amp-color-swatch-tooltip-wrap" data-tooltip={`Използва се от ${takenBy}`}>
+              {btn}
+            </span>
+          ) : btn;
         })}
       </div>
     </div>
