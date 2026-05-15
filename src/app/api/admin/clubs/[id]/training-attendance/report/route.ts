@@ -7,7 +7,6 @@ import {
   isoDateToUtcMidnight,
   utcDateToIsoDate,
 } from "@/lib/training";
-import { getTrainingSessionScopeKey } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -261,73 +260,67 @@ export async function GET(
       club.trainingWeekdays ??
       [];
 
+    const trainingDates = getTrainingDatesInRange({
+      from,
+      to,
+      trainingDates: effectiveDates,
+      trainingWeekdays: effectiveWeekdays,
+    });
+
+    const players = targetPlayer
+      ? [targetPlayer]
+      : await prisma.player.findMany({
+          where: {
+            clubId: id,
+            isActive: true,
+            ...(coachGroupId ? { coachGroups: { some: { id: coachGroupId } } } : {}),
+            ...(customTrainingGroup ? { id: { in: customTrainingGroup.players.map((p) => p.playerId) } } : {}),
+            ...(trainingGroup ? { teamGroup: { in: trainingGroup.teamGroups } } : {}),
+            ...(teamGroup !== null && !trainingGroup ? { teamGroup } : {}),
+          },
+          select: { id: true, fullName: true, teamGroup: true },
+          orderBy: { fullName: "asc" },
+        });
+
     const fromDate = isoDateToUtcMidnight(from);
     const toDate = isoDateToUtcMidnight(to);
-    const scopeKey = getTrainingSessionScopeKey(
-      customTrainingGroup
-        ? { type: "customGroup", id: customTrainingGroup.id }
-        : trainingGroup
-          ? { type: "trainingGroup", id: trainingGroup.id }
-          : teamGroup !== null
-            ? { type: "teamGroup", teamGroup }
-            : { type: "club" },
-    );
-    const storedSessions = await prisma.trainingSession.findMany({
-      where: {
-        clubId: id,
-        scopeKey,
-        trainingDate: { gte: fromDate, lte: toDate },
-        status: { not: "cancelled" },
-      },
-      select: {
-        trainingDate: true,
-        players: {
-          where: playerId ? { playerId } : {},
-          select: {
-            playerId: true,
-            playerName: true,
-            teamGroup: true,
-            present: true,
-            reasonCode: true,
-          },
-          orderBy: { playerName: "asc" },
-        },
-      },
-      orderBy: { trainingDate: "asc" },
-    });
-    const storedTrainingDates = Array.from(
-      new Set(storedSessions.map((session) => utcDateToIsoDate(session.trainingDate))),
-    ).sort((a, b) => a.localeCompare(b));
 
-    const trainingDates = storedTrainingDates;
-    const playerRows = new Map<string, { id: string; fullName: string; teamGroup: number | null; attendance: Record<string, { present: boolean; reasonCode: string | null }> }>();
-    for (const session of storedSessions) {
-      const date = utcDateToIsoDate(session.trainingDate);
-      for (const player of session.players) {
-        const key = player.playerId ?? `${player.playerName}|${player.teamGroup ?? ""}`;
-        const existing = playerRows.get(key) ?? {
-          id: player.playerId ?? key,
-          fullName: player.playerName,
-          teamGroup: player.teamGroup,
-          attendance: {},
-        };
-        existing.attendance[date] = {
-          present: player.present,
-          reasonCode: player.present ? null : player.reasonCode ?? null,
-        };
-        playerRows.set(key, existing);
-      }
+    const optOuts =
+      players.length > 0 && trainingDates.length > 0
+        ? await prisma.trainingOptOut.findMany({
+            where: {
+              playerId: { in: players.map((p) => p.id) },
+              trainingDate: { gte: fromDate, lte: toDate },
+            },
+            select: { playerId: true, trainingDate: true, reasonCode: true },
+          })
+        : [];
+
+    const optOutMap = new Map<string, Map<string, string | null>>();
+    for (const o of optOuts) {
+      const iso = utcDateToIsoDate(o.trainingDate);
+      if (!optOutMap.has(o.playerId)) optOutMap.set(o.playerId, new Map());
+      optOutMap.get(o.playerId)!.set(iso, o.reasonCode ?? null);
     }
 
     return NextResponse.json({
       trainingDates,
-      players: Array.from(playerRows.values()).map((player) => ({
-        ...player,
+      players: players.map((p) => ({
+        id: p.id,
+        fullName: p.fullName,
+        teamGroup: p.teamGroup,
         attendance: Object.fromEntries(
-          trainingDates.map((date) => [
-            date,
-            player.attendance[date] ?? { present: false, reasonCode: "not_expected" },
-          ]),
+          trainingDates.map((d) => {
+            const byDate = optOutMap.get(p.id);
+            const optedOut = byDate?.has(d) ?? false;
+            return [
+              d,
+              {
+                present: !optedOut,
+                reasonCode: optedOut ? (byDate?.get(d) ?? null) : null,
+              },
+            ];
+          }),
         ),
       })),
     });
