@@ -4885,7 +4885,7 @@ function AdminMembersPageContent() {
           }}
           isReactivating={reactivatingMemberId === selectedMember.id}
           isDeletingPermanent={deletingPermanentMemberId === selectedMember.id}
-          coachGroups={isAdmin && coachGroups.length > 0 ? coachGroups : undefined}
+          coachGroups={(isAdmin || isCoach) && coachGroups.length > 0 ? coachGroups : undefined}
           onCoachGroupAssigned={(memberId, newCoachGroupIds) => {
             setMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, coachGroupIds: newCoachGroupIds } : m));
             setSelectedMember((prev) => prev?.id === memberId ? { ...prev, coachGroupIds: newCoachGroupIds } : prev);
@@ -4918,23 +4918,25 @@ function AdminMembersPageContent() {
                     onChange={(e) => setEditForm((prev) => ({ ...prev, fullName: e.target.value }))}
                   />
                 </label>
-                <label className="amp-edit-field">
-                  <span className="amp-lbl">Club</span>
-                  <select
-                    className="amp-edit-input"
-                    value={editForm.clubId}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, clubId: e.target.value }))}
-                  >
-                    <option value="" disabled>
-                      Изберете отбор
-                    </option>
-                    {clubs.map((club) => (
-                      <option key={club.id} value={club.id}>
-                        {club.name}
+                {isAdmin && (
+                  <label className="amp-edit-field">
+                    <span className="amp-lbl">Club</span>
+                    <select
+                      className="amp-edit-input"
+                      value={editForm.clubId}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, clubId: e.target.value }))}
+                    >
+                      <option value="" disabled>
+                        Изберете отбор
                       </option>
-                    ))}
-                  </select>
-                </label>
+                      {clubs.map((club) => (
+                        <option key={club.id} value={club.id}>
+                          {club.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="amp-edit-field">
                   <span className="amp-lbl">Номер в отбора</span>
                   <input

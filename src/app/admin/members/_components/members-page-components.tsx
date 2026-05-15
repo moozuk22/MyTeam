@@ -2128,7 +2128,7 @@ function PlayerCard({
               aria-label={`Редактирай ${member.fullName}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onEdit?.(member);
+                onClick();
               }}
             >
               <PencilIcon size={14} />
