@@ -47,6 +47,7 @@ export default function DiscountsPageClient() {
   const [startY, setStartY] = useState(0);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [badgeIsText, setBadgeIsText] = useState(false);
+  const [teamSearch, setTeamSearch] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -295,9 +296,19 @@ export default function DiscountsPageClient() {
         </section>
 
         <section className="section-card">
-          <h3 className="section-title"><Users size={20} /> Настройка по отбори</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px", gap: "16px", flexWrap: "wrap" }}>
+            <h3 className="section-title" style={{ margin: 0 }}><Users size={20} /> Настройка по отбори</h3>
+            <input
+              type="text"
+              className="form-input"
+              style={{ width: "240px", fontSize: "14px" }}
+              placeholder="Търси отбор..."
+              value={teamSearch}
+              onChange={e => setTeamSearch(e.target.value)}
+            />
+          </div>
           <div className="teams-list">
-            {teams.map(team => (
+            {teams.filter(t => t.clubName.toLowerCase().includes(teamSearch.toLowerCase())).map(team => (
               <div key={`${team.clubId}`} className="team-row">
                 <div className="team-header">
                   <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
