@@ -18,6 +18,8 @@ export const CUSTOM_TRAINING_GROUP_COLOR_PALETTE = [
   "#5E35B1",
   "#546E7A",
   "#00ACC1",
+  "#212121",
+  "#FAFAFA",
 ] as const;
 
 export type CustomTrainingGroupPaletteColor = (typeof CUSTOM_TRAINING_GROUP_COLOR_PALETTE)[number];
