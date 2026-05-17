@@ -75,6 +75,7 @@ type WeekSession = {
   location?: string;
   scopeLabel?: string;
   isHome?: boolean;
+  limitedSpots?: { id: string; maxSpots: number; registeredCount: number } | null;
 };
 
 function formatTeamGroupsLabel(teamGroups: number[]): string {
@@ -109,7 +110,7 @@ export async function GET(
   const dates = getSevenDates(todayIso);
 
   try {
-    const [club, teamSchedules, trainingGroups, customTrainingGroups, clubMatches] = await Promise.all([
+    const [club, teamSchedules, trainingGroups, customTrainingGroups, clubMatches, limitedEvents] = await Promise.all([
       prisma.club.findUnique({
         where: { id },
         select: {
@@ -165,10 +166,25 @@ export async function GET(
         where: { clubId: id, matchDate: { in: dates } },
         select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, teamGroups: true, isHome: true },
       }),
+      prisma.limitedTrainingEvent.findMany({
+        where: { clubId: id, trainingDate: { in: dates.map((d) => new Date(d + "T00:00:00.000Z")) } },
+        select: { id: true, scopeKey: true, trainingDate: true, maxSpots: true, _count: { select: { registrations: true } } },
+      }),
     ]);
 
     if (!club) {
       return NextResponse.json({ error: "Club not found" }, { status: 404 });
+    }
+
+    // Build a lookup: "scopeKey|YYYY-MM-DD" → limited event data
+    const limitedEventByKey = new Map<string, { id: string; maxSpots: number; registeredCount: number }>();
+    for (const ev of limitedEvents) {
+      const dateIso = ev.trainingDate.toISOString().slice(0, 10);
+      limitedEventByKey.set(`${ev.scopeKey}|${dateIso}`, {
+        id: ev.id,
+        maxSpots: ev.maxSpots,
+        registeredCount: ev._count.registrations,
+      });
     }
 
     const sessions: WeekSession[] = [];
@@ -192,6 +208,7 @@ export async function GET(
             label: group.name || "Custom group",
             teamGroups: [],
             color: group.color ?? null,
+            limitedSpots: limitedEventByKey.get(`custom_group:${group.id}|${date}`) ?? null,
           });
         }
       }
@@ -297,6 +314,7 @@ export async function GET(
           eventType: "training",
           label: `Отбор ${teamGroup}`,
           teamGroups: [teamGroup],
+          limitedSpots: limitedEventByKey.get(`team_group:${teamGroup}|${date}`) ?? null,
         });
       }
     }
