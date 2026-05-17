@@ -81,6 +81,7 @@ import type {
   TrainingDaysStep,
   TrainingWeekSessionItem,
   ClubMatch,
+  LimitedEventDetail,
 } from "./_components/members-page-components";
 
 /* ── Weekly schedule (Тази седмица): vertical list by day ── */
@@ -97,6 +98,14 @@ function sortWeekSessionsForDay(a: TrainingWeekSessionItem, b: TrainingWeekSessi
 function customTrainingGroupCoachScopeKey(coachGroupIdFromUrl: string): string | null {
   const trimmed = coachGroupIdFromUrl.trim();
   return trimmed || null;
+}
+
+function getScopeKeyFromSessionId(sessionId: string): string | null {
+  const customMatch = sessionId.match(/^\d{4}-\d{2}-\d{2}-custom-(.+)$/);
+  if (customMatch) return `custom_group:${customMatch[1]}`;
+  const teamMatch = sessionId.match(/^\d{4}-\d{2}-\d{2}-team-(\d+)$/);
+  if (teamMatch) return `team_group:${teamMatch[1]}`;
+  return null;
 }
 
 function CustomTrainingGroupColorPicker({
@@ -142,7 +151,7 @@ function CustomTrainingGroupColorPicker({
               aria-label={takenBy && !isSelected ? "Зает цвят" : `Цвят ${hex}`}
               disabled={isDisabled}
               className={`amp-custom-group-color-swatch${isSelected ? " is-selected" : ""}${takenBy && !isSelected ? " is-taken" : ""}`}
-              style={{ backgroundColor: hex }}
+              style={{ backgroundColor: hex, ...(hex === "#FAFAFA" && !isSelected ? { borderColor: "rgba(0,0,0,0.35)" } : {}) }}
               onClick={() => onChange(hex)}
             />
           );
@@ -212,7 +221,7 @@ function WeeklyGrid({
                       }
                     : undefined;
                   const timeStyle: CSSProperties | undefined = accent
-                    ? { color: accent }
+                    ? { color: customTrainingGroupReadableOnAccent(accent) === "#fafafa" ? "rgba(255,255,255,0.75)" : accent }
                     : undefined;
                   const badgeStyle: CSSProperties | undefined =
                     accent && session.eventType !== "match"
@@ -241,6 +250,14 @@ function WeeklyGrid({
                         <span className="amp-training-week-session-row-meta">
                           {session.isHome ? "Домакин" : "Гост"}
                           {session.scopeLabel ? ` · ${session.scopeLabel}` : ""}
+                        </span>
+                      )}
+                      {session.eventType !== "match" && session.limitedSpots && (
+                        <span
+                          className="amp-training-week-session-row-meta"
+                          title={`Ограничени места: ${session.limitedSpots.registeredCount} от ${session.limitedSpots.maxSpots} записани`}
+                        >
+                          {session.limitedSpots.registeredCount}/{session.limitedSpots.maxSpots} места
                         </span>
                       )}
                     </div>
@@ -471,7 +488,17 @@ function AdminMembersPageContent() {
   const [matchViewMatch, setMatchViewMatch] = useState<ClubMatch | null>(null);
   const [trainingDayDetailsTab, setTrainingDayDetailsTab] = useState<string>("training");
   const [trainingDayDetailsTabLoading, setTrainingDayDetailsTabLoading] = useState(false);
+  const [limitedEvent, setLimitedEvent] = useState<LimitedEventDetail | null>(null);
+  const [limitedEventLoading, setLimitedEventLoading] = useState(false);
+  const [limitedSpotsInput, setLimitedSpotsInput] = useState("10");
+  const [showLimitedForm, setShowLimitedForm] = useState(false);
+  const [limitedEventSaving, setLimitedEventSaving] = useState(false);
+  const [limitedEventError, setLimitedEventError] = useState("");
   const [trainingDaysActiveStep, setTrainingDaysActiveStep] = useState<TrainingDaysStep>("days");
+  const [schedulerLimitedMode, setSchedulerLimitedMode] = useState(false);
+  const [schedulerLimitedSpots, setSchedulerLimitedSpots] = useState("10");
+  const [schedulerPerDayLimited, setSchedulerPerDayLimited] = useState(false);
+  const [schedulerPerDayConfig, setSchedulerPerDayConfig] = useState<Record<string, { limited: boolean; spots: string }>>({});
   const [trainingFieldActiveDate, setTrainingFieldActiveDate] = useState("");
   const [trainingDaysInitialDates, setTrainingDaysInitialDates] = useState<string[]>([]);
   const [trainingDaysInitialDurationMinutes, setTrainingDaysInitialDurationMinutes] = useState(DEFAULT_TRAINING_DURATION_MINUTES);
@@ -1880,16 +1907,38 @@ function AdminMembersPageContent() {
     canShowTrainingDaysTimeStep &&
     !hasMissingTrainingTime &&
     !hasInvalidTrainingDuration;
+  const spotsStepSupportedByMode =
+    trainingDaysEditorMode === "teamGroup" ||
+    trainingDaysEditorMode === "customGroup" ||
+    trainingDaysEditorMode === "coachGroup";
+  const canShowTrainingDaysSpotsStep = canShowTrainingDaysFieldStep && spotsStepSupportedByMode;
+  const schedulerLimitedSpotsValue = parseInt(schedulerLimitedSpots, 10);
+  const isSchedulerLimitedSpotsValid =
+    Number.isInteger(schedulerLimitedSpotsValue) && schedulerLimitedSpotsValue >= 1 && schedulerLimitedSpotsValue <= 200;
+  const isSchedulerPerDayConfigValid =
+    !schedulerPerDayLimited ||
+    !normalizedTrainingDaysSelection.some((d) => {
+      const cfg = schedulerPerDayConfig[d];
+      if (!cfg?.limited) return false;
+      const s = parseInt(cfg.spots, 10);
+      return !Number.isInteger(s) || s < 1 || s > 200;
+    });
   const effectiveTrainingDaysActiveStep: TrainingDaysStep =
     trainingDaysEditorMode === "createGroup"
       ? "days"
       : trainingDaysActiveStep === "field" && !canShowTrainingDaysFieldStep
-        ? canShowTrainingDaysTimeStep
-          ? "time"
-          : "days"
-        : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
-          ? "days"
-          : trainingDaysActiveStep;
+        ? canShowTrainingDaysSpotsStep
+          ? "spots"
+          : canShowTrainingDaysTimeStep
+            ? "time"
+            : "days"
+        : trainingDaysActiveStep === "spots" && !canShowTrainingDaysSpotsStep
+          ? canShowTrainingDaysTimeStep
+            ? "time"
+            : "days"
+          : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
+            ? "days"
+            : trainingDaysActiveStep;
   const trainingWeekdayBuckets = Array.from(
     new Set(
       normalizedTrainingDaysSelection
@@ -1933,7 +1982,9 @@ function AdminMembersPageContent() {
   const isTrainingStepNextDisabled =
     trainingDaysEditorSaving ||
     (effectiveTrainingDaysActiveStep === "days" && !canShowTrainingDaysTimeStep) ||
-    (effectiveTrainingDaysActiveStep === "time" && !canShowTrainingDaysFieldStep);
+    (effectiveTrainingDaysActiveStep === "time" && !canShowTrainingDaysFieldStep) ||
+    (effectiveTrainingDaysActiveStep === "spots" && !schedulerPerDayLimited && schedulerLimitedMode && !isSchedulerLimitedSpotsValid) ||
+    (effectiveTrainingDaysActiveStep === "spots" && !isSchedulerPerDayConfigValid);
   const normalizedTrainingDateTimesSelectionKey = normalizedTrainingDaysSelection
     .map((date) => `${date}:${normalizedTrainingDateTimesSelection[date] ?? ""}`)
     .join("|");
@@ -2911,6 +2962,10 @@ function AdminMembersPageContent() {
     setTrainingFieldSelections({});
     setTrainingFieldActiveDate("");
     setTrainingTimeMode("all");
+    setSchedulerLimitedMode(false);
+    setSchedulerLimitedSpots("10");
+    setSchedulerPerDayLimited(false);
+    setSchedulerPerDayConfig({});
     setTrainingDaysEditorLoading(true);
     await loadTrainingFields();
     const loadedGroups = isCustomTrainingGroupMode ? [] : await loadTrainingScheduleGroups();
@@ -3181,6 +3236,27 @@ function AdminMembersPageContent() {
       throw new Error(schedulerPayload?.error || "Неуспешно запазване на тренировъчните дни.");
     }
 
+    if (clubId && selectedTeamGroup !== null && schedulerForm.trainingDates.length > 0) {
+      const scopeKey = `team_group:${selectedTeamGroup}`;
+      const datesToLimit: Array<{ date: string; spots: number }> = schedulerPerDayLimited
+        ? schedulerForm.trainingDates
+            .filter((d) => schedulerPerDayConfig[d]?.limited)
+            .map((d) => ({ date: d, spots: parseInt(schedulerPerDayConfig[d].spots, 10) }))
+            .filter(({ spots }) => Number.isInteger(spots) && spots >= 1 && spots <= 200)
+        : schedulerLimitedMode && isSchedulerLimitedSpotsValid
+          ? schedulerForm.trainingDates.map((d) => ({ date: d, spots: schedulerLimitedSpotsValue }))
+          : [];
+      if (datesToLimit.length > 0) {
+        await Promise.allSettled(datesToLimit.map(({ date, spots }) =>
+          fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scopeKey, scopeId: null, teamGroup: selectedTeamGroup, trainingDate: date, maxSpots: spots }),
+          })
+        ));
+      }
+    }
+
     setTrainingDaysEditorCreateOpen(false);
     setTrainingDaysEditorGroupName("");
     setTrainingDaysEditorGroups([]);
@@ -3274,6 +3350,37 @@ function AdminMembersPageContent() {
         if (!groupResponse.ok) {
           throw new Error(groupPayload.error || "Неуспешно запазване на тренировъчните дни.");
         }
+
+        if (clubId && nextTrainingDates.length > 0) {
+          let scopeKey = "";
+          let scopeId: string | null = null;
+          if (trainingDaysEditorMode === "customGroup") {
+            scopeKey = `custom_group:${selectedTrainingGroupId}`;
+            scopeId = selectedTrainingGroupId;
+          } else if (trainingDaysEditorMode === "coachGroup") {
+            scopeKey = `coach_group:${coachGroupId}`;
+          }
+          if (scopeKey) {
+            const datesToLimit: Array<{ date: string; spots: number }> = schedulerPerDayLimited
+              ? nextTrainingDates
+                  .filter((d) => schedulerPerDayConfig[d]?.limited)
+                  .map((d) => ({ date: d, spots: parseInt(schedulerPerDayConfig[d].spots, 10) }))
+                  .filter(({ spots }) => Number.isInteger(spots) && spots >= 1 && spots <= 200)
+              : schedulerLimitedMode && isSchedulerLimitedSpotsValid
+                ? nextTrainingDates.map((d) => ({ date: d, spots: schedulerLimitedSpotsValue }))
+                : [];
+            if (datesToLimit.length > 0) {
+              await Promise.allSettled(datesToLimit.map(({ date, spots }) =>
+                fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ scopeKey, scopeId, teamGroup: null, trainingDate: date, maxSpots: spots }),
+                })
+              ));
+            }
+          }
+        }
+
         setTrainingDaysEditorCreateOpen(false);
         setTrainingDaysEditorGroupName("");
         setTrainingDaysEditorGroups([]);
@@ -3783,6 +3890,13 @@ function AdminMembersPageContent() {
                 const c = typeof raw.color === "string" ? raw.color.trim() : "";
                 return isCustomTrainingGroupPaletteColor(c) ? c : undefined;
               })(),
+              limitedSpots: (() => {
+                const ls = raw.limitedSpots;
+                if (!ls || typeof ls !== "object") return null;
+                const o = ls as Record<string, unknown>;
+                if (typeof o.id !== "string" || typeof o.maxSpots !== "number" || typeof o.registeredCount !== "number") return null;
+                return { id: o.id, maxSpots: o.maxSpots, registeredCount: o.registeredCount };
+              })(),
             } satisfies TrainingWeekSessionItem;
           })
         : [];
@@ -4040,17 +4154,55 @@ function AdminMembersPageContent() {
     }
   };
 
+  const fetchLimitedEventForSession = async (date: string, sessionId: string) => {
+    if (!clubId) return;
+    const scopeKey = getScopeKeyFromSessionId(sessionId);
+    if (!scopeKey) {
+      setLimitedEvent(null);
+      return;
+    }
+    setLimitedEventLoading(true);
+    try {
+      const url = `/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events?date=${encodeURIComponent(date)}&scopeKey=${encodeURIComponent(scopeKey)}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) { setLimitedEvent(null); return; }
+      const data: unknown = await res.json();
+      const arr = Array.isArray(data) ? data : [];
+      if (arr.length === 0) { setLimitedEvent(null); return; }
+      const ev = arr[0] as { id: string; scopeKey: string; scopeId: string | null; teamGroup: number | null; trainingDate: string; maxSpots: number; registeredCount: number };
+      // Fetch full event details with registrations
+      const detailRes = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events/${encodeURIComponent(ev.id)}`, { cache: "no-store" });
+      if (!detailRes.ok) { setLimitedEvent(null); return; }
+      const detail = await detailRes.json() as { event: LimitedEventDetail; registrations: LimitedEventDetail["registrations"]; spotsRemaining: number };
+      setLimitedEvent({
+        ...detail.event,
+        registrations: detail.registrations,
+        spotsRemaining: detail.spotsRemaining,
+      });
+    } catch {
+      setLimitedEvent(null);
+    } finally {
+      setLimitedEventLoading(false);
+    }
+  };
+
   const openTrainingDayDetails = async (date: string) => {
     const month = getMonthKeyFromIsoDate(date);
     setTrainingDayDetailsOpening(true);
     setTrainingAttendanceDate(date);
     setTrainingAttendanceMonth(month);
     const firstSession = trainingWeekSessions.find((s) => s.date === date && s.eventType !== "match");
-    setTrainingDayDetailsTab(firstSession?.id ?? "training");
+    const firstSessionId = firstSession?.id ?? "training";
+    setTrainingDayDetailsTab(firstSessionId);
+    setLimitedEvent(null);
+    setShowLimitedForm(false);
+    setLimitedEventError("");
+    setLimitedSpotsInput("10");
     try {
       await Promise.all([
         fetchTrainingAttendance(date, undefined, undefined, undefined, month),
         fetchClubMatches(),
+        fetchLimitedEventForSession(date, firstSessionId),
       ]);
       setTrainingDayDetailsOpen(true);
     } finally {
@@ -4313,6 +4465,52 @@ function AdminMembersPageContent() {
       source.close();
     };
   }, [trainingAttendanceOpen, clubId, trainingAttendanceDate, trainingAttendanceMonth, selectedTeamGroup, trainingAttendanceView, selectedTrainingGroupId]);
+
+  // Live updates for the week view — re-fetch week sessions on any club attendance change
+  useEffect(() => {
+    if (!trainingAttendanceOpen || !clubId || trainingAttendanceView !== "today") {
+      return;
+    }
+    const streamUrl = `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/stream`;
+    const source = new EventSource(streamUrl, { withCredentials: true });
+    const handleUpdate = () => {
+      void fetchTrainingWeekSessions();
+    };
+    source.addEventListener("attendance-update", handleUpdate);
+    return () => {
+      source.removeEventListener("attendance-update", handleUpdate);
+      source.close();
+    };
+  }, [trainingAttendanceOpen, clubId, trainingAttendanceView]);
+
+  // Polling fallback — re-fetch every 15s while the Graf modal is open (covers SSE gaps on serverless)
+  useEffect(() => {
+    if (!trainingAttendanceOpen || !clubId || trainingAttendanceView !== "today") {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      void fetchTrainingWeekSessions();
+    }, 15000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [trainingAttendanceOpen, clubId, trainingAttendanceView]);
+
+  // Re-fetch when admin tab becomes visible again (SSE drops while tab is backgrounded)
+  useEffect(() => {
+    if (!trainingAttendanceOpen || !clubId || trainingAttendanceView !== "today") {
+      return;
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void fetchTrainingWeekSessions();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [trainingAttendanceOpen, clubId, trainingAttendanceView]);
 
   return (
     <main className="amp-page">
@@ -7049,13 +7247,24 @@ function AdminMembersPageContent() {
                         <span className="amp-training-step-index">2</span>
                         Час
                       </button>
+                      {spotsStepSupportedByMode && (
+                        <button
+                          type="button"
+                          className={`amp-training-step${effectiveTrainingDaysActiveStep === "spots" ? " is-active" : ""}${canShowTrainingDaysSpotsStep && effectiveTrainingDaysActiveStep === "field" ? " is-complete" : ""}`}
+                          onClick={() => setTrainingDaysActiveStep("spots")}
+                          disabled={trainingDaysEditorSaving || !canShowTrainingDaysSpotsStep}
+                        >
+                          <span className="amp-training-step-index">3</span>
+                          Места
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}`}
                         onClick={() => setTrainingDaysActiveStep("field")}
                         disabled={trainingDaysEditorSaving || !canShowTrainingDaysFieldStep}
                       >
-                        <span className="amp-training-step-index">3</span>
+                        <span className="amp-training-step-index">{spotsStepSupportedByMode ? 4 : 3}</span>
                         Терен
                       </button>
                     </div>
@@ -7082,7 +7291,7 @@ function AdminMembersPageContent() {
                       <span className="amp-training-step-summary-value">{trainingDaysSummaryText}</span>
                     </div>
                   )}
-                  {trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep === "field" && (
+                  {trainingDaysEditorMode !== "createGroup" && (effectiveTrainingDaysActiveStep === "spots" || effectiveTrainingDaysActiveStep === "field") && (
                     <div className="amp-training-step-summary" style={{ order: 1 }}>
                       <div>
                         <span className="amp-training-step-summary-label">Избрани дни</span>
@@ -7092,6 +7301,23 @@ function AdminMembersPageContent() {
                         <span className="amp-training-step-summary-label">Час и продължителност</span>
                         <span className="amp-training-step-summary-value">{trainingTimeSummaryText} · {trainingDurationSummaryText}</span>
                       </div>
+                      {spotsStepSupportedByMode && effectiveTrainingDaysActiveStep === "field" && (
+                        <div>
+                          <span className="amp-training-step-summary-label">Участие</span>
+                          <span className="amp-training-step-summary-value">
+                            {schedulerPerDayLimited
+                              ? (() => {
+                                  const limitedDays = normalizedTrainingDaysSelection.filter(d => schedulerPerDayConfig[d]?.limited);
+                                  return limitedDays.length === 0
+                                    ? "Всички участват"
+                                    : `${limitedDays.length} ${limitedDays.length === 1 ? "ден" : "дни"} с ограничени места`;
+                                })()
+                              : schedulerLimitedMode && isSchedulerLimitedSpotsValid
+                                ? `Ограничено — ${schedulerLimitedSpotsValue} места`
+                                : "Всички участват"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && (
@@ -7337,6 +7563,119 @@ function AdminMembersPageContent() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysSpotsStep && effectiveTrainingDaysActiveStep === "spots" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8, order: 2 }}>
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Режим на присъствие</span>
+                      {!schedulerPerDayLimited && (
+                        <>
+                          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              style={{
+                                flex: "1 1 160px", maxWidth: 220, padding: "14px 16px", borderRadius: 10, border: `2px solid ${!schedulerLimitedMode ? "rgba(102,187,106,0.8)" : "rgba(255,255,255,0.15)"}`,
+                                background: !schedulerLimitedMode ? "rgba(102,187,106,0.12)" : "rgba(255,255,255,0.04)",
+                                color: "#fff", cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                              }}
+                              onClick={() => setSchedulerLimitedMode(false)}
+                              disabled={trainingDaysEditorSaving}
+                            >
+                              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Всички участват</div>
+                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>Всеки активен играч е маркиран като присъстващ по подразбиране.</div>
+                            </button>
+                            <button
+                              type="button"
+                              style={{
+                                flex: "1 1 160px", maxWidth: 220, padding: "14px 16px", borderRadius: 10, border: `2px solid ${schedulerLimitedMode ? "rgba(240,160,48,0.8)" : "rgba(255,255,255,0.15)"}`,
+                                background: schedulerLimitedMode ? "rgba(240,160,48,0.10)" : "rgba(255,255,255,0.04)",
+                                color: "#fff", cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                              }}
+                              onClick={() => setSchedulerLimitedMode(true)}
+                              disabled={trainingDaysEditorSaving}
+                            >
+                              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Ограничен брой места</div>
+                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>Играчите се записват сами. Само записаните участват.</div>
+                            </button>
+                          </div>
+                          {schedulerLimitedMode && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", marginTop: 4 }}>
+                              <label style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>Брой места:</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={200}
+                                value={schedulerLimitedSpots}
+                                onChange={(e) => setSchedulerLimitedSpots(e.target.value)}
+                                style={{ width: 80, padding: "6px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.07)", color: "#fff", fontSize: 14 }}
+                                disabled={trainingDaysEditorSaving}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {schedulerPerDayLimited && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {normalizedTrainingDaysSelection.map((date) => {
+                            const cfg = schedulerPerDayConfig[date] ?? { limited: false, spots: schedulerLimitedSpots };
+                            const spotsNum = parseInt(cfg.spots, 10);
+                            const spotsInvalid = cfg.limited && (!Number.isInteger(spotsNum) || spotsNum < 1 || spotsNum > 200);
+                            return (
+                              <div key={date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                                <span style={{ flex: 1, fontSize: 13, color: "rgba(255,255,255,0.8)" }}>{formatIsoDateForDisplay(date)}</span>
+                                <button
+                                  type="button"
+                                  disabled={trainingDaysEditorSaving}
+                                  style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${!cfg.limited ? "rgba(102,187,106,0.8)" : "rgba(255,255,255,0.15)"}`, background: !cfg.limited ? "rgba(102,187,106,0.15)" : "rgba(255,255,255,0.05)", color: "#fff" }}
+                                  onClick={() => setSchedulerPerDayConfig((prev) => ({ ...prev, [date]: { limited: false, spots: prev[date]?.spots ?? schedulerLimitedSpots } }))}
+                                >Всички</button>
+                                <button
+                                  type="button"
+                                  disabled={trainingDaysEditorSaving}
+                                  style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${cfg.limited ? "rgba(240,160,48,0.8)" : "rgba(255,255,255,0.15)"}`, background: cfg.limited ? "rgba(240,160,48,0.12)" : "rgba(255,255,255,0.05)", color: "#fff" }}
+                                  onClick={() => setSchedulerPerDayConfig((prev) => ({ ...prev, [date]: { limited: true, spots: prev[date]?.spots ?? schedulerLimitedSpots } }))}
+                                >Ограничено</button>
+                                {cfg.limited && (
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={200}
+                                    value={cfg.spots}
+                                    disabled={trainingDaysEditorSaving}
+                                    onChange={(e) => setSchedulerPerDayConfig((prev) => ({ ...prev, [date]: { limited: true, spots: e.target.value } }))}
+                                    style={{ width: 60, padding: "4px 8px", borderRadius: 6, border: `1px solid ${spotsInvalid ? "rgba(229,57,53,0.7)" : "rgba(255,255,255,0.2)"}`, background: "rgba(255,255,255,0.07)", color: "#fff", fontSize: 13 }}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {normalizedTrainingDaysSelection.length > 1 && (
+                        <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
+                          <label className={`amp-group-check-chip${schedulerPerDayLimited ? " is-selected" : ""}${trainingDaysEditorSaving ? " is-disabled" : ""}`} style={{ fontSize: 13 }}>
+                            <input
+                              className="amp-group-check-input"
+                              type="checkbox"
+                              checked={schedulerPerDayLimited}
+                              disabled={trainingDaysEditorSaving}
+                              onChange={(e) => {
+                                const on = e.target.checked;
+                                setSchedulerPerDayLimited(on);
+                                if (on) {
+                                  const init: Record<string, { limited: boolean; spots: string }> = {};
+                                  for (const d of normalizedTrainingDaysSelection) {
+                                    init[d] = { limited: schedulerLimitedMode, spots: schedulerLimitedSpots };
+                                  }
+                                  setSchedulerPerDayConfig(init);
+                                }
+                              }}
+                            />
+                            <span className="amp-group-check-box" aria-hidden="true" />
+                            Различна настройка за всеки ден
+                          </label>
+                        </div>
+                      )}
                     </div>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysFieldStep && effectiveTrainingDaysActiveStep === "field" && trainingFields.length > 0 && (
@@ -7599,7 +7938,13 @@ function AdminMembersPageContent() {
                           type="button"
                           className="amp-btn amp-btn--ghost"
                           onClick={() => {
-                            setTrainingDaysActiveStep(effectiveTrainingDaysActiveStep === "field" ? "time" : "days");
+                            if (effectiveTrainingDaysActiveStep === "field") {
+                              setTrainingDaysActiveStep(canShowTrainingDaysSpotsStep ? "spots" : "time");
+                            } else if (effectiveTrainingDaysActiveStep === "spots") {
+                              setTrainingDaysActiveStep("time");
+                            } else {
+                              setTrainingDaysActiveStep("days");
+                            }
                           }}
                           disabled={trainingDaysEditorSaving}
                         >
@@ -7611,7 +7956,13 @@ function AdminMembersPageContent() {
                           type="button"
                           className="amp-btn amp-btn--primary"
                           onClick={() => {
-                            setTrainingDaysActiveStep(effectiveTrainingDaysActiveStep === "days" ? "time" : "field");
+                            if (effectiveTrainingDaysActiveStep === "days") {
+                              setTrainingDaysActiveStep("time");
+                            } else if (effectiveTrainingDaysActiveStep === "time") {
+                              setTrainingDaysActiveStep(canShowTrainingDaysSpotsStep ? "spots" : "field");
+                            } else {
+                              setTrainingDaysActiveStep("field");
+                            }
                           }}
                           disabled={isTrainingStepNextDisabled}
                         >
@@ -8005,6 +8356,11 @@ function AdminMembersPageContent() {
                       Добави описание
                     </button>
                   </div>
+                  {limitedEvent && !limitedEventLoading && (
+                    <p style={{ fontSize: 12, color: "rgba(240,160,48,0.9)", background: "rgba(240,160,48,0.08)", border: "1px solid rgba(240,160,48,0.25)", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
+                      Ограничен режим — всички маркирани като отсъстващи. Маркирайте ръчно кой е присъствал.
+                    </p>
+                  )}
                   <div className="amp-training-table-wrap">
                     {trainingAttendanceLoading || trainingDayDetailsTabLoading ? (
                       <p className="amp-empty amp-empty--modal">Зареждане...</p>
@@ -8035,6 +8391,218 @@ function AdminMembersPageContent() {
                       </table>
                     )}
                   </div>
+                  {/* ── Limited spots section ── */}
+                  {(() => {
+                    const activeScopeKey = getScopeKeyFromSessionId(trainingDayDetailsTab);
+                    if (!activeScopeKey) return null;
+                    return (
+                      <div style={{ marginTop: 20, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "rgba(255,255,255,0.88)" }}>Ограничени места</span>
+                          {!limitedEvent && !limitedEventLoading && !showLimitedForm && (
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--sm amp-btn--ghost"
+                              onClick={() => setShowLimitedForm(true)}
+                              disabled={limitedEventSaving}
+                            >
+                              + Ограничи броя места
+                            </button>
+                          )}
+                        </div>
+                        {limitedEventLoading && <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Зареждане...</p>}
+                        {limitedEventError && <p style={{ fontSize: 13, color: "#ff6b6b", marginBottom: 8 }}>{limitedEventError}</p>}
+                        {!limitedEventLoading && limitedEvent && (
+                          <div>
+                            {(() => {
+                              const confirmed = limitedEvent.registrations.filter((r) => r.isConfirmed);
+                              const waitlisted = limitedEvent.registrations.filter((r) => !r.isConfirmed);
+                              return (
+                                <>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: "#32cd32", background: "rgba(50,205,50,0.12)", border: "1px solid rgba(50,205,50,0.35)", borderRadius: 6, padding: "3px 10px" }}>
+                                      {confirmed.length}/{limitedEvent.maxSpots} записани
+                                    </span>
+                                    {waitlisted.length > 0 && (
+                                      <span style={{ fontSize: 13, fontWeight: 600, color: "#f0a030", background: "rgba(240,160,48,0.12)", border: "1px solid rgba(240,160,48,0.35)", borderRadius: 6, padding: "3px 10px" }}>
+                                        {waitlisted.length} в чакалня
+                                      </span>
+                                    )}
+                                    {limitedEvent.spotsRemaining > 0 && (
+                                      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
+                                        {limitedEvent.spotsRemaining} свободни
+                                      </span>
+                                    )}
+                                  </div>
+                                  {confirmed.length > 0 && (
+                                    <ol style={{ margin: "0 0 8px 0", padding: "0 0 0 18px", fontSize: 13, color: "rgba(255,255,255,0.78)" }}>
+                                      {confirmed.map((r) => (
+                                        <li key={r.playerId} style={{ marginBottom: 3 }}>
+                                          {r.fullName} <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                                            {new Date(r.registeredAt).toLocaleTimeString("bg-BG", { hour: "2-digit", minute: "2-digit" })}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ol>
+                                  )}
+                                  {waitlisted.length > 0 && (
+                                    <>
+                                      <div style={{ fontSize: 11, fontWeight: 700, color: "#f0a030", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Чакалня</div>
+                                      <ol start={limitedEvent.maxSpots + 1} style={{ margin: "0 0 12px 0", padding: "0 0 0 18px", fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
+                                        {waitlisted.map((r) => (
+                                          <li key={r.playerId} style={{ marginBottom: 3 }}>
+                                            {r.fullName} <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>
+                                              {new Date(r.registeredAt).toLocaleTimeString("bg-BG", { hour: "2-digit", minute: "2-digit" })}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ol>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <input
+                                type="number"
+                                min={1}
+                                max={200}
+                                value={limitedSpotsInput}
+                                onChange={(e) => setLimitedSpotsInput(e.target.value)}
+                                style={{ width: 70, padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.07)", color: "#fff", fontSize: 13 }}
+                                disabled={limitedEventSaving}
+                              />
+                              <button
+                                type="button"
+                                className="amp-btn amp-btn--sm amp-btn--primary"
+                                disabled={limitedEventSaving}
+                                onClick={async () => {
+                                  if (!clubId || !limitedEvent) return;
+                                  const maxSpots = parseInt(limitedSpotsInput, 10);
+                                  if (!Number.isInteger(maxSpots) || maxSpots < 1 || maxSpots > 200) {
+                                    setLimitedEventError("Броят места трябва да е между 1 и 200.");
+                                    return;
+                                  }
+                                  setLimitedEventSaving(true);
+                                  setLimitedEventError("");
+                                  try {
+                                    const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events/${encodeURIComponent(limitedEvent.id)}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ maxSpots }),
+                                    });
+                                    if (!res.ok) {
+                                      const d = await res.json().catch(() => ({})) as { error?: string };
+                                      setLimitedEventError(typeof d.error === "string" ? d.error : "Грешка при запазване.");
+                                      return;
+                                    }
+                                    await fetchLimitedEventForSession(trainingAttendanceDate ?? "", trainingDayDetailsTab);
+                                  } catch {
+                                    setLimitedEventError("Грешка при запазване.");
+                                  } finally {
+                                    setLimitedEventSaving(false);
+                                  }
+                                }}
+                              >
+                                Промени места
+                              </button>
+                              <button
+                                type="button"
+                                className="amp-btn amp-btn--sm amp-btn--danger"
+                                disabled={limitedEventSaving}
+                                onClick={async () => {
+                                  if (!clubId || !limitedEvent) return;
+                                  setLimitedEventSaving(true);
+                                  setLimitedEventError("");
+                                  try {
+                                    const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events/${encodeURIComponent(limitedEvent.id)}`, {
+                                      method: "DELETE",
+                                    });
+                                    if (!res.ok) {
+                                      const d = await res.json().catch(() => ({})) as { error?: string };
+                                      setLimitedEventError(typeof d.error === "string" ? d.error : "Грешка при изтриване.");
+                                      return;
+                                    }
+                                    setLimitedEvent(null);
+                                    setLimitedSpotsInput("10");
+                                  } catch {
+                                    setLimitedEventError("Грешка при изтриване.");
+                                  } finally {
+                                    setLimitedEventSaving(false);
+                                  }
+                                }}
+                              >
+                                Деактивирай
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {!limitedEventLoading && !limitedEvent && showLimitedForm && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <input
+                              type="number"
+                              min={1}
+                              max={200}
+                              value={limitedSpotsInput}
+                              onChange={(e) => setLimitedSpotsInput(e.target.value)}
+                              placeholder="Брой места"
+                              style={{ width: 100, padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.07)", color: "#fff", fontSize: 13 }}
+                              disabled={limitedEventSaving}
+                            />
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--sm amp-btn--primary"
+                              disabled={limitedEventSaving}
+                              onClick={async () => {
+                                if (!clubId || !trainingAttendanceDate) return;
+                                const maxSpots = parseInt(limitedSpotsInput, 10);
+                                if (!Number.isInteger(maxSpots) || maxSpots < 1 || maxSpots > 200) {
+                                  setLimitedEventError("Броят места трябва да е между 1 и 200.");
+                                  return;
+                                }
+                                const scopeKey = getScopeKeyFromSessionId(trainingDayDetailsTab);
+                                if (!scopeKey) return;
+                                const teamGroupMatch = scopeKey.match(/^team_group:(\d+)$/);
+                                const teamGroup = teamGroupMatch ? parseInt(teamGroupMatch[1], 10) : null;
+                                const customGroupMatch = scopeKey.match(/^custom_group:(.+)$/);
+                                const scopeId = customGroupMatch ? customGroupMatch[1] : null;
+                                setLimitedEventSaving(true);
+                                setLimitedEventError("");
+                                try {
+                                  const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ scopeKey, scopeId, teamGroup, trainingDate: trainingAttendanceDate, maxSpots }),
+                                  });
+                                  if (!res.ok) {
+                                    const d = await res.json().catch(() => ({})) as { error?: string };
+                                    setLimitedEventError(typeof d.error === "string" ? d.error : "Грешка при създаване.");
+                                    return;
+                                  }
+                                  setShowLimitedForm(false);
+                                  await fetchLimitedEventForSession(trainingAttendanceDate, trainingDayDetailsTab);
+                                } catch {
+                                  setLimitedEventError("Грешка при създаване.");
+                                } finally {
+                                  setLimitedEventSaving(false);
+                                }
+                              }}
+                            >
+                              Запази
+                            </button>
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--sm amp-btn--ghost"
+                              onClick={() => { setShowLimitedForm(false); setLimitedEventError(""); }}
+                              disabled={limitedEventSaving}
+                            >
+                              Отказ
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>

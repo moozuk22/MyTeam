@@ -159,7 +159,7 @@ interface TrainingField {
 
 type TrainingTimeMode = "all" | "perDay" | "byWeekday";
 
-type TrainingDaysStep = "days" | "time" | "field";
+type TrainingDaysStep = "days" | "time" | "spots" | "field";
 
 interface TrainingTodaySessionItem {
   id: string;
@@ -186,6 +186,7 @@ interface TrainingWeekSessionItem {
   location?: string;
   scopeLabel?: string;
   isHome?: boolean;
+  limitedSpots?: { id: string; maxSpots: number; registeredCount: number } | null;
 }
 
 interface ClubMatch {
@@ -284,6 +285,25 @@ type PhotoImportResult = {
   };
 };
 
+interface LimitedEventRegistration {
+  position: number;
+  playerId: string;
+  fullName: string;
+  registeredAt: string;
+  isConfirmed: boolean;
+}
+
+interface LimitedEventDetail {
+  id: string;
+  scopeKey: string;
+  scopeId: string | null;
+  teamGroup: number | null;
+  trainingDate: string;
+  maxSpots: number;
+  registrations: LimitedEventRegistration[];
+  spotsRemaining: number;
+}
+
 export type {
   ReportKind,
   ReportPaymentLog,
@@ -318,4 +338,6 @@ export type {
   ParsedPlayerRow,
   ImportResult,
   PhotoImportResult,
+  LimitedEventRegistration,
+  LimitedEventDetail,
 };

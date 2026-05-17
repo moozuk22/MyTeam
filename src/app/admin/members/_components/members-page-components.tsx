@@ -731,6 +731,7 @@ function AttendanceDashboard({
                               : !hasPending && cell.reasonCode === "injury" ? "Контузия"
                               : !hasPending && cell.reasonCode === "sick" ? "Болен"
                               : !hasPending && cell.reasonCode === "other" ? "Друга причина"
+                              : !hasPending && cell.reasonCode === "limited_event" ? "Не е записан за ограниченото събитие"
                               : !hasPending && cell.reasonCode ? `Причина: ${cell.reasonCode}` : "Отказал се";
                             const displayReasonCode = hasPending ? (displayOptedOut ? "other" : null) : cell.reasonCode;
                             return (
@@ -744,7 +745,8 @@ function AttendanceDashboard({
                                   displayReasonCode === "injury" ? "Конт" :
                                     displayReasonCode === "sick" ? "Болен" :
                                       displayReasonCode === "other" ? "Друго" :
-                                        displayReasonCode ? displayReasonCode.slice(0, 4) : "✗"
+                                        displayReasonCode === "limited_event" ? "✗" :
+                                          displayReasonCode ? displayReasonCode.slice(0, 4) : "✗"
                                 )}
                               </td>
                             );
