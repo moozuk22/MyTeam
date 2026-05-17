@@ -183,7 +183,7 @@ export default function VipPage() {
                       <h2 className="text-neon">VIP CLUB</h2>
                     </div>
                     <p className="text-neon" style={{ color: "var(--neon-green)", opacity: 1 }}>Ексклузивно за първите 10 клуба</p>
-                    <p style={{ color: "#FF3E3E", fontSize: 14, fontWeight: 700, marginTop: 4 }}>*3 свободни места</p>
+                    <p style={{ color: "#FF3E3E", fontSize: 14, fontWeight: 700, marginTop: 4 }}>*1 свободно място</p>
                   </div>
 
                   <div className="vip-rows-v2">
