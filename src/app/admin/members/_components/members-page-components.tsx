@@ -73,11 +73,14 @@ function AttendanceDashboard({
   const [error, setError] = useState("");
   const [availableGroups, setAvailableGroups] = useState<number[]>([]);
   const [scheduleGroups, setScheduleGroups] = useState<TrainingScheduleGroup[]>([]);
+  const [coachGroupsList, setCoachGroupsList] = useState<Array<{ id: string; name: string }>>([]);
   const [editMode, setEditMode] = useState(false);
   // key: "playerId|date", value: optedOut boolean (desired new state)
   const [pendingChanges, setPendingChanges] = useState<Map<string, boolean>>(new Map());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [customTrainingGroupsList, setCustomTrainingGroupsList] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCustomGroupId, setSelectedCustomGroupId] = useState("");
   const attendanceScopeKey = `${clubId}|${coachGroupId}`;
 
   useEffect(() => {
@@ -95,10 +98,12 @@ function AttendanceDashboard({
           ? `/api/admin/members?${membersSearch.toString()}`
           : "/api/admin/members";
         const groupsUrl = `/api/admin/clubs/${encodeURIComponent(clubId)}/training-groups`;
+        const coachGroupsUrl = `/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups`;
 
-        const [membersRes, groupsRes] = await Promise.all([
+        const [membersRes, groupsRes, coachGroupsRes] = await Promise.all([
           fetch(membersUrl, { cache: "no-store" }),
           fetch(groupsUrl, { cache: "no-store" }),
+          fetch(coachGroupsUrl, { cache: "no-store" }),
         ]);
 
         if (membersRes.ok) {
@@ -166,27 +171,64 @@ function AttendanceDashboard({
             : [];
           setScheduleGroups(groups);
         }
+
+        if (coachGroupsRes.ok) {
+          const payload: unknown = await coachGroupsRes.json();
+          const cgs = Array.isArray(payload)
+            ? payload
+              .map((item) => {
+                const r = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+                return { id: String(r.id ?? ""), name: String(r.name ?? "").trim() };
+              })
+              .filter((g) => g.id && g.name)
+            : [];
+          setCoachGroupsList(cgs);
+        }
       } catch {
         // silent
       }
     };
     void fetchOptions();
-     
+
   }, [attendanceScopeKey]);
 
   useEffect(() => {
-    if (scopeType === "group" && !groupScope && (scheduleGroups.length > 0 || availableGroups.length > 0)) {
-      if (scheduleGroups.length > 0) {
-        setGroupScope(`tg:${scheduleGroups[0].id}`);
-      } else if (availableGroups.length > 0) {
-        const trainingGroupYears = new Set(scheduleGroups.flatMap((g) => g.teamGroups));
-        const standalone = availableGroups.filter((g) => !trainingGroupYears.has(g));
-        if (standalone.length > 0) {
-          setGroupScope(`year:${standalone[0]}`);
-        }
-      }
+    if (scopeType === "group" && !groupScope && coachGroupsList.length > 0) {
+      setGroupScope(`cg:${coachGroupsList[0].id}`);
     }
-  }, [scheduleGroups, availableGroups, scopeType, groupScope]);
+  }, [coachGroupsList, scopeType, groupScope]);
+
+  useEffect(() => {
+    if (!groupScope.startsWith("cg:")) {
+      setCustomTrainingGroupsList([]);
+      setSelectedCustomGroupId("");
+      return;
+    }
+    const cgId = groupScope.slice(3);
+    const fetchCustomGroups = async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups?coachGroupId=${encodeURIComponent(cgId)}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const payload: unknown = await res.json();
+        const groups = Array.isArray(payload)
+          ? payload
+            .map((item) => {
+              const r = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+              return { id: String(r.id ?? ""), name: String(r.name ?? "").trim() };
+            })
+            .filter((g) => g.id && g.name)
+          : [];
+        setCustomTrainingGroupsList(groups);
+        setSelectedCustomGroupId(groups.length > 0 ? groups[0].id : "");
+      } catch {
+        // silent
+      }
+    };
+    void fetchCustomGroups();
+  }, [groupScope, clubId]);
 
   useEffect(() => {
     if (!from || !to || from > to) return;
@@ -209,8 +251,14 @@ function AttendanceDashboard({
           search.set("trainingGroupId", groupScope.slice(3));
         } else if (groupScope.startsWith("year:")) {
           search.set("teamGroup", groupScope.slice(5));
+        } else if (groupScope.startsWith("cg:")) {
+          if (selectedCustomGroupId) {
+            search.set("customTrainingGroupId", selectedCustomGroupId);
+          } else {
+            search.set("coachGroupId", groupScope.slice(3));
+          }
         }
-        if (coachGroupId) {
+        if (!groupScope.startsWith("cg:") && coachGroupId) {
           search.set("coachGroupId", coachGroupId);
         }
         const res = await fetch(
@@ -247,7 +295,7 @@ function AttendanceDashboard({
       clearTimeout(timer);
     };
      
-  }, [from, to, scopeType, groupScope, selectedPlayerId, attendanceScopeKey]);
+  }, [from, to, scopeType, groupScope, selectedPlayerId, selectedCustomGroupId, attendanceScopeKey]);
 
   const formatDateHeader = (iso: string): string => {
     const parts = iso.split("-");
@@ -262,10 +310,10 @@ function AttendanceDashboard({
     ? "Няма играчи в избраната група."
     : groupScope.startsWith("year:")
       ? "Няма играчи в избрания набор."
-      : "Няма активни играчи.";
+      : groupScope.startsWith("cg:")
+        ? "Няма играчи в избраната треньорска група."
+        : "Няма активни играчи.";
 
-  const trainingGroupYears = new Set(scheduleGroups.flatMap((g) => g.teamGroups));
-  const standaloneGroups = availableGroups.filter((g) => !trainingGroupYears.has(g));
 
   const filteredSearchPlayers = playerSearch.length >= 1 && !selectedPlayerId
     ? allPlayers.filter((p) =>
@@ -538,28 +586,47 @@ function AttendanceDashboard({
             </div>
           </div>
           {scopeType === "group" ? (
-            <div className="rd-field">
-              <label className="rd-label">Група</label>
-              <div className="rd-select-wrap">
-                <select
-                  className="rd-select"
-                  value={groupScope}
-                  onChange={(e) => setGroupScope(e.target.value)}
-                >
-                  {scheduleGroups.map((g) => (
-                    <option key={g.id} value={`tg:${g.id}`}>
-                      {g.name}
-                    </option>
-                  ))}
-                  {standaloneGroups.map((g) => (
-                    <option key={g} value={`year:${g}`}>
-                      Набор {g}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDownIcon />
+            <>
+              <div className="rd-field">
+                <label className="rd-label">Група</label>
+                <div className="rd-select-wrap">
+                  <select
+                    className="rd-select"
+                    value={groupScope}
+                    onChange={(e) => setGroupScope(e.target.value)}
+                  >
+                    {coachGroupsList.map((g) => (
+                      <option key={g.id} value={`cg:${g.id}`}>
+                        {g.name}
+                      </option>
+                    ))}
+                    {coachGroupsList.length === 0 && (
+                      <option value="" disabled>Няма треньорски групи</option>
+                    )}
+                  </select>
+                  <ChevronDownIcon />
+                </div>
               </div>
-            </div>
+              {groupScope.startsWith("cg:") && customTrainingGroupsList.length > 0 && (
+                <div className="rd-field">
+                  <label className="rd-label">Подгрупа</label>
+                  <div className="rd-select-wrap">
+                    <select
+                      className="rd-select"
+                      value={selectedCustomGroupId}
+                      onChange={(e) => setSelectedCustomGroupId(e.target.value)}
+                    >
+                      {customTrainingGroupsList.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDownIcon />
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="rd-field acd-player-search-field">
               <label className="rd-label">Играч</label>
