@@ -1278,6 +1278,9 @@
   margin: -4px;
   border-radius: 8px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
 }
 
 .amp-info-cell-trigger {
@@ -1537,9 +1540,24 @@
 }
 
 .amp-acc-chevron {
-  color: rgba(255, 255, 255, 0.3);
-  transition: transform 0.2s ease;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px;
+  transition: transform 0.2s ease, background 0.15s;
   display: flex;
+  flex-shrink: 0;
+}
+
+.amp-acc-chevron svg {
+  width: 20px;
+  height: 20px;
+}
+
+.amp-info-cell-trigger:hover .amp-acc-chevron {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .amp-acc-chevron.open {
