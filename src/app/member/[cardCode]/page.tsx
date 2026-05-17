@@ -54,6 +54,25 @@ interface MemberProfile {
   }>;
 }
 
+interface LimitedEventInfo {
+  id: string;
+  maxSpots: number;
+  spotsRemaining: number;
+  isRegistered: boolean;
+  isConfirmed: boolean;
+  waitlistPosition: number | null;
+}
+
+interface TrainingSessionItem {
+  scopeKey: string;
+  trainingTime?: string;
+  trainingDurationMinutes?: number;
+  trainingFieldName?: string | null;
+  trainingFieldPieces?: string[];
+  trainingFieldPieceNames?: string[];
+  limitedEvent?: LimitedEventInfo | null;
+}
+
 interface TrainingDayStatus {
   date: string;
   weekday: number;
@@ -66,6 +85,8 @@ interface TrainingDayStatus {
   trainingFieldName?: string | null;
   trainingFieldPieces?: string[];
   trainingFieldPieceNames?: string[];
+  limitedEvent?: LimitedEventInfo | null;
+  sessions: TrainingSessionItem[];
 }
 
 interface MemberMatch {
@@ -387,6 +408,8 @@ export default function MemberCardPage({
   const [trainingError, setTrainingError] = useState<string | null>(null);
   const [memberMatches, setMemberMatches] = useState<MemberMatch[]>([]);
   const [trainingSavingDate, setTrainingSavingDate] = useState<string | null>(null);
+  const [registerSavingEventId, setRegisterSavingEventId] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
   const [trainingModalOpen, setTrainingModalOpen] = useState(false);
   const [trainingCalendarMonth, setTrainingCalendarMonth] = useState(() => {
     const today = new Date();
@@ -653,6 +676,66 @@ export default function MemberCardPage({
                 ? raw.trainingFieldPieceNames.map((name) => String(name ?? "").trim()).filter(Boolean)
                 : [],
               note: String(raw.note ?? ""),
+              limitedEvent: (() => {
+                const le = raw.limitedEvent;
+                if (!le || typeof le !== "object") return null;
+                const l = le as Record<string, unknown>;
+                if (typeof l.id !== "string" || !l.id) return null;
+                const isRegistered = Boolean(l.isRegistered);
+                const isConfirmed = isRegistered && Boolean(l.isConfirmed);
+                return {
+                  id: l.id,
+                  maxSpots: Number(l.maxSpots),
+                  spotsRemaining: Number(l.spotsRemaining),
+                  isRegistered,
+                  isConfirmed,
+                  waitlistPosition: isRegistered && !isConfirmed && typeof l.waitlistPosition === "number" ? l.waitlistPosition : null,
+                } satisfies LimitedEventInfo;
+              })(),
+              sessions: (() => {
+                const parseLimitedEvent = (le: unknown): LimitedEventInfo | null => {
+                  if (!le || typeof le !== "object") return null;
+                  const l = le as Record<string, unknown>;
+                  if (typeof l.id !== "string" || !l.id) return null;
+                  const isRegistered = Boolean(l.isRegistered);
+                  const isConfirmed = isRegistered && Boolean(l.isConfirmed);
+                  return {
+                    id: l.id,
+                    maxSpots: Number(l.maxSpots),
+                    spotsRemaining: Number(l.spotsRemaining),
+                    isRegistered,
+                    isConfirmed,
+                    waitlistPosition: isRegistered && !isConfirmed && typeof l.waitlistPosition === "number" ? l.waitlistPosition : null,
+                  };
+                };
+                const rawSessions = Array.isArray(raw.sessions) ? raw.sessions : null;
+                if (!rawSessions || rawSessions.length === 0) {
+                  // Fallback: synthesize single session from top-level fields
+                  return [
+                    {
+                      scopeKey: "",
+                      trainingTime: String(raw.trainingTime ?? "").trim(),
+                      trainingDurationMinutes: Number.isInteger(Number(raw.trainingDurationMinutes)) ? Number(raw.trainingDurationMinutes) : undefined,
+                      trainingFieldName: String(raw.trainingFieldName ?? "").trim() || null,
+                      trainingFieldPieces: Array.isArray(raw.trainingFieldPieces) ? (raw.trainingFieldPieces as unknown[]).map((n) => String(n ?? "").trim()).filter(Boolean) : [],
+                      trainingFieldPieceNames: Array.isArray(raw.trainingFieldPieceNames) ? (raw.trainingFieldPieceNames as unknown[]).map((n) => String(n ?? "").trim()).filter(Boolean) : [],
+                      limitedEvent: parseLimitedEvent(raw.limitedEvent),
+                    } satisfies TrainingSessionItem,
+                  ];
+                }
+                return (rawSessions as unknown[]).map((s) => {
+                  const rs = typeof s === "object" && s !== null ? (s as Record<string, unknown>) : {};
+                  return {
+                    scopeKey: String(rs.scopeKey ?? ""),
+                    trainingTime: String(rs.trainingTime ?? "").trim(),
+                    trainingDurationMinutes: Number.isInteger(Number(rs.trainingDurationMinutes)) ? Number(rs.trainingDurationMinutes) : undefined,
+                    trainingFieldName: String(rs.trainingFieldName ?? "").trim() || null,
+                    trainingFieldPieces: Array.isArray(rs.trainingFieldPieces) ? (rs.trainingFieldPieces as unknown[]).map((n) => String(n ?? "").trim()).filter(Boolean) : [],
+                    trainingFieldPieceNames: Array.isArray(rs.trainingFieldPieceNames) ? (rs.trainingFieldPieceNames as unknown[]).map((n) => String(n ?? "").trim()).filter(Boolean) : [],
+                    limitedEvent: parseLimitedEvent(rs.limitedEvent),
+                  } satisfies TrainingSessionItem;
+                });
+              })(),
             } satisfies TrainingDayStatus;
           })
           .filter((item: TrainingDayStatus) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
@@ -826,6 +909,19 @@ export default function MemberCardPage({
       source.close();
     };
   }, [normalizedCardCode, notificationsPanelOpen]);
+
+  // Re-fetch training data when app returns to foreground (SSE is lost while backgrounded on mobile)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void Promise.all([fetchTrainingDays(), fetchMemberMatches()]);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [normalizedCardCode]);
 
   // Fetch unread notification count on page load
   useEffect(() => {
@@ -1868,7 +1964,16 @@ export default function MemberCardPage({
                           {trainingTimeLabel && (
                             <span className="training-calendar-time">{trainingTimeLabel}</span>
                           )}
-                          <span className="training-calendar-mark">{isSaving ? "..." : trainingItem.optedOut ? "x" : "✓"}</span>
+                          {trainingItem.limitedEvent && !isSaving && (
+                            <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1, color: trainingItem.limitedEvent.isRegistered ? (trainingItem.limitedEvent.isConfirmed ? "#32cd32" : "#f0a030") : trainingItem.limitedEvent.spotsRemaining === 0 ? "#ff6b6b" : "#f0a030" }}>
+                              {trainingItem.limitedEvent.isRegistered
+                                ? trainingItem.limitedEvent.isConfirmed ? "✓" : `#${trainingItem.limitedEvent.waitlistPosition}`
+                                : trainingItem.limitedEvent.spotsRemaining === 0 ? "Ч" : `${trainingItem.limitedEvent.spotsRemaining}м`}
+                            </span>
+                          )}
+                          {!trainingItem.limitedEvent && (
+                            <span className="training-calendar-mark">{isSaving ? "..." : trainingItem.optedOut ? "x" : "✓"}</span>
+                          )}
                         </button>
                       );
                     })}
@@ -2365,10 +2470,21 @@ export default function MemberCardPage({
 
                                 const isOptedOut = trainingItem!.optedOut;
                                 const trainingTimeLabel = trainingItem!.trainingTime?.trim() ?? "";
+                                const multiSession = (trainingItem!.sessions?.length ?? 1) > 1;
                                 const dateLabel = new Date(`${trainingItem!.date}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
                                   day: "2-digit",
                                   month: "2-digit",
                                 });
+                                // Priority limited event for badge: confirmed > waitlisted > available > full
+                                const allLimitedSessions = trainingItem!.sessions?.filter((s) => s.limitedEvent) ?? [];
+                                const displayLimitedEvent =
+                                  allLimitedSessions.find((s) => s.limitedEvent?.isConfirmed)?.limitedEvent ??
+                                  allLimitedSessions.find((s) => s.limitedEvent?.isRegistered)?.limitedEvent ??
+                                  allLimitedSessions.find((s) => (s.limitedEvent?.spotsRemaining ?? 0) > 0)?.limitedEvent ??
+                                  allLimitedSessions[0]?.limitedEvent ??
+                                  trainingItem!.limitedEvent ??
+                                  null;
+                                const isSaving = trainingSavingDate === trainingItem!.date;
                                 return (
                                   <button
                                     key={cellDate}
@@ -2380,14 +2496,22 @@ export default function MemberCardPage({
                                     }}
                                     disabled={Boolean(trainingSavingDate)}
                                     type="button"
-                                    aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem!.weekday] ?? "-"} ${dateLabel}${trainingTimeLabel ? ` ${trainingTimeLabel}` : ""}`}
+                                    aria-label={`${TRAINING_WEEKDAY_LABELS_BG[trainingItem!.weekday] ?? "-"} ${dateLabel}${trainingTimeLabel ? ` ${trainingTimeLabel}` : ""}${multiSession ? " (няколко тренировки)" : ""}`}
                                     aria-pressed={!isOptedOut}
                                   >
                                     <span className="training-calendar-day-number">{dayNumber}</span>
                                     {trainingTimeLabel && (
-                                      <span className="training-calendar-time">{trainingTimeLabel}</span>
+                                      <span className="training-calendar-time">{trainingTimeLabel}{multiSession ? "+" : ""}</span>
                                     )}
-                                    <span className="training-calendar-mark">{isOptedOut ? "x" : "✓"}</span>
+                                    {displayLimitedEvent && !isSaving ? (
+                                      <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1, color: displayLimitedEvent.isRegistered ? (displayLimitedEvent.isConfirmed ? "#32cd32" : "#f0a030") : displayLimitedEvent.spotsRemaining === 0 ? "#ff6b6b" : "#f0a030" }}>
+                                        {displayLimitedEvent.isRegistered
+                                          ? displayLimitedEvent.isConfirmed ? "✓" : `#${displayLimitedEvent.waitlistPosition}`
+                                          : displayLimitedEvent.spotsRemaining === 0 ? "Ч" : `${displayLimitedEvent.spotsRemaining}м`}
+                                      </span>
+                                    ) : (
+                                      <span className="training-calendar-mark">{isSaving ? "..." : isOptedOut ? "x" : "✓"}</span>
+                                    )}
                                   </button>
                                 );
                               })}
@@ -2446,101 +2570,364 @@ export default function MemberCardPage({
                                 })}
                               </span>
                             </div>
-                            {trainingDetailsItem.trainingTime?.trim() && (
-                              <div className="training-attendance-info-row">
-                                <span className="training-attendance-info-label">Час</span>
-                                <span className="training-attendance-info-value">{trainingDetailsItem.trainingTime}</span>
-                              </div>
-                            )}
-                            {formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes) && (
-                              <div className="training-attendance-info-row">
-                                <span className="training-attendance-info-label">Продължителност</span>
-                                <span className="training-attendance-info-value">{formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes)}</span>
-                              </div>
-                            )}
-                            {trainingDetailsItem.trainingFieldName && (() => {
-                              const pieces = trainingDetailsItem.trainingFieldPieces?.length
-                                ? trainingDetailsItem.trainingFieldPieces
-                                : trainingDetailsItem.trainingFieldPieceNames?.length
-                                  ? trainingDetailsItem.trainingFieldPieceNames
-                                  : ["Цял терен"];
-                              const selectedPieces = trainingDetailsItem.trainingFieldPieceNames ?? [];
-                              const isWholeFieldSelected = selectedPieces.length === 0;
-                              return (
-                                <div className="member-training-field-visual">
-                                  <div
-                                    className={`member-training-field-name${isWholeFieldSelected ? " member-training-field-name--selected" : ""}`}
-                                  >
-                                    {trainingDetailsItem.trainingFieldName}
+                            {trainingDetailsItem.sessions.length === 1 && (
+                              <>
+                                {trainingDetailsItem.trainingTime?.trim() && (
+                                  <div className="training-attendance-info-row">
+                                    <span className="training-attendance-info-label">Час</span>
+                                    <span className="training-attendance-info-value">{trainingDetailsItem.trainingTime}</span>
                                   </div>
-                                  <div
-                                    className="member-training-field-pitch"
-                                    style={{ gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))` }}
-                                    aria-label={`Терен ${trainingDetailsItem.trainingFieldName}`}
-                                  >
-                                    {pieces.map((piece, index) => {
-                                      const isSelected = isWholeFieldSelected || selectedPieces.includes(piece);
-                                      return (
-                                        <div
-                                          key={`${piece}-${index}`}
-                                          className={`member-training-field-piece${isSelected ? " member-training-field-piece--selected" : ""}`}
-                                        >
-                                          {piece}
-                                        </div>
-                                      );
-                                    })}
+                                )}
+                                {formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes) && (
+                                  <div className="training-attendance-info-row">
+                                    <span className="training-attendance-info-label">Продължителност</span>
+                                    <span className="training-attendance-info-value">{formatTrainingDuration(trainingDetailsItem.trainingDurationMinutes)}</span>
                                   </div>
-                                </div>
-                              );
-                            })()}
+                                )}
+                                {trainingDetailsItem.trainingFieldName && (() => {
+                                  const pieces = trainingDetailsItem.trainingFieldPieces?.length
+                                    ? trainingDetailsItem.trainingFieldPieces
+                                    : trainingDetailsItem.trainingFieldPieceNames?.length
+                                      ? trainingDetailsItem.trainingFieldPieceNames
+                                      : ["Цял терен"];
+                                  const selectedPieces = trainingDetailsItem.trainingFieldPieceNames ?? [];
+                                  const isWholeFieldSelected = selectedPieces.length === 0;
+                                  return (
+                                    <div className="member-training-field-visual">
+                                      <div className={`member-training-field-name${isWholeFieldSelected ? " member-training-field-name--selected" : ""}`}>
+                                        {trainingDetailsItem.trainingFieldName}
+                                      </div>
+                                      <div
+                                        className="member-training-field-pitch"
+                                        style={{ gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))` }}
+                                        aria-label={`Терен ${trainingDetailsItem.trainingFieldName}`}
+                                      >
+                                        {pieces.map((piece, index) => {
+                                          const isSelected = isWholeFieldSelected || selectedPieces.includes(piece);
+                                          return (
+                                            <div key={`${piece}-${index}`} className={`member-training-field-piece${isSelected ? " member-training-field-piece--selected" : ""}`}>
+                                              {piece}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </>
+                            )}
                           </div>
+                          {trainingDetailsItem.sessions.length > 1 && trainingDetailsItem.sessions.map((session, sessionIndex) => (
+                            <div key={session.scopeKey || sessionIndex} style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.75)", marginBottom: session.trainingTime || session.trainingDurationMinutes || session.trainingFieldName ? 8 : 0 }}>
+                                Тренировка {sessionIndex + 1}{session.trainingTime ? ` — ${session.trainingTime}` : ""}
+                              </div>
+                              {formatTrainingDuration(session.trainingDurationMinutes) && (
+                                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginBottom: 6 }}>
+                                  {formatTrainingDuration(session.trainingDurationMinutes)}
+                                </div>
+                              )}
+                              {session.trainingFieldName && (() => {
+                                const pieces = session.trainingFieldPieces?.length
+                                  ? session.trainingFieldPieces
+                                  : session.trainingFieldPieceNames?.length
+                                    ? session.trainingFieldPieceNames
+                                    : ["Цял терен"];
+                                const selectedPieces = session.trainingFieldPieceNames ?? [];
+                                const isWholeFieldSelected = selectedPieces.length === 0;
+                                return (
+                                  <div className="member-training-field-visual" style={{ marginBottom: 8 }}>
+                                    <div className={`member-training-field-name${isWholeFieldSelected ? " member-training-field-name--selected" : ""}`}>
+                                      {session.trainingFieldName}
+                                    </div>
+                                    <div
+                                      className="member-training-field-pitch"
+                                      style={{ gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))` }}
+                                    >
+                                      {pieces.map((piece, pieceIndex) => {
+                                        const isSelected = isWholeFieldSelected || selectedPieces.includes(piece);
+                                        return (
+                                          <div key={`${piece}-${pieceIndex}`} className={`member-training-field-piece${isSelected ? " member-training-field-piece--selected" : ""}`}>
+                                            {piece}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                              {session.limitedEvent ? (() => {
+                                const le = session.limitedEvent!;
+                                return (
+                                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                                    {registerError && registerSavingEventId === le.id && (
+                                      <p style={{ fontSize: 12, color: "#ff6b6b", margin: 0 }}>{registerError}</p>
+                                    )}
+                                    {le.isRegistered ? (
+                                      <>
+                                        {le.isConfirmed ? (
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#32cd32" }}>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                              <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                            Записан
+                                          </div>
+                                        ) : (
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#f0a030" }}>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                              <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                                            </svg>
+                                            В чакалня ({le.waitlistPosition === 1 ? "следващ" : `#${le.waitlistPosition}`})
+                                          </div>
+                                        )}
+                                        <button
+                                          className="pm-btn training-optout-btn"
+                                          type="button"
+                                          disabled={registerSavingEventId !== null}
+                                          onClick={async () => {
+                                            setRegisterSavingEventId(le.id);
+                                            setRegisterError(null);
+                                            try {
+                                              const res = await fetch(`/api/members/${normalizedCardCode}/training/register`, {
+                                                method: "DELETE",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ trainingDate: trainingDetailsItem.date, limitedEventId: le.id }),
+                                              });
+                                              if (!res.ok) {
+                                                const d = await res.json().catch(() => ({})) as { error?: string };
+                                                setRegisterError(typeof d.error === "string" ? d.error : "Грешка при отказване.");
+                                                return;
+                                              }
+                                              await fetchTrainingDays();
+                                            } catch {
+                                              setRegisterError("Грешка при отказване.");
+                                            } finally {
+                                              setRegisterSavingEventId(null);
+                                            }
+                                          }}
+                                        >
+                                          {registerSavingEventId === le.id ? "Запазване..." : le.isConfirmed ? "Откажи записването" : "Откажи чакалнята"}
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        className="pm-btn training-attend-btn"
+                                        type="button"
+                                        disabled={registerSavingEventId !== null}
+                                        onClick={async () => {
+                                          setRegisterSavingEventId(le.id);
+                                          setRegisterError(null);
+                                          try {
+                                            const res = await fetch(`/api/members/${normalizedCardCode}/training/register`, {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ trainingDate: trainingDetailsItem.date, limitedEventId: le.id }),
+                                            });
+                                            if (!res.ok) {
+                                              const d = await res.json().catch(() => ({})) as { error?: string };
+                                              setRegisterError(typeof d.error === "string" ? d.error : "Грешка при записване.");
+                                              return;
+                                            }
+                                            await fetchTrainingDays();
+                                          } catch {
+                                            setRegisterError("Грешка при записване.");
+                                          } finally {
+                                            setRegisterSavingEventId(null);
+                                          }
+                                        }}
+                                      >
+                                        {registerSavingEventId === le.id ? "Запазване..." : le.spotsRemaining > 0 ? `Запиши се (${le.spotsRemaining} ${le.spotsRemaining === 1 ? "място" : "места"})` : "Запиши се в чакалнята"}
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })() : (
+                                <div className="training-attendance-buttons" style={{ marginTop: 8 }}>
+                                  <button
+                                    className={`pm-btn training-attend-btn${!trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                                    type="button"
+                                    onClick={() => {
+                                      if (!trainingDetailsItem.optedOut) return;
+                                      setTrainingOptOutReasonCode("");
+                                      setTrainingOptOutReasonText("");
+                                      setTrainingConfirmAction("attend");
+                                      setTrainingConfirmModalOpen(true);
+                                    }}
+                                    disabled={!trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                                  >
+                                    {!trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                    {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Присъствам"}
+                                  </button>
+                                  <button
+                                    className={`pm-btn training-optout-btn${trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                                    type="button"
+                                    onClick={() => {
+                                      if (trainingDetailsItem.optedOut) return;
+                                      setTrainingOptOutReasonCode("");
+                                      setTrainingOptOutReasonText("");
+                                      setTrainingConfirmAction("optOut");
+                                      setTrainingConfirmModalOpen(true);
+                                    }}
+                                    disabled={trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                                  >
+                                    {trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                    {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Отсъствам"}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
                           {trainingDetailsItem.note?.trim() && (
                             <div className="training-attendance-note-card">
                               <p className="training-attendance-note-label">Описание</p>
                               <p className="training-attendance-note-text">{trainingDetailsItem.note}</p>
                             </div>
                           )}
-                          <p className="training-attendance-choice-label">Заявка</p>
-                          <div className="training-attendance-buttons">
-                            <button
-                              className={`pm-btn training-attend-btn${!trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
-                              type="button"
-                              onClick={() => {
-                                if (!trainingDetailsItem.optedOut) return;
-                                setTrainingOptOutReasonCode("");
-                                setTrainingOptOutReasonText("");
-                                setTrainingConfirmAction("attend");
-                                setTrainingConfirmModalOpen(true);
-                              }}
-                              disabled={!trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
-                            >
-                              {!trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                  <polyline points="20 6 9 17 4 12" />
-                                </svg>
+                          {trainingDetailsItem.sessions.length === 1 ? (
+                            <>
+                              <p className="training-attendance-choice-label">Заявка</p>
+                              {trainingDetailsItem.limitedEvent ? (
+                                <div className="training-attendance-buttons" style={{ flexDirection: "column", gap: 10 }}>
+                                  {registerError && registerSavingEventId === trainingDetailsItem.limitedEvent.id && (
+                                    <p style={{ fontSize: 13, color: "#ff6b6b", margin: 0 }}>{registerError}</p>
+                                  )}
+                                  {trainingDetailsItem.limitedEvent.isRegistered ? (
+                                    <>
+                                      {trainingDetailsItem.limitedEvent.isConfirmed ? (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: "#32cd32" }}>
+                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12" />
+                                          </svg>
+                                          Записан
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: "#f0a030" }}>
+                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                                          </svg>
+                                          В чакалня ({trainingDetailsItem.limitedEvent.waitlistPosition === 1 ? "следващ" : `#${trainingDetailsItem.limitedEvent.waitlistPosition}`})
+                                        </div>
+                                      )}
+                                      <button
+                                        className="pm-btn training-optout-btn"
+                                        type="button"
+                                        disabled={registerSavingEventId !== null}
+                                        onClick={async () => {
+                                          const le = trainingDetailsItem.limitedEvent;
+                                          if (!le) return;
+                                          setRegisterSavingEventId(le.id);
+                                          setRegisterError(null);
+                                          try {
+                                            const res = await fetch(`/api/members/${normalizedCardCode}/training/register`, {
+                                              method: "DELETE",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ trainingDate: trainingDetailsItem.date, limitedEventId: le.id }),
+                                            });
+                                            if (!res.ok) {
+                                              const d = await res.json().catch(() => ({})) as { error?: string };
+                                              setRegisterError(typeof d.error === "string" ? d.error : "Грешка при отказване.");
+                                              return;
+                                            }
+                                            await fetchTrainingDays();
+                                          } catch {
+                                            setRegisterError("Грешка при отказване.");
+                                          } finally {
+                                            setRegisterSavingEventId(null);
+                                          }
+                                        }}
+                                      >
+                                        {registerSavingEventId === trainingDetailsItem.limitedEvent.id ? "Запазване..." : trainingDetailsItem.limitedEvent.isConfirmed ? "Откажи записването" : "Откажи чакалнята"}
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      className="pm-btn training-attend-btn"
+                                      type="button"
+                                      disabled={registerSavingEventId !== null}
+                                      onClick={async () => {
+                                        const le = trainingDetailsItem.limitedEvent;
+                                        if (!le) return;
+                                        setRegisterSavingEventId(le.id);
+                                        setRegisterError(null);
+                                        try {
+                                          const res = await fetch(`/api/members/${normalizedCardCode}/training/register`, {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ trainingDate: trainingDetailsItem.date, limitedEventId: le.id }),
+                                          });
+                                          if (!res.ok) {
+                                            const d = await res.json().catch(() => ({})) as { error?: string };
+                                            setRegisterError(typeof d.error === "string" ? d.error : "Грешка при записване.");
+                                            return;
+                                          }
+                                          await fetchTrainingDays();
+                                        } catch {
+                                          setRegisterError("Грешка при записване.");
+                                        } finally {
+                                          setRegisterSavingEventId(null);
+                                        }
+                                      }}
+                                    >
+                                      {registerSavingEventId === trainingDetailsItem.limitedEvent.id
+                                        ? "Запазване..."
+                                        : trainingDetailsItem.limitedEvent.spotsRemaining > 0
+                                          ? `Запиши се (${trainingDetailsItem.limitedEvent.spotsRemaining} ${trainingDetailsItem.limitedEvent.spotsRemaining === 1 ? "място" : "места"})`
+                                          : "Запиши се в чакалнята"}
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="training-attendance-buttons">
+                                  <button
+                                    className={`pm-btn training-attend-btn${!trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                                    type="button"
+                                    onClick={() => {
+                                      if (!trainingDetailsItem.optedOut) return;
+                                      setTrainingOptOutReasonCode("");
+                                      setTrainingOptOutReasonText("");
+                                      setTrainingConfirmAction("attend");
+                                      setTrainingConfirmModalOpen(true);
+                                    }}
+                                    disabled={!trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                                  >
+                                    {!trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                    {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Присъствам"}
+                                  </button>
+                                  <button
+                                    className={`pm-btn training-optout-btn${trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                                    type="button"
+                                    onClick={() => {
+                                      if (trainingDetailsItem.optedOut) return;
+                                      setTrainingOptOutReasonCode("");
+                                      setTrainingOptOutReasonText("");
+                                      setTrainingConfirmAction("optOut");
+                                      setTrainingConfirmModalOpen(true);
+                                    }}
+                                    disabled={trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                                  >
+                                    {trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    )}
+                                    {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Отсъствам"}
+                                  </button>
+                                </div>
                               )}
-                              {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Присъствам"}
-                            </button>
-                            <button
-                              className={`pm-btn training-optout-btn${trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
-                              type="button"
-                              onClick={() => {
-                                if (trainingDetailsItem.optedOut) return;
-                                setTrainingOptOutReasonCode("");
-                                setTrainingOptOutReasonText("");
-                                setTrainingConfirmAction("optOut");
-                                setTrainingConfirmModalOpen(true);
-                              }}
-                              disabled={trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
-                            >
-                              {trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                  <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                              )}
-                              {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Отсъствам"}
-                            </button>
-                          </div>
+                            </>
+                          ) : null}
                         </>
                       ) : (
                         <div className="member-day-match-panel">

@@ -402,7 +402,13 @@ async function getMemberTrainingContext(cardCode: string) {
     playerId: card.playerId,
     playerName: card.player.fullName,
     clubId: card.player.clubId,
+    playerTeamGroup: card.player.teamGroup,
+    playerCustomGroupIds: card.player.customTrainingGroups.map((g) => g.group.id),
+    playerCoachGroupIds: card.player.coachGroups.map((g) => g.id),
     scheduledCoachGroups,
+    scheduledCustomGroups,
+    hasCoachGroupSchedule,
+    hasCustomGroupSchedule,
     trainingWeekdays,
     trainingWindowDays,
     upcomingDates,
@@ -433,6 +439,61 @@ function resolveFieldSelectionsForDate(
     }
   }
   return { fieldId, fieldPieceIds };
+}
+
+type LimitedEventComputed = {
+  scopeKey: string;
+  id: string;
+  maxSpots: number;
+  isRegistered: boolean;
+  isConfirmed: boolean;
+  waitlistPosition: number | null;
+  spotsRemaining: number;
+};
+
+type SessionItem = {
+  scopeKey: string;
+  trainingTime: string;
+  trainingDurationMinutes: number;
+  trainingFieldName: string | null;
+  trainingFieldPieces: string[];
+  trainingFieldPieceNames: string[];
+  limitedEvent: Omit<LimitedEventComputed, "scopeKey"> | null;
+};
+
+function buildGroupSession(
+  group: CoachGroupSchedule,
+  scopeKey: string,
+  date: string,
+  limitedEventsForDate: LimitedEventComputed[],
+  fieldById: Map<string, { id: string; name: string; pieces: { id: string; name: string }[] }>,
+): SessionItem {
+  const groupDateTimes = normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates);
+  const trainingTime = groupDateTimes[date] ?? safeNormalizeTrainingTime(group.trainingTime) ?? "";
+  const sel = resolveFieldSelectionsForDate(
+    group.trainingFieldId, group.trainingFieldPieceIds, group.trainingFieldSelections, date,
+  );
+  const field = sel.fieldId ? fieldById.get(sel.fieldId) : null;
+  const allPieceNames = field?.pieces.map((p) => p.name) ?? [];
+  const selectedPieceNames =
+    field && sel.fieldPieceIds.length > 0
+      ? sel.fieldPieceIds
+          .map((pid) => field.pieces.find((p) => p.id === pid)?.name)
+          .filter((n): n is string => Boolean(n))
+      : [];
+  const leRow = limitedEventsForDate.find((e) => e.scopeKey === scopeKey);
+  const limitedEvent = leRow
+    ? { id: leRow.id, maxSpots: leRow.maxSpots, isRegistered: leRow.isRegistered, isConfirmed: leRow.isConfirmed, waitlistPosition: leRow.waitlistPosition, spotsRemaining: leRow.spotsRemaining }
+    : null;
+  return {
+    scopeKey,
+    trainingTime,
+    trainingDurationMinutes: group.trainingDurationMinutes,
+    trainingFieldName: field?.name ?? null,
+    trainingFieldPieces: allPieceNames,
+    trainingFieldPieceNames: selectedPieceNames,
+    limitedEvent,
+  };
 }
 
 function hasAnyStoredFieldSelection(fieldSelections: unknown) {
@@ -471,7 +532,20 @@ export async function GET(
   }
 
   const trainingDatesAsUtc = context.upcomingDates.map((value) => isoDateToUtcMidnight(value));
-  const [optOutRows, noteRows, sessionRows] = await Promise.all([
+
+  // Build scope keys for this player to match limited training events
+  const playerScopeKeys: string[] = [];
+  if (context.playerTeamGroup !== null) {
+    playerScopeKeys.push(`team_group:${context.playerTeamGroup}`);
+  }
+  for (const cgId of context.playerCustomGroupIds) {
+    playerScopeKeys.push(`custom_group:${cgId}`);
+  }
+  for (const coachGId of context.playerCoachGroupIds) {
+    playerScopeKeys.push(`coach_group:${coachGId}`);
+  }
+
+  const [optOutRows, noteRows, sessionRows, limitedEventRows] = await Promise.all([
     prisma.trainingOptOut.findMany({
       where: {
         playerId: context.playerId,
@@ -520,12 +594,51 @@ export async function GET(
         trainingFieldPieceIds: true,
       },
     }),
+    playerScopeKeys.length > 0
+      ? prisma.limitedTrainingEvent.findMany({
+          where: {
+            clubId: context.clubId,
+            scopeKey: { in: playerScopeKeys },
+            trainingDate: { in: trainingDatesAsUtc },
+          },
+          select: {
+            id: true,
+            scopeKey: true,
+            trainingDate: true,
+            maxSpots: true,
+            registrations: {
+              select: { playerId: true },
+              orderBy: { registeredAt: "asc" },
+            },
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
   const sessionByDate = new Map(sessionRows.map((session) => [utcDateToIsoDate(session.trainingDate), session]));
+  const limitedEventsByDate = new Map<string, LimitedEventComputed[]>();
+  for (const e of limitedEventRows) {
+    const dateKey = utcDateToIsoDate(e.trainingDate);
+    const totalCount = e.registrations.length;
+    const playerIndex = e.registrations.findIndex((r) => r.playerId === context.playerId);
+    const position = playerIndex >= 0 ? playerIndex + 1 : null;
+    const isRegistered = position !== null;
+    const isConfirmed = isRegistered && position <= e.maxSpots;
+    const waitlistPosition = isRegistered && !isConfirmed ? position - e.maxSpots : null;
+    const spotsRemaining = Math.max(0, e.maxSpots - totalCount);
+    const arr = limitedEventsByDate.get(dateKey) ?? [];
+    arr.push({ scopeKey: e.scopeKey, id: e.id, maxSpots: e.maxSpots, isRegistered, isConfirmed, waitlistPosition, spotsRemaining });
+    limitedEventsByDate.set(dateKey, arr);
+  }
   const hasSessionFieldSelection = sessionRows.some((session) => Boolean(session.trainingFieldId));
+  const hasAnyCoachGroupField = context.scheduledCoachGroups.some(
+    (g) => Boolean(g.trainingFieldId) || hasAnyStoredFieldSelection(g.trainingFieldSelections),
+  );
+  const hasAnyCustomGroupField = context.scheduledCustomGroups.some(
+    (g) => Boolean(g.trainingFieldId) || hasAnyStoredFieldSelection(g.trainingFieldSelections),
+  );
   const clubFields =
-    context.scheduleFieldId || hasAnyStoredFieldSelection(context.scheduleFieldSelections) || hasSessionFieldSelection
+    context.scheduleFieldId || hasAnyStoredFieldSelection(context.scheduleFieldSelections) || hasSessionFieldSelection || hasAnyCoachGroupField || hasAnyCustomGroupField
       ? await prisma.field.findMany({
           where: { clubId: context.clubId },
           select: {
@@ -562,34 +675,84 @@ export async function GET(
     trainingWeekdays: context.trainingWeekdays,
     trainingWindowDays: context.trainingWindowDays,
     dates: context.upcomingDates.map((date) => {
-      const session = sessionByDate.get(date);
-      const scheduleFieldSelection = resolveFieldSelectionsForDate(
-        context.scheduleFieldId,
-        context.scheduleFieldPieceIds,
-        context.scheduleFieldSelections,
-        date,
-      );
-      const fieldId = session?.trainingFieldId ?? scheduleFieldSelection.fieldId;
-      const fieldPieceIds = session?.trainingFieldPieceIds ?? scheduleFieldSelection.fieldPieceIds;
-      const field = fieldId ? fieldById.get(fieldId) : null;
-      const fieldPieceNames = field?.pieces.map((piece) => piece.name) ?? [];
-      const pieceNames = field && fieldPieceIds.length > 0
-        ? fieldPieceIds
-            .map((pid) => field.pieces.find((p) => p.id === pid)?.name)
-            .filter((n): n is string => Boolean(n))
-        : [];
+      const weekday = getWeekdayMondayFirst(date, FIXED_TIME_ZONE);
+      const limitedEventsForDate = limitedEventsByDate.get(date) ?? [];
+
+      let sessions: SessionItem[];
+
+      if (context.hasCoachGroupSchedule) {
+        const matchingGroups = context.scheduledCoachGroups.filter(
+          (g) => g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday),
+        );
+        sessions = matchingGroups.map((g) =>
+          buildGroupSession(g, `coach_group:${g.id}`, date, limitedEventsForDate, fieldById),
+        );
+      } else if (context.hasCustomGroupSchedule) {
+        const matchingGroups = context.scheduledCustomGroups.filter(
+          (g) => g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday),
+        );
+        sessions = matchingGroups.map((g) =>
+          buildGroupSession(g, `custom_group:${g.id}`, date, limitedEventsForDate, fieldById),
+        );
+      } else {
+        const session = sessionByDate.get(date);
+        const scheduleFieldSelection = resolveFieldSelectionsForDate(
+          context.scheduleFieldId, context.scheduleFieldPieceIds, context.scheduleFieldSelections, date,
+        );
+        const fieldId = session?.trainingFieldId ?? scheduleFieldSelection.fieldId;
+        const fieldPieceIds = session?.trainingFieldPieceIds ?? scheduleFieldSelection.fieldPieceIds;
+        const field = fieldId ? fieldById.get(fieldId) : null;
+        const allPieceNames = field?.pieces.map((p) => p.name) ?? [];
+        const selectedPieceNames =
+          field && fieldPieceIds.length > 0
+            ? fieldPieceIds.map((pid) => field.pieces.find((p) => p.id === pid)?.name).filter((n): n is string => Boolean(n))
+            : [];
+        const leRow = limitedEventsForDate[0] ?? null;
+        sessions = [
+          {
+            scopeKey: context.playerTeamGroup !== null ? `team_group:${context.playerTeamGroup}` : "",
+            trainingTime: session?.trainingTime ?? context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
+            trainingDurationMinutes: session?.trainingDurationMinutes ?? context.trainingDurationMinutes,
+            trainingFieldName: field?.name ?? null,
+            trainingFieldPieces: allPieceNames,
+            trainingFieldPieceNames: selectedPieceNames,
+            limitedEvent: leRow
+              ? { id: leRow.id, maxSpots: leRow.maxSpots, isRegistered: leRow.isRegistered, isConfirmed: leRow.isConfirmed, waitlistPosition: leRow.waitlistPosition, spotsRemaining: leRow.spotsRemaining }
+              : null,
+          },
+        ];
+      }
+
+      if (sessions.length === 0) {
+        sessions = [
+          {
+            scopeKey: "",
+            trainingTime: context.fallbackTrainingTime ?? "",
+            trainingDurationMinutes: context.trainingDurationMinutes,
+            trainingFieldName: null,
+            trainingFieldPieces: [],
+            trainingFieldPieceNames: [],
+            limitedEvent: null,
+          },
+        ];
+      }
+
+      const firstSession = sessions[0]!;
       return {
         date,
-        weekday: getWeekdayMondayFirst(date, FIXED_TIME_ZONE),
+        weekday,
         optedOut: optedOutByDate.has(date),
         optOutReasonCode: optedOutByDate.get(date)?.reasonCode ?? null,
         optOutReasonText: optedOutByDate.get(date)?.reasonText ?? null,
-        trainingTime: session?.trainingTime ?? context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
-        trainingDurationMinutes: session?.trainingDurationMinutes ?? context.trainingDurationMinutes,
         note: noteByDate.get(date) ?? "",
-        trainingFieldName: field?.name ?? null,
-        trainingFieldPieces: fieldPieceNames,
-        trainingFieldPieceNames: pieceNames,
+        // Top-level fields kept for backward compatibility (first session's values):
+        trainingTime: firstSession.trainingTime,
+        trainingDurationMinutes: firstSession.trainingDurationMinutes,
+        trainingFieldName: firstSession.trainingFieldName,
+        trainingFieldPieces: firstSession.trainingFieldPieces,
+        trainingFieldPieceNames: firstSession.trainingFieldPieceNames,
+        limitedEvent: firstSession.limitedEvent,
+        sessions,
       };
     }),
   });

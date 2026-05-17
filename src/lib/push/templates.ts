@@ -109,6 +109,31 @@ export function buildNotificationPayload(
         tag: "monthly-overdue-payment-reminder",
         data: { type: input.type },
       };
+    case "limited_training_promoted": {
+      const suffix = input.trainingDate ? ` на ${input.trainingDate}` : "";
+      return {
+        title: "Записан за тренировка!",
+        body: `Освободи се място и вече си записан за тренировката${suffix}.`,
+        url,
+        icon: DEFAULT_ICON,
+        badge: DEFAULT_ICON,
+        tag: "limited-training-promoted",
+        data: { type: input.type, trainingDate: input.trainingDate ?? null },
+      };
+    }
+    case "limited_training_created": {
+      const suffix = input.trainingDate ? ` на ${input.trainingDate}` : "";
+      const spotsText = typeof input.maxSpots === "number" ? ` (${input.maxSpots} места)` : "";
+      return {
+        title: "Записване за тренировка",
+        body: `Тренировката${suffix}${spotsText} е с ограничен брой места. Запишете се навреме!`,
+        url,
+        icon: DEFAULT_ICON,
+        badge: DEFAULT_ICON,
+        tag: "limited-training-created",
+        data: { type: input.type, trainingDate: input.trainingDate ?? null },
+      };
+    }
     default:
       return {
         title: "Ново известие",
