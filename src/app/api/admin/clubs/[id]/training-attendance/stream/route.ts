@@ -51,21 +51,22 @@ export async function GET(
 
   const { id } = await params;
   const dateParam = request.nextUrl.searchParams.get("date")?.trim() ?? "";
+  // date is optional — omit it to subscribe to all club-level attendance updates (week view)
+  const trainingDateIso = isIsoDate(dateParam) ? dateParam : null;
+
   let teamGroup: number | null = null;
   let trainingGroupId: string | null = null;
-  try {
-    teamGroup = parseOptionalTeamGroup(request.nextUrl.searchParams.get("teamGroup"));
-    trainingGroupId = parseOptionalTrainingGroupId(request.nextUrl.searchParams.get("trainingGroupId"));
-  } catch {
-    return new Response("Invalid teamGroup or trainingGroupId query parameter", { status: 400 });
+  if (trainingDateIso) {
+    try {
+      teamGroup = parseOptionalTeamGroup(request.nextUrl.searchParams.get("teamGroup"));
+      trainingGroupId = parseOptionalTrainingGroupId(request.nextUrl.searchParams.get("trainingGroupId"));
+    } catch {
+      return new Response("Invalid teamGroup or trainingGroupId query parameter", { status: 400 });
+    }
+    if (teamGroup !== null && trainingGroupId) {
+      return new Response("Use either teamGroup or trainingGroupId.", { status: 400 });
+    }
   }
-  if (teamGroup !== null && trainingGroupId) {
-    return new Response("Use either teamGroup or trainingGroupId.", { status: 400 });
-  }
-  if (!isIsoDate(dateParam)) {
-    return new Response("Invalid date query parameter", { status: 400 });
-  }
-  const trainingDateIso = dateParam;
   try {
     if (trainingGroupId) {
       const trainingGroup = await prisma.clubTrainingScheduleGroup.findFirst({
@@ -150,7 +151,7 @@ export async function GET(
       sendEvent("connected", { date: trainingDateIso });
 
       unsubscribe = subscribeTrainingAttendanceEvents(id, (event) => {
-        if (event.trainingDate !== trainingDateIso) {
+        if (trainingDateIso !== null && event.trainingDate !== trainingDateIso) {
           return;
         }
         sendEvent("attendance-update", { date: event.trainingDate, at: event.timestamp });
