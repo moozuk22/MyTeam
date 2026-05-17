@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
           firstBillingMonth: true,
           billingActivatedAt: true,
           defaultPaymentAmount: true,
+          createdAt: true,
         },
         orderBy: {
           name: "asc",
@@ -99,6 +100,7 @@ export async function GET(request: NextRequest) {
           firstBillingMonth: true,
           billingActivatedAt: true,
           defaultPaymentAmount: true,
+          createdAt: true,
         },
         orderBy: {
           name: "asc",

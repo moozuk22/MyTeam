@@ -56,6 +56,7 @@ interface ClubRow {
   imagePublicId?: string | null;
   notifyOnCoachVisit?: boolean;
   billingStatus?: string;
+  createdAt?: string | null;
 }
 
 export default function AdminPlayersPage() {
@@ -106,6 +107,7 @@ export default function AdminPlayersPage() {
 
       const data = (await response.json()) as ClubRow[];
       const nextClubs = Array.isArray(data) ? data : [];
+      console.log("clubs response:", nextClubs);
       setClubs(nextClubs);
       setDemoClubIds((prev) => prev.filter((id) => nextClubs.some((club) => club.id === id)));
     } catch (error) {
@@ -582,6 +584,11 @@ export default function AdminPlayersPage() {
                   </div>
                   <div className="mp-team-info">
                     <h3 className="mp-team-name">{club.name}</h3>
+                    {club.createdAt && (
+                      <p className="mp-team-created">
+                        {new Date(club.createdAt).toLocaleDateString("bg-BG", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      </p>
+                    )}
                   </div>
                   <ChevronRightIcon />
                 </button>

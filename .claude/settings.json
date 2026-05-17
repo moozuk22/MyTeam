@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(cd /d \"d:\\\\Documents\\\\GitHub\\\\MyTeam\")",
+      "Bash(npm run *)"
     ]
   }
 }
