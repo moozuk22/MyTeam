@@ -61,8 +61,9 @@ model Club {
   billingActivatedAt      DateTime?                   @map("billing_activated_at") @db.Timestamptz(6)
   defaultPaymentAmount    Decimal                     @default(0) @map("default_payment_amount") @db.Decimal(10, 2)
   discountConfigs         TeamDiscountConfig[]
-  matches                 ClubMatch[]
-  trainingPlans           TrainingPlan[]
+  matches                    ClubMatch[]
+  trainingPlans              TrainingPlan[]
+  limitedTrainingEvents      LimitedTrainingEvent[]
 
   @@map("clubs")
 }
@@ -245,9 +246,10 @@ model Player {
   trainingSessionRows  TrainingSessionPlayer[]
   discountUsages       PartnerDiscountUsage[]
   customTrainingGroups ClubCustomTrainingGroupPlayer[]
-  coachGroups          CoachGroup[]                    @relation("PlayerCoachGroups")
-  firstBillingMonth    DateTime?                       @map("first_billing_month") @db.Timestamptz(6)
-  paymentAmount        Decimal                         @default(0) @map("payment_amount") @db.Decimal(10, 2)
+  coachGroups                  CoachGroup[]                    @relation("PlayerCoachGroups")
+  firstBillingMonth            DateTime?                       @map("first_billing_month") @db.Timestamptz(6)
+  paymentAmount                Decimal                         @default(0) @map("payment_amount") @db.Decimal(10, 2)
+  limitedTrainingRegistrations LimitedTrainingRegistration[]
 
   @@index([clubId])
   @@map("players")
@@ -562,4 +564,39 @@ model TeamDiscountConfig {
 
   @@unique([clubId, teamGroup, discountId])
   @@map("team_discount_configs")
+}
+
+model LimitedTrainingEvent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId       String   @map("club_id") @db.Uuid
+  scopeKey     String   @map("scope_key")
+  scopeId      String?  @map("scope_id") @db.Uuid
+  teamGroup    Int?     @map("team_group")
+  trainingDate DateTime @map("training_date") @db.Date
+  maxSpots     Int      @map("max_spots")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  club          Club                          @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  registrations LimitedTrainingRegistration[]
+
+  @@unique([clubId, scopeKey, trainingDate])
+  @@index([clubId])
+  @@index([trainingDate])
+  @@map("limited_training_events")
+}
+
+model LimitedTrainingRegistration {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId      String   @map("event_id") @db.Uuid
+  playerId     String   @map("player_id") @db.Uuid
+  registeredAt DateTime @default(now()) @map("registered_at") @db.Timestamptz(6)
+
+  event  LimitedTrainingEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  player Player               @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, playerId])
+  @@index([eventId, registeredAt])
+  @@index([playerId])
+  @@map("limited_training_registrations")
 }

@@ -3,7 +3,16 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(cd /d \"d:\\\\Documents\\\\GitHub\\\\MyTeam\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(mkdir -p \"d:\\\\Documents\\\\GitHub\\\\MyTeam\\\\src\\\\app\\\\api\\\\admin\\\\clubs\\\\[id]\\\\limited-training-events\\\\[eventId]\" 2>&1; echo \"done\")",
+      "Bash(mkdir -p \"d:\\\\Documents\\\\GitHub\\\\MyTeam\\\\src\\\\app\\\\api\\\\members\\\\[cardCode]\\\\training\\\\register\" 2>&1; echo \"done\")",
+      "Bash(npx eslint *)",
+      "Bash(netstat -ano)",
+      "Bash(npx next *)"
+    ],
+    "additionalDirectories": [
+      "d:\\Documents\\GitHub\\MyTeam\\src\\app\\api\\admin\\clubs\\[id]\\limited-training-events",
+      "d:\\Documents\\GitHub\\MyTeam\\src\\app\\api\\members\\[cardCode]\\training"
     ]
   }
 }
