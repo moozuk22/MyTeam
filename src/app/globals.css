@@ -29,6 +29,13 @@ body {
   min-height: 100vh;
 }
 
+html:has(.amp-overlay),
+html:has(.pm-overlay),
+body:has(.amp-overlay),
+body:has(.pm-overlay) {
+  overflow: hidden;
+}
+
 a {
   text-decoration: none;
 }

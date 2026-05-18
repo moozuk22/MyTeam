@@ -57,6 +57,11 @@ function AttendanceDashboard({
   coachGroupId?: string;
   coachGroupName?: string;
 }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   const todayIso = new Date().toISOString().slice(0, 10);
   const defaultFrom = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
 
@@ -588,7 +593,7 @@ function AttendanceDashboard({
           {scopeType === "group" ? (
             <>
               <div className="rd-field">
-                <label className="rd-label">Група</label>
+                <label className="rd-label">Треньор</label>
                 <div className="rd-select-wrap">
                   <select
                     className="rd-select"
@@ -609,7 +614,7 @@ function AttendanceDashboard({
               </div>
               {groupScope.startsWith("cg:") && customTrainingGroupsList.length > 0 && (
                 <div className="rd-field">
-                  <label className="rd-label">Подгрупа</label>
+                  <label className="rd-label">Треньорска група</label>
                   <div className="rd-select-wrap">
                     <select
                       className="rd-select"
@@ -856,6 +861,11 @@ function ReportsDialog({
   coachGroupId?: string;
   coachGroupName?: string;
 }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   const now = new Date();
   const [month, setMonth] = useState(MONTHS[now.getMonth()] ?? MONTHS[0]);
   const [year, setYear] = useState(String(Math.max(2026, now.getFullYear())));
