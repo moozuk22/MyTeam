@@ -1,0 +1,1 @@
+ALTER TABLE "fields" ADD COLUMN IF NOT EXISTS "field_type" TEXT NOT NULL DEFAULT 'football';
