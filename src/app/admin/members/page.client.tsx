@@ -108,6 +108,102 @@ function getScopeKeyFromSessionId(sessionId: string): string | null {
   return null;
 }
 
+function getFieldBackground(fieldType: string): string {
+  switch (fieldType) {
+    case "basketball":
+      return "#c17a32";
+    case "tennis":
+      return "#2e6b9e";
+    case "volleyball":
+      return "#e07a50";
+    case "boxing":
+      return "#1a6b9e";
+    default:
+      return "linear-gradient(90deg, rgba(32,142,50,0.82) 0 12.5%, rgba(26,122,43,0.82) 12.5% 25%, rgba(32,142,50,0.82) 25% 37.5%, rgba(26,122,43,0.82) 37.5% 50%, rgba(32,142,50,0.82) 50% 62.5%, rgba(26,122,43,0.82) 62.5% 75%, rgba(32,142,50,0.82) 75% 87.5%, rgba(26,122,43,0.82) 87.5% 100%)";
+  }
+}
+
+function renderFieldMarkings(fieldType: string) {
+  const line = "rgba(255,255,255,0.82)";
+  switch (fieldType) {
+    case "basketball":
+      return (
+        <>
+          {/* outer border */}
+          <div aria-hidden="true" style={{ position: "absolute", inset: "8px", border: `1px solid ${line}`, borderRadius: "2px", pointerEvents: "none" }} />
+          {/* center line */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", left: "50%", width: "1px", background: line, transform: "translateX(-0.5px)", pointerEvents: "none" }} />
+          {/* center circle */}
+          <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "26px", height: "26px", border: `1px solid ${line}`, borderRadius: "999px", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+          {/* center dot */}
+          <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "4px", height: "4px", background: "rgba(255,255,255,0.9)", borderRadius: "999px", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+          {/* left key rectangle */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "22%", bottom: "22%", left: "8px", width: "19%", border: `1px solid ${line}`, borderRight: "none", pointerEvents: "none" }} />
+          {/* left free-throw semi-circle */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "22%", bottom: "22%", left: "calc(8px + 19%)", width: "9%", borderTop: `1px solid ${line}`, borderRight: `1px solid ${line}`, borderBottom: `1px solid ${line}`, borderRadius: "0 999px 999px 0", pointerEvents: "none" }} />
+          {/* right key rectangle */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "22%", bottom: "22%", right: "8px", width: "19%", border: `1px solid ${line}`, borderLeft: "none", pointerEvents: "none" }} />
+          {/* right free-throw semi-circle */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "22%", bottom: "22%", right: "calc(8px + 19%)", width: "9%", borderTop: `1px solid ${line}`, borderLeft: `1px solid ${line}`, borderBottom: `1px solid ${line}`, borderRadius: "999px 0 0 999px", pointerEvents: "none" }} />
+        </>
+      );
+    case "tennis":
+      return (
+        <>
+          <div aria-hidden="true" style={{ position: "absolute", inset: "8px", border: `1px solid ${line}`, borderRadius: "2px", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", left: "50%", width: "2px", background: "rgba(255,255,255,0.9)", transform: "translateX(-1px)", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", left: "35%", width: "1px", background: line, pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", right: "35%", width: "1px", background: line, pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "50%", left: "35%", width: "15%", height: "1px", background: line, transform: "translateY(-0.5px)", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "50%", right: "35%", width: "15%", height: "1px", background: line, transform: "translateY(-0.5px)", pointerEvents: "none" }} />
+        </>
+      );
+    case "volleyball":
+      return (
+        <>
+          {/* outer border */}
+          <div aria-hidden="true" style={{ position: "absolute", inset: "8px", border: `2px solid ${line}`, borderRadius: "2px", pointerEvents: "none" }} />
+          {/* net band with mesh */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", left: "calc(50% - 5px)", width: "10px", borderLeft: "1px solid rgba(255,255,255,0.95)", borderRight: "1px solid rgba(255,255,255,0.95)", background: "repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0px, rgba(255,255,255,0.55) 1px, transparent 1px, transparent 4px), repeating-linear-gradient(-45deg, rgba(255,255,255,0.55) 0px, rgba(255,255,255,0.55) 1px, transparent 1px, transparent 4px)", pointerEvents: "none" }} />
+          {/* antenna top */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "2px", left: "50%", width: "2px", height: "6px", background: "rgba(255,255,255,0.7)", transform: "translateX(-1px)", pointerEvents: "none" }} />
+          {/* antenna bottom */}
+          <div aria-hidden="true" style={{ position: "absolute", bottom: "2px", left: "50%", width: "2px", height: "6px", background: "rgba(255,255,255,0.7)", transform: "translateX(-1px)", pointerEvents: "none" }} />
+          {/* left attack line */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", left: "33%", width: "1px", background: line, pointerEvents: "none" }} />
+          {/* right attack line */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", right: "33%", width: "1px", background: line, pointerEvents: "none" }} />
+        </>
+      );
+    case "boxing":
+      return (
+        <>
+          {/* outer rope */}
+          <div aria-hidden="true" style={{ position: "absolute", inset: "5px", border: "2px solid rgba(255,255,255,0.9)", borderRadius: "2px", pointerEvents: "none" }} />
+          {/* inner rope (dashed) */}
+          <div aria-hidden="true" style={{ position: "absolute", inset: "12px", border: "1px dashed rgba(255,255,255,0.65)", borderRadius: "2px", pointerEvents: "none" }} />
+          {/* corner post top-left */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "3px", left: "3px", width: "6px", height: "6px", background: "rgba(20,20,20,0.9)", borderRadius: "999px", pointerEvents: "none" }} />
+          {/* corner post top-right */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "3px", right: "3px", width: "6px", height: "6px", background: "rgba(20,20,20,0.9)", borderRadius: "999px", pointerEvents: "none" }} />
+          {/* corner post bottom-left */}
+          <div aria-hidden="true" style={{ position: "absolute", bottom: "3px", left: "3px", width: "6px", height: "6px", background: "rgba(20,20,20,0.9)", borderRadius: "999px", pointerEvents: "none" }} />
+          {/* corner post bottom-right */}
+          <div aria-hidden="true" style={{ position: "absolute", bottom: "3px", right: "3px", width: "6px", height: "6px", background: "rgba(20,20,20,0.9)", borderRadius: "999px", pointerEvents: "none" }} />
+        </>
+      );
+    default:
+      return (
+        <>
+          <div aria-hidden="true" style={{ position: "absolute", inset: "8px", border: "1px solid rgba(255,255,255,0.72)", borderRadius: "4px", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", left: "50%", width: "1px", background: "rgba(255,255,255,0.72)", transform: "translateX(-0.5px)", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "26px", height: "26px", border: "1px solid rgba(255,255,255,0.72)", borderRadius: "999px", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "4px", height: "4px", background: "rgba(255,255,255,0.8)", borderRadius: "999px", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+        </>
+      );
+  }
+}
+
 function CustomTrainingGroupColorPicker({
   value,
   onChange,
@@ -469,7 +565,7 @@ function AdminMembersPageContent() {
   const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
   const [trainingDayDetailsOpening, setTrainingDayDetailsOpening] = useState(false);
   const [trainingDayDurationMinutes, setTrainingDayDurationMinutes] = useState(DEFAULT_TRAINING_DURATION_MINUTES);
-  const [trainingDayField, setTrainingDayField] = useState<{ id: string; name: string; pieces: { id: string; name: string }[] } | null>(null);
+  const [trainingDayField, setTrainingDayField] = useState<{ id: string; name: string; fieldType: string; pieces: { id: string; name: string }[] } | null>(null);
   const [trainingDayFieldPieceIds, setTrainingDayFieldPieceIds] = useState<string[]>([]);
   const [trainingDaysEditorOpen, setTrainingDaysEditorOpen] = useState(false);
   const [trainingDaysEditorLoading, setTrainingDaysEditorLoading] = useState(false);
@@ -572,6 +668,7 @@ function AdminMembersPageContent() {
   const [trainingFieldError, setTrainingFieldError] = useState("");
   const [trainingFieldEditId, setTrainingFieldEditId] = useState<string | null>(null);
   const [trainingFieldName, setTrainingFieldName] = useState("");
+  const [trainingFieldType, setTrainingFieldType] = useState("football");
   const [trainingFieldPieces, setTrainingFieldPieces] = useState<Array<{ id: string | null; name: string }>>([]);
   const schedulerCalendarDates = getNextTrainingCalendarDates();
   const schedulerCalendarDateSet = new Set(schedulerCalendarDates);
@@ -2573,6 +2670,7 @@ function AdminMembersPageContent() {
           return {
             id: String(raw.id ?? ""),
             name: String(raw.name ?? "").trim(),
+            fieldType: typeof raw.fieldType === "string" ? raw.fieldType : "football",
             pieces: pieces.sort((a, b) => a.sortOrder - b.sortOrder),
           } satisfies TrainingField;
         }).filter((field) => field.id && field.name)
@@ -3547,10 +3645,12 @@ function AdminMembersPageContent() {
     if (field) {
       setTrainingFieldEditId(field.id);
       setTrainingFieldName(field.name);
+      setTrainingFieldType(field.fieldType || "football");
       setTrainingFieldPieces(field.pieces.map((piece) => ({ id: piece.id, name: piece.name })));
     } else {
       setTrainingFieldEditId(null);
       setTrainingFieldName("");
+      setTrainingFieldType("football");
       setTrainingFieldPieces([]);
     }
     setTrainingFieldModalOpen(true);
@@ -3569,6 +3669,7 @@ function AdminMembersPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: trainingFieldName.trim(),
+          fieldType: trainingFieldType,
           pieces: trainingFieldEditId
             ? trainingFieldPieces.map((piece) => ({ id: piece.id, name: piece.name.trim() }))
             : trainingFieldPieces.map((piece) => piece.name.trim()),
@@ -3906,6 +4007,9 @@ function AdminMembersPageContent() {
           ? {
               id: String((rawField as Record<string, unknown>).id ?? ""),
               name: String((rawField as Record<string, unknown>).name ?? ""),
+              fieldType: typeof (rawField as Record<string, unknown>).fieldType === "string"
+                ? String((rawField as Record<string, unknown>).fieldType)
+                : "football",
               pieces: Array.isArray((rawField as Record<string, unknown>).pieces)
                 ? ((rawField as Record<string, unknown>).pieces as unknown[]).map((p) => {
                     const rp = typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {};
@@ -7860,70 +7964,21 @@ function AdminMembersPageContent() {
                                       style={{
                                         display: "grid",
                                         gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))`,
-                                        minHeight: "96px",
-                                        aspectRatio: "3 / 1",
+                                        minHeight: (field.fieldType || "football") === "boxing" ? undefined : "96px",
+                                        width: (field.fieldType || "football") === "boxing" ? "55%" : "100%",
+                                        margin: (field.fieldType || "football") === "boxing" ? "0 auto" : undefined,
+                                        aspectRatio: (field.fieldType || "football") === "boxing" ? "1 / 1" : "2.2 / 1",
                                         border: isFieldSelected
                                             ? "2px solid rgba(50,205,50,0.8)"
                                             : "1px solid rgba(255,255,255,0.38)",
                                         borderRadius: "8px",
                                         overflow: "hidden",
-                                        background:
-                                            "linear-gradient(90deg, rgba(32,142,50,0.82) 0 12.5%, rgba(26,122,43,0.82) 12.5% 25%, rgba(32,142,50,0.82) 25% 37.5%, rgba(26,122,43,0.82) 37.5% 50%, rgba(32,142,50,0.82) 50% 62.5%, rgba(26,122,43,0.82) 62.5% 75%, rgba(32,142,50,0.82) 75% 87.5%, rgba(26,122,43,0.82) 87.5% 100%)",
+                                        background: getFieldBackground(field.fieldType || "football"),
                                         boxShadow: isFieldSelected ? "0 0 0 1px rgba(50,205,50,0.6), 0 0 22px rgba(50,205,50,0.28)" : "none",
                                         position: "relative",
                                       }}
                                   >
-                                    <div
-                                        aria-hidden="true"
-                                        style={{
-                                          position: "absolute",
-                                          inset: "8px",
-                                          border: "1px solid rgba(255,255,255,0.72)",
-                                          borderRadius: "4px",
-                                          pointerEvents: "none",
-                                        }}
-                                    />
-                                    <div
-                                        aria-hidden="true"
-                                        style={{
-                                          position: "absolute",
-                                          top: "8px",
-                                          bottom: "8px",
-                                          left: "50%",
-                                          width: "1px",
-                                          background: "rgba(255,255,255,0.72)",
-                                          transform: "translateX(-0.5px)",
-                                          pointerEvents: "none",
-                                        }}
-                                    />
-                                    <div
-                                        aria-hidden="true"
-                                        style={{
-                                          position: "absolute",
-                                          left: "50%",
-                                          top: "50%",
-                                          width: "26px",
-                                          height: "26px",
-                                          border: "1px solid rgba(255,255,255,0.72)",
-                                          borderRadius: "999px",
-                                          transform: "translate(-50%, -50%)",
-                                          pointerEvents: "none",
-                                        }}
-                                    />
-                                    <div
-                                        aria-hidden="true"
-                                        style={{
-                                          position: "absolute",
-                                          left: "50%",
-                                          top: "50%",
-                                          width: "4px",
-                                          height: "4px",
-                                          background: "rgba(255,255,255,0.8)",
-                                          borderRadius: "999px",
-                                          transform: "translate(-50%, -50%)",
-                                          pointerEvents: "none",
-                                        }}
-                                    />
+                                    {renderFieldMarkings(field.fieldType || "football")}
                                     {pieces.map((piece, index) => {
                                       const isPieceConflicted = field.pieces.length === 0
                                           ? isWholeFieldConflicted
@@ -8144,6 +8199,22 @@ function AdminMembersPageContent() {
               </button>
             </h2>
             <div className="amp-modal-body">
+              <label className="amp-edit-field" style={{ textAlign: "center" }}>
+                <span className="amp-lbl" style={{ textAlign: "center" }}>Вид терен</span>
+                <select
+                  className="amp-edit-input"
+                  value={trainingFieldType}
+                  onChange={(e) => setTrainingFieldType(e.target.value)}
+                  disabled={trainingFieldSaving}
+                  style={{ textAlign: "center" }}
+                >
+                  <option value="football">Футбол</option>
+                  <option value="basketball">Баскетбол</option>
+                  <option value="tennis">Тенис</option>
+                  <option value="volleyball">Волейбол</option>
+                  <option value="boxing">Бокс</option>
+                </select>
+              </label>
               <label className="amp-edit-field" style={{ textAlign: "center" }}>
                 <span className="amp-lbl" style={{ textAlign: "center" }}>Име на терена</span>
                 <input
@@ -8405,20 +8476,19 @@ function AdminMembersPageContent() {
                             style={{
                               display: "grid",
                               gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))`,
-                              minHeight: "96px",
-                              aspectRatio: "3 / 1",
+                              minHeight: (trainingDayField.fieldType || "football") === "boxing" ? undefined : "96px",
+                              width: (trainingDayField.fieldType || "football") === "boxing" ? "55%" : "100%",
+                              margin: (trainingDayField.fieldType || "football") === "boxing" ? "0 auto" : undefined,
+                              aspectRatio: (trainingDayField.fieldType || "football") === "boxing" ? "1 / 1" : "2.2 / 1",
                               border: "2px solid rgba(50,205,50,0.8)",
                               borderRadius: "8px",
                               overflow: "hidden",
-                              background: "linear-gradient(90deg, rgba(32,142,50,0.82) 0 12.5%, rgba(26,122,43,0.82) 12.5% 25%, rgba(32,142,50,0.82) 25% 37.5%, rgba(26,122,43,0.82) 37.5% 50%, rgba(32,142,50,0.82) 50% 62.5%, rgba(26,122,43,0.82) 62.5% 75%, rgba(32,142,50,0.82) 75% 87.5%, rgba(26,122,43,0.82) 87.5% 100%)",
+                              background: getFieldBackground(trainingDayField.fieldType || "football"),
                               boxShadow: "0 0 0 1px rgba(50,205,50,0.6), 0 0 22px rgba(50,205,50,0.28)",
                               position: "relative",
                             }}
                           >
-                            <div aria-hidden="true" style={{ position: "absolute", inset: "8px", border: "1px solid rgba(255,255,255,0.72)", borderRadius: "4px", pointerEvents: "none" }} />
-                            <div aria-hidden="true" style={{ position: "absolute", top: "8px", bottom: "8px", left: "50%", width: "1px", background: "rgba(255,255,255,0.72)", transform: "translateX(-0.5px)", pointerEvents: "none" }} />
-                            <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "26px", height: "26px", border: "1px solid rgba(255,255,255,0.72)", borderRadius: "999px", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
-                            <div aria-hidden="true" style={{ position: "absolute", left: "50%", top: "50%", width: "4px", height: "4px", background: "rgba(255,255,255,0.8)", borderRadius: "999px", transform: "translate(-50%, -50%)", pointerEvents: "none" }} />
+                            {renderFieldMarkings(trainingDayField.fieldType || "football")}
                             {pieces.map((piece, index) => {
                               const isPieceSelected = trainingDayField.pieces.length === 0
                                 ? true

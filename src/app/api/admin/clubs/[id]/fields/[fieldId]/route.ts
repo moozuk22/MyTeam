@@ -60,12 +60,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Field not found." }, { status: 404 });
   }
 
+  const VALID_FIELD_TYPES = ["football", "basketball", "tennis", "volleyball", "boxing"];
   const body = await request.json().catch(() => ({}));
   let name = "";
   let pieces: PieceInput[] = [];
+  let fieldType = "football";
   try {
     name = normalizeFieldName((body as { name?: unknown }).name);
     pieces = normalizePieces((body as { pieces?: unknown }).pieces);
+    const rawType = String((body as { fieldType?: unknown }).fieldType ?? "").trim().toLowerCase();
+    fieldType = VALID_FIELD_TYPES.includes(rawType) ? rawType : "football";
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Invalid field." },
@@ -93,7 +97,7 @@ export async function PATCH(
 
       await tx.field.update({
         where: { id: fieldId },
-        data: { name },
+        data: { name, fieldType },
       });
 
       if (removableIds.length > 0) {
@@ -120,6 +124,7 @@ export async function PATCH(
         select: {
           id: true,
           name: true,
+          fieldType: true,
           pieces: {
             orderBy: { sortOrder: "asc" },
             select: { id: true, name: true, sortOrder: true },

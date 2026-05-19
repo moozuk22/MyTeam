@@ -187,6 +187,7 @@ model Field {
   id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clubId    String       @map("club_id") @db.Uuid
   name      String
+  fieldType String       @default("football") @map("field_type")
   createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   club      Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)

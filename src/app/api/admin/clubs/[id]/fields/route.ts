@@ -16,6 +16,13 @@ function normalizeFieldName(raw: unknown): string {
   return name;
 }
 
+const VALID_FIELD_TYPES = ["football", "basketball", "tennis", "volleyball", "boxing"];
+
+function normalizeFieldType(raw: unknown): string {
+  const t = String(raw ?? "").trim().toLowerCase();
+  return VALID_FIELD_TYPES.includes(t) ? t : "football";
+}
+
 function normalizePieceNames(raw: unknown): string[] {
   if (!Array.isArray(raw)) {
     return [];
@@ -53,6 +60,7 @@ export async function GET(
     select: {
       id: true,
       name: true,
+      fieldType: true,
       pieces: {
         orderBy: { sortOrder: "asc" },
         select: {
@@ -81,9 +89,11 @@ export async function POST(
 
   let name = "";
   let pieces: string[] = [];
+  let fieldType = "football";
   try {
     name = normalizeFieldName((body as { name?: unknown }).name);
     pieces = normalizePieceNames((body as { pieces?: unknown }).pieces);
+    fieldType = normalizeFieldType((body as { fieldType?: unknown }).fieldType);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Invalid field." },
@@ -102,7 +112,7 @@ export async function POST(
       }
 
       const field = await tx.field.create({
-        data: { clubId, name },
+        data: { clubId, name, fieldType },
         select: { id: true },
       });
 
@@ -121,6 +131,7 @@ export async function POST(
         select: {
           id: true,
           name: true,
+          fieldType: true,
           pieces: {
             orderBy: { sortOrder: "asc" },
             select: { id: true, name: true, sortOrder: true },

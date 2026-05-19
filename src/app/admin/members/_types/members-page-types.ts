@@ -154,6 +154,7 @@ interface TrainingFieldPiece {
 interface TrainingField {
   id: string;
   name: string;
+  fieldType: string;
   pieces: TrainingFieldPiece[];
 }
 
