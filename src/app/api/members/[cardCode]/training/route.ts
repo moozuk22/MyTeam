@@ -737,6 +737,10 @@ export async function GET(
         ];
       }
 
+      if (sessions.length > 1) {
+        sessions.sort((a, b) => (a.trainingTime || "").localeCompare(b.trainingTime || ""));
+      }
+
       const firstSession = sessions[0]!;
       return {
         date,
