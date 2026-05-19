@@ -1676,7 +1676,7 @@ export default function MemberCardPage({
           <div className="card-shell">
             <div className="card-body" style={{ gap: "12px" }}>
               <p style={{ color: "#e03535", textAlign: "center", margin: 0 }}>{error ?? "Профилът не е намерен."}</p>
-              <button className="add-btn" onClick={() => router.push("/admin/members")}>Назад</button>
+              <button className="add-btn" onClick={() => router.push(searchParams.get("coachGroupId") ? `/admin/members?coachGroupId=${encodeURIComponent(searchParams.get("coachGroupId")!)}` : "/admin/members")}>Назад</button>
             </div>
           </div>
         </div>
@@ -1698,13 +1698,17 @@ export default function MemberCardPage({
           {(isAdmin || isCoach) && (
             <button
               className="amp-back-btn"
-              onClick={() =>
+              onClick={() => {
+                const backCoachGroupId = searchParams.get("coachGroupId");
+                const base = member.clubId
+                  ? `/admin/members?clubId=${encodeURIComponent(member.clubId)}`
+                  : "/admin/members";
                 router.push(
-                  member.clubId
-                    ? `/admin/members?clubId=${encodeURIComponent(member.clubId)}`
-                    : "/admin/members",
-                )
-              }
+                  backCoachGroupId
+                    ? `${base}&coachGroupId=${encodeURIComponent(backCoachGroupId)}`
+                    : base,
+                );
+              }}
             >
               <ArrowLeftIcon />
               Назад към състезатели

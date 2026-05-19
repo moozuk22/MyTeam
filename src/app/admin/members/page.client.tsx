@@ -4942,6 +4942,7 @@ function AdminMembersPageContent() {
                   onClick={() => setSelectedMember(m)}
                   onEdit={openEditMember}
                   coachGroupName={!coachGroupId && m.coachGroupIds.length > 0 ? m.coachGroupIds.map((id) => coachGroups.find((g) => g.id === id)?.name ?? "").filter(Boolean).join(", ") : null}
+                  coachGroupId={coachGroupId || null}
                 />
               ))}
               {filtered.length === 0 && (

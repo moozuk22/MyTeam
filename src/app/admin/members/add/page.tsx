@@ -355,10 +355,6 @@ function AddMemberPageContent() {
               />
             </div>
 
-            <div className="add-member-hint">
-              ⚡ Кодът на картата се генерира автоматично при създаване на състезател.
-            </div>
-
             <div className="add-member-divider" />
 
             <div className="add-member-field">
@@ -375,7 +371,7 @@ function AddMemberPageContent() {
             </div>
 
             <div className="add-member-field">
-              <label className="add-member-label">Номер в отбора</label>
+              <label className="add-member-label">Номер в отбора (Не е задължително)</label>
               <input
                 type="text"
                 value={jerseyNumber}

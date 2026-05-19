@@ -2144,6 +2144,7 @@ function PlayerCard({
   isDeleteLoading = false,
   onPermanentDelete,
   coachGroupName,
+  coachGroupId,
 }: {
   member: Member;
   onClick: () => void;
@@ -2154,6 +2155,7 @@ function PlayerCard({
   isDeleteLoading?: boolean;
   onPermanentDelete?: () => void;
   coachGroupName?: string | null;
+  coachGroupId?: string | null;
 }) {
   const router = useRouter();
   const s = getStatusMeta(member.status);
@@ -2221,7 +2223,10 @@ function PlayerCard({
               className="pc-profile-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/member/${encodeURIComponent(cardCode)}`);
+                const profileUrl = coachGroupId
+                  ? `/member/${encodeURIComponent(cardCode)}?coachGroupId=${encodeURIComponent(coachGroupId)}`
+                  : `/member/${encodeURIComponent(cardCode)}`;
+                router.push(profileUrl);
               }}
             >
               профил
