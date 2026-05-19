@@ -103,6 +103,8 @@ self.addEventListener("notificationclick", (event) => {
         : null;
     if (notifType === "training_reminder") {
       destinationUrl.searchParams.set("openTraining", "1");
+    } else if (notifType === "birthday") {
+      destinationUrl.searchParams.set("openBirthday", "1");
     } else {
       destinationUrl.searchParams.set("openBell", "1");
     }

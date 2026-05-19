@@ -13,6 +13,7 @@ const SUPPORTED_TYPES = new Set<NotificationTemplateType>([
   "membership_almost_finished",
   "training_reminder",
   "trainer_message",
+  "birthday",
 ]);
 
 function normalizeMemberIds(payload: {
@@ -127,12 +128,14 @@ export async function POST(request: NextRequest) {
             ? payload.trainerMessage.trim()
             : undefined;
 
+        const cardCode = member.cards[0]?.cardCode;
         const pushPayload = buildNotificationPayload({
           type,
           memberName,
           trainingDate,
           trainerMessage,
           url,
+          cardCode,
         });
 
         const sendResult = await sendPushToMember(member.id, pushPayload, type);

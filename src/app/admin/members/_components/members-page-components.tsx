@@ -585,7 +585,7 @@ function AttendanceDashboard({
                 }}
               >
                 <option value="group">Отбор</option>
-                <option value="player">Играч</option>
+                <option value="player">играч</option>
               </select>
               <ChevronDownIcon />
             </div>
@@ -634,7 +634,7 @@ function AttendanceDashboard({
             </>
           ) : (
             <div className="rd-field acd-player-search-field">
-              <label className="rd-label">Играч</label>
+              <label className="rd-label">играч</label>
               <div className="acd-player-search">
                 <input
                   type="text"
@@ -694,7 +694,7 @@ function AttendanceDashboard({
                 <table className="acd-table">
                   <thead>
                     <tr>
-                      <th className="acd-th-name">Играч</th>
+                      <th className="acd-th-name">играч</th>
                       {data.trainingDates.map((d) => (
                         <th key={d} className="acd-th-date" title={d}>
                           <span className="acd-date-label">{formatDateHeader(d)}</span>
@@ -1514,6 +1514,7 @@ function MemberDetailModal({
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notifications, setNotifications] = useState<MemberNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
   const [coachNoteLoading, setCoachNoteLoading] = useState(false);
   const [coachNoteSaving, setCoachNoteSaving] = useState(false);
   const [coachNoteError, setCoachNoteError] = useState("");
@@ -1534,6 +1535,7 @@ function MemberDetailModal({
   const activeCardCode = memberCardCode || "Няма активна карта";
   const memberClubId = member.club?.id ?? "";
   const memberId = member.id;
+
 
   const fetchNotifications = async () => {
     if (!memberClubId || !memberId) {

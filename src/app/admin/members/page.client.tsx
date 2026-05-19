@@ -6417,7 +6417,7 @@ function AdminMembersPageContent() {
                         marginBottom: "4px",
                       }}
                     >
-                      <span className="amp-lbl" style={{ margin: 0 }}>Играчите в групата</span>
+                      <span className="amp-lbl" style={{ margin: 0 }}>играчите в групата</span>
                       {availablePlayersForCustomGroupEdit.length > 0 ? (
                         <button
                           type="button"
@@ -6621,7 +6621,7 @@ function AdminMembersPageContent() {
                         marginBottom: "4px",
                       }}
                     >
-                      <span className="amp-lbl" style={{ margin: 0 }}>Играчите в групата</span>
+                      <span className="amp-lbl" style={{ margin: 0 }}>играчите в групата</span>
                       {availablePlayersForCustomGroupCreate.length > 0 ? (
                         <button
                           type="button"
@@ -7595,7 +7595,7 @@ function AdminMembersPageContent() {
                               disabled={trainingDaysEditorSaving}
                             >
                               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Ограничен брой места</div>
-                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>Играчите се записват сами. Само записаните участват.</div>
+                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>играчите се записват сами. Само записаните участват.</div>
                             </button>
                           </div>
                           {schedulerLimitedMode && (

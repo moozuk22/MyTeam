@@ -9,7 +9,8 @@ export type NotificationTemplateType =
   | "admin_message"
   | "member_push_enabled"
   | "limited_training_created"
-  | "limited_training_promoted";
+  | "limited_training_promoted"
+  | "birthday";
 
 export interface PushNotificationPayload {
   title: string;
@@ -38,4 +39,5 @@ export interface NotificationTemplateInput {
   trainerMessage?: string;
   url?: string;
   maxSpots?: number;
+  cardCode?: string;
 }
