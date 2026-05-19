@@ -5418,7 +5418,7 @@ function AdminMembersPageContent() {
           isAssigning={isAssigningNewCard}
         />
       )}
-      {paymentAmountModalOpen && isAdmin && clubId && !coachGroupId && (
+      {paymentAmountModalOpen && (isAdmin || isCoach) && clubId && (
         <div className="amp-overlay" onClick={closePaymentAmountModal}>
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
