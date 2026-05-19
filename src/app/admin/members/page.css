@@ -599,8 +599,6 @@
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
-  opacity: 0;
-  transition: opacity 0.25s ease;
 }
 
 .pc-card:hover .pc-avatar {

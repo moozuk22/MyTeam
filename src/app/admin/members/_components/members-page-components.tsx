@@ -2251,7 +2251,6 @@ function PlayerCard({
                 src={member.avatarUrl}
                 alt={member.fullName}
                 className="pc-avatar-img-overlay"
-                onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "1"; }}
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
               />
             )}
