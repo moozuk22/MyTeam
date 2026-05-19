@@ -312,12 +312,12 @@ function AttendanceDashboard({
   };
 
   const emptyLabel = groupScope.startsWith("tg:")
-    ? "Няма играчи в избраната група."
+    ? "Няма състезатели в избраната група."
     : groupScope.startsWith("year:")
-      ? "Няма играчи в избрания набор."
+      ? "Няма състезатели в избрания набор."
       : groupScope.startsWith("cg:")
-        ? "Няма играчи в избраната треньорска група."
-        : "Няма активни играчи.";
+        ? "Няма състезатели в избраната треньорска група."
+        : "Няма активни състезатели.";
 
 
   const filteredSearchPlayers = playerSearch.length >= 1 && !selectedPlayerId
@@ -585,7 +585,7 @@ function AttendanceDashboard({
                 }}
               >
                 <option value="group">Отбор</option>
-                <option value="player">играч</option>
+                <option value="player">Състезател</option>
               </select>
               <ChevronDownIcon />
             </div>
@@ -634,12 +634,12 @@ function AttendanceDashboard({
             </>
           ) : (
             <div className="rd-field acd-player-search-field">
-              <label className="rd-label">играч</label>
+              <label className="rd-label">Състезател</label>
               <div className="acd-player-search">
                 <input
                   type="text"
                   className="acd-search-input"
-                  placeholder="Търси играч..."
+                  placeholder="Търси състезател..."
                   value={playerSearch}
                   autoComplete="off"
                   onChange={(e) => {
@@ -694,7 +694,7 @@ function AttendanceDashboard({
                 <table className="acd-table">
                   <thead>
                     <tr>
-                      <th className="acd-th-name">играч</th>
+                      <th className="acd-th-name">Състезател</th>
                       {data.trainingDates.map((d) => (
                         <th key={d} className="acd-th-date" title={d}>
                           <span className="acd-date-label">{formatDateHeader(d)}</span>
@@ -799,7 +799,7 @@ function AttendanceDashboard({
         {!data && !loading && !error && (
           <p className="acd-empty">
             {scopeType === "player" && !selectedPlayerId
-              ? "Изберете играч за да видите присъствията."
+              ? "Изберете състезател за да видите присъствията."
               : "Няма данни за избрания период."}
           </p>
         )}
@@ -1250,7 +1250,7 @@ function ReportsDialog({
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="rd-empty-row">Няма играчи за избраните филтри.</td>
+                  <td colSpan={5} className="rd-empty-row">Няма състезатели за избраните филтри.</td>
                 </tr>
               )}
               {!loading && filtered.map((row, i) => (
@@ -1384,7 +1384,7 @@ function MemberDetailModalLegacy({
             </div>
 
             <div className="amp-info-cell">
-              <span className="amp-lbl">Телефон играч:</span>
+              <span className="amp-lbl">Телефон състезател:</span>
               <span className="amp-val">{member.playerPhone ?? "Не е посочен"}</span>
             </div>
 
@@ -1444,7 +1444,7 @@ function MemberDetailModalLegacy({
                   className="amp-btn amp-btn--danger"
                   onClick={() => onRequestDelete(member)}
                 >
-                  Премахни играч
+                  Премахни състезател
                 </button>
               </>
             ) : (
@@ -1777,7 +1777,7 @@ function MemberDetailModal({
             </div>
 
             <div className="amp-info-cell">
-              <span className="amp-lbl">Телефон играч:</span>
+              <span className="amp-lbl">Телефон състезател:</span>
               <span className="amp-val">{member.playerPhone ?? "Не е посочен"}</span>
             </div>
 
@@ -1914,7 +1914,7 @@ function MemberDetailModal({
                         className="amp-edit-input"
                         value={coachNoteDraft}
                         onChange={(e) => setCoachNoteDraft(e.target.value)}
-                        placeholder="Напиши инструкции/наблюдения за играча..."
+                        placeholder="Напиши инструкции/наблюдения за състезателя..."
                         rows={6}
                         style={{
                           width: "100%",
@@ -1959,7 +1959,7 @@ function MemberDetailModal({
                       >
                         {coachNote.trim()
                           ? coachNote
-                          : "Напиши инструкции/наблюдения за играча... (кликни молива за редакция)"}
+                          : "Напиши инструкции/наблюдения за състезателя... (кликни молива за редакция)"}
                       </div>
                       {coachNoteError ? (
                         <p className="amp-confirm-error" style={{ marginTop: "8px", marginBottom: 0 }}>{coachNoteError}</p>
@@ -2005,7 +2005,7 @@ function MemberDetailModal({
                   Редактирай
                 </button>
                 <button className="amp-btn amp-btn--danger" onClick={() => onRequestDelete(member)}>
-                  Премахни играч
+                  Премахни състезател
                 </button>
               </>
             ) : (
@@ -2269,7 +2269,7 @@ function InactivePlayersModal({
       <div className="amp-modal amp-modal--inactive" onClick={(e) => e.stopPropagation()}>
         <div className="amp-modal-tint" aria-hidden="true" />
         <h2 className="amp-modal-title">
-          <span className="amp-modal-title-gradient">Неактивни играчи</span>
+          <span className="amp-modal-title-gradient">Неактивни състезатели</span>
           <button className="amp-modal-close" onClick={onClose} aria-label="Затвори">
             <XIcon />
           </button>
@@ -2278,7 +2278,7 @@ function InactivePlayersModal({
         <div className="amp-modal-body">
           {error && <p className="amp-confirm-error">{error}</p>}
           {members.length === 0 ? (
-            <p className="amp-empty amp-empty--modal">Няма неактивни играчи</p>
+            <p className="amp-empty amp-empty--modal">Няма неактивни състезатели</p>
           ) : (
             <div className="amp-cards">
               {members.map((member) => (
@@ -2328,7 +2328,7 @@ function ConfirmPermanentDeleteModal({
             Сигурен ли си, че искаш да изтриеш завинаги <strong>{member.fullName}</strong>?
           </p>
           <p className="amp-confirm-subtext">
-            Това действие е необратимо и ще премахне играча и свързаните данни.
+            Това действие е необратимо и ще премахне състезателя и свързаните данни.
           </p>
 
           <div className="amp-modal-actions">
@@ -2372,7 +2372,7 @@ function ConfirmDeleteTeamModal({
             Сигурен ли си, че искаш да изтриеш <strong>{teamName}</strong>?
           </p>
           <p className="amp-confirm-subtext">
-            Това действие е необратимо и ще изтрие всички играчи, снимки, плащания, карти и свързани записи.
+            Това действие е необратимо и ще изтрие всички състезатели, снимки, плащания, карти и свързани записи.
           </p>
 
           <div className="amp-modal-actions">
@@ -2644,7 +2644,7 @@ function ImportFromSheetsModal({
                   onClick={() => void runImport()}
                   disabled={previewLoading || validRowCount === 0}
                 >
-                  Импортирай {validRowCount > 0 ? `${validRowCount} играча` : ""}
+                  Импортирай {validRowCount > 0 ? `${validRowCount} състезателя` : ""}
                 </button>
               </div>
             </div>
@@ -2889,7 +2889,7 @@ function ImportPhotosFromDriveModal({
                 <strong>{selectedFolder.name}</strong>
               </p>
               <p className="amp-import-confirm-hint">
-                Снимките в тази папка ще бъдат съпоставени с играчите по име на файл.
+                Снимките в тази папка ще бъдат съпоставени с състезателите по име на файл.
               </p>
 
               {importError && <p className="amp-confirm-error" style={{ marginTop: 8 }}>{importError}</p>}

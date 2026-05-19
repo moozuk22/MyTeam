@@ -176,7 +176,7 @@ export default function AdminEditTeamPage() {
             className="back-btn"
             onClick={() => router.push(`/admin/members?clubId=${encodeURIComponent(teamId)}`)}
           >
-            ← Назад към играчи
+            ← Назад към състезатели
           </button>
         </div>
 

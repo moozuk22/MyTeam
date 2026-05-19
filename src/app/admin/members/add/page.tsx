@@ -257,10 +257,10 @@ function AddMemberPageContent() {
       } else {
         const data = await response.json();
         if (response.status === 409 && data?.error === "duplicate_player") {
-          setError("Вече има активен играч със същото име и дата на раждане. Потвърдете предупреждението и опитайте отново.");
+          setError("Вече има активен състезател със същото име и дата на раждане. Потвърдете предупреждението и опитайте отново.");
           return;
         }
-        setError(data.error || "Грешка при създаване на играч");
+        setError(data.error || "Грешка при създаване на състезател");
       }
     } catch (err) {
       setError("Възникна грешка. Моля опитайте отново.");
@@ -327,7 +327,7 @@ function AddMemberPageContent() {
               <text x="60" y="122" textAnchor="middle" fill="#32cd32" fontSize="14" fontWeight="800" fontFamily="Arial, sans-serif">2024</text>
             </svg>
           )}
-          <h1 className="add-member-title">Добави нов играч</h1>
+          <h1 className="add-member-title">Добави нов състезател</h1>
           <div className="add-member-title-line" />
         </div>
 
@@ -336,7 +336,7 @@ function AddMemberPageContent() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 18-6-6 6-6" />
           </svg>
-          Назад към играчи
+          Назад към състезатели
         </Link>
 
         {/* Form card */}
@@ -356,7 +356,7 @@ function AddMemberPageContent() {
             </div>
 
             <div className="add-member-hint">
-              ⚡ Кодът на картата се генерира автоматично при създаване на играч.
+              ⚡ Кодът на картата се генерира автоматично при създаване на състезател.
             </div>
 
             <div className="add-member-divider" />
@@ -411,7 +411,7 @@ function AddMemberPageContent() {
             </div>
 
             <div className="add-member-field">
-              <label className="add-member-label">Телефон на играч</label>
+              <label className="add-member-label">Телефон на състезател</label>
               <input
                 type="tel"
                 value={playerPhone}
@@ -454,7 +454,7 @@ function AddMemberPageContent() {
             </div>
 
             <div className="add-member-field">
-              <label className="add-member-label">Снимка на играч</label>
+              <label className="add-member-label">Снимка на състезател</label>
               <input
                 type="file"
                 accept="image/*"
@@ -502,7 +502,7 @@ function AddMemberPageContent() {
                 disabled={isSubmitting}
                 className="add-member-btn-submit"
               >
-                {isSubmitting ? "Създаване..." : "Създай играч"}
+                {isSubmitting ? "Създаване..." : "Създай състезател"}
               </button>
             </div>
 
@@ -517,16 +517,16 @@ function AddMemberPageContent() {
         >
           <div className="add-member-modal" onClick={(e) => e.stopPropagation()}>
             <div className="add-member-modal-icon">!</div>
-            <h2 className="add-member-modal-title">Възможно дублиране на играч</h2>
+            <h2 className="add-member-modal-title">Възможно дублиране на състезател</h2>
             <p className="add-member-modal-text">
-              Вече има активен играч със същото име и дата на раждане:
+              Вече има активен състезател със същото име и дата на раждане:
             </p>
             <div className="add-member-modal-player">
               <strong>{duplicateWarning.fullName}</strong>
               <span>{normalizeDateInput(duplicateWarning.birthDate) || birthDate}</span>
             </div>
             <p className="add-member-modal-subtext">
-              Сигурни ли сте, че искате да добавите играча отново?
+              Сигурни ли сте, че искате да добавите състезателя отново?
             </p>
             <div className="add-member-modal-actions">
               <button

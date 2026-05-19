@@ -313,7 +313,7 @@ export async function POST(
 
   try {
     if (playerIds.length === 0) {
-      return NextResponse.json({ error: "В тази група няма избрани активни играчи." }, { status: 400 });
+      return NextResponse.json({ error: "В тази група няма избрани активни състезатели." }, { status: 400 });
     }
     const created = await prisma.$transaction(async (tx) => {
       const players = playerIds.length
@@ -399,7 +399,7 @@ export async function POST(
     return NextResponse.json({ ...serializeGroup(created), notifications }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_PLAYERS") {
-      return NextResponse.json({ error: "Избраните играчи трябва да са активни и да принадлежат към този клуб." }, { status: 400 });
+      return NextResponse.json({ error: "Избраните състезатели трябва да са активни и да принадлежат към този клуб." }, { status: 400 });
     }
     console.error("Custom training groups POST error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

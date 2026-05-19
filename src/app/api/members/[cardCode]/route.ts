@@ -415,7 +415,7 @@ export async function PUT(
       if (!raw) {
         data.playerPhone = null;
       } else if (!isValidPhone(raw)) {
-        return NextResponse.json({ error: "Невалиден телефон на играч" }, { status: 400 });
+        return NextResponse.json({ error: "Невалиден телефон на състезател" }, { status: 400 });
       } else {
         data.playerPhone = raw;
       }

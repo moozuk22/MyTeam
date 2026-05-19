@@ -112,7 +112,7 @@ export default function ClubBillingPage() {
       );
       setStep("idle");
       setSuccess(
-        `Таксуването е активирано от ${selectedMonth}. Засегнати играчи: ${affectedPlayers}.`,
+        `Таксуването е активирано от ${selectedMonth}. Засегнати състезатели: ${affectedPlayers}.`,
       );
     } catch (err) {
       console.error("Billing activation error:", err);
@@ -225,7 +225,7 @@ export default function ClubBillingPage() {
           {step === "confirm" && (
             <div className={styles.alertWarning}>
               <strong>Внимание:</strong> Промяната на началния месец ще актуализира{" "}
-              <em>всички активни играчи</em> в клуба
+              <em>всички активни състезатели</em> в клуба
               {playerStatus === "keep"
                 ? " без промяна на техния статус"
                 : ` и ще зададе техния статус на "${
@@ -238,12 +238,12 @@ export default function ClubBillingPage() {
           {step === "override" && (
             <div className={styles.alertError}>
               <strong>Таксуването е вече активно.</strong> Искаш ли да замениш началния месец с{" "}
-              <strong>{selectedMonth}</strong>? Това ще актуализира всички активни играчи.
+              <strong>{selectedMonth}</strong>? Това ще актуализира всички активни състезатели.
             </div>
           )}
 
           <div className={styles.section}>
-            <label className={styles.label}>Статус на играчите след активиране</label>
+            <label className={styles.label}>Статус на състезателите след активиране</label>
             <select
               className={styles.select}
               value={playerStatus}
@@ -275,7 +275,7 @@ export default function ClubBillingPage() {
             />
             {!isActive && (
               <p className={styles.hint}>
-                След активиране всички активни играчи ще получат този начален месец и статусите им ще бъдат преизчислени.
+                След активиране всички активни състезатели ще получат този начален месец и статусите им ще бъдат преизчислени.
               </p>
             )}
           </div>

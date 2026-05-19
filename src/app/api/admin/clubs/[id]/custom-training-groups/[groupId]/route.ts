@@ -314,7 +314,7 @@ export async function PATCH(
     const nextName = hasName ? String(payload.name ?? "").trim() : existing.name;
     if (!nextName) return NextResponse.json({ error: "Group name is required." }, { status: 400 });
     if (hasPlayerIds && playerIds.length === 0) {
-      return NextResponse.json({ error: "В тази група няма избрани активни играчи." }, { status: 400 });
+      return NextResponse.json({ error: "В тази група няма избрани активни състезатели." }, { status: 400 });
     }
 
     if (hasPlayerIds) {
@@ -324,7 +324,7 @@ export async function PATCH(
       });
       if (validPlayers.length !== playerIds.length) {
         return NextResponse.json(
-          { error: "Избраните играчи трябва да са активни и да принадлежат към този клуб." },
+          { error: "Избраните състезатели трябва да са активни и да принадлежат към този клуб." },
           { status: 400 },
         );
       }

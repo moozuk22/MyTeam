@@ -74,14 +74,14 @@ const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   text: "Добави текст",
   "team1-coach": "Треньор",
   "team1-goalkeeper": "Вратар",
-  "team1-player-1": "играч 1",
-  "team1-player-2": "играч 2",
-  "team1-player-more": "играч 3-11",
+  "team1-player-1": "състезател 1",
+  "team1-player-2": "състезател 2",
+  "team1-player-more": "състезател 3-11",
   "team2-coach": "Треньор",
   "team2-goalkeeper": "Вратар",
-  "team2-player-1": "играч 1",
-  "team2-player-2": "играч 2",
-  "team2-player-more": "играч 3-11",
+  "team2-player-1": "състезател 1",
+  "team2-player-2": "състезател 2",
+  "team2-player-more": "състезател 3-11",
 };
 
 const TACTICAL_TYPES = new Set<EquipmentType>([

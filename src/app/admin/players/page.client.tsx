@@ -311,7 +311,7 @@ export default function AdminPlayersPage() {
           <AdminLogoutButton />
         </div>
         <div className="mp-header">
-          <h1 className="mp-title">Списък играчи</h1>
+          <h1 className="mp-title">Списък състезатели</h1>
           <p className="mp-subtitle">Търсене, филтриране и ръчно отбелязване на плащания</p>
           <div className="mp-title-line" />
         </div>

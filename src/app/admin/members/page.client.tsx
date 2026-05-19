@@ -804,7 +804,7 @@ function AdminMembersPageContent() {
       }
 
       setClubDefaultPaymentAmount(normalizedPaymentAmount);
-      setPaymentAmountSuccess("Месечната такса е обновена за клуба и всички играчи.");
+      setPaymentAmountSuccess("Месечната такса е обновена за клуба и всички състезатели.");
       setMembers((prev) => prev.map((member) => ({ ...member, paymentAmount: normalizedPaymentAmount })));
     } catch (error) {
       console.error("Payment amount save error:", error);
@@ -1018,7 +1018,7 @@ function AdminMembersPageContent() {
       });
 
       if (!response.ok) {
-        let message = "Неуспешно премахване на играч.";
+        let message = "Неуспешно премахване на състезател.";
         try {
           const data = await response.json();
           if (typeof data?.error === "string" && data.error.trim()) {
@@ -1046,7 +1046,7 @@ function AdminMembersPageContent() {
       setMemberToDelete(null);
     } catch (error) {
       console.error("Error removing member:", error);
-      setDeleteError("Възникна грешка при премахване на играч.");
+      setDeleteError("Възникна грешка при премахване на състезател.");
     } finally {
       setIsDeletingMember(false);
     }
@@ -1234,7 +1234,7 @@ function AdminMembersPageContent() {
         const message =
           typeof data?.error === "string" && data.error.trim()
             ? data.error.trim()
-            : "Неуспешно редактиране на играч.";
+            : "Неуспешно редактиране на състезател.";
         setEditError(message);
         return;
       }
@@ -1316,7 +1316,7 @@ function AdminMembersPageContent() {
         const message =
           typeof data?.error === "string" && data.error.trim()
             ? data.error.trim()
-            : "Неуспешно активиране на играч.";
+            : "Неуспешно активиране на състезател.";
         setInactiveActionError(message);
         return;
       }
@@ -1326,7 +1326,7 @@ function AdminMembersPageContent() {
       setSelectedMember((prev) => (prev?.id === member.id ? updatedMember : prev));
     } catch (error) {
       console.error("Error reactivating member:", error);
-      setInactiveActionError("Възникна грешка при активиране на играч.");
+      setInactiveActionError("Възникна грешка при активиране на състезател.");
     } finally {
       setReactivatingMemberId(null);
     }
@@ -1349,7 +1349,7 @@ function AdminMembersPageContent() {
         const message =
           typeof data?.error === "string" && data.error.trim()
             ? data.error.trim()
-            : "Неуспешно изтриване на играч.";
+            : "Неуспешно изтриване на състезател.";
         setInactiveActionError(message);
         return;
       }
@@ -1358,7 +1358,7 @@ function AdminMembersPageContent() {
       setSelectedMember((prev) => (prev?.id === member.id ? null : prev));
     } catch (error) {
       console.error("Error permanently deleting member:", error);
-      setInactiveActionError("Възникна грешка при изтриване на играч.");
+      setInactiveActionError("Възникна грешка при изтриване на състезател.");
     } finally {
       setDeletingPermanentMemberId(null);
       setMemberToPermanentDelete(null);
@@ -2180,13 +2180,13 @@ function AdminMembersPageContent() {
       .sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" }));
 
     if (rows.length === 0) {
-      window.alert("Няма активни играчи с карта за export.");
+      window.alert("Няма активни състезатели с карта за export.");
       return;
     }
 
     const header = [
       `Отбор: ${clubName || "-"}`,
-      `Общо активни играчи: ${rows.length}`,
+      `Общо активни състезатели: ${rows.length}`,
       "",
     ].join("\n");
     const entries = rows
@@ -4540,7 +4540,7 @@ function AdminMembersPageContent() {
 
         {/* ── Page header ── */}
         <div className="amp-header">
-          <h1 className="amp-title">Списък играчи</h1>
+          <h1 className="amp-title">Списък състезатели</h1>
           <p className="amp-subtitle">Търсене, филтриране и ръчно отбелязване на плащания</p>
           <div className="amp-title-line" />
         </div>
@@ -4589,7 +4589,7 @@ function AdminMembersPageContent() {
         <div className="amp-buttons-grid">
           <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`)}>
             <PlusIcon />
-            Добави играч
+            Добави състезател
           </button>
           {isAdmin && clubId && (
             <button className="amp-import-sheets-btn amp-btn--compact" onClick={() => setImportSheetsOpen(true)} type="button">
@@ -4945,7 +4945,7 @@ function AdminMembersPageContent() {
                 />
               ))}
               {filtered.length === 0 && (
-                <p className="amp-empty">Няма намерени играчи</p>
+                <p className="amp-empty">Няма намерени състезатели</p>
               )}
             </div>
           )}
@@ -5114,7 +5114,7 @@ function AdminMembersPageContent() {
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">Редактиране на играч</span>
+              <span className="amp-modal-title-gradient">Редактиране на състезател</span>
               <button
                 className="amp-modal-close"
                 onClick={closeEditModal}
@@ -5172,7 +5172,7 @@ function AdminMembersPageContent() {
                   />
                 </label>
                 <label className="amp-edit-field">
-                  <span className="amp-lbl">Телефон на играч</span>
+                  <span className="amp-lbl">Телефон на състезател</span>
                   <input
                     className="amp-edit-input"
                     type="tel"
@@ -5338,7 +5338,7 @@ function AdminMembersPageContent() {
                 </div>
               </label>
               <p className="amp-confirm-text">
-                Тази сума ще бъде зададена като стандартна за клуба и ще се приложи за всички играчи.
+                Тази сума ще бъде зададена като стандартна за клуба и ще се приложи за всички състезатели.
               </p>
 
               {paymentAmountError && <p className="amp-confirm-error">{paymentAmountError}</p>}
@@ -5587,7 +5587,7 @@ function AdminMembersPageContent() {
                         <>
                           <div style={{ flex: 1 }}>
                             <span style={{ fontWeight: 500 }}>{group.name}</span>
-                            <span style={{ marginLeft: "8px", fontSize: "0.8rem", opacity: 0.6 }}>{group.playerCount} играчи</span>
+                            <span style={{ marginLeft: "8px", fontSize: "0.8rem", opacity: 0.6 }}>{group.playerCount} Състезатели</span>
                           </div>
                           {coachGroupDeleteId !== group.id && (
                             <button
@@ -6244,7 +6244,7 @@ function AdminMembersPageContent() {
                     {trainingAttendanceLoading ? (
                       <p className="amp-empty amp-empty--modal">Зареждане...</p>
                     ) : trainingAttendancePlayers.length === 0 ? (
-                      <p className="amp-empty amp-empty--modal">Няма играчи за този отбор.</p>
+                      <p className="amp-empty amp-empty--modal">Няма състезатели за този отбор.</p>
                     ) : (
                       <table className="amp-training-table">
                         <thead>
@@ -6417,7 +6417,7 @@ function AdminMembersPageContent() {
                         marginBottom: "4px",
                       }}
                     >
-                      <span className="amp-lbl" style={{ margin: 0 }}>играчите в групата</span>
+                      <span className="amp-lbl" style={{ margin: 0 }}>Състезателите в групата</span>
                       {availablePlayersForCustomGroupEdit.length > 0 ? (
                         <button
                           type="button"
@@ -6445,7 +6445,7 @@ function AdminMembersPageContent() {
                     <input
                       className="amp-edit-input"
                       type="search"
-                      placeholder="Търси играч..."
+                      placeholder="Търси състезател..."
                       value={customGroupEditSearch}
                       onChange={(e) => setCustomGroupEditSearch(e.target.value)}
                       disabled={trainingGroupEditSaving}
@@ -6474,10 +6474,10 @@ function AdminMembersPageContent() {
                       })}
                     </div>
                     {availablePlayersForCustomGroupEdit.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма свободни играчи за добавяне.</p>
+                      <p className="amp-empty amp-empty--modal">Няма свободни състезатели за добавяне.</p>
                     )}
                     {availablePlayersForCustomGroupEdit.length > 0 && filteredPlayersForCustomGroupEdit.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма играчи, отговарящи на търсенето.</p>
+                      <p className="amp-empty amp-empty--modal">Няма състезатели, отговарящи на търсенето.</p>
                     )}
                   </div>
                 </>
@@ -6621,7 +6621,7 @@ function AdminMembersPageContent() {
                         marginBottom: "4px",
                       }}
                     >
-                      <span className="amp-lbl" style={{ margin: 0 }}>играчите в групата</span>
+                      <span className="amp-lbl" style={{ margin: 0 }}>състезателите в групата</span>
                       {availablePlayersForCustomGroupCreate.length > 0 ? (
                         <button
                           type="button"
@@ -6649,7 +6649,7 @@ function AdminMembersPageContent() {
                     <input
                       className="amp-edit-input"
                       type="search"
-                      placeholder="Търси играч..."
+                      placeholder="Търси състезател..."
                       value={customGroupCreateSearch}
                       onChange={(e) => setCustomGroupCreateSearch(e.target.value)}
                       disabled={trainingGroupCreateSaving}
@@ -6678,10 +6678,10 @@ function AdminMembersPageContent() {
                       })}
                     </div>
                     {availablePlayersForCustomGroupCreate.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма свободни играчи за добавяне.</p>
+                      <p className="amp-empty amp-empty--modal">Няма свободни състезатели за добавяне.</p>
                     )}
                     {availablePlayersForCustomGroupCreate.length > 0 && filteredPlayersForCustomGroupCreate.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма играчи, отговарящи на търсенето.</p>
+                      <p className="amp-empty amp-empty--modal">Няма състезатели, отговарящи на търсенето.</p>
                     )}
                   </div>
                 </>
@@ -7582,7 +7582,7 @@ function AdminMembersPageContent() {
                               disabled={trainingDaysEditorSaving}
                             >
                               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Всички участват</div>
-                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>Всеки активен играч е маркиран като присъстващ по подразбиране.</div>
+                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>Всеки активен състезател е маркиран като присъстващ по подразбиране.</div>
                             </button>
                             <button
                               type="button"
@@ -7595,7 +7595,7 @@ function AdminMembersPageContent() {
                               disabled={trainingDaysEditorSaving}
                             >
                               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Ограничен брой места</div>
-                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>играчите се записват сами. Само записаните участват.</div>
+                              <div style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.4 }}>Състезателите се записват сами. Само записаните участват.</div>
                             </button>
                           </div>
                           {schedulerLimitedMode && (
@@ -8365,7 +8365,7 @@ function AdminMembersPageContent() {
                     {trainingAttendanceLoading || trainingDayDetailsTabLoading ? (
                       <p className="amp-empty amp-empty--modal">Зареждане...</p>
                     ) : trainingAttendancePlayers.length === 0 ? (
-                      <p className="amp-empty amp-empty--modal">Няма играчи за този отбор.</p>
+                      <p className="amp-empty amp-empty--modal">Няма състезатели за този отбор.</p>
                     ) : (
                       <table className="amp-training-table">
                         <thead>
@@ -9217,7 +9217,7 @@ function AdminMembersPageContent() {
               <div className="amp-notify-player-list">
                 {notifyVisibleMembers.length === 0 ? (
                   <p style={{ padding: "12px", fontSize: "13px", color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
-                    Няма играчи
+                    Няма състезатели
                   </p>
                 ) : (
                   notifyVisibleMembers.map((m) => (

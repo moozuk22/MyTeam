@@ -1538,7 +1538,7 @@ export default function MemberCardPage({
         <p class="sub">Разписка за членски внос</p>
       </div>
       <hr class="sep" />
-      <div class="row"><span class="lbl">играч:</span><span class="val">${safeMemberName}</span></div>
+      <div class="row"><span class="lbl">Състезател:</span><span class="val">${safeMemberName}</span></div>
       <div class="row"><span class="lbl">Период:</span><span class="val">${safePeriod}</span></div>
       <div class="row"><span class="lbl">Дата на плащане:</span><span class="val">${safePaidAt}</span></div>
       <hr class="sep" />
@@ -1707,7 +1707,7 @@ export default function MemberCardPage({
               }
             >
               <ArrowLeftIcon />
-              Назад към играчи
+              Назад към състезатели
             </button>
           )}
 
@@ -3280,7 +3280,7 @@ export default function MemberCardPage({
                   />
                 </label>
                 <label style={{ display: "grid", gap: "6px" }}>
-                  <span className="pm-info-lbl">Телефон на играч</span>
+                  <span className="pm-info-lbl">Телефон на състезател</span>
                   <input
                     type="tel"
                     value={editForm.playerPhone}
@@ -3772,7 +3772,7 @@ export default function MemberCardPage({
 
                 <div className="receipt-fields">
                   <div className="receipt-row">
-                    <span className="receipt-lbl">играч:</span>
+                    <span className="receipt-lbl">Състезател:</span>
                     <span className="receipt-val">{member.name}</span>
                   </div>
                   <div className="receipt-row">
