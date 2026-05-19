@@ -353,6 +353,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const customGroupId = request.nextUrl.searchParams.get("customGroupId")?.trim() ?? "";
+    if (customGroupId && !uuidRegex.test(customGroupId)) {
+      return NextResponse.json({ error: "Custom group not found" }, { status: 404 });
+    }
+
     const now = new Date();
     const currentMonthStart = normalizeToMonthStart(now);
     const nextMonthStart = new Date(Date.UTC(
@@ -370,6 +375,7 @@ export async function GET(request: NextRequest) {
       where: {
         ...(clubId ? { clubId } : {}),
         ...(coachGroupId ? { coachGroups: { some: { id: coachGroupId } } } : {}),
+        ...(customGroupId ? { customTrainingGroups: { some: { groupId: customGroupId } } } : {}),
       },
       select: {
         id: true,

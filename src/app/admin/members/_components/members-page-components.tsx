@@ -869,11 +869,67 @@ function ReportsDialog({
   const now = new Date();
   const [month, setMonth] = useState(MONTHS[now.getMonth()] ?? MONTHS[0]);
   const [year, setYear] = useState(String(Math.max(2026, now.getFullYear())));
-  const [group, setGroup] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [players, setPlayers] = useState<ReportPlayer[]>([]);
   const [loading, setLoading] = useState(true);
-  const reportScopeKey = `${clubId}|${coachGroupId}`;
+  const [coachGroupsList, setCoachGroupsList] = useState<Array<{ id: string; name: string }>>([]);
+  const [filterCoachGroupId, setFilterCoachGroupId] = useState(coachGroupId);
+  const [customTrainingGroupsList, setCustomTrainingGroupsList] = useState<Array<{ id: string; name: string }>>([]);
+  const [filterCustomGroupId, setFilterCustomGroupId] = useState("");
+
+  useEffect(() => {
+    if (!clubId) return;
+    const fetchCoachGroups = async () => {
+      try {
+        const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups`, { cache: "no-store" });
+        if (!res.ok) return;
+        const payload: unknown = await res.json();
+        const cgs = Array.isArray(payload)
+          ? payload
+            .map((item) => {
+              const r = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+              return { id: String(r.id ?? ""), name: String(r.name ?? "").trim() };
+            })
+            .filter((g) => g.id && g.name)
+          : [];
+        setCoachGroupsList(cgs);
+      } catch {
+        // silent
+      }
+    };
+    void fetchCoachGroups();
+  }, [clubId]);
+
+  useEffect(() => {
+    if (!filterCoachGroupId) {
+      setCustomTrainingGroupsList([]);
+      setFilterCustomGroupId("");
+      return;
+    }
+    const fetchCustomGroups = async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups?coachGroupId=${encodeURIComponent(filterCoachGroupId)}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const payload: unknown = await res.json();
+        const groups = Array.isArray(payload)
+          ? payload
+            .map((item) => {
+              const r = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+              return { id: String(r.id ?? ""), name: String(r.name ?? "").trim() };
+            })
+            .filter((g) => g.id && g.name)
+          : [];
+        setCustomTrainingGroupsList(groups);
+        setFilterCustomGroupId("");
+      } catch {
+        // silent
+      }
+    };
+    void fetchCustomGroups();
+  }, [clubId, filterCoachGroupId]);
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -883,8 +939,11 @@ function ReportsDialog({
         if (clubId) {
           search.set("clubId", clubId);
         }
-        if (coachGroupId) {
-          search.set("coachGroupId", coachGroupId);
+        if (filterCoachGroupId) {
+          search.set("coachGroupId", filterCoachGroupId);
+        }
+        if (filterCustomGroupId) {
+          search.set("customGroupId", filterCustomGroupId);
         }
         const endpoint = search.size ? `/api/admin/members?${search.toString()}` : "/api/admin/members";
         const response = await fetch(endpoint, { cache: "no-store" });
@@ -928,18 +987,12 @@ function ReportsDialog({
     };
 
     void fetchPlayers();
-  }, [reportScopeKey]);
+  }, [clubId, filterCoachGroupId, filterCustomGroupId]);
 
   const years = Array.from(
     { length: Math.max(1, now.getFullYear() - 2026 + 2) },
     (_, idx) => String(2026 + idx),
   );
-
-  const groups = [...new Set(
-    players
-      .map((player) => player.teamGroup)
-      .filter((value): value is number => value !== null),
-  )].sort((a, b) => b - a);
 
   const selectedMonthIdx = MONTHS.indexOf(month);
   const selectedYear = Number(year);
@@ -984,20 +1037,13 @@ function ReportsDialog({
     return latestPaidAt ? latestPaidAt.toLocaleDateString("bg-BG") : null;
   };
 
-  const groupFiltered = players.filter((player) => {
-    if (group === "all") {
-      return true;
-    }
-    return String(player.teamGroup ?? "") === group;
-  });
-
   const formatPaymentAmount = (value: string | null): string => {
     if (!value) return "€0.00";
     const parsed = Number(value.replace(",", "."));
     return Number.isFinite(parsed) ? `€${parsed.toFixed(2)}` : "€0.00";
   };
 
-  const rows = groupFiltered.map((player) => {
+  const rows = players.map((player) => {
     const paidDate = getPaymentDateForMonth(player);
     return {
       id: player.id,
@@ -1010,7 +1056,7 @@ function ReportsDialog({
     };
   });
 
-  const rowsYearly = groupFiltered.map((player) => {
+  const rowsYearly = players.map((player) => {
     const paidDate = getPaymentDateForYear(player);
     return {
       id: player.id,
@@ -1057,7 +1103,13 @@ function ReportsDialog({
     const percent = totalRows > 0 ? Math.round((paid / totalRows) * 100) : 0;
     const unpaid = totalRows - paid;
     const periodTitle = kind === "monthly" ? `${month} ${year}` : `Година ${year}`;
-    const scopeTitle = coachGroupId ? `Само за треньорска група: ${coachGroupName || "текущата група"}` : "";
+    const activeGroupName = coachGroupsList.find((g) => g.id === filterCoachGroupId)?.name ?? coachGroupName ?? "текущата група";
+    const activeCustomGroupName = customTrainingGroupsList.find((g) => g.id === filterCustomGroupId)?.name ?? "";
+    const scopeTitle = filterCoachGroupId
+      ? activeCustomGroupName
+        ? `Треньор: ${activeGroupName} — Треньорска група: ${activeCustomGroupName}`
+        : `Треньор: ${activeGroupName}`
+      : "";
 
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
@@ -1083,14 +1135,13 @@ function ReportsDialog({
             <tr>
               <td>${idx + 1}</td>
               <td>${escapeHtml(row.name)}</td>
-              <td>${row.group ?? "—"}</td>
               <td>${escapeHtml(row.amount)}</td>
               <td>${escapeHtml(row.date)}</td>
               <td>${row.paid ? "Платено" : "Неплатено"}</td>
             </tr>
           `)
         .join("")
-      : `<tr><td colspan="6" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
+      : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
 
     doc.open();
     doc.write(`<!doctype html>
@@ -1127,7 +1178,6 @@ function ReportsDialog({
         <tr>
           <th>#</th>
           <th>Име</th>
-          <th>Набор</th>
           <th>Сума</th>
           <th>Дата на плащане</th>
           <th>Статус</th>
@@ -1163,11 +1213,6 @@ function ReportsDialog({
             <ChartColumnIcon size={20} />
             Център за отчети
           </h2>
-          {coachGroupId && (
-            <p className="rd-subtitle">
-              Само за треньорска група: {coachGroupName || "текущата група"}
-            </p>
-          )}
         </div>
 
         <div className="rd-filters">
@@ -1193,16 +1238,40 @@ function ReportsDialog({
             </div>
           </div>
 
-          <div className="rd-field">
-            <label className="rd-label">Набор</label>
-            <div className="rd-select-wrap">
-              <select className="rd-select rd-select--w120" value={group} onChange={(e) => setGroup(e.target.value)}>
-                <option value="all">Всички</option>
-                {groups.map((g) => <option key={g} value={String(g)}>{g}</option>)}
-              </select>
-              <ChevronDownIcon />
-            </div>
-          </div>
+          {!coachGroupId && (
+            <>
+              <div className="rd-field rd-field--grow">
+                <label className="rd-label">Треньор</label>
+                <div className="rd-select-wrap">
+                  <select
+                    className="rd-select"
+                    value={filterCoachGroupId}
+                    onChange={(e) => setFilterCoachGroupId(e.target.value)}
+                  >
+                    <option value="">Всички</option>
+                    {coachGroupsList.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                  <ChevronDownIcon />
+                </div>
+              </div>
+              {filterCoachGroupId && customTrainingGroupsList.length > 0 && (
+                <div className="rd-field">
+                  <label className="rd-label">Треньорска група</label>
+                  <div className="rd-select-wrap">
+                    <select
+                      className="rd-select rd-select--w140"
+                      value={filterCustomGroupId}
+                      onChange={(e) => setFilterCustomGroupId(e.target.value)}
+                    >
+                      <option value="">Всички</option>
+                      {customTrainingGroupsList.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                    <ChevronDownIcon />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           <div className="rd-field">
             <label className="rd-label">Статус</label>
@@ -1237,7 +1306,6 @@ function ReportsDialog({
               <tr>
                 <th>#</th>
                 <th>Име</th>
-                <th>Набор</th>
                 <th>Дата на плащане</th>
                 <th>Статус</th>
               </tr>
@@ -1245,19 +1313,18 @@ function ReportsDialog({
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={5} className="rd-empty-row">Зареждане...</td>
+                  <td colSpan={4} className="rd-empty-row">Зареждане...</td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="rd-empty-row">Няма състезатели за избраните филтри.</td>
+                  <td colSpan={4} className="rd-empty-row">Няма състезатели за избраните филтри.</td>
                 </tr>
               )}
               {!loading && filtered.map((row, i) => (
                 <tr key={row.id}>
                   <td className="rd-td-muted">{i + 1}</td>
                   <td>{row.name}</td>
-                  <td className="rd-td-dim">{row.group ?? "—"}</td>
                   <td className="rd-td-dim">{row.date}</td>
                   <td>
                     <span className={`rd-badge ${row.paid ? "rd-badge--paid" : "rd-badge--unpaid"}`}>

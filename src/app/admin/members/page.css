@@ -3160,6 +3160,18 @@
   width: 120px;
 }
 
+.rd-select--w180 {
+  width: 180px;
+}
+
+.rd-field--grow {
+  flex: 1;
+}
+
+.rd-field--grow .rd-select {
+  width: 100%;
+}
+
 /* Segmented control */
 .rd-seg {
   display: flex;
@@ -3452,7 +3464,8 @@
 
   .rd-select--w140,
   .rd-select--w100,
-  .rd-select--w120 {
+  .rd-select--w120,
+  .rd-select--w180 {
     width: 100%;
   }
 
