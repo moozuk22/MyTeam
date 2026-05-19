@@ -118,6 +118,10 @@ function getFieldBackground(fieldType: string): string {
       return "#e07a50";
     case "boxing":
       return "#1a6b9e";
+    case "karate":
+      return "#e8919f";
+    case "swimming":
+      return "linear-gradient(180deg, #0e5fb5 0%, #1878d4 45%, #1060b8 100%)";
     default:
       return "linear-gradient(90deg, rgba(32,142,50,0.82) 0 12.5%, rgba(26,122,43,0.82) 12.5% 25%, rgba(32,142,50,0.82) 25% 37.5%, rgba(26,122,43,0.82) 37.5% 50%, rgba(32,142,50,0.82) 50% 62.5%, rgba(26,122,43,0.82) 62.5% 75%, rgba(32,142,50,0.82) 75% 87.5%, rgba(26,122,43,0.82) 87.5% 100%)";
   }
@@ -129,6 +133,8 @@ function clubSportToFieldType(sport: string): string {
   if (/tenis|тенис/.test(s)) return "tennis";
   if (/voley|волей/.test(s)) return "volleyball";
   if (/box|бокс/.test(s)) return "boxing";
+  if (/karat|karate|карате|taekwon|таекуондо|judo|джудо/.test(s)) return "karate";
+  if (/swim|плув|басейн/.test(s)) return "swimming";
   return "football";
 }
 
@@ -199,6 +205,42 @@ function renderFieldMarkings(fieldType: string) {
           <div aria-hidden="true" style={{ position: "absolute", bottom: "3px", left: "3px", width: "6px", height: "6px", background: "rgba(20,20,20,0.9)", borderRadius: "999px", pointerEvents: "none" }} />
           {/* corner post bottom-right */}
           <div aria-hidden="true" style={{ position: "absolute", bottom: "3px", right: "3px", width: "6px", height: "6px", background: "rgba(20,20,20,0.9)", borderRadius: "999px", pointerEvents: "none" }} />
+        </>
+      );
+    case "karate":
+      return (
+        <>
+          {/* Blue competition frame with inner pink area */}
+          <div aria-hidden="true" style={{ position: "absolute", inset: "15%", background: "#1564bf", pointerEvents: "none" }}>
+            <div aria-hidden="true" style={{ position: "absolute", inset: "20%", background: "#e8919f", pointerEvents: "none" }}>
+              {/* contestant position marks — horizontal top */}
+              <div aria-hidden="true" style={{ position: "absolute", top: "28%", left: "38%", right: "38%", height: "2px", background: "#1564bf", pointerEvents: "none" }} />
+              {/* contestant position marks — left vertical */}
+              <div aria-hidden="true" style={{ position: "absolute", top: "36%", bottom: "22%", left: "41%", width: "2px", background: "#1564bf", pointerEvents: "none" }} />
+              {/* contestant position marks — right vertical */}
+              <div aria-hidden="true" style={{ position: "absolute", top: "36%", bottom: "22%", right: "41%", width: "2px", background: "#1564bf", pointerEvents: "none" }} />
+            </div>
+          </div>
+          {/* diagonal dashes in outer pink corners */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "8%", left: "2%", width: "11%", height: "0", borderTop: "2px dashed #1564bf", transform: "rotate(-45deg)", transformOrigin: "right center", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "8%", right: "2%", width: "11%", height: "0", borderTop: "2px dashed #1564bf", transform: "rotate(45deg)", transformOrigin: "left center", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", bottom: "8%", left: "2%", width: "11%", height: "0", borderTop: "2px dashed #1564bf", transform: "rotate(45deg)", transformOrigin: "right center", pointerEvents: "none" }} />
+          <div aria-hidden="true" style={{ position: "absolute", bottom: "8%", right: "2%", width: "11%", height: "0", borderTop: "2px dashed #1564bf", transform: "rotate(-45deg)", transformOrigin: "left center", pointerEvents: "none" }} />
+        </>
+      );
+    case "swimming":
+      return (
+        <>
+          {/* pool border */}
+          <div aria-hidden="true" style={{ position: "absolute", inset: "4px", border: "2px solid rgba(255,255,255,0.7)", borderRadius: "2px", pointerEvents: "none" }} />
+          {/* lane rope between lane 1 and 2 */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "calc(33.33% - 3px)", left: "4px", right: "4px", height: "6px", borderRadius: "3px", background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.92) 0px, rgba(255,255,255,0.92) 6px, transparent 6px, transparent 8px, rgba(210,40,40,0.9) 8px, rgba(210,40,40,0.9) 14px, transparent 14px, transparent 16px)", pointerEvents: "none" }} />
+          {/* lane rope between lane 2 and 3 */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "calc(66.66% - 3px)", left: "4px", right: "4px", height: "6px", borderRadius: "3px", background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.92) 0px, rgba(255,255,255,0.92) 6px, transparent 6px, transparent 8px, rgba(210,40,40,0.9) 8px, rgba(210,40,40,0.9) 14px, transparent 14px, transparent 16px)", pointerEvents: "none" }} />
+          {/* turn wall line (left) */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "4px", bottom: "4px", left: "10%", width: "1px", background: "rgba(255,255,255,0.45)", pointerEvents: "none" }} />
+          {/* turn wall line (right) */}
+          <div aria-hidden="true" style={{ position: "absolute", top: "4px", bottom: "4px", right: "10%", width: "1px", background: "rgba(255,255,255,0.45)", pointerEvents: "none" }} />
         </>
       );
     default:
@@ -2660,7 +2702,8 @@ function AdminMembersPageContent() {
         cache: "no-store",
       });
       if (!response.ok) {
-        throw new Error("Неуспешно зареждане на терените.");
+        setTrainingFields([]);
+        return [];
       }
       const payload: unknown = await response.json();
       const fields = Array.isArray(payload)
@@ -7973,10 +8016,10 @@ function AdminMembersPageContent() {
                                       style={{
                                         display: "grid",
                                         gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))`,
-                                        minHeight: (field.fieldType || "football") === "boxing" ? undefined : "96px",
-                                        width: (field.fieldType || "football") === "boxing" ? "55%" : "100%",
-                                        margin: (field.fieldType || "football") === "boxing" ? "0 auto" : undefined,
-                                        aspectRatio: (field.fieldType || "football") === "boxing" ? "1 / 1" : "2.2 / 1",
+                                        minHeight: ["boxing", "karate"].includes(field.fieldType || "football") ? undefined : "96px",
+                                        width: ["boxing", "karate"].includes(field.fieldType || "football") ? "55%" : "100%",
+                                        margin: ["boxing", "karate"].includes(field.fieldType || "football") ? "0 auto" : undefined,
+                                        aspectRatio: ["boxing", "karate"].includes(field.fieldType || "football") ? "1 / 1" : "2.2 / 1",
                                         border: isFieldSelected
                                             ? "2px solid rgba(50,205,50,0.8)"
                                             : "1px solid rgba(255,255,255,0.38)",
@@ -8061,7 +8104,7 @@ function AdminMembersPageContent() {
                                                 transition: "background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
                                               }}
                                           >
-                                            {piece.name}
+                                            {piece.id ? piece.name : null}
                                           </button>
                                       );
                                     })}
@@ -8222,6 +8265,8 @@ function AdminMembersPageContent() {
                   <option value="tennis">Тенис</option>
                   <option value="volleyball">Волейбол</option>
                   <option value="boxing">Бокс</option>
+                  <option value="karate">Карате / Таекуондо</option>
+                  <option value="swimming">Плувен басейн</option>
                 </select>
               </label>
               <label className="amp-edit-field" style={{ textAlign: "center" }}>
@@ -8485,10 +8530,10 @@ function AdminMembersPageContent() {
                             style={{
                               display: "grid",
                               gridTemplateColumns: `repeat(${pieces.length}, minmax(0, 1fr))`,
-                              minHeight: (trainingDayField.fieldType || "football") === "boxing" ? undefined : "96px",
-                              width: (trainingDayField.fieldType || "football") === "boxing" ? "55%" : "100%",
-                              margin: (trainingDayField.fieldType || "football") === "boxing" ? "0 auto" : undefined,
-                              aspectRatio: (trainingDayField.fieldType || "football") === "boxing" ? "1 / 1" : "2.2 / 1",
+                              minHeight: ["boxing", "karate"].includes(trainingDayField.fieldType || "football") ? undefined : "96px",
+                              width: ["boxing", "karate"].includes(trainingDayField.fieldType || "football") ? "55%" : "100%",
+                              margin: ["boxing", "karate"].includes(trainingDayField.fieldType || "football") ? "0 auto" : undefined,
+                              aspectRatio: ["boxing", "karate"].includes(trainingDayField.fieldType || "football") ? "1 / 1" : "2.2 / 1",
                               border: "2px solid rgba(50,205,50,0.8)",
                               borderRadius: "8px",
                               overflow: "hidden",
@@ -8523,7 +8568,7 @@ function AdminMembersPageContent() {
                                     textShadow: "0 1px 2px rgba(0,0,0,0.55)",
                                   }}
                                 >
-                                  {piece.name}
+                                  {piece.id ? piece.name : null}
                                 </div>
                               );
                             })}

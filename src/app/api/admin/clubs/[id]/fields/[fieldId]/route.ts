@@ -60,7 +60,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Field not found." }, { status: 404 });
   }
 
-  const VALID_FIELD_TYPES = ["football", "basketball", "tennis", "volleyball", "boxing"];
+  const VALID_FIELD_TYPES = ["football", "basketball", "tennis", "volleyball", "boxing", "karate", "swimming"];
   const body = await request.json().catch(() => ({}));
   let name = "";
   let pieces: PieceInput[] = [];

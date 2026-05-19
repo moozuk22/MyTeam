@@ -16,7 +16,7 @@ function normalizeFieldName(raw: unknown): string {
   return name;
 }
 
-const VALID_FIELD_TYPES = ["football", "basketball", "tennis", "volleyball", "boxing"];
+const VALID_FIELD_TYPES = ["football", "basketball", "tennis", "volleyball", "boxing", "karate", "swimming"];
 
 function normalizeFieldType(raw: unknown): string {
   const t = String(raw ?? "").trim().toLowerCase();
