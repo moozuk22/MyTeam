@@ -91,7 +91,7 @@ export function buildNotificationPayload(
         title: "Известия са активирани",
         body: memberPrefix
           ? `${memberPrefix}Включи известия на телефона (PWA).`
-          : "Играч включи известия на телефона (PWA).",
+          : "играч включи известия на телефона (PWA).",
         url,
         icon: DEFAULT_ICON,
         badge: DEFAULT_ICON,
@@ -134,6 +134,18 @@ export function buildNotificationPayload(
         data: { type: input.type, trainingDate: input.trainingDate ?? null },
       };
     }
+    case "birthday":
+      return {
+        title: "🎂 Честит рожден ден!",
+        body: input.memberName
+          ? `${input.memberName}, денят ти е специален! Виж поздравлението си.`
+          : "Денят ти е специален! Виж поздравлението си.",
+        url: input.cardCode ? `/member/${input.cardCode}` : url,
+        icon: DEFAULT_ICON,
+        badge: DEFAULT_ICON,
+        tag: "birthday",
+        data: { type: input.type },
+      };
     default:
       return {
         title: "Ново известие",
