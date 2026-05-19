@@ -88,16 +88,18 @@ export async function GET(
 
     const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
     const pausedThisMonth = isCurrentMonthWaived(waivedDates);
-    const resolvedStatus = player.club.paymentWorkflow === "rolling_30_days"
-      ? resolveRollingThirtyDayStatus({
+    const resolvedStatus = player.club.paymentWorkflow === "training_credits"
+      ? (player.remainingTrainingCredits > 0 ? "paid" : "overdue")
+      : player.club.paymentWorkflow === "rolling_30_days"
+        ? resolveRollingThirtyDayStatus({
           paidDates: player.paymentLogs.map((item) => item.paidFor),
           firstBillingDate: player.firstBillingMonth,
         })
-      : player.status;
+        : player.status;
 
     return NextResponse.json({
       ...player,
-      status: pausedThisMonth ? "paused" : resolvedStatus,
+      status: player.club.paymentWorkflow === "calendar_month" && pausedThisMonth ? "paused" : resolvedStatus,
       imageUrl: imagePath,
       avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
       imagePublicId: null,
@@ -325,6 +327,9 @@ export async function PUT(
 
     return NextResponse.json({
       ...updatedPlayer,
+      status: updatedPlayer.club.paymentWorkflow === "training_credits"
+        ? (updatedPlayer.remainingTrainingCredits > 0 ? "paid" : "overdue")
+        : updatedPlayer.status,
       imageUrl: imagePath,
       avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
       imagePublicId: null,
@@ -498,12 +503,23 @@ export async function PATCH(
           }),
           prisma.player.findUnique({
             where: { id },
-            select: { status: true },
+            select: {
+              status: true,
+              remainingTrainingCredits: true,
+              club: {
+                select: { paymentWorkflow: true },
+              },
+            },
           }),
         ]),
       );
 
       const pausedThisMonth = isCurrentMonthWaived(paymentWaivers.map((row) => row.waivedFor));
+      const responseStatus = player?.club.paymentWorkflow === "training_credits"
+        ? (player.remainingTrainingCredits > 0 ? "paid" : "overdue")
+        : player?.club.paymentWorkflow === "calendar_month" && pausedThisMonth
+          ? "paused"
+          : (player?.status ?? "paid");
       const targetCardCode = cards[0]?.cardCode;
       if (targetCardCode) {
         publishMemberUpdated(targetCardCode, "status-updated");
@@ -512,7 +528,7 @@ export async function PATCH(
 
       return NextResponse.json({
         success: true,
-        status: pausedThisMonth ? "paused" : (player?.status ?? "paid"),
+        status: responseStatus,
         isPausedThisMonth: pausedThisMonth,
         paymentWaivers,
       });

@@ -393,6 +393,7 @@ export async function GET(request: NextRequest) {
         lastPaymentDate: true,
         firstBillingMonth: true,
         paymentAmount: true,
+        remainingTrainingCredits: true,
         isActive: true,
         coachGroups: { select: { id: true } },
         customTrainingGroups: {
@@ -477,14 +478,16 @@ export async function GET(request: NextRequest) {
         ...rest,
         coachGroupIds: coachGroups.map((g) => g.id),
         customTrainingGroupColors,
-        status: waivedDates.length > 0
+        status: rest.club.paymentWorkflow === "calendar_month" && waivedDates.length > 0
           ? "paused"
-          : rest.club.paymentWorkflow === "rolling_30_days"
-            ? resolveRollingThirtyDayStatus({
-                paidDates: rest.paymentLogs.map((log) => log.paidFor),
-                firstBillingDate: rest.firstBillingMonth,
-              })
-            : rest.status,
+          : rest.club.paymentWorkflow === "training_credits"
+            ? (rest.remainingTrainingCredits > 0 ? "paid" : "overdue")
+            : rest.club.paymentWorkflow === "rolling_30_days"
+              ? resolveRollingThirtyDayStatus({
+                  paidDates: rest.paymentLogs.map((log) => log.paidFor),
+                  firstBillingDate: rest.firstBillingMonth,
+                })
+              : rest.status,
         imageUrl: imagePath,
         avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
         imagePublicId: null,

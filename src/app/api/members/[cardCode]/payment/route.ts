@@ -42,6 +42,7 @@ export async function POST(
     const normalizedCardCode = cardCode.trim().toUpperCase();
     const body = await request.json().catch(() => ({}));
     const paidForRaw = (body as { paidFor?: unknown }).paidFor;
+    const remainingTrainingsRaw = (body as { remainingTrainings?: unknown }).remainingTrainings;
 
     if (!paidForRaw) {
       return NextResponse.json({ error: "paidFor is required" }, { status: 400 });
@@ -80,6 +81,7 @@ export async function POST(
     const playerFirstBillingMonth =
       card.player.firstBillingMonth ?? normalizeToMonthStart(new Date());
     const isRollingThirtyDay = card.player.club.paymentWorkflow === "rolling_30_days";
+    const isTrainingCredits = card.player.club.paymentWorkflow === "training_credits";
 
     const [existingLogs, existingWaivers] = await Promise.all([
       prisma.paymentLog.findMany({
@@ -95,7 +97,28 @@ export async function POST(
 
     let monthsToCreate: Date[] = [];
 
-    if (isRollingThirtyDay) {
+    let remainingTrainingCreditsUpdate: number | undefined;
+
+    if (isTrainingCredits) {
+      const parsedRemainingTrainings = Number(remainingTrainingsRaw);
+      if (!Number.isInteger(parsedRemainingTrainings) || parsedRemainingTrainings < 1 || parsedRemainingTrainings > 999) {
+        return NextResponse.json(
+          { error: "remainingTrainings must be a whole number greater than 0" },
+          { status: 400 },
+        );
+      }
+
+      const paidForDate = normalizeToDayStart(parsedPaidFor);
+      if (card.player.firstBillingMonth && paidForDate < normalizeToDayStart(card.player.firstBillingMonth)) {
+        return NextResponse.json(
+          { error: "Cannot record payment before billing start date" },
+          { status: 400 },
+        );
+      }
+
+      remainingTrainingCreditsUpdate = parsedRemainingTrainings;
+      monthsToCreate = [paidForDate];
+    } else if (isRollingThirtyDay) {
       const paidForDate = normalizeToDayStart(parsedPaidFor);
 
       if (card.player.firstBillingMonth && paidForDate < normalizeToDayStart(card.player.firstBillingMonth)) {
@@ -175,6 +198,9 @@ export async function POST(
         data: {
           status: "paid",
           lastPaymentDate: new Date(),
+          ...(remainingTrainingCreditsUpdate !== undefined
+            ? { remainingTrainingCredits: remainingTrainingCreditsUpdate }
+            : {}),
         },
       });
     });

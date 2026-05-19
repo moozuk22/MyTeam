@@ -5,7 +5,7 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PAYMENT_WORKFLOWS = ["calendar_month", "rolling_30_days"] as const;
+const PAYMENT_WORKFLOWS = ["calendar_month", "rolling_30_days", "training_credits"] as const;
 type PaymentWorkflow = (typeof PAYMENT_WORKFLOWS)[number];
 
 function parsePaymentWorkflow(value: unknown): PaymentWorkflow | null {

@@ -60,7 +60,7 @@ interface ClubOption {
   trainingWindowDays?: number;
   trainingGroupMode?: "team_group" | "custom_group";
   billingStatus?: string;
-  paymentWorkflow?: "calendar_month" | "rolling_30_days";
+  paymentWorkflow?: "calendar_month" | "rolling_30_days" | "training_credits";
   defaultPaymentAmount?: string | number | null;
 }
 
@@ -82,6 +82,7 @@ interface Member {
   birthDate: string | null;
   lastPaymentDate: string | null;
   paymentAmount: string | null;
+  remainingTrainingCredits?: number;
   club?: MemberClub;
   paymentLogs: PaymentLog[];
   cards: MemberCard[];

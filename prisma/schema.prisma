@@ -17,6 +17,7 @@ enum BillingStatus {
 enum PaymentWorkflow {
   calendar_month
   rolling_30_days
+  training_credits
 
   @@map("payment_workflow")
 }
@@ -258,6 +259,7 @@ model Player {
   coachGroups                  CoachGroup[]                    @relation("PlayerCoachGroups")
   firstBillingMonth            DateTime?                       @map("first_billing_month") @db.Timestamptz(6)
   paymentAmount                Decimal                         @default(0) @map("payment_amount") @db.Decimal(10, 2)
+  remainingTrainingCredits     Int                             @default(0) @map("remaining_training_credits")
   limitedTrainingRegistrations LimitedTrainingRegistration[]
 
   @@index([clubId])

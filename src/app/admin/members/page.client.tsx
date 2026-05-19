@@ -523,9 +523,10 @@ function AdminMembersPageContent() {
   const [clubName, setClubName] = useState("Всички отбори");
   const [clubSport, setClubSport] = useState("");
   const [clubBillingStatus, setClubBillingStatus] = useState<string>("");
-  const [clubPaymentWorkflow, setClubPaymentWorkflow] = useState<"calendar_month" | "rolling_30_days">("calendar_month");
+  type PaymentWorkflow = "calendar_month" | "rolling_30_days" | "training_credits";
+  const [clubPaymentWorkflow, setClubPaymentWorkflow] = useState<PaymentWorkflow>("calendar_month");
   const [paymentWorkflowModalOpen, setPaymentWorkflowModalOpen] = useState(false);
-  const [paymentWorkflowDraft, setPaymentWorkflowDraft] = useState<"calendar_month" | "rolling_30_days">("calendar_month");
+  const [paymentWorkflowDraft, setPaymentWorkflowDraft] = useState<PaymentWorkflow>("calendar_month");
   const [paymentWorkflowSaving, setPaymentWorkflowSaving] = useState(false);
   const [paymentWorkflowError, setPaymentWorkflowError] = useState("");
   const [paymentWorkflowSuccess, setPaymentWorkflowSuccess] = useState("");
@@ -1336,7 +1337,9 @@ function AdminMembersPageContent() {
                   imagePublicId: typeof item.imagePublicId === "string" ? item.imagePublicId : null,
                   paymentWorkflow: item.paymentWorkflow === "rolling_30_days"
                     ? ("rolling_30_days" as const)
-                    : ("calendar_month" as const),
+                    : item.paymentWorkflow === "training_credits"
+                      ? ("training_credits" as const)
+                      : ("calendar_month" as const),
                 };
               })
               .filter((club) => club.id && club.name)
@@ -1770,7 +1773,13 @@ function AdminMembersPageContent() {
           const billing = (selectedClub as Record<string, unknown>).billingStatus;
           setClubBillingStatus(typeof billing === "string" ? billing : "");
           const workflow = (selectedClub as Record<string, unknown>).paymentWorkflow;
-          setClubPaymentWorkflow(workflow === "rolling_30_days" ? "rolling_30_days" : "calendar_month");
+          setClubPaymentWorkflow(
+            workflow === "rolling_30_days"
+              ? "rolling_30_days"
+              : workflow === "training_credits"
+                ? "training_credits"
+                : "calendar_month",
+          );
           const defaultPaymentAmount = (selectedClub as Record<string, unknown>).defaultPaymentAmount;
           setClubDefaultPaymentAmount(
             defaultPaymentAmount === null || defaultPaymentAmount === undefined ? "" : String(defaultPaymentAmount),
@@ -1847,7 +1856,13 @@ function AdminMembersPageContent() {
         const billing = (selectedClub as Record<string, unknown> | null)?.billingStatus;
         setClubBillingStatus(typeof billing === "string" ? billing : "");
         const workflow = (selectedClub as Record<string, unknown> | null)?.paymentWorkflow;
-        setClubPaymentWorkflow(workflow === "rolling_30_days" ? "rolling_30_days" : "calendar_month");
+        setClubPaymentWorkflow(
+          workflow === "rolling_30_days"
+            ? "rolling_30_days"
+            : workflow === "training_credits"
+              ? "training_credits"
+              : "calendar_month",
+        );
         const defaultPaymentAmount = (selectedClub as Record<string, unknown> | null)?.defaultPaymentAmount;
         setClubDefaultPaymentAmount(
           defaultPaymentAmount === null || defaultPaymentAmount === undefined ? "" : String(defaultPaymentAmount),
@@ -5708,6 +5723,26 @@ function AdminMembersPageContent() {
                     <span className="amp-payment-workflow-title">30 дни от датата на плащане</span>
                     <span className="amp-payment-workflow-desc">
                       Всяко плащане важи 30 дни от деня, в който е отчетено. Ако остават активни дни, треньорът вижда колко дни остават и не може да отчете ново плащане.
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={paymentWorkflowDraft === "training_credits"}
+                  className={`amp-payment-workflow-option${paymentWorkflowDraft === "training_credits" ? " is-selected" : ""}`}
+                  onClick={() => {
+                    setPaymentWorkflowDraft("training_credits");
+                    setPaymentWorkflowError("");
+                    setPaymentWorkflowSuccess("");
+                  }}
+                  disabled={paymentWorkflowSaving}
+                >
+                  <span className="amp-payment-workflow-check" aria-hidden="true" />
+                  <span className="amp-payment-workflow-copy">
+                    <span className="amp-payment-workflow-title">Брой тренировки</span>
+                    <span className="amp-payment-workflow-desc">
+                      Треньорът задава колко тренировки остават при плащане. Всяко чекиране намалява броя с 1.
                     </span>
                   </span>
                 </button>

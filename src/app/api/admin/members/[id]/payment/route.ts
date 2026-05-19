@@ -28,7 +28,9 @@ export async function POST(
 
   try {
     const { id } = await params;
-    const { paidFor } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const paidFor = (body as { paidFor?: unknown }).paidFor;
+    const remainingTrainingsRaw = (body as { remainingTrainings?: unknown }).remainingTrainings;
 
     if (!paidFor) {
       return NextResponse.json(
@@ -37,7 +39,7 @@ export async function POST(
       );
     }
 
-    const parsedPaidFor = new Date(paidFor);
+    const parsedPaidFor = new Date(String(paidFor));
     if (isNaN(parsedPaidFor.getTime())) {
       return NextResponse.json(
         { error: "paidFor must be a valid date" },
@@ -69,20 +71,33 @@ export async function POST(
     }
 
     const isRollingThirtyDay = player.club.paymentWorkflow === "rolling_30_days";
-    const paidForDate = isRollingThirtyDay
+    const isTrainingCredits = player.club.paymentWorkflow === "training_credits";
+    const paidForDate = isRollingThirtyDay || isTrainingCredits
       ? normalizeToDayStart(parsedPaidFor)
       : normalizeToMonthStart(parsedPaidFor);
 
     if (player.firstBillingMonth) {
-      const isBeforeBillingStart = isRollingThirtyDay
+      const isBeforeBillingStart = isRollingThirtyDay || isTrainingCredits
         ? paidForDate < normalizeToDayStart(player.firstBillingMonth)
         : compareYearMonth(toYearMonth(paidForDate), toYearMonth(player.firstBillingMonth)) < 0;
       if (isBeforeBillingStart) {
         return NextResponse.json(
-          { error: isRollingThirtyDay ? "Cannot record payment before billing start date" : "Cannot record payment before billing start month" },
+          { error: isRollingThirtyDay || isTrainingCredits ? "Cannot record payment before billing start date" : "Cannot record payment before billing start month" },
           { status: 400 },
         );
       }
+    }
+
+    let remainingTrainingCreditsUpdate: number | undefined;
+    if (isTrainingCredits) {
+      const parsedRemainingTrainings = Number(remainingTrainingsRaw);
+      if (!Number.isInteger(parsedRemainingTrainings) || parsedRemainingTrainings < 1 || parsedRemainingTrainings > 999) {
+        return NextResponse.json(
+          { error: "remainingTrainings must be a whole number greater than 0" },
+          { status: 400 },
+        );
+      }
+      remainingTrainingCreditsUpdate = parsedRemainingTrainings;
     }
 
     if (isRollingThirtyDay) {
@@ -145,6 +160,9 @@ export async function POST(
       data: {
         status: "paid",
         lastPaymentDate: new Date(),
+        ...(remainingTrainingCreditsUpdate !== undefined
+          ? { remainingTrainingCredits: remainingTrainingCreditsUpdate }
+          : {}),
       },
     });
 

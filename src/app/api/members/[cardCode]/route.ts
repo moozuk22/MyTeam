@@ -230,12 +230,14 @@ export async function GET(
     const waivedDates = paymentWaivers.map((item) => item.waivedFor);
     const pausedThisMonth = isCurrentMonthWaived(waivedDates);
     const paymentWorkflow = card.player.club?.paymentWorkflow ?? "calendar_month";
-    const resolvedStatus = paymentWorkflow === "rolling_30_days"
-      ? resolveRollingThirtyDayStatus({
+    const resolvedStatus = paymentWorkflow === "training_credits"
+      ? (card.player.remainingTrainingCredits > 0 ? "paid" : "overdue")
+      : paymentWorkflow === "rolling_30_days"
+        ? resolveRollingThirtyDayStatus({
           paidDates: paymentLogs.map((item) => item.paidFor),
           firstBillingDate: card.player.firstBillingMonth,
         })
-      : card.player.status;
+        : card.player.status;
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
     const playerImagePath = getPlayerImagePathByAudience(card.player.images, isPrivilegedViewer);
@@ -268,7 +270,8 @@ export async function GET(
         playerPhone: card.player.playerPhone,
         birthDate: card.player.birthDate,
         paymentWorkflow,
-        status: pausedThisMonth ? "paused" : resolvedStatus,
+        remainingTrainingCredits: card.player.remainingTrainingCredits,
+        status: paymentWorkflow === "calendar_month" && pausedThisMonth ? "paused" : resolvedStatus,
         firstBillingMonth: card.player.firstBillingMonth,
         last_payment_date: card.player.lastPaymentDate,
         paymentLogs: paymentLogs.map((item) => ({

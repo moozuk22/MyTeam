@@ -14,7 +14,8 @@ interface MemberProfile {
   clubName?: string | null;
   clubSports?: string | null;
   clubLogoUrl?: string | null;
-  paymentWorkflow?: "calendar_month" | "rolling_30_days";
+  paymentWorkflow?: "calendar_month" | "rolling_30_days" | "training_credits";
+  remainingTrainingCredits?: number;
   avatarUrl?: string | null;
   jerseyNumber?: string | null;
   parentPhone?: string | null;
@@ -393,6 +394,9 @@ export default function MemberCardPage({
   const [selectedPaymentDeleteMonths, setSelectedPaymentDeleteMonths] = useState<Array<{ year: number; month: number }>>([]);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentTrainingCredits, setPaymentTrainingCredits] = useState("");
+  const [trainingCreditLoading, setTrainingCreditLoading] = useState(false);
+  const [trainingCreditError, setTrainingCreditError] = useState<string | null>(null);
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
   const [pauseReason, setPauseReason] = useState("");
   const [pauseActionLoading, setPauseActionLoading] = useState(false);
@@ -478,6 +482,8 @@ export default function MemberCardPage({
   const trainingDetailsMatches = trainingDetailsDate ? (matchesByDate.get(trainingDetailsDate) ?? []) : [];
   const today = new Date();
   const isRollingThirtyDayPayment = member?.paymentWorkflow === "rolling_30_days";
+  const isTrainingCreditsPayment = member?.paymentWorkflow === "training_credits";
+  const remainingTrainingCredits = Math.max(0, Number(member?.remainingTrainingCredits ?? 0));
   const rollingPaymentWindow = (() => {
     if (!isRollingThirtyDayPayment || !member?.paymentLogs?.length) return null;
     const latestPaidStart = [...member.paymentLogs]
@@ -559,6 +565,7 @@ export default function MemberCardPage({
     setPaymentModalMode("create");
     setCalendarYear(firstUnpaidYM.year);
     setSelectedYM(firstUnpaidYM);
+    setPaymentTrainingCredits("");
     setSelectedPaymentDeleteMonths([]);
     setPaymentError(null);
     setPaymentModalOpen(true);
@@ -1331,6 +1338,11 @@ export default function MemberCardPage({
   // Submit payment
   const handlePayment = async () => {
     if (!selectedYM || !member) return;
+    const parsedTrainingCredits = Number(paymentTrainingCredits);
+    if (isTrainingCreditsPayment && (!Number.isInteger(parsedTrainingCredits) || parsedTrainingCredits < 1)) {
+      setPaymentError("Въведете брой тренировки по-голям от 0.");
+      return;
+    }
     setPaymentLoading(true);
     setPaymentError(null);
     try {
@@ -1338,7 +1350,8 @@ export default function MemberCardPage({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paidFor: isRollingThirtyDayPayment ? new Date().toISOString() : toISOMonth(selectedYM),
+          paidFor: isRollingThirtyDayPayment || isTrainingCreditsPayment ? new Date().toISOString() : toISOMonth(selectedYM),
+          ...(isTrainingCreditsPayment ? { remainingTrainings: parsedTrainingCredits } : {}),
         }),
       });
       if (!response.ok) {
@@ -1353,6 +1366,41 @@ export default function MemberCardPage({
       setPaymentError(e instanceof Error ? e.message : "Възникна грешка");
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  const handleTrainingCreditCheckIn = async () => {
+    if (!member || trainingCreditLoading) return;
+    setTrainingCreditLoading(true);
+    setTrainingCreditError(null);
+    try {
+      const response = await fetch(`/api/members/${normalizedCardCode}/training-credit/check-in`, {
+        method: "POST",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error
+            : "Грешка при чекиране на тренировка",
+        );
+      }
+      const refreshed = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
+      if (refreshed.ok) {
+        setMember((await refreshed.json()) as MemberProfile);
+      } else if (typeof payload?.remainingTrainingCredits === "number") {
+        setMember((prev) => prev
+          ? {
+              ...prev,
+              remainingTrainingCredits: payload.remainingTrainingCredits,
+              status: payload.remainingTrainingCredits > 0 ? "paid" : "overdue",
+            }
+          : prev);
+      }
+    } catch (e) {
+      setTrainingCreditError(e instanceof Error ? e.message : "Възникна грешка");
+    } finally {
+      setTrainingCreditLoading(false);
     }
   };
 
@@ -1517,9 +1565,12 @@ export default function MemberCardPage({
   };
 
   const formatPaymentPeriod = (value: string) => {
+    const start = new Date(value);
+    if (isTrainingCreditsPayment) {
+      return Number.isNaN(start.getTime()) ? value : `Плащане на ${start.toLocaleDateString("bg-BG")}`;
+    }
     if (!isRollingThirtyDayPayment) return formatMonthYearInBgUtc(value);
 
-    const start = new Date(value);
     if (Number.isNaN(start.getTime())) return value;
     const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
     return `${start.toLocaleDateString("bg-BG")} - ${end.toLocaleDateString("bg-BG")}`;
@@ -1921,6 +1972,14 @@ export default function MemberCardPage({
                     </span>
                   </div>
                 )}
+                {isTrainingCreditsPayment && (
+                  <div className="info-row">
+                    <span className="info-lbl">Оставащи тренировки:</span>
+                    <span className={`info-val ${remainingTrainingCredits > 0 ? "green glow" : "red glow-red"}`}>
+                      {remainingTrainingCredits}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2092,7 +2151,17 @@ export default function MemberCardPage({
               >
                 Плати
               </button>
-              {!isRollingThirtyDayPayment && (
+              {isTrainingCreditsPayment && (
+                <button
+                  className="add-btn member-action-btn training-credit-btn"
+                  onClick={handleTrainingCreditCheckIn}
+                  disabled={trainingCreditLoading || remainingTrainingCredits <= 0}
+                  title={remainingTrainingCredits <= 0 ? "Няма оставащи тренировки" : undefined}
+                >
+                  {trainingCreditLoading ? "Чекиране..." : "Чекирай тренировка"}
+                </button>
+              )}
+              {!isRollingThirtyDayPayment && !isTrainingCreditsPayment && (
                 <button
                   className="add-btn member-action-btn payment-delete-btn"
                   onClick={openPaymentDeleteModal}
@@ -2102,7 +2171,7 @@ export default function MemberCardPage({
                 </button>
               )}
             </>
-            {!isRollingThirtyDayPayment && (
+            {!isRollingThirtyDayPayment && !isTrainingCreditsPayment && (
               <button
                 className="add-btn member-action-btn pause-btn"
                 onClick={() => {
@@ -2115,6 +2184,9 @@ export default function MemberCardPage({
               >
                 Пауза
               </button>
+            )}
+            {trainingCreditError && (
+              <p className="training-credit-error">{trainingCreditError}</p>
             )}
           </>)}
 
@@ -3451,7 +3523,37 @@ export default function MemberCardPage({
 
               <div className="pm-divider" />
 
-              {isRollingThirtyDayPayment ? (
+              {isTrainingCreditsPayment ? (
+                <div className="pm-training-credit-panel">
+                  <div className={`pm-training-credit-balance${remainingTrainingCredits <= 0 ? " pm-training-credit-balance--empty" : ""}`}>
+                    <span className="pm-training-credit-balance-label">Оставащи тренировки</span>
+                    <span className="pm-training-credit-balance-value">
+                      {remainingTrainingCredits}
+                    </span>
+                  </div>
+                  <label className="pm-training-credit-label" htmlFor="paymentTrainingCredits">
+                    Нов брой тренировки
+                  </label>
+                  <input
+                    id="paymentTrainingCredits"
+                    className="pm-training-credit-input"
+                    type="number"
+                    min="1"
+                    max="999"
+                    inputMode="numeric"
+                    value={paymentTrainingCredits}
+                    onChange={(event) => {
+                      setPaymentTrainingCredits(event.target.value);
+                      setPaymentError(null);
+                    }}
+                    placeholder="Напр. 8"
+                    disabled={paymentLoading}
+                  />
+                  <p className="pm-training-credit-help">
+                    При потвърждение оставащите тренировки ще се заменят с този брой.
+                  </p>
+                </div>
+              ) : isRollingThirtyDayPayment ? (
                 <div className={`pm-info-row pm-info-row--rolling${hasActiveRollingPayment ? " pm-info-row--locked" : ""}`}>
                   <span className="pm-info-lbl">
                     {paymentModalMode === "delete" ? "Плащания по дата" : "30-дневен период"}
@@ -3584,7 +3686,13 @@ export default function MemberCardPage({
                   <button
                     className="pm-btn pm-btn--submit"
                     onClick={handlePayment}
-                    disabled={!selectedYM || paymentLoading || selectedPaymentDeleteMonths.length > 0 || hasActiveRollingPayment}
+                    disabled={
+                      !selectedYM ||
+                      paymentLoading ||
+                      selectedPaymentDeleteMonths.length > 0 ||
+                      hasActiveRollingPayment ||
+                      (isTrainingCreditsPayment && (!Number.isInteger(Number(paymentTrainingCredits)) || Number(paymentTrainingCredits) < 1))
+                    }
                     title={hasActiveRollingPayment ? `Остават ${rollingRemainingText}` : undefined}
                   >
                     {paymentLoading ? "Обработка..." : "Потвърди плащане"}
