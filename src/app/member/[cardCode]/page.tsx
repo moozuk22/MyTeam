@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { use, useEffect, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -1805,16 +1805,13 @@ export default function MemberCardPage({
                 <h1 className="card-title">КЛУБНА КАРТА <span>2026</span></h1>
                 <p className="card-subtitle">{member.clubName || "Клуб"}</p>
               </div>
-              <div className="shield">
+              <div className="shield" style={!(member.jerseyNumber && Number.isFinite(Number(member.jerseyNumber))) ? { visibility: "hidden" } : undefined}>
                 <svg viewBox="0 0 50 56" fill="none" className="shield-bg">
                   <path d="M25 2 L47 12 L47 35 Q47 50 25 54 Q3 50 3 35 L3 12 Z" fill="rgba(50,205,50,0.1)" stroke="#32cd32" strokeWidth="2.5" />
                 </svg>
-                <span className="shield-num">
-                  {member.jerseyNumber ? `№${member.jerseyNumber}` : "\u2116 3"}
-                </span>
+                <span className="shield-num">№{member.jerseyNumber}</span>
               </div>
             </div>
-
             <div className="divider" />
 
             <div className="central">
