@@ -9105,6 +9105,7 @@ function AdminMembersPageContent() {
       {importSheetsOpen && clubId && (
         <ImportFromSheetsModal
           clubId={clubId}
+          coachGroupId={coachGroupId || undefined}
           onClose={() => setImportSheetsOpen(false)}
           onImported={() => void refreshMembersList()}
         />

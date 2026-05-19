@@ -2467,10 +2467,12 @@ function ConfirmDeleteTeamModal({
 
 function ImportFromSheetsModal({
   clubId,
+  coachGroupId,
   onClose,
   onImported,
 }: {
   clubId: string;
+  coachGroupId?: string;
   onClose: () => void;
   onImported: () => void;
 }) {
@@ -2553,7 +2555,7 @@ function ImportFromSheetsModal({
       const res = await fetch("/api/admin/members/import-sheets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spreadsheetId: selectedSheet.id, clubId }),
+        body: JSON.stringify({ spreadsheetId: selectedSheet.id, clubId, ...(coachGroupId ? { coachGroupId } : {}) }),
       });
       const data = (await res.json()) as ImportResult & { error?: string };
       if (!res.ok) {

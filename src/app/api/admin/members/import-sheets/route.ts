@@ -117,6 +117,7 @@ async function createPlayerWithCard({
   jerseyNumber,
   firstBillingMonth,
   paymentAmount,
+  coachGroupId,
 }: {
   clubId: string;
   fullName: string;
@@ -125,6 +126,7 @@ async function createPlayerWithCard({
   jerseyNumber: string | null;
   firstBillingMonth: Date | null;
   paymentAmount: string;
+  coachGroupId: string | null;
 }) {
   let lastError: unknown = null;
   for (let i = 0; i < 5; i++) {
@@ -141,6 +143,7 @@ async function createPlayerWithCard({
           firstBillingMonth: firstBillingMonth ?? undefined,
           paymentAmount,
           cards: { create: { cardCode, isActive: true } },
+          ...(coachGroupId ? { coachGroups: { connect: [{ id: coachGroupId }] } } : {}),
         },
       });
       return;
@@ -210,6 +213,7 @@ export async function POST(request: NextRequest) {
     clubId?: unknown;
     firstBillingMonth?: unknown;
     paymentAmount?: unknown;
+    coachGroupId?: unknown;
   };
 
   const spreadsheetId = String(body.spreadsheetId ?? "").trim();
@@ -217,6 +221,23 @@ export async function POST(request: NextRequest) {
 
   if (!spreadsheetId) return NextResponse.json({ error: "spreadsheetId is required" }, { status: 400 });
   if (!clubId) return NextResponse.json({ error: "clubId is required" }, { status: 400 });
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const rawCoachGroupId = body.coachGroupId != null ? String(body.coachGroupId).trim() : null;
+  let coachGroupId: string | null = null;
+  if (rawCoachGroupId) {
+    if (!uuidRegex.test(rawCoachGroupId)) {
+      return NextResponse.json({ error: "Invalid coachGroupId" }, { status: 400 });
+    }
+    const groupExists = await prisma.coachGroup.findFirst({
+      where: { id: rawCoachGroupId, clubId },
+      select: { id: true },
+    });
+    if (!groupExists) {
+      return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
+    }
+    coachGroupId = rawCoachGroupId;
+  }
 
   // Verify club exists and fetch billing info
   const club = await prisma.club.findUnique({
@@ -279,6 +300,7 @@ export async function POST(request: NextRequest) {
           jerseyNumber: row.jerseyNumber,
           firstBillingMonth: resolvedFirstBillingMonth,
           paymentAmount,
+          coachGroupId,
         });
         created++;
       } catch (err) {
