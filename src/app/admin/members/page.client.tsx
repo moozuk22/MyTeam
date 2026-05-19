@@ -551,6 +551,15 @@ function AdminMembersPageContent() {
   const [notifyBusy, setNotifyBusy] = useState(false);
   const [notifyError, setNotifyError] = useState("");
   const [notifySuccess, setNotifySuccess] = useState("");
+  const [bulkCoachGroupTargetId, setBulkCoachGroupTargetId] = useState<string | null>(null);
+  const [bulkCoachGroupAllMembers, setBulkCoachGroupAllMembers] = useState<Member[]>([]);
+  const [bulkCoachGroupLoadingMembers, setBulkCoachGroupLoadingMembers] = useState(false);
+  const [bulkCoachGroupSelectedIds, setBulkCoachGroupSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCoachGroupInitialIds, setBulkCoachGroupInitialIds] = useState<Set<string>>(new Set());
+  const [bulkCoachGroupSearchTerm, setBulkCoachGroupSearchTerm] = useState("");
+  const [bulkCoachGroupBusy, setBulkCoachGroupBusy] = useState(false);
+  const [bulkCoachGroupError, setBulkCoachGroupError] = useState("");
+  const [bulkCoachGroupSaved, setBulkCoachGroupSaved] = useState(false);
   const [trainingScheduleGroupsLoading, setTrainingScheduleGroupsLoading] = useState(false);
   const [trainingScheduleGroups, setTrainingScheduleGroups] = useState<TrainingScheduleGroup[]>([]);
   const [customTrainingGroups, setCustomTrainingGroups] = useState<CustomTrainingGroup[]>([]);
@@ -2124,6 +2133,83 @@ function AdminMembersPageContent() {
     }
     return list;
   }, [members, notifyGroupFilter, notifySearchTerm, notifyCoachGroupFilter, coachGroupId, isCustomTrainingGroupMode, customTrainingGroups, trainingScheduleGroups]);
+
+  const bulkCoachGroupVisibleMembers = useMemo(() => {
+    let list = bulkCoachGroupAllMembers.filter((m) => m.isActive);
+    if (bulkCoachGroupSearchTerm.trim()) {
+      const q = bulkCoachGroupSearchTerm.trim().toLowerCase();
+      list = list.filter((m) => m.fullName.toLowerCase().includes(q));
+    }
+    return list;
+  }, [bulkCoachGroupAllMembers, bulkCoachGroupSearchTerm]);
+
+  const openBulkCoachGroupModal = async (groupId: string) => {
+    setBulkCoachGroupTargetId(groupId);
+    setBulkCoachGroupAllMembers([]);
+    setBulkCoachGroupSelectedIds(new Set());
+    setBulkCoachGroupInitialIds(new Set());
+    setBulkCoachGroupSearchTerm("");
+    setBulkCoachGroupError("");
+    setBulkCoachGroupSaved(false);
+    setBulkCoachGroupBusy(false);
+    setBulkCoachGroupLoadingMembers(true);
+    try {
+      const res = await fetch(`/api/admin/members?clubId=${encodeURIComponent(clubId)}`);
+      const data = (await res.json().catch(() => [])) as Member[];
+      const allActive = Array.isArray(data) ? data.filter((m) => m.isActive) : [];
+      const alreadyIn = new Set(allActive.filter((m) => m.coachGroupIds.includes(groupId)).map((m) => m.id));
+      setBulkCoachGroupAllMembers(allActive);
+      setBulkCoachGroupSelectedIds(new Set(alreadyIn));
+      setBulkCoachGroupInitialIds(new Set(alreadyIn));
+    } catch {
+      setBulkCoachGroupError("Грешка при зареждане на състезателите.");
+    } finally {
+      setBulkCoachGroupLoadingMembers(false);
+    }
+  };
+
+  const handleBulkCoachGroupSave = async () => {
+    if (!bulkCoachGroupTargetId) return;
+    setBulkCoachGroupBusy(true);
+    setBulkCoachGroupError("");
+    try {
+      const toAdd = bulkCoachGroupAllMembers.filter(
+        (m) => m.isActive && bulkCoachGroupSelectedIds.has(m.id) && !bulkCoachGroupInitialIds.has(m.id)
+      );
+      const toRemove = bulkCoachGroupAllMembers.filter(
+        (m) => m.isActive && !bulkCoachGroupSelectedIds.has(m.id) && bulkCoachGroupInitialIds.has(m.id)
+      );
+      const allChanged = [...toAdd, ...toRemove];
+      if (allChanged.length === 0) {
+        setBulkCoachGroupSaved(true);
+        setTimeout(() => setBulkCoachGroupSaved(false), 2000);
+        return;
+      }
+      for (const member of allChanged) {
+        const isAdding = bulkCoachGroupSelectedIds.has(member.id);
+        const newGroupIds = isAdding
+          ? [...new Set([...(member.coachGroupIds ?? []), bulkCoachGroupTargetId])]
+          : (member.coachGroupIds ?? []).filter((id) => id !== bulkCoachGroupTargetId);
+        const res = await fetch(`/api/admin/members/${encodeURIComponent(member.id)}/coach-group`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ coachGroupIds: newGroupIds }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error ?? "Грешка при запазване");
+        }
+      }
+      setBulkCoachGroupSaved(true);
+      setBulkCoachGroupInitialIds(new Set(bulkCoachGroupSelectedIds));
+      void refreshMembersList();
+      setTimeout(() => setBulkCoachGroupSaved(false), 2000);
+    } catch (err) {
+      setBulkCoachGroupError(err instanceof Error ? err.message : "Грешка");
+    } finally {
+      setBulkCoachGroupBusy(false);
+    }
+  };
 
   const handleSendNotify = async () => {
     if (!notifyMessage.trim() || notifySelectedIds.size === 0) return;
@@ -4591,6 +4677,22 @@ function AdminMembersPageContent() {
             <PlusIcon />
             Добави състезател
           </button>
+          {clubId && coachGroupId && (
+            <button
+              className="amp-import-sheets-btn amp-btn--compact"
+              type="button"
+              title="Управление на състезатели в групата"
+              onClick={() => openBulkCoachGroupModal(coachGroupId)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              <span>Управление на група</span>
+            </button>
+          )}
           {isAdmin && clubId && (
             <button className="amp-import-sheets-btn amp-btn--compact" onClick={() => setImportSheetsOpen(true)} type="button">
               <ImportSheetsIcon />
@@ -4858,17 +4960,31 @@ function AdminMembersPageContent() {
           {!coachGroupId && coachGroups.length > 0 && (
             <div className="amp-coach-group-nav-list">
               {coachGroups.map((group) => (
-                <button
-                  key={group.id}
-                  className="amp-coach-group-nav-btn"
-                  onClick={() => { window.location.href = `/admin/members?clubId=${encodeURIComponent(clubId)}&coachGroupId=${encodeURIComponent(group.id)}`; }}
-                  type="button"
-                >
-                  <span>{group.name}</span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </button>
+                <div key={group.id} className="amp-coach-group-nav-row">
+                  <button
+                    className="amp-coach-group-nav-btn"
+                    onClick={() => { window.location.href = `/admin/members?clubId=${encodeURIComponent(clubId)}&coachGroupId=${encodeURIComponent(group.id)}`; }}
+                    type="button"
+                  >
+                    <span>{group.name}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </button>
+                  <button
+                    className="amp-coach-group-assign-btn"
+                    type="button"
+                    title="Управление на състезатели"
+                    onClick={() => openBulkCoachGroupModal(group.id)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -9117,6 +9233,126 @@ function AdminMembersPageContent() {
           onClose={() => setImportPhotosOpen(false)}
           onImported={() => void refreshMembersList()}
         />
+      )}
+
+      {bulkCoachGroupTargetId && (
+        <div
+          className="amp-overlay amp-overlay--confirm"
+          onClick={() => { if (!bulkCoachGroupBusy) setBulkCoachGroupTargetId(null); }}
+        >
+          <div
+            className="amp-modal amp-modal--confirm amp-modal--notify"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">
+                {coachGroups.find((g) => g.id === bulkCoachGroupTargetId)?.name ?? "Управление на група"}
+              </span>
+              <button
+                className="amp-modal-close"
+                onClick={() => setBulkCoachGroupTargetId(null)}
+                disabled={bulkCoachGroupBusy}
+                aria-label="Затвори"
+                type="button"
+              >
+                <XIcon />
+              </button>
+            </h2>
+            <div className="amp-modal-body">
+              <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
+                <span className="amp-lbl">Търсене</span>
+                <input
+                  className="amp-edit-input"
+                  type="search"
+                  placeholder="Търси по име..."
+                  value={bulkCoachGroupSearchTerm}
+                  onChange={(e) => setBulkCoachGroupSearchTerm(e.target.value)}
+                  disabled={bulkCoachGroupBusy}
+                />
+              </label>
+              <div className="amp-notify-count" style={{ marginBottom: "8px" }}>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost amp-btn--compact"
+                  style={{ marginRight: "8px" }}
+                  disabled={bulkCoachGroupBusy || bulkCoachGroupLoadingMembers || bulkCoachGroupVisibleMembers.length === 0}
+                  onClick={() => setBulkCoachGroupSelectedIds(new Set(bulkCoachGroupVisibleMembers.map((m) => m.id)))}
+                >
+                  Избери всички видими ({bulkCoachGroupVisibleMembers.length})
+                </button>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost amp-btn--compact"
+                  disabled={bulkCoachGroupBusy || bulkCoachGroupLoadingMembers || bulkCoachGroupSelectedIds.size === 0}
+                  onClick={() => setBulkCoachGroupSelectedIds(new Set())}
+                >
+                  Изчисти
+                </button>
+              </div>
+              <div className="amp-notify-player-list">
+                {bulkCoachGroupLoadingMembers ? (
+                  <p style={{ padding: "12px", fontSize: "13px", color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+                    Зареждане...
+                  </p>
+                ) : bulkCoachGroupVisibleMembers.length === 0 ? (
+                  <p style={{ padding: "12px", fontSize: "13px", color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+                    Няма състезатели
+                  </p>
+                ) : (
+                  bulkCoachGroupVisibleMembers.map((m) => {
+                    const isSelected = bulkCoachGroupSelectedIds.has(m.id);
+                    return (
+                      <label
+                        key={m.id}
+                        className={`amp-notify-player-item${isSelected ? " amp-notify-player-item--selected" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={bulkCoachGroupBusy}
+                          onChange={(e) => {
+                            setBulkCoachGroupSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(m.id);
+                              else next.delete(m.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className="amp-notify-player-name">{m.fullName}</span>
+                        {m.teamGroup !== null && (
+                          <span className="amp-notify-player-group">{m.teamGroup}</span>
+                        )}
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              {bulkCoachGroupError && (
+                <p className="amp-confirm-error" style={{ marginTop: "8px" }}>{bulkCoachGroupError}</p>
+              )}
+              <div className="amp-modal-actions" style={{ marginTop: "16px" }}>
+                <button
+                  type="button"
+                  className="amp-btn amp-btn--ghost"
+                  onClick={() => setBulkCoachGroupTargetId(null)}
+                  disabled={bulkCoachGroupBusy}
+                >
+                  Затвори
+                </button>
+                <button
+                  type="button"
+                  className={`amp-btn amp-btn--primary${bulkCoachGroupSaved ? " amp-btn--saved" : ""}`}
+                  disabled={bulkCoachGroupBusy || bulkCoachGroupSaved}
+                  onClick={() => void handleBulkCoachGroupSave()}
+                >
+                  {bulkCoachGroupBusy ? "Запазване..." : bulkCoachGroupSaved ? "✓ Записано" : `Запази (${bulkCoachGroupSelectedIds.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {notifyPanelOpen && (

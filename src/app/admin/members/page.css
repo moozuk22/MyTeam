@@ -2899,6 +2899,12 @@
   color: #9cff9c;
 }
 
+.amp-btn--primary.amp-btn--saved {
+  background: rgba(50, 205, 50, 0.25);
+  border-color: rgba(50, 205, 50, 0.7);
+  color: #b9ffb9;
+}
+
 .amp-btn--primary:hover:not(:disabled) {
   background: rgba(50, 205, 50, 0.28);
   box-shadow: 0 0 20px rgba(50, 205, 50, 0.2);
@@ -2910,6 +2916,38 @@
   flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.amp-coach-group-nav-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.amp-coach-group-nav-row .amp-coach-group-nav-btn {
+  flex: 1;
+  width: auto;
+}
+
+.amp-coach-group-assign-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(50, 205, 50, 0.38);
+  background: rgba(50, 205, 50, 0.08);
+  color: #9cff9c;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.amp-coach-group-assign-btn:hover {
+  background: rgba(50, 205, 50, 0.2);
+  border-color: rgba(50, 205, 50, 0.6);
+  box-shadow: 0 0 12px rgba(50, 205, 50, 0.15);
 }
 
 .amp-coach-group-nav-btn {
