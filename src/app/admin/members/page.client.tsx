@@ -4714,18 +4714,18 @@ function AdminMembersPageContent() {
               )}
             </>
           )}
+          {(isAdmin || isCoach) && clubId && (
+            <button
+              className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+              onClick={openPaymentAmountModal}
+              type="button"
+            >
+              <ReceiptIcon size={16} />
+              <span>Месечна такса</span>
+            </button>
+          )}
           {isAdmin && clubId && (
             <>
-              {!coachGroupId && (
-                <button
-                  className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
-                  onClick={openPaymentAmountModal}
-                  type="button"
-                >
-                  <ReceiptIcon size={16} />
-                  <span>Месечна такса</span>
-                </button>
-              )}
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => router.push(`/admin/clubs/${encodeURIComponent(clubId)}/billing`)}
