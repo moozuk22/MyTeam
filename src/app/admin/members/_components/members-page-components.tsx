@@ -2244,17 +2244,13 @@ function PlayerCard({
       <div className="pc-content">
         <div className="pc-avatar-stack">
           {/* Avatar */}
-          <div className="pc-avatar pc-avatar--wrap" style={{ color: s.color, background: s.bg, borderColor: s.border }}>
-            <span className="pc-avatar-letter">{initial}</span>
-            {member.avatarUrl && (
-              <img
-                src={member.avatarUrl}
-                alt={member.fullName}
-                className="pc-avatar-img-overlay"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-            )}
-          </div>
+          {member.avatarUrl ? (
+            <img src={member.avatarUrl} alt={member.fullName} className="pc-avatar pc-avatar--img" />
+          ) : (
+            <div className="pc-avatar" style={{ color: s.color, background: s.bg, borderColor: s.border }}>
+              <span className="pc-avatar-letter">{initial}</span>
+            </div>
+          )}
          
         </div>
 

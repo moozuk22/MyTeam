@@ -588,17 +588,9 @@
   overflow: hidden;
 }
 
-.pc-avatar--wrap {
-  position: relative;
-}
-
-.pc-avatar-img-overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.pc-avatar--img {
   object-fit: cover;
-  border-radius: 50%;
+  background: transparent;
 }
 
 .pc-card:hover .pc-avatar {
