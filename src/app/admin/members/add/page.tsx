@@ -52,9 +52,6 @@ function AddMemberPageContent() {
   const [isValidatingClubId, setIsValidatingClubId] = useState(true);
   const router = useRouter();
   const returnUrl = `/admin/members?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`;
-  const parsedBirthDate = birthDate.trim() ? new Date(`${birthDate}T00:00:00.000Z`) : null;
-  const derivedTeamGroup = parsedBirthDate && !Number.isNaN(parsedBirthDate.getTime()) ? String(parsedBirthDate.getUTCFullYear()) : "";
-
   useEffect(() => {
     let isActive = true;
 
@@ -357,128 +354,130 @@ function AddMemberPageContent() {
 
             <div className="add-member-divider" />
 
-            <div className="add-member-field">
-              <label className="add-member-label">Статус</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as "paid" | "warning" | "overdue")}
-                className="add-member-select"
-              >
-                <option value="paid">Платено</option>
-                <option value="warning">Напомняне</option>
-                <option value="overdue">Просрочено</option>
-              </select>
+            <div className="add-member-row">
+              <div className="add-member-field">
+                <label className="add-member-label">Дата на раждане</label>
+                <input
+                  type="date"
+                  required
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="add-member-input"
+                />
+              </div>
+              <div className="add-member-field">
+                <label className="add-member-label">Статус</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as "paid" | "warning" | "overdue")}
+                  className="add-member-select"
+                >
+                  <option value="paid">Платено</option>
+                  <option value="warning">Напомняне</option>
+                  <option value="overdue">Просрочено</option>
+                </select>
+              </div>
             </div>
 
-            <div className="add-member-field">
-              <label className="add-member-label">Номер в отбора (Не е задължително)</label>
-              <input
-                type="text"
-                value={jerseyNumber}
-                onChange={(e) => setJerseyNumber(e.target.value)}
-                className="add-member-input"
-                placeholder="По желание"
-              />
+            <div className="add-member-row">
+              <div className="add-member-field">
+                <label className="add-member-label">
+                  Телефон на родител <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={parentPhone}
+                  onChange={(e) => setParentPhone(e.target.value)}
+                  className="add-member-input"
+                  placeholder="+359..."
+                />
+              </div>
+              <div className="add-member-field">
+                <label className="add-member-label">Телефон на състезател</label>
+                <input
+                  type="tel"
+                  value={playerPhone}
+                  onChange={(e) => setPlayerPhone(e.target.value)}
+                  className="add-member-input"
+                  placeholder="По желание"
+                />
+              </div>
             </div>
 
-            <div className="add-member-field">
-              <label className="add-member-label">Дата на раждане</label>
-              <input
-                type="date"
-                required
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                className="add-member-input"
-              />
-            </div>
-
-            <div className="add-member-field">
-              <label className="add-member-label">
-                Телефон на родител <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>
-              </label>
-              <input
-                type="tel"
-                required
-                value={parentPhone}
-                onChange={(e) => setParentPhone(e.target.value)}
-                className="add-member-input"
-                placeholder="+359..."
-              />
-            </div>
-
-            <div className="add-member-field">
-              <label className="add-member-label">Телефон на състезател</label>
-              <input
-                type="tel"
-                value={playerPhone}
-                onChange={(e) => setPlayerPhone(e.target.value)}
-                className="add-member-input"
-                placeholder="По желание"
-              />
-            </div>
-
-            <div className="add-member-field">
-              <label className="add-member-label">
-                Начален месец на таксуване
-                {clubData?.billingStatus === "active" && <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>}
-              </label>
-              <input
-                type="month"
-                required={clubData?.billingStatus === "active"}
-                value={firstBillingMonth}
-                onChange={(e) => setFirstBillingMonth(e.target.value)}
-                className="add-member-input"
-              />
-              {clubData?.billingStatus !== "active" && (
-                <span className="add-member-hint" style={{ marginTop: "4px", display: "block" }}>
-                  Таксуването не е активирано за този клуб. Полето е незадължително.
-                </span>
-              )}
-            </div>
-
-            <div className="add-member-field">
-              <label className="add-member-label">Набор</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={derivedTeamGroup}
-                readOnly
-                disabled
-                className="add-member-input"
-              />
+            <div className="add-member-row">
+              <div className="add-member-field">
+                <label className="add-member-label">
+                  Начален месец на таксуване
+                  {clubData?.billingStatus === "active" && <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>}
+                </label>
+                <input
+                  type="month"
+                  required={clubData?.billingStatus === "active"}
+                  value={firstBillingMonth}
+                  onChange={(e) => setFirstBillingMonth(e.target.value)}
+                  className="add-member-input"
+                  placeholder={clubData?.billingStatus !== "active" ? "НЕ Е ЗАДЪЛЖИТЕЛНО" : undefined}
+                />
+              </div>
+              <div className="add-member-field">
+                <label className="add-member-label">Номер в отбора</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={jerseyNumber}
+                  onChange={(e) => setJerseyNumber(e.target.value.replace(/\D/g, ""))}
+                  className="add-member-input"
+                  placeholder="НЕ Е ЗАДЪЛЖИТЕЛНО"
+                />
+              </div>
             </div>
 
             <div className="add-member-field">
               <label className="add-member-label">Снимка на състезател</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  if (file) {
-                    const err = validateImageFile(file);
-                    if (err) { setError(err); e.target.value = ""; return; }
-                  }
-                  setAvatarFile(file);
-                }}
-                className="add-member-input"
-              />
-              {avatarPreviewUrl && (
-                <img
-                  src={avatarPreviewUrl}
-                  alt="Preview"
-                  style={{
-                    width: "min(160px, 100%)",
-                    aspectRatio: "4 / 5",
-                    objectFit: "cover",
-                    borderRadius: "10px",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    marginTop: "10px",
-                    marginInline: "auto",
+              <label className={`add-member-dropzone${avatarPreviewUrl ? " add-member-dropzone--has-image" : ""}`}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    if (file) {
+                      const err = validateImageFile(file);
+                      if (err) { setError(err); e.target.value = ""; return; }
+                    }
+                    setAvatarFile(file);
                   }}
                 />
-              )}
+                {avatarPreviewUrl ? (
+                  <img
+                    src={avatarPreviewUrl}
+                    alt="Preview"
+                    className="add-member-dropzone-preview"
+                  />
+                ) : (
+                  <div className="add-member-dropzone-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="3" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="m21 15-5-5L5 21" />
+                    </svg>
+                    <span>Кликнете за да изберете снимка</span>
+                    <span className="add-member-dropzone-sub">JPG, PNG, WEBP</span>
+                  </div>
+                )}
+                {avatarPreviewUrl && (
+                  <div className="add-member-dropzone-overlay">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Смени снимката</span>
+                  </div>
+                )}
+              </label>
             </div>
 
             {error && (
