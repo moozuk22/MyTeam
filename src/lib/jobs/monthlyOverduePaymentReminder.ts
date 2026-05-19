@@ -342,6 +342,9 @@ export async function runMonthlyOverduePaymentReminder(
   const schedulerTimeZone = DEFAULT_TIME_ZONE;
   const nowIso = now.toISOString();
   const clubs = await prisma.club.findMany({
+    where: {
+      paymentWorkflow: "calendar_month",
+    },
     select: {
       id: true,
       overdueDay: true,

@@ -6,7 +6,10 @@ import {
   applyCloudinaryTransformToUrl,
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
-import { normalizeToMonthStart } from "@/lib/paymentStatus";
+import {
+  normalizeToMonthStart,
+  resolveRollingThirtyDayStatus,
+} from "@/lib/paymentStatus";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { parsePaymentAmount } from "@/lib/paymentAmount";
 import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
@@ -388,6 +391,7 @@ export async function GET(request: NextRequest) {
         birthDate: true,
         teamGroup: true,
         lastPaymentDate: true,
+        firstBillingMonth: true,
         paymentAmount: true,
         isActive: true,
         coachGroups: { select: { id: true } },
@@ -402,6 +406,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            paymentWorkflow: true,
           },
         },
         cards: {
@@ -472,7 +477,14 @@ export async function GET(request: NextRequest) {
         ...rest,
         coachGroupIds: coachGroups.map((g) => g.id),
         customTrainingGroupColors,
-        status: waivedDates.length > 0 ? "paused" : rest.status,
+        status: waivedDates.length > 0
+          ? "paused"
+          : rest.club.paymentWorkflow === "rolling_30_days"
+            ? resolveRollingThirtyDayStatus({
+                paidDates: rest.paymentLogs.map((log) => log.paidFor),
+                firstBillingDate: rest.firstBillingMonth,
+              })
+            : rest.status,
         imageUrl: imagePath,
         avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
         imagePublicId: null,

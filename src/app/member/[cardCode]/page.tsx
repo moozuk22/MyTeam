@@ -14,6 +14,7 @@ interface MemberProfile {
   clubName?: string | null;
   clubSports?: string | null;
   clubLogoUrl?: string | null;
+  paymentWorkflow?: "calendar_month" | "rolling_30_days";
   avatarUrl?: string | null;
   jerseyNumber?: string | null;
   parentPhone?: string | null;
@@ -476,6 +477,24 @@ export default function MemberCardPage({
   const trainingDetailsItem = trainingDetailsDate ? trainingByDate.get(trainingDetailsDate) ?? null : null;
   const trainingDetailsMatches = trainingDetailsDate ? (matchesByDate.get(trainingDetailsDate) ?? []) : [];
   const today = new Date();
+  const isRollingThirtyDayPayment = member?.paymentWorkflow === "rolling_30_days";
+  const rollingPaymentWindow = (() => {
+    if (!isRollingThirtyDayPayment || !member?.paymentLogs?.length) return null;
+    const latestPaidStart = [...member.paymentLogs]
+      .map(({ paidFor }) => new Date(paidFor))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+    if (!latestPaidStart) return null;
+
+    const paidUntil = new Date(latestPaidStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const remainingMs = paidUntil.getTime() - Date.now();
+    const remainingDays = remainingMs > 0 ? Math.ceil(remainingMs / (24 * 60 * 60 * 1000)) : 0;
+
+    return { latestPaidStart, paidUntil, remainingDays };
+  })();
+  const hasActiveRollingPayment = Boolean(
+    isRollingThirtyDayPayment && rollingPaymentWindow && rollingPaymentWindow.remainingDays > 0,
+  );
   const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const trainingMonths = [buildTrainingCalendarMonth(trainingCalendarMonth.year, trainingCalendarMonth.month)];
   const nextScheduleEvent =
@@ -792,29 +811,35 @@ export default function MemberCardPage({
     }).catch(() => { });
   };
 
-  // Fetch member
-  useEffect(() => {
-    const fetchMember = async () => {
+  const refreshMember = async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
+    if (showLoading) {
       setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
-        if (!response.ok) {
-          setMember(null);
-          setError("Профилът не е намерен.");
-          return;
-        }
-        const data = (await response.json()) as MemberProfile;
-        console.log("MEMBER DISCOUNTS JSON:", data.discounts);
-        setMember(data);
-      } catch (e) {
-        console.error("Failed to fetch member:", e);
-        setError("Възникна грешка при зареждане.");
-      } finally {
+    }
+    setError(null);
+    try {
+      const response = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
+      if (!response.ok) {
+        setMember(null);
+        setError("Профилът не е намерен.");
+        return null;
+      }
+      const data = (await response.json()) as MemberProfile;
+      setMember(data);
+      return data;
+    } catch (e) {
+      console.error("Failed to fetch member:", e);
+      setError("Възникна грешка при зареждане.");
+      return null;
+    } finally {
+      if (showLoading) {
         setLoading(false);
       }
-    };
-    void fetchMember();
+    }
+  };
+
+  // Fetch member
+  useEffect(() => {
+    void refreshMember({ showLoading: true });
   }, [normalizedCardCode]);
 
   useEffect(() => {
@@ -877,18 +902,7 @@ export default function MemberCardPage({
         type === "payment-history-updated" ||
         type === "notification-created"
       ) {
-        void (async () => {
-          try {
-            const response = await fetch(`/api/members/${normalizedCardCode}`, { cache: "no-store" });
-            if (!response.ok) {
-              return;
-            }
-            const data = (await response.json()) as MemberProfile;
-            setMember(data);
-          } catch (error) {
-            console.error("Failed to refresh member after live update event:", error);
-          }
-        })();
+        void refreshMember();
       }
 
       if (type === "training-updated") {
@@ -925,18 +939,49 @@ export default function MemberCardPage({
     };
   }, [normalizedCardCode, notificationsPanelOpen]);
 
-  // Re-fetch training data when app returns to foreground (SSE is lost while backgrounded on mobile)
+  // Re-fetch dynamic data when app returns to foreground (SSE is lost while backgrounded on mobile).
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void Promise.all([fetchTrainingDays(), fetchMemberMatches()]);
-      }
+    const refreshForegroundData = () => {
+      void refreshMember();
+      void Promise.all([fetchTrainingDays(), fetchMemberMatches()]);
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshForegroundData();
+    };
+    const handleFocus = () => refreshForegroundData();
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [normalizedCardCode]);
+
+  useEffect(() => {
+    if (!isRollingThirtyDayPayment || !rollingPaymentWindow || rollingPaymentWindow.remainingDays <= 0) {
+      return;
+    }
+
+    const msUntilExpiry = rollingPaymentWindow.paidUntil.getTime() - Date.now();
+    if (msUntilExpiry <= 0) {
+      void refreshMember();
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void refreshMember();
+    }, Math.min(msUntilExpiry + 1000, 2_147_483_647));
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [
+    isRollingThirtyDayPayment,
+    rollingPaymentWindow?.paidUntil.getTime(),
+    rollingPaymentWindow?.remainingDays,
+    normalizedCardCode,
+  ]);
 
   // Fetch unread notification count on page load
   useEffect(() => {
@@ -1292,7 +1337,9 @@ export default function MemberCardPage({
       const response = await fetch(`/api/members/${normalizedCardCode}/payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paidFor: toISOMonth(selectedYM) }),
+        body: JSON.stringify({
+          paidFor: isRollingThirtyDayPayment ? new Date().toISOString() : toISOMonth(selectedYM),
+        }),
       });
       if (!response.ok) {
         const err = await response.json();
@@ -1469,7 +1516,16 @@ export default function MemberCardPage({
     }
   };
 
-  const formatReceiptPeriod = (value: string) => formatMonthYearInBgUtc(value);
+  const formatPaymentPeriod = (value: string) => {
+    if (!isRollingThirtyDayPayment) return formatMonthYearInBgUtc(value);
+
+    const start = new Date(value);
+    if (Number.isNaN(start.getTime())) return value;
+    const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+    return `${start.toLocaleDateString("bg-BG")} - ${end.toLocaleDateString("bg-BG")}`;
+  };
+
+  const formatReceiptPeriod = (value: string) => formatPaymentPeriod(value);
 
   const escapeHtml = (value: string) =>
     value
@@ -1566,6 +1622,9 @@ export default function MemberCardPage({
   const lastPaymentText = member?.last_payment_date
     ? new Date(member.last_payment_date).toLocaleDateString("bg-BG")
     : "Няма плащане";
+  const rollingRemainingText = rollingPaymentWindow && rollingPaymentWindow.remainingDays > 0
+    ? `${rollingPaymentWindow.remainingDays} ${rollingPaymentWindow.remainingDays === 1 ? "ден" : "дни"}`
+    : "Няма активни дни";
   const birthDateText = member?.birthDate
     ? new Date(member.birthDate).toLocaleDateString("bg-BG").replace(/\s*г\.\s*$/, "")
     : "-";
@@ -1854,6 +1913,14 @@ export default function MemberCardPage({
                   <span className="info-lbl">Последно плащане:</span>
                   <span className="info-val">{lastPaymentText}</span>
                 </div>
+                {isRollingThirtyDayPayment && (
+                  <div className="info-row">
+                    <span className="info-lbl">Оставащи дни:</span>
+                    <span className={`info-val ${hasActiveRollingPayment ? "green glow" : "red glow-red"}`}>
+                      {rollingRemainingText}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2018,29 +2085,37 @@ export default function MemberCardPage({
         <div className="below-card">
           {canManagePayments && (<>
             <>
-              <button className="pay-btn" onClick={openPaymentModal}>
+              <button
+                className="pay-btn"
+                onClick={openPaymentModal}
+                title={hasActiveRollingPayment ? `Остават ${rollingRemainingText}` : undefined}
+              >
                 Плати
               </button>
-              <button
-                className="add-btn member-action-btn payment-delete-btn"
-                onClick={openPaymentDeleteModal}
-                disabled={(member.paymentLogs?.length ?? 0) === 0}
-              >
-                Изтрий плащане
-              </button>
+              {!isRollingThirtyDayPayment && (
+                <button
+                  className="add-btn member-action-btn payment-delete-btn"
+                  onClick={openPaymentDeleteModal}
+                  disabled={(member.paymentLogs?.length ?? 0) === 0}
+                >
+                  Изтрий плащане
+                </button>
+              )}
             </>
-            <button
-              className="add-btn member-action-btn pause-btn"
-              onClick={() => {
-                setPauseError(null);
-                setSelectedPauseMonths([]);
-                setPauseReason("");
-                setCalendarYear(new Date().getFullYear());
-                setPauseModalOpen(true);
-              }}
-            >
-              Пауза
-            </button>
+            {!isRollingThirtyDayPayment && (
+              <button
+                className="add-btn member-action-btn pause-btn"
+                onClick={() => {
+                  setPauseError(null);
+                  setSelectedPauseMonths([]);
+                  setPauseReason("");
+                  setCalendarYear(new Date().getFullYear());
+                  setPauseModalOpen(true);
+                }}
+              >
+                Пауза
+              </button>
+            )}
           </>)}
 
           <button className="add-btn member-action-btn training-schedule-btn" onClick={() => void openTrainingModal()}>
@@ -2167,7 +2242,7 @@ export default function MemberCardPage({
                       <div className="payment-row" key={item.id}>
                         <div className="payment-info">
                           <p className="p-month">
-                            {formatMonthYearInBgUtc(item.paidFor)}
+                            {formatPaymentPeriod(item.paidFor)}
                           </p>
                           <p className="p-date">{new Date(item.paidAt).toLocaleDateString("bg-BG")}</p>
                         </div>
@@ -3376,6 +3451,29 @@ export default function MemberCardPage({
 
               <div className="pm-divider" />
 
+              {isRollingThirtyDayPayment ? (
+                <div className={`pm-info-row pm-info-row--rolling${hasActiveRollingPayment ? " pm-info-row--locked" : ""}`}>
+                  <span className="pm-info-lbl">
+                    {paymentModalMode === "delete" ? "Плащания по дата" : "30-дневен период"}
+                  </span>
+                  {paymentModalMode === "delete" ? (
+                    <span className="pm-info-val pm-info-val--muted">
+                      Изтриването се управлява от платените дати по-долу.
+                    </span>
+                  ) : hasActiveRollingPayment && rollingPaymentWindow ? (
+                    <span className="pm-rolling-status">
+                      <strong>{rollingRemainingText} остават</strong>
+                      <span>Платено до {rollingPaymentWindow.paidUntil.toLocaleDateString("bg-BG")}</span>
+                    </span>
+                  ) : (
+                    <span className="pm-rolling-status">
+                      <strong>Готово за плащане</strong>
+                      <span>Новото плащане ще важи 30 дни от днешната дата.</span>
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <>
               <div className="pm-info-row">
                 <span className="pm-info-lbl">
                   {paymentModalMode === "delete" ? "Изберете платени месеци:" : "Следващ дължим месец:"}
@@ -3460,6 +3558,9 @@ export default function MemberCardPage({
                 </div>
               )}
 
+                </>
+              )}
+
               {paymentError && (
                 <div className="pm-error">{paymentError}</div>
               )}
@@ -3479,13 +3580,16 @@ export default function MemberCardPage({
                     {paymentLoading ? "Изтриване..." : "Изтрий плащания"}
                   </button>
                 )}
-                <button
-                  className="pm-btn pm-btn--submit"
-                  onClick={handlePayment}
-                  disabled={!selectedYM || paymentLoading || selectedPaymentDeleteMonths.length > 0}
-                >
-                  {paymentLoading ? "Обработка..." : "Потвърди плащане"}
-                </button>
+                {paymentModalMode === "create" && (
+                  <button
+                    className="pm-btn pm-btn--submit"
+                    onClick={handlePayment}
+                    disabled={!selectedYM || paymentLoading || selectedPaymentDeleteMonths.length > 0 || hasActiveRollingPayment}
+                    title={hasActiveRollingPayment ? `Остават ${rollingRemainingText}` : undefined}
+                  >
+                    {paymentLoading ? "Обработка..." : "Потвърди плащане"}
+                  </button>
+                )}
               </div>
 
             </div>

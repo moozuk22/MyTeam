@@ -5,7 +5,13 @@ import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
 import { publishMemberUpdated } from "@/lib/memberEvents";
-import { normalizeToMonthStart, toYearMonth, compareYearMonth } from "@/lib/paymentStatus";
+import {
+  normalizeToDayStart,
+  normalizeToMonthStart,
+  getRollingThirtyDayPaymentWindow,
+  toYearMonth,
+  compareYearMonth,
+} from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,9 +37,8 @@ export async function POST(
       );
     }
 
-    // Validate that paidFor is a valid date
-    const paidForDate = normalizeToMonthStart(new Date(paidFor));
-    if (isNaN(paidForDate.getTime())) {
+    const parsedPaidFor = new Date(paidFor);
+    if (isNaN(parsedPaidFor.getTime())) {
       return NextResponse.json(
         { error: "paidFor must be a valid date" },
         { status: 400 }
@@ -45,13 +50,16 @@ export async function POST(
       where: { id },
       include: {
         paymentLogs: {
-          orderBy: { paidAt: "desc" },
+          orderBy: { paidFor: "desc" },
           take: 1,
         },
         cards: {
           where: { isActive: true },
           select: { cardCode: true },
           take: 1,
+        },
+        club: {
+          select: { paymentWorkflow: true },
         },
       },
     });
@@ -60,11 +68,34 @@ export async function POST(
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
 
+    const isRollingThirtyDay = player.club.paymentWorkflow === "rolling_30_days";
+    const paidForDate = isRollingThirtyDay
+      ? normalizeToDayStart(parsedPaidFor)
+      : normalizeToMonthStart(parsedPaidFor);
+
     if (player.firstBillingMonth) {
-      const firstBillingYM = toYearMonth(player.firstBillingMonth);
-      if (compareYearMonth(toYearMonth(paidForDate), firstBillingYM) < 0) {
+      const isBeforeBillingStart = isRollingThirtyDay
+        ? paidForDate < normalizeToDayStart(player.firstBillingMonth)
+        : compareYearMonth(toYearMonth(paidForDate), toYearMonth(player.firstBillingMonth)) < 0;
+      if (isBeforeBillingStart) {
         return NextResponse.json(
-          { error: "Cannot record payment before billing start month" },
+          { error: isRollingThirtyDay ? "Cannot record payment before billing start date" : "Cannot record payment before billing start month" },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (isRollingThirtyDay) {
+      const activeWindow = getRollingThirtyDayPaymentWindow({
+        paidDates: player.paymentLogs.map((log) => log.paidFor),
+      });
+      if (activeWindow && activeWindow.remainingDays > 0) {
+        return NextResponse.json(
+          {
+            error: `Membership is already paid for ${activeWindow.remainingDays} more ${activeWindow.remainingDays === 1 ? "day" : "days"}.`,
+            remainingDays: activeWindow.remainingDays,
+            paidUntil: activeWindow.paidUntil,
+          },
           { status: 400 },
         );
       }
@@ -121,6 +152,7 @@ export async function POST(
       ? `/member/${player.cards[0].cardCode}`
       : "/";
     const paidForLabel = paidForDate.toLocaleDateString("bg-BG", {
+      day: isRollingThirtyDay ? "2-digit" : undefined,
       month: "long",
       year: "numeric",
     });

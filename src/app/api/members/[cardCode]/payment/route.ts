@@ -9,7 +9,10 @@ import {
   addMonths,
   compareYearMonth,
   getFirstUnpaidYM,
+  getRollingThirtyDayPaymentWindow,
+  normalizeToDayStart,
   normalizeToMonthStart,
+  resolveRollingThirtyDayStatus,
   resolveStatusFromSettledMonths,
   toMonthKey,
   toYearMonth,
@@ -44,8 +47,8 @@ export async function POST(
       return NextResponse.json({ error: "paidFor is required" }, { status: 400 });
     }
 
-    const paidForDate = normalizeToMonthStart(new Date(String(paidForRaw)));
-    if (Number.isNaN(paidForDate.getTime())) {
+    const parsedPaidFor = new Date(String(paidForRaw));
+    if (Number.isNaN(parsedPaidFor.getTime())) {
       return NextResponse.json(
         { error: "paidFor must be a valid date" },
         { status: 400 },
@@ -60,7 +63,12 @@ export async function POST(
       select: {
         playerId: true,
         player: {
-          select: { firstBillingMonth: true },
+          select: {
+            firstBillingMonth: true,
+            club: {
+              select: { paymentWorkflow: true },
+            },
+          },
         },
       },
     });
@@ -71,6 +79,7 @@ export async function POST(
 
     const playerFirstBillingMonth =
       card.player.firstBillingMonth ?? normalizeToMonthStart(new Date());
+    const isRollingThirtyDay = card.player.club.paymentWorkflow === "rolling_30_days";
 
     const [existingLogs, existingWaivers] = await Promise.all([
       prisma.paymentLog.findMany({
@@ -84,39 +93,68 @@ export async function POST(
       }),
     ]);
 
-    const firstBillingYM = toYearMonth(playerFirstBillingMonth);
-    const targetYM = toYearMonth(paidForDate);
+    let monthsToCreate: Date[] = [];
 
-    if (compareYearMonth(targetYM, firstBillingYM) < 0) {
-      return NextResponse.json(
-        { error: "Cannot record payment before billing start month" },
-        { status: 400 },
-      );
-    }
+    if (isRollingThirtyDay) {
+      const paidForDate = normalizeToDayStart(parsedPaidFor);
 
-    const paidSet = new Set(existingLogs.map((log) => toMonthKey(toYearMonth(log.paidFor))));
-    const waivedSet = new Set(existingWaivers.map((row) => toMonthKey(toYearMonth(row.waivedFor))));
-
-    const firstUnpaidYM: YearMonth = getFirstUnpaidYM(
-      existingLogs.map((log) => log.paidFor),
-      existingWaivers.map((row) => row.waivedFor),
-      firstBillingYM,
-    ) ?? firstBillingYM;
-
-    if (compareYearMonth(targetYM, firstUnpaidYM) < 0) {
-      return NextResponse.json(
-        { error: "Selected month is before the next unpaid month" },
-        { status: 400 },
-      );
-    }
-
-    const monthsToCreate: Date[] = [];
-    let cursor = firstUnpaidYM;
-    while (compareYearMonth(cursor, targetYM) <= 0) {
-      if (!paidSet.has(toMonthKey(cursor)) && !waivedSet.has(toMonthKey(cursor))) {
-        monthsToCreate.push(ymToDate(cursor));
+      if (card.player.firstBillingMonth && paidForDate < normalizeToDayStart(card.player.firstBillingMonth)) {
+        return NextResponse.json(
+          { error: "Cannot record payment before billing start date" },
+          { status: 400 },
+        );
       }
-      cursor = addMonths(cursor, 1);
+
+      const activeWindow = getRollingThirtyDayPaymentWindow({
+        paidDates: existingLogs.map((log) => log.paidFor),
+      });
+      if (activeWindow && activeWindow.remainingDays > 0) {
+        return NextResponse.json(
+          {
+            error: `Membership is already paid for ${activeWindow.remainingDays} more ${activeWindow.remainingDays === 1 ? "day" : "days"}.`,
+            remainingDays: activeWindow.remainingDays,
+            paidUntil: activeWindow.paidUntil,
+          },
+          { status: 400 },
+        );
+      }
+
+      monthsToCreate = [paidForDate];
+    } else {
+      const paidForDate = normalizeToMonthStart(parsedPaidFor);
+      const firstBillingYM = toYearMonth(playerFirstBillingMonth);
+      const targetYM = toYearMonth(paidForDate);
+
+      if (compareYearMonth(targetYM, firstBillingYM) < 0) {
+        return NextResponse.json(
+          { error: "Cannot record payment before billing start month" },
+          { status: 400 },
+        );
+      }
+
+      const paidSet = new Set(existingLogs.map((log) => toMonthKey(toYearMonth(log.paidFor))));
+      const waivedSet = new Set(existingWaivers.map((row) => toMonthKey(toYearMonth(row.waivedFor))));
+
+      const firstUnpaidYM: YearMonth = getFirstUnpaidYM(
+        existingLogs.map((log) => log.paidFor),
+        existingWaivers.map((row) => row.waivedFor),
+        firstBillingYM,
+      ) ?? firstBillingYM;
+
+      if (compareYearMonth(targetYM, firstUnpaidYM) < 0) {
+        return NextResponse.json(
+          { error: "Selected month is before the next unpaid month" },
+          { status: 400 },
+        );
+      }
+
+      let cursor = firstUnpaidYM;
+      while (compareYearMonth(cursor, targetYM) <= 0) {
+        if (!paidSet.has(toMonthKey(cursor)) && !waivedSet.has(toMonthKey(cursor))) {
+          monthsToCreate.push(ymToDate(cursor));
+        }
+        cursor = addMonths(cursor, 1);
+      }
     }
 
     if (monthsToCreate.length === 0) {
@@ -227,19 +265,9 @@ export async function DELETE(
       ? (body as { paidFor: unknown[] }).paidFor
       : [];
 
-    const paidForDates = paidForValues
-      .map((value) => normalizeToMonthStart(new Date(String(value))))
+    const parsedPaidForDates = paidForValues
+      .map((value) => new Date(String(value)))
       .filter((date) => !Number.isNaN(date.getTime()));
-    const uniqueDates = Array.from(
-      new Map(paidForDates.map((date) => [date.toISOString(), date])).values(),
-    );
-
-    if (uniqueDates.length === 0) {
-      return NextResponse.json(
-        { error: "Select at least one valid paid month" },
-        { status: 400 },
-      );
-    }
 
     const card = await prisma.card.findFirst({
       where: {
@@ -253,6 +281,9 @@ export async function DELETE(
             id: true,
             fullName: true,
             firstBillingMonth: true,
+            club: {
+              select: { paymentWorkflow: true },
+            },
             cards: {
               where: { isActive: true },
               select: { cardCode: true },
@@ -265,6 +296,21 @@ export async function DELETE(
 
     if (!card) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    const isRollingThirtyDay = card.player.club.paymentWorkflow === "rolling_30_days";
+    const paidForDates = parsedPaidForDates.map((date) =>
+      isRollingThirtyDay ? normalizeToDayStart(date) : normalizeToMonthStart(date),
+    );
+    const uniqueDates = Array.from(
+      new Map(paidForDates.map((date) => [date.toISOString(), date])).values(),
+    );
+
+    if (uniqueDates.length === 0) {
+      return NextResponse.json(
+        { error: isRollingThirtyDay ? "Select at least one valid payment date" : "Select at least one valid paid month" },
+        { status: 400 },
+      );
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -300,13 +346,18 @@ export async function DELETE(
         }),
       ]);
 
-      const nextStatus = resolveStatusFromSettledMonths({
-        paidDates: remainingLogs.map((log) => log.paidFor),
-        waivedDates: remainingWaivers.map((waiver) => waiver.waivedFor),
-        firstBillingMonth: toYearMonth(
-          card.player.firstBillingMonth ?? normalizeToMonthStart(new Date()),
-        ),
-      });
+      const nextStatus = isRollingThirtyDay
+        ? resolveRollingThirtyDayStatus({
+            paidDates: remainingLogs.map((log) => log.paidFor),
+            firstBillingDate: card.player.firstBillingMonth,
+          })
+        : resolveStatusFromSettledMonths({
+            paidDates: remainingLogs.map((log) => log.paidFor),
+            waivedDates: remainingWaivers.map((waiver) => waiver.waivedFor),
+            firstBillingMonth: toYearMonth(
+              card.player.firstBillingMonth ?? normalizeToMonthStart(new Date()),
+            ),
+          });
 
       await tx.player.update({
         where: { id: card.playerId },

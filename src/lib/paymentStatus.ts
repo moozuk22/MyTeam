@@ -27,9 +27,83 @@ export function normalizeToMonthStart(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
 }
 
+export function normalizeToDayStart(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+}
+
 export function isCurrentMonthWaived(waivedDates: Date[], now = new Date()): boolean {
   const current = toMonthKey(toYearMonth(now));
   return waivedDates.some((date) => toMonthKey(toYearMonth(date)) === current);
+}
+
+export function resolveRollingThirtyDayStatus(input: {
+  paidDates: Date[];
+  firstBillingDate?: Date | null;
+  now?: Date;
+}): "paid" | "overdue" {
+  const now = input.now ?? new Date();
+  const validPaidDates = input.paidDates
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  if (validPaidDates.length > 0) {
+    const latestPaidStart = validPaidDates[0];
+    const paidUntil = new Date(latestPaidStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    if (now < paidUntil) return "paid";
+    return "overdue";
+  }
+
+  const firstBillingDate = input.firstBillingDate;
+  if (!firstBillingDate) return "paid";
+  if (now < firstBillingDate) return "paid";
+  return "overdue";
+}
+
+export function getRollingThirtyDayPaymentWindow(input: {
+  paidDates: Date[];
+  now?: Date;
+}): { latestPaidStart: Date; paidUntil: Date; remainingDays: number } | null {
+  const now = input.now ?? new Date();
+  const latestPaidStart = input.paidDates
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+
+  if (!latestPaidStart) return null;
+
+  const paidUntil = new Date(latestPaidStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const remainingMs = paidUntil.getTime() - now.getTime();
+  const remainingDays = remainingMs > 0 ? Math.ceil(remainingMs / (24 * 60 * 60 * 1000)) : 0;
+
+  return {
+    latestPaidStart,
+    paidUntil,
+    remainingDays,
+  };
+}
+
+export function resolvePaymentStatus(input: {
+  workflow?: "calendar_month" | "rolling_30_days" | string | null;
+  paidDates: Date[];
+  waivedDates: Date[];
+  firstBillingMonth?: YearMonth | null;
+  firstBillingDate?: Date | null;
+  now?: Date;
+}): "paid" | "warning" | "overdue" {
+  if (input.workflow === "rolling_30_days") {
+    return resolveRollingThirtyDayStatus({
+      paidDates: input.paidDates,
+      firstBillingDate: input.firstBillingDate,
+      now: input.now,
+    });
+  }
+
+  return resolveStatusFromSettledMonths({
+    paidDates: input.paidDates,
+    waivedDates: input.waivedDates,
+    firstBillingMonth: input.firstBillingMonth,
+    now: input.now,
+  });
 }
 
 export function resolveStatusFromSettledMonths(input: {

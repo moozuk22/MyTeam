@@ -10,6 +10,7 @@ import {
 import {
   isCurrentMonthWaived,
   normalizeToMonthStart,
+  resolveRollingThirtyDayStatus,
 } from "@/lib/paymentStatus";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { parsePaymentAmount } from "@/lib/paymentAmount";
@@ -69,6 +70,12 @@ export async function GET(
           orderBy: { waivedFor: "desc" },
         },
         images: true,
+        club: {
+          select: {
+            billingStatus: true,
+            paymentWorkflow: true,
+          },
+        },
       },
     });
 
@@ -81,10 +88,16 @@ export async function GET(
 
     const waivedDates = player.paymentWaivers.map((item) => item.waivedFor);
     const pausedThisMonth = isCurrentMonthWaived(waivedDates);
+    const resolvedStatus = player.club.paymentWorkflow === "rolling_30_days"
+      ? resolveRollingThirtyDayStatus({
+          paidDates: player.paymentLogs.map((item) => item.paidFor),
+          firstBillingDate: player.firstBillingMonth,
+        })
+      : player.status;
 
     return NextResponse.json({
       ...player,
-      status: pausedThisMonth ? "paused" : player.status,
+      status: pausedThisMonth ? "paused" : resolvedStatus,
       imageUrl: imagePath,
       avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
       imagePublicId: null,

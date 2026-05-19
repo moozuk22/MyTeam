@@ -60,6 +60,7 @@ interface ClubOption {
   trainingWindowDays?: number;
   trainingGroupMode?: "team_group" | "custom_group";
   billingStatus?: string;
+  paymentWorkflow?: "calendar_month" | "rolling_30_days";
   defaultPaymentAmount?: string | number | null;
 }
 

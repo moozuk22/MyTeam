@@ -7,7 +7,7 @@ import {
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { cloudinary } from "@/lib/cloudinary";
 import { publishMemberUpdated } from "@/lib/memberEvents";
-import { isCurrentMonthWaived } from "@/lib/paymentStatus";
+import { isCurrentMonthWaived, resolveRollingThirtyDayStatus } from "@/lib/paymentStatus";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 export const runtime = "nodejs";
@@ -99,6 +99,7 @@ export async function GET(
                 sports: true,
                 imageUrl: true,
                 emblemUrl: true,
+                paymentWorkflow: true,
               },
             },
             images: {
@@ -228,6 +229,13 @@ export async function GET(
 
     const waivedDates = paymentWaivers.map((item) => item.waivedFor);
     const pausedThisMonth = isCurrentMonthWaived(waivedDates);
+    const paymentWorkflow = card.player.club?.paymentWorkflow ?? "calendar_month";
+    const resolvedStatus = paymentWorkflow === "rolling_30_days"
+      ? resolveRollingThirtyDayStatus({
+          paidDates: paymentLogs.map((item) => item.paidFor),
+          firstBillingDate: card.player.firstBillingMonth,
+        })
+      : card.player.status;
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? "";
     const playerImagePath = getPlayerImagePathByAudience(card.player.images, isPrivilegedViewer);
@@ -259,7 +267,8 @@ export async function GET(
         parentPhone: card.player.parentPhone,
         playerPhone: card.player.playerPhone,
         birthDate: card.player.birthDate,
-        status: pausedThisMonth ? "paused" : card.player.status,
+        paymentWorkflow,
+        status: pausedThisMonth ? "paused" : resolvedStatus,
         firstBillingMonth: card.player.firstBillingMonth,
         last_payment_date: card.player.lastPaymentDate,
         paymentLogs: paymentLogs.map((item) => ({

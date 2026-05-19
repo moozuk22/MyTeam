@@ -523,6 +523,12 @@ function AdminMembersPageContent() {
   const [clubName, setClubName] = useState("Всички отбори");
   const [clubSport, setClubSport] = useState("");
   const [clubBillingStatus, setClubBillingStatus] = useState<string>("");
+  const [clubPaymentWorkflow, setClubPaymentWorkflow] = useState<"calendar_month" | "rolling_30_days">("calendar_month");
+  const [paymentWorkflowModalOpen, setPaymentWorkflowModalOpen] = useState(false);
+  const [paymentWorkflowDraft, setPaymentWorkflowDraft] = useState<"calendar_month" | "rolling_30_days">("calendar_month");
+  const [paymentWorkflowSaving, setPaymentWorkflowSaving] = useState(false);
+  const [paymentWorkflowError, setPaymentWorkflowError] = useState("");
+  const [paymentWorkflowSuccess, setPaymentWorkflowSuccess] = useState("");
   const [clubDefaultPaymentAmount, setClubDefaultPaymentAmount] = useState("");
   const [paymentAmountModalOpen, setPaymentAmountModalOpen] = useState(false);
   const [paymentAmountForm, setPaymentAmountForm] = useState("");
@@ -930,6 +936,60 @@ function AdminMembersPageContent() {
     setPaymentAmountSuccess("");
   };
 
+  const openPaymentWorkflowModal = () => {
+    setPaymentWorkflowDraft(clubPaymentWorkflow);
+    setPaymentWorkflowError("");
+    setPaymentWorkflowSuccess("");
+    setPaymentWorkflowModalOpen(true);
+  };
+
+  const closePaymentWorkflowModal = () => {
+    if (paymentWorkflowSaving) return;
+    setPaymentWorkflowModalOpen(false);
+    setPaymentWorkflowError("");
+    setPaymentWorkflowSuccess("");
+  };
+
+  const handleSavePaymentWorkflow = async () => {
+    if (!clubId || paymentWorkflowSaving) return;
+
+    setPaymentWorkflowSaving(true);
+    setPaymentWorkflowError("");
+    setPaymentWorkflowSuccess("");
+
+    try {
+      const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/payment-workflow`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentWorkflow: paymentWorkflowDraft }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setPaymentWorkflowError(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно запазване на метода за плащане.",
+        );
+        return;
+      }
+
+      setClubPaymentWorkflow(paymentWorkflowDraft);
+      setClubs((prev) =>
+        prev.map((club) =>
+          club.id === clubId ? { ...club, paymentWorkflow: paymentWorkflowDraft } : club,
+        ),
+      );
+      setPaymentWorkflowSuccess("Методът за плащане е обновен за клуба.");
+      await refreshMembersList();
+    } catch (error) {
+      console.error("Payment workflow save error:", error);
+      setPaymentWorkflowError("Възникна грешка при запазване на метода за плащане.");
+    } finally {
+      setPaymentWorkflowSaving(false);
+    }
+  };
+
   const handleSavePaymentAmount = async () => {
     if (!clubId || paymentAmountSaving) return;
 
@@ -1263,6 +1323,7 @@ function AdminMembersPageContent() {
                       emblemUrl?: unknown;
                       imageUrl?: unknown;
                       imagePublicId?: unknown;
+                      paymentWorkflow?: unknown;
                     })
                     : {};
                 const rawName = String(item.name ?? "").trim();
@@ -1273,6 +1334,9 @@ function AdminMembersPageContent() {
                   emblemUrl: typeof item.emblemUrl === "string" ? item.emblemUrl : null,
                   imageUrl: typeof item.imageUrl === "string" ? item.imageUrl : null,
                   imagePublicId: typeof item.imagePublicId === "string" ? item.imagePublicId : null,
+                  paymentWorkflow: item.paymentWorkflow === "rolling_30_days"
+                    ? ("rolling_30_days" as const)
+                    : ("calendar_month" as const),
                 };
               })
               .filter((club) => club.id && club.name)
@@ -1705,6 +1769,8 @@ function AdminMembersPageContent() {
 
           const billing = (selectedClub as Record<string, unknown>).billingStatus;
           setClubBillingStatus(typeof billing === "string" ? billing : "");
+          const workflow = (selectedClub as Record<string, unknown>).paymentWorkflow;
+          setClubPaymentWorkflow(workflow === "rolling_30_days" ? "rolling_30_days" : "calendar_month");
           const defaultPaymentAmount = (selectedClub as Record<string, unknown>).defaultPaymentAmount;
           setClubDefaultPaymentAmount(
             defaultPaymentAmount === null || defaultPaymentAmount === undefined ? "" : String(defaultPaymentAmount),
@@ -1780,6 +1846,8 @@ function AdminMembersPageContent() {
         setTrainingGroupModeDraft(selectedMode === "custom_group" ? "custom_group" : "team_group");
         const billing = (selectedClub as Record<string, unknown> | null)?.billingStatus;
         setClubBillingStatus(typeof billing === "string" ? billing : "");
+        const workflow = (selectedClub as Record<string, unknown> | null)?.paymentWorkflow;
+        setClubPaymentWorkflow(workflow === "rolling_30_days" ? "rolling_30_days" : "calendar_month");
         const defaultPaymentAmount = (selectedClub as Record<string, unknown> | null)?.defaultPaymentAmount;
         setClubDefaultPaymentAmount(
           defaultPaymentAmount === null || defaultPaymentAmount === undefined ? "" : String(defaultPaymentAmount),
@@ -4983,6 +5051,16 @@ function AdminMembersPageContent() {
             </button>
           )}
           {isAdmin && clubId && (
+            <button
+              className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+              onClick={openPaymentWorkflowModal}
+              type="button"
+            >
+              <ReceiptIcon size={16} />
+              <span>Метод плащане</span>
+            </button>
+          )}
+          {isAdmin && clubId && (
             <>
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
@@ -5573,6 +5651,96 @@ function AdminMembersPageContent() {
           onConfirm={handleConfirmAssignNewCard}
           isAssigning={isAssigningNewCard}
         />
+      )}
+      {paymentWorkflowModalOpen && isAdmin && clubId && (
+        <div className="amp-overlay" onClick={closePaymentWorkflowModal}>
+          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <h2 className="amp-modal-title">
+              <span className="amp-modal-title-gradient">Метод на плащане</span>
+              <button
+                className="amp-modal-close"
+                onClick={closePaymentWorkflowModal}
+                aria-label="Затвори"
+                disabled={paymentWorkflowSaving}
+              >
+                <XIcon />
+              </button>
+            </h2>
+
+            <div className="amp-modal-body">
+              <div className="amp-payment-workflow-picker" role="radiogroup" aria-label="Метод за плащане">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={paymentWorkflowDraft === "calendar_month"}
+                  className={`amp-payment-workflow-option${paymentWorkflowDraft === "calendar_month" ? " is-selected" : ""}`}
+                  onClick={() => {
+                    setPaymentWorkflowDraft("calendar_month");
+                    setPaymentWorkflowError("");
+                    setPaymentWorkflowSuccess("");
+                  }}
+                  disabled={paymentWorkflowSaving}
+                >
+                  <span className="amp-payment-workflow-check" aria-hidden="true" />
+                  <span className="amp-payment-workflow-copy">
+                    <span className="amp-payment-workflow-title">Календарен месец</span>
+                    <span className="amp-payment-workflow-desc">
+                      Плащанията се отчитат по месеци. Състезателят е платен за избрания календарен месец, а статусът се изчислява спрямо текущия и предходния месец.
+                    </span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={paymentWorkflowDraft === "rolling_30_days"}
+                  className={`amp-payment-workflow-option${paymentWorkflowDraft === "rolling_30_days" ? " is-selected" : ""}`}
+                  onClick={() => {
+                    setPaymentWorkflowDraft("rolling_30_days");
+                    setPaymentWorkflowError("");
+                    setPaymentWorkflowSuccess("");
+                  }}
+                  disabled={paymentWorkflowSaving}
+                >
+                  <span className="amp-payment-workflow-check" aria-hidden="true" />
+                  <span className="amp-payment-workflow-copy">
+                    <span className="amp-payment-workflow-title">30 дни от датата на плащане</span>
+                    <span className="amp-payment-workflow-desc">
+                      Всяко плащане важи 30 дни от деня, в който е отчетено. Ако остават активни дни, треньорът вижда колко дни остават и не може да отчете ново плащане.
+                    </span>
+                  </span>
+                </button>
+              </div>
+
+              <p className="amp-payment-workflow-note">
+                Избраният метод се прилага за всички състезатели в клуба.
+              </p>
+
+              {paymentWorkflowError && <p className="amp-confirm-error">{paymentWorkflowError}</p>}
+              {paymentWorkflowSuccess && <p className="amp-confirm-success">{paymentWorkflowSuccess}</p>}
+
+              <div className="amp-modal-actions">
+                <button
+                  className="amp-btn amp-btn--ghost"
+                  type="button"
+                  onClick={closePaymentWorkflowModal}
+                  disabled={paymentWorkflowSaving}
+                >
+                  Отказ
+                </button>
+                <button
+                  className="amp-btn amp-btn--primary"
+                  type="button"
+                  onClick={handleSavePaymentWorkflow}
+                  disabled={paymentWorkflowSaving}
+                >
+                  {paymentWorkflowSaving ? "Запазване..." : "Запази"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       {paymentAmountModalOpen && (isAdmin || isCoach) && clubId && (
         <div className="amp-overlay" onClick={closePaymentAmountModal}>

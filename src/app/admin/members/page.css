@@ -1652,6 +1652,98 @@
   line-height: 1.5;
 }
 
+.amp-payment-workflow-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.amp-payment-workflow-option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.amp-payment-workflow-option:hover:not(:disabled) {
+  border-color: rgba(50, 205, 50, 0.38);
+  background: rgba(50, 205, 50, 0.07);
+}
+
+.amp-payment-workflow-option.is-selected {
+  border-color: rgba(50, 205, 50, 0.68);
+  background: linear-gradient(135deg, rgba(50, 205, 50, 0.14), rgba(50, 205, 50, 0.055));
+  box-shadow: 0 0 0 1px rgba(50, 205, 50, 0.16), 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.amp-payment-workflow-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.amp-payment-workflow-check {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.22);
+  position: relative;
+}
+
+.amp-payment-workflow-option.is-selected .amp-payment-workflow-check {
+  border-color: rgba(50, 205, 50, 0.9);
+  background: rgba(50, 205, 50, 0.18);
+}
+
+.amp-payment-workflow-option.is-selected .amp-payment-workflow-check::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: inherit;
+  background: #32cd32;
+  box-shadow: 0 0 10px rgba(50, 205, 50, 0.45);
+}
+
+.amp-payment-workflow-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.amp-payment-workflow-title {
+  color: #f5fff5;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.amp-payment-workflow-desc {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.amp-payment-workflow-note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .amp-confirm-subtext {
   margin: 0;
   color: rgba(255, 255, 255, 0.6);

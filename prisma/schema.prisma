@@ -14,6 +14,13 @@ enum BillingStatus {
   @@map("billing_status")
 }
 
+enum PaymentWorkflow {
+  calendar_month
+  rolling_30_days
+
+  @@map("payment_workflow")
+}
+
 model Club {
   id                      String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                    String
@@ -57,6 +64,7 @@ model Club {
   coachGroups             CoachGroup[]
   notifyOnCoachVisit      Boolean                     @default(false) @map("notify_on_coach_visit")
   billingStatus           BillingStatus               @default(demo) @map("billing_status")
+  paymentWorkflow         PaymentWorkflow             @default(calendar_month) @map("payment_workflow")
   firstBillingMonth       DateTime?                   @map("first_billing_month") @db.Timestamptz(6)
   billingActivatedAt      DateTime?                   @map("billing_activated_at") @db.Timestamptz(6)
   defaultPaymentAmount    Decimal                     @default(0) @map("default_payment_amount") @db.Decimal(10, 2)
