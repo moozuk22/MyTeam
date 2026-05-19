@@ -1576,6 +1576,7 @@ function MemberDetailModal({
   const [coachGroupsOpen, setCoachGroupsOpen] = useState(false);
   const [assignCoachGroupValue, setAssignCoachGroupValue] = useState<string[]>([...member.coachGroupIds]);
   const [assignCoachGroupSaving, setAssignCoachGroupSaving] = useState(false);
+  const [assignCoachGroupSaved, setAssignCoachGroupSaved] = useState(false);
   const [assignCoachGroupError, setAssignCoachGroupError] = useState("");
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -1902,10 +1903,11 @@ function MemberDetailModal({
                       <div className="amp-coach-group-picker-actions">
                         <button
                           type="button"
-                          className="amp-btn amp-btn--ghost amp-btn--compact"
-                          disabled={assignCoachGroupSaving}
+                          className={`amp-btn amp-btn--compact amp-coach-group-save-btn${assignCoachGroupSaved ? " amp-coach-group-save-btn--saved" : ""}${assignCoachGroupError ? " amp-coach-group-save-btn--error" : ""}`}
+                          disabled={assignCoachGroupSaving || assignCoachGroupSaved}
                           onClick={async () => {
                             setAssignCoachGroupSaving(true);
+                            setAssignCoachGroupSaved(false);
                             setAssignCoachGroupError("");
                             try {
                               const response = await fetch(`/api/admin/members/${encodeURIComponent(member.id)}/coach-group`, {
@@ -1918,6 +1920,8 @@ function MemberDetailModal({
                                 throw new Error(String((payload as { error?: unknown }).error ?? "Грешка"));
                               }
                               onCoachGroupAssigned?.(member.id, assignCoachGroupValue);
+                              setAssignCoachGroupSaved(true);
+                              setTimeout(() => setAssignCoachGroupSaved(false), 2500);
                             } catch (err) {
                               setAssignCoachGroupError(err instanceof Error ? err.message : "Грешка");
                             } finally {
@@ -1925,7 +1929,7 @@ function MemberDetailModal({
                             }
                           }}
                         >
-                          {assignCoachGroupSaving ? "..." : "Запиши"}
+                          {assignCoachGroupSaving ? "Запазване..." : assignCoachGroupSaved ? "✓ Записано" : "Запиши"}
                         </button>
                       </div>
                       {assignCoachGroupError && <p className="amp-confirm-error amp-coach-group-picker-error">{assignCoachGroupError}</p>}
