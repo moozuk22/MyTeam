@@ -123,6 +123,15 @@ function getFieldBackground(fieldType: string): string {
   }
 }
 
+function clubSportToFieldType(sport: string): string {
+  const s = sport.toLowerCase();
+  if (/basket|баскетбол/.test(s)) return "basketball";
+  if (/tenis|тенис/.test(s)) return "tennis";
+  if (/voley|волей/.test(s)) return "volleyball";
+  if (/box|бокс/.test(s)) return "boxing";
+  return "football";
+}
+
 function renderFieldMarkings(fieldType: string) {
   const line = "rgba(255,255,255,0.82)";
   switch (fieldType) {
@@ -3650,7 +3659,7 @@ function AdminMembersPageContent() {
     } else {
       setTrainingFieldEditId(null);
       setTrainingFieldName("");
-      setTrainingFieldType("football");
+      setTrainingFieldType(clubSport ? clubSportToFieldType(clubSport) : "football");
       setTrainingFieldPieces([]);
     }
     setTrainingFieldModalOpen(true);
