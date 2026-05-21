@@ -5106,3 +5106,248 @@
   font-size: 13px;
   color: rgba(255, 255, 255, 0.55);
 }
+
+/* ── Guide modal ─────────────────────────────────────────────────────── */
+.amp-modal--guide {
+  max-width: 860px;
+  width: 96vw;
+  display: flex;
+  flex-direction: row;
+  padding: 0;
+  overflow: hidden;
+  max-height: 90vh;
+}
+
+/* Sidebar */
+.amp-guide-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.28);
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 197, 94, 0.2) transparent;
+  padding: 16px 8px;
+  gap: 2px;
+}
+
+.amp-guide-sidebar-title {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.28);
+  padding: 4px 8px 10px;
+  font-weight: 600;
+}
+
+.amp-guide-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12.5px;
+  text-align: left;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  line-height: 1.3;
+}
+
+.amp-guide-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.amp-guide-sidebar-item.is-active {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.28);
+  color: #4ade80;
+}
+
+.amp-guide-sidebar-num {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.amp-guide-sidebar-item.is-active .amp-guide-sidebar-num {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.amp-guide-sidebar-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Content panel */
+.amp-guide-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.amp-guide-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 14px 18px 0;
+}
+
+.amp-guide-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 22px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 197, 94, 0.2) transparent;
+}
+
+/* Image */
+.amp-guide-step-img-wrap {
+  border-radius: 10px;
+  overflow: visible;
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  position: relative;
+}
+
+.amp-guide-step-img {
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  display: block;
+  border-radius: 10px 10px 0 0;
+  cursor: zoom-in;
+}
+
+.amp-guide-step-img-hint {
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 5px 0 6px;
+}
+
+/* Lightbox */
+.amp-guide-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 24px;
+}
+
+.amp-guide-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.6);
+}
+
+/* Step body */
+.amp-guide-step-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  min-height: 100px;
+}
+
+.amp-guide-step-icon-wrap {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #22c55e;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.12);
+}
+
+.amp-guide-step-icon-wrap svg {
+  display: block;
+  color: #22c55e;
+  stroke: #22c55e;
+}
+
+.amp-guide-step-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 2px 0 10px;
+  line-height: 1.25;
+}
+
+.amp-guide-step-desc {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0;
+}
+
+/* Nav */
+.amp-guide-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 14px 22px;
+}
+
+/* Guide trigger button */
+.amp-guide-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.amp-guide-btn:hover {
+  background: rgba(34, 197, 94, 0.07);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
