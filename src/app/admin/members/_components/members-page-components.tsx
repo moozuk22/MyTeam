@@ -407,23 +407,7 @@ function AttendanceDashboard({
   };
 
   const printAttendance = () => {
-    if (!data || typeof window === "undefined" || typeof document === "undefined") return;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument;
-    const win = iframe.contentWindow;
-    if (!doc || !win) {
-      document.body.removeChild(iframe);
-      return;
-    }
+    if (!data || typeof window === "undefined") return;
 
     const escapeHtml = (value: string) =>
       value
@@ -445,11 +429,11 @@ function AttendanceDashboard({
     const tbodyHtml = data.players.map((player) => {
       const presentCount = data.trainingDates.filter(d => player.attendance[d]?.present ?? true).length;
       const pct = data.trainingDates.length > 0 ? Math.round((presentCount / data.trainingDates.length) * 100) : 0;
-      
+
       const cellsHtml = data.trainingDates.map((d) => {
         const cell = player.attendance[d];
         if (!cell) return `<td style="padding: 4px; text-align: center; color: #999;">–</td>`;
-        return cell.present 
+        return cell.present
           ? `<td style="padding: 4px; text-align: center; color: #16a34a; font-weight: bold;">&#x2713;</td>`
           : `<td style="padding: 4px; text-align: center; color: #dc2626;">&#x2717;</td>`;
       }).join('');
@@ -480,8 +464,10 @@ function AttendanceDashboard({
       `;
     }
 
-    doc.open();
-    doc.write(`<!doctype html>
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.open();
+    win.document.write(`<!doctype html>
 <html lang="bg">
 <head>
   <meta charset="utf-8" />
@@ -507,17 +493,9 @@ function AttendanceDashboard({
   </div>
 </body>
 </html>`);
-    doc.close();
-
-    window.setTimeout(() => {
-      win.focus();
-      win.print();
-      window.setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }, 80);
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   return (
@@ -1111,23 +1089,7 @@ function ReportsDialog({
         : `Треньор: ${activeGroupName}`
       : "";
 
-    if (typeof window === "undefined" || typeof document === "undefined") return;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument;
-    const win = iframe.contentWindow;
-    if (!doc || !win) {
-      document.body.removeChild(iframe);
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     const tableRowsHtml = rowsToPrint.length > 0
       ? rowsToPrint
@@ -1143,8 +1105,10 @@ function ReportsDialog({
         .join("")
       : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
 
-    doc.open();
-    doc.write(`<!doctype html>
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.open();
+    win.document.write(`<!doctype html>
 <html lang="bg">
 <head>
   <meta charset="utf-8" />
@@ -1188,17 +1152,9 @@ function ReportsDialog({
   </div>
 </body>
 </html>`);
-    doc.close();
-
-    window.setTimeout(() => {
-      win.focus();
-      win.print();
-      window.setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }, 80);
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   return (
