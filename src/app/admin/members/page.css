@@ -2362,6 +2362,30 @@
   color: #1a0a04;
 }
 
+.amp-training-week-session-row-info {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, serif;
+  color: rgba(255, 255, 255, 0.3);
+  transition: border-color 0.15s, color 0.15s;
+  pointer-events: none;
+}
+
+.amp-training-week-session-row--clickable:hover .amp-training-week-session-row-info {
+  border-color: rgba(50, 205, 50, 0.65);
+  color: rgba(50, 205, 50, 0.85);
+}
+
 .amp-schedule-event-type-picker {
   display: flex;
   flex-direction: column;

@@ -423,6 +423,9 @@ function WeeklyGrid({
                     >
                       {session.eventType === "match" ? "М" : "Т"}
                     </span>
+                    {onDateClick && (
+                      <span className="amp-training-week-session-row-info" aria-hidden="true">i</span>
+                    )}
                   </li>
                   );
                 })}
