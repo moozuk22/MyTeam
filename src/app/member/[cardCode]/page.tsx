@@ -67,6 +67,7 @@ interface LimitedEventInfo {
 
 interface TrainingSessionItem {
   scopeKey: string;
+  note?: string;
   trainingTime?: string;
   trainingDurationMinutes?: number;
   trainingFieldName?: string | null;
@@ -751,6 +752,7 @@ export default function MemberCardPage({
                   return [
                     {
                       scopeKey: "",
+                      note: String(raw.note ?? "").trim(),
                       trainingTime: String(raw.trainingTime ?? "").trim(),
                       trainingDurationMinutes: Number.isInteger(Number(raw.trainingDurationMinutes)) ? Number(raw.trainingDurationMinutes) : undefined,
                       trainingFieldName: String(raw.trainingFieldName ?? "").trim() || null,
@@ -764,6 +766,7 @@ export default function MemberCardPage({
                   const rs = typeof s === "object" && s !== null ? (s as Record<string, unknown>) : {};
                   return {
                     scopeKey: String(rs.scopeKey ?? ""),
+                    note: String(rs.note ?? "").trim(),
                     trainingTime: String(rs.trainingTime ?? "").trim(),
                     trainingDurationMinutes: Number.isInteger(Number(rs.trainingDurationMinutes)) ? Number(rs.trainingDurationMinutes) : undefined,
                     trainingFieldName: String(rs.trainingFieldName ?? "").trim() || null,
@@ -3008,9 +3011,15 @@ export default function MemberCardPage({
                                   </button>
                                 </div>
                               )}
+                              {session.note?.trim() && (
+                                <div className="training-attendance-note-card" style={{ marginTop: 8 }}>
+                                  <p className="training-attendance-note-label">Описание</p>
+                                  <p className="training-attendance-note-text">{session.note}</p>
+                                </div>
+                              )}
                             </div>
                           ))}
-                          {trainingDetailsItem.note?.trim() && (
+                          {trainingDetailsItem.sessions.length === 1 && trainingDetailsItem.note?.trim() && (
                             <div className="training-attendance-note-card">
                               <p className="training-attendance-note-label">Описание</p>
                               <p className="training-attendance-note-text">{trainingDetailsItem.note}</p>
