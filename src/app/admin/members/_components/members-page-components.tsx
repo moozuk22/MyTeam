@@ -478,6 +478,8 @@ function AttendanceDashboard({
     .page { padding: 20px; }
     h1 { margin: 0 0 16px; font-size: 20px; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .close-btn { display: inline-block; margin: 0 0 16px; padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    @media print { .close-btn { display: none; } }
     @page { size: landscape; margin: 10mm; }
   </style>
 </head>
@@ -485,6 +487,7 @@ function AttendanceDashboard({
   <div class="page">
     <h1>Отчет присъствия (${from} до ${to})</h1>
     ${scopeTitle ? `<p style="margin: 0 0 12px; color: #6b7280; font-size: 13px;">${escapeHtml(scopeTitle)}</p>` : ""}
+    <button onclick="window.close()" class="close-btn">✕ Затвори</button>
     <table>
       <thead>${tHeadHtml}</thead>
       <tbody>${tbodyHtml}</tbody>
@@ -494,9 +497,9 @@ function AttendanceDashboard({
 </body>
 </html>`);
     win.document.close();
+    win.addEventListener("afterprint", () => win.close());
     win.focus();
     win.print();
-    win.close();
   };
 
   return (
@@ -1125,6 +1128,8 @@ function ReportsDialog({
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { border: 1px solid #e5e7eb; padding: 7px 8px; text-align: left; }
     th { background: #f9fafb; }
+    .close-btn { display: inline-block; margin: 0 0 16px; padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    @media print { .close-btn { display: none; } }
     @page { margin: 10mm; }
   </style>
 </head>
@@ -1133,6 +1138,7 @@ function ReportsDialog({
     <h1>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</h1>
     <p class="sub">Период: ${escapeHtml(periodTitle)}</p>
     ${scopeTitle ? `<p class="sub">${escapeHtml(scopeTitle)}</p>` : ""}
+    <button onclick="window.close()" class="close-btn">✕ Затвори</button>
     <div class="stats">
       <div class="stat">Платили: <strong>${paid}</strong> / ${totalRows}</div>
       <div class="stat">Събираемост: <strong>${percent}%</strong></div>
@@ -1154,9 +1160,9 @@ function ReportsDialog({
 </body>
 </html>`);
     win.document.close();
+    win.addEventListener("afterprint", () => win.close());
     win.focus();
     win.print();
-    win.close();
   };
 
   return (
