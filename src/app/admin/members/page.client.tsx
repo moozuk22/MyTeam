@@ -10137,6 +10137,7 @@ function AdminMembersPageContent() {
             </div>
             <div className="amp-guide-content">
               <div className="amp-guide-content-header">
+                <span className="amp-guide-step-counter">{guideStep + 1} / {guideSteps.length}</span>
                 <button className="amp-modal-close" onClick={() => setGuideOpen(false)} aria-label="Затвори">
                   <XIcon />
                 </button>
