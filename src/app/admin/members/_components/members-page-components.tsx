@@ -496,6 +496,7 @@ function AttendanceDashboard({
     win.document.close();
     win.focus();
     win.print();
+    win.close();
   };
 
   return (
@@ -1155,6 +1156,7 @@ function ReportsDialog({
     win.document.close();
     win.focus();
     win.print();
+    win.close();
   };
 
   return (
