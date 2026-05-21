@@ -4395,10 +4395,12 @@ function AdminMembersPageContent() {
         : [];
       setTrainingWeekDates(dates);
       setTrainingWeekSessions(sessions);
+      return sessions;
     } catch (error) {
       setTrainingWeekDates([]);
       setTrainingWeekSessions([]);
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
+      return [];
     } finally {
       setTrainingWeekLoading(false);
     }
@@ -4418,7 +4420,29 @@ function AdminMembersPageContent() {
     setTrainingDaysEditorError("");
     setTrainingNoteTargetDates([]);
     setWeekColorFilter(null);
-    await Promise.all([fetchTrainingWeekSessions(), fetchClubMatches()]);
+    const [sessions = []] = await Promise.all([fetchTrainingWeekSessions(), fetchClubMatches()]);
+    if (!options?.hideTeamsTab && sessions.length === 0) {
+      setTrainingAttendanceView("trainingGroups");
+      const groups = isCustomTrainingGroupMode
+        ? (customTrainingGroups.length > 0 ? customTrainingGroups : await loadCustomTrainingGroups())
+        : (trainingScheduleGroups.length > 0 ? trainingScheduleGroups : await loadTrainingScheduleGroups());
+      const resolvedGroupId =
+        selectedTrainingGroupId && groups.some((g) => g.id === selectedTrainingGroupId)
+          ? selectedTrainingGroupId
+          : (groups[0]?.id ?? "");
+      setSelectedTrainingGroupId(resolvedGroupId);
+      if (!resolvedGroupId) {
+        if (!isCustomTrainingGroupMode && standaloneTeamGroups.length > 0) {
+          const firstYear = String(standaloneTeamGroups[0]);
+          setTrainingAttendanceView("teamGroup");
+          setTrainingGroupScope(firstYear);
+          await fetchTrainingAttendance(undefined, firstYear, undefined, "teamGroup");
+          return;
+        }
+        return;
+      }
+      await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
+    }
   };
 
   const handleTrainingGroupScopeChange = async (nextScope: string) => {
@@ -6492,7 +6516,7 @@ function AdminMembersPageContent() {
                     onClick={() => void handleTrainingAttendanceViewChange("trainingGroups")}
                     disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving}
                   >
-                    Отбори
+                    Отбори / Групи
                   </button>
                 </div>
               )}
