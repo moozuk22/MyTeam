@@ -497,7 +497,7 @@ const ALL_GUIDE_STEPS: GuideStep[] = [
   {
     id: 'member-profile',
     title: 'Клубна карта на спортиста',
-    description: 'Натиснете бутона „Профил" върху картичката на спортиста, за да отворите личната му страница. Тук се отбелязват плащания, вижда се графикът на тренировките и може да се архивира спортистът. Това е същата страница, която се отваря при сканиране на NFC картата.',
+    description: 'Натиснете бутона „Профил" върху картичката на спортиста, за да отворите личната му страница. Тук се отбелязват плащания, вижда се графикът на тренировките и може да се архивира спортистът. Това е същата страница, която се отваря при сканиране на картата.',
     icon: "<rect x='2' y='3' width='20' height='14' rx='2'/><path d='M8 21h8m-4-4v4'/>",
   },
   {
@@ -781,8 +781,6 @@ function AdminMembersPageContent() {
   const [trainingNoteSaving, setTrainingNoteSaving] = useState(false);
   const [trainingNoteTargetDates, setTrainingNoteTargetDates] = useState<string[]>([]);
   const [trainingBulkNoteOpen, setTrainingBulkNoteOpen] = useState(false);
-  const [trainingNoteSuccessOpen, setTrainingNoteSuccessOpen] = useState(false);
-  const [trainingNoteSuccessMessage, setTrainingNoteSuccessMessage] = useState("");
   const [trainingNotesByDate, setTrainingNotesByDate] = useState<Record<string, string>>({});
   const [trainingNoteComparisonLoading, setTrainingNoteComparisonLoading] = useState(false);
   const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
@@ -4744,9 +4742,9 @@ function AdminMembersPageContent() {
       const customM = sessionId.match(/^\d{4}-\d{2}-\d{2}-custom-(.+)$/);
       const groupM = sessionId.match(/^\d{4}-\d{2}-\d{2}-group-(.+)$/);
       const teamM = sessionId.match(/^\d{4}-\d{2}-\d{2}-team-(\d+)$/);
-      if (customM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = customM[1]; }
-      else if (groupM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = groupM[1]; }
-      else if (teamM) { _viewOverride = "teamGroup"; _groupScopeOverride = teamM[1]; }
+      if (customM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = customM[1]; setTrainingAttendanceView("trainingGroups"); setSelectedTrainingGroupId(customM[1]); }
+      else if (groupM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = groupM[1]; setTrainingAttendanceView("trainingGroups"); setSelectedTrainingGroupId(groupM[1]); }
+      else if (teamM) { _viewOverride = "teamGroup"; _groupScopeOverride = teamM[1]; setTrainingAttendanceView("teamGroup"); setTrainingGroupScope(teamM[1]); }
     }
     try {
       await Promise.all([
@@ -4767,6 +4765,8 @@ function AdminMembersPageContent() {
       if (session.scopeType === "teamGroup") {
         const tg = session.teamGroups[0];
         const groupScope = tg !== undefined && Number.isInteger(tg) ? String(tg) : "all";
+        setTrainingAttendanceView("teamGroup");
+        setTrainingGroupScope(groupScope);
         await fetchTrainingAttendance(date, groupScope, undefined, "teamGroup", month);
       } else {
         const groupPrefix = `${date}-group-`;
@@ -4778,6 +4778,8 @@ function AdminMembersPageContent() {
           groupId = session.id.slice(customPrefix.length);
         }
         if (groupId) {
+          setTrainingAttendanceView("trainingGroups");
+          setSelectedTrainingGroupId(groupId);
           await fetchTrainingAttendance(date, undefined, groupId, "trainingGroups", month);
         }
       }
@@ -4892,14 +4894,8 @@ function AdminMembersPageContent() {
         }
         return next;
       });
-      await fetchTrainingAttendance();
+      await fetchTrainingAttendance(trainingAttendanceDate || undefined);
       setTrainingBulkNoteOpen(false);
-      setTrainingNoteSuccessMessage(
-        datesToSave.length > 1
-          ? `Промените са изпратени успешно за ${datesToSave.length} дни.`
-          : "Промените са изпратени успешно.",
-      );
-      setTrainingNoteSuccessOpen(true);
     } catch (error) {
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
@@ -9469,31 +9465,6 @@ function AdminMembersPageContent() {
                   {trainingNoteSaving
                     ? "Запазване..."
                     : `Запази описание за ${effectiveTrainingNoteTargetDates.length} ден(дни)`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {trainingNoteSuccessOpen && (
-        <div className="amp-overlay amp-overlay--confirm" onClick={() => setTrainingNoteSuccessOpen(false)}>
-          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
-            <div className="amp-modal-tint" aria-hidden="true" />
-            <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">Изпратено</span>
-              <button
-                className="amp-modal-close"
-                onClick={() => setTrainingNoteSuccessOpen(false)}
-                aria-label="Затвори"
-              >
-                <XIcon />
-              </button>
-            </h2>
-            <div className="amp-modal-body">
-              <p className="amp-confirm-text">{trainingNoteSuccessMessage}</p>
-              <div className="amp-modal-actions amp-modal-actions--end">
-                <button className="amp-btn amp-btn--primary" onClick={() => setTrainingNoteSuccessOpen(false)}>
-                  Добре
                 </button>
               </div>
             </div>
