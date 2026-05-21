@@ -14,6 +14,7 @@ interface ClubData {
   imageUrl?: string | null;
   billingStatus?: "demo" | "active";
   firstBillingMonth?: string | null;
+  paymentWorkflow?: string | null;
 }
 
 interface DuplicateMember {
@@ -100,6 +101,7 @@ function AddMemberPageContent() {
           imageUrl: typeof raw.imageUrl === "string" ? raw.imageUrl : null,
           billingStatus,
           firstBillingMonth: clubFirstBillingMonth,
+          paymentWorkflow: typeof raw.paymentWorkflow === "string" ? raw.paymentWorkflow : null,
         });
         setIsClubValidated(true);
       } catch (validationError) {
@@ -187,7 +189,8 @@ function AddMemberPageContent() {
       setError("Player phone is invalid.");
       return;
     }
-    if (clubData?.billingStatus === "active" && !firstBillingMonth.trim()) {
+    const isRolling = clubData?.paymentWorkflow === "rolling_30_days";
+    if (clubData?.billingStatus === "active" && !isRolling && !firstBillingMonth.trim()) {
       setError("First billing month is required for active billing clubs.");
       return;
     }
@@ -406,6 +409,7 @@ function AddMemberPageContent() {
             </div>
 
             <div className="add-member-row">
+              {clubData?.paymentWorkflow !== "rolling_30_days" && (
               <div className="add-member-field">
                 <label className="add-member-label">
                   Начален месец на таксуване
@@ -420,6 +424,7 @@ function AddMemberPageContent() {
                   placeholder={clubData?.billingStatus !== "active" ? "НЕ Е ЗАДЪЛЖИТЕЛНО" : undefined}
                 />
               </div>
+              )}
               <div className="add-member-field">
                 <label className="add-member-label">Номер в отбора</label>
                 <input

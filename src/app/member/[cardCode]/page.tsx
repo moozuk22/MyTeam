@@ -2182,7 +2182,7 @@ export default function MemberCardPage({
                   setPauseModalOpen(true);
                 }}
               >
-                Пауза
+                Архивирай
               </button>
             )}
             {trainingCreditError && (
@@ -3715,7 +3715,7 @@ export default function MemberCardPage({
               <div className="pm-header">
                 <div className="pm-title-icon">II</div>
                 <div>
-                  <h2 className="pm-title">Пауза</h2>
+                  <h2 className="pm-title">Архивирай</h2>
                   <p className="pm-name">{member.name}</p>
                 </div>
               </div>
