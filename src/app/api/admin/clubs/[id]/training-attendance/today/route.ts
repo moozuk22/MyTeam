@@ -108,12 +108,11 @@ export async function GET(
           teamGroup: true,
         },
       }),
-      prisma.trainingNote.findUnique({
+      prisma.trainingNote.findFirst({
         where: {
-          clubId_trainingDate: {
-            clubId: id,
-            trainingDate: todayAsDate,
-          },
+          clubId: id,
+          trainingDate: todayAsDate,
+          scopeKey: "club",
         },
         select: {
           note: true,
