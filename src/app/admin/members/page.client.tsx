@@ -317,10 +317,12 @@ function WeeklyGrid({
   dates,
   sessions,
   todayIso,
+  onDateClick,
 }: {
   dates: string[];
   sessions: TrainingWeekSessionItem[];
   todayIso: string;
+  onDateClick?: (date: string, sessionId: string) => void;
 }) {
   const sessionsByDate = new Map<string, TrainingWeekSessionItem[]>();
   for (const d of dates) sessionsByDate.set(d, []);
@@ -383,8 +385,12 @@ function WeeklyGrid({
                     key={session.id}
                     className={`amp-training-week-session-row${
                       session.eventType === "match" ? " amp-training-week-session-row--match" : ""
-                    }`}
-                    style={rowStyle}
+                    }${onDateClick ? " amp-training-week-session-row--clickable" : ""}`}
+                    style={onDateClick ? { ...rowStyle, cursor: "pointer" } : rowStyle}
+                    onClick={onDateClick ? () => onDateClick(session.date, session.id) : undefined}
+                    role={onDateClick ? "button" : undefined}
+                    tabIndex={onDateClick ? 0 : undefined}
+                    onKeyDown={onDateClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onDateClick(session.date, session.id); } } : undefined}
                   >
                     <span className="amp-training-week-session-row-time" style={timeStyle}>
                       {session.trainingTime?.trim()
@@ -750,6 +756,8 @@ function AdminMembersPageContent() {
   const [trainingAttendanceOpen, setTrainingAttendanceOpen] = useState(false);
   /** Club members page without `coachGroupId`: show week list only (hide «Отбори» tab). */
   const [trainingAttendanceHideTeamsTab, setTrainingAttendanceHideTeamsTab] = useState(false);
+  const [schedulerCalendarVisibleMonthIdx, setSchedulerCalendarVisibleMonthIdx] = useState(0);
+  const [matchCalendarVisibleMonthIdx, setMatchCalendarVisibleMonthIdx] = useState(0);
   const [trainingAttendanceView, setTrainingAttendanceView] = useState<"teamGroup" | "trainingGroups" | "today">("today");
   const [trainingAttendanceLoading, setTrainingAttendanceLoading] = useState(false);
   const [trainingAttendanceError, setTrainingAttendanceError] = useState("");
@@ -891,6 +899,13 @@ function AdminMembersPageContent() {
   const matchCalendarDates = getNextTrainingCalendarDates(30);
   const matchCalendarDateSet = new Set(matchCalendarDates);
   const matchCalendarMonths = buildCalendarMonths(matchCalendarDates);
+  const trimCalendarMonthCells = (months: ReturnType<typeof buildCalendarMonths>, fromDate: string) =>
+    months.map((m) => {
+      const firstIdx = m.cells.findIndex((d) => d !== null && d >= fromDate);
+      return { ...m, cells: m.cells.slice(firstIdx >= 0 ? Math.floor(firstIdx / 7) * 7 : 0) };
+    });
+  const schedulerCalendarMonthsTrimmed = trimCalendarMonthCells(schedulerCalendarMonths, getTodayIsoDate());
+  const matchCalendarMonthsTrimmed = trimCalendarMonthCells(matchCalendarMonths, getTodayIsoDate());
   const matchCalendarMatchesByDate = new Map<string, ClubMatch[]>();
   for (const match of clubMatches) {
     if (!matchCalendarDateSet.has(match.matchDate)) continue;
@@ -902,6 +917,7 @@ function AdminMembersPageContent() {
   const trainingUpcomingByDate = new Map(trainingUpcomingDates.map((item) => [item.date, item]));
   const trainingAttendanceCalendarDates = getCalendarDatesForMonth(trainingAttendanceMonth);
   const trainingAttendanceCalendarMonths = buildCalendarMonths(trainingAttendanceCalendarDates);
+  const trainingAttendanceCalendarMonthsTrimmed = trimCalendarMonthCells(trainingAttendanceCalendarMonths, getTodayIsoDate());
   const todayIsoDate = getTodayIsoDate();
   const clubNotificationTeamGroups = Array.from(
     new Set(
@@ -4420,6 +4436,8 @@ function AdminMembersPageContent() {
     setTrainingDaysEditorError("");
     setTrainingNoteTargetDates([]);
     setWeekColorFilter(null);
+    setSchedulerCalendarVisibleMonthIdx(0);
+    setMatchCalendarVisibleMonthIdx(0);
     const [sessions = []] = await Promise.all([fetchTrainingWeekSessions(), fetchClubMatches()]);
     if (!options?.hideTeamsTab && sessions.length === 0) {
       setTrainingAttendanceView("trainingGroups");
@@ -4703,21 +4721,33 @@ function AdminMembersPageContent() {
     }
   };
 
-  const openTrainingDayDetails = async (date: string) => {
+  const openTrainingDayDetails = async (date: string, sessionId?: string) => {
     const month = getMonthKeyFromIsoDate(date);
     setTrainingDayDetailsOpening(true);
     setTrainingAttendanceDate(date);
     setTrainingAttendanceMonth(month);
     const firstSession = trainingWeekSessions.find((s) => s.date === date && s.eventType !== "match");
-    const firstSessionId = firstSession?.id ?? "training";
+    const firstSessionId = sessionId ?? (firstSession?.id ?? "training");
     setTrainingDayDetailsTab(firstSessionId);
     setLimitedEvent(null);
     setShowLimitedForm(false);
     setLimitedEventError("");
     setLimitedSpotsInput("10");
+    // Resolve scope from session ID so the right group data is fetched
+    let _viewOverride: "teamGroup" | "trainingGroups" | undefined;
+    let _groupScopeOverride: string | undefined;
+    let _trainingGroupIdOverride: string | undefined;
+    if (sessionId && !sessionId.startsWith("match-")) {
+      const customM = sessionId.match(/^\d{4}-\d{2}-\d{2}-custom-(.+)$/);
+      const groupM = sessionId.match(/^\d{4}-\d{2}-\d{2}-group-(.+)$/);
+      const teamM = sessionId.match(/^\d{4}-\d{2}-\d{2}-team-(\d+)$/);
+      if (customM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = customM[1]; }
+      else if (groupM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = groupM[1]; }
+      else if (teamM) { _viewOverride = "teamGroup"; _groupScopeOverride = teamM[1]; }
+    }
     try {
       await Promise.all([
-        fetchTrainingAttendance(date, undefined, undefined, undefined, month),
+        fetchTrainingAttendance(date, _groupScopeOverride, _trainingGroupIdOverride, _viewOverride, month),
         fetchClubMatches(),
         fetchLimitedEventForSession(date, firstSessionId),
       ]);
@@ -6565,6 +6595,7 @@ function AdminMembersPageContent() {
                           : trainingWeekSessions
                         }
                         todayIso={todayIsoDate}
+                        onDateClick={(date, sid) => void openTrainingDayDetails(date, sid)}
                       />
                     </>
                   )}
@@ -6698,7 +6729,7 @@ function AdminMembersPageContent() {
                             ›
                           </button>
                         </div>
-                        {trainingAttendanceCalendarMonths.map((month) => (
+                        {trainingAttendanceCalendarMonthsTrimmed.map((month) => (
                           <div key={month.key} className="amp-training-month">
                             <div className="amp-training-month-title">{month.label}</div>
                             <div className="amp-training-weekdays-row">
@@ -6714,6 +6745,15 @@ function AdminMembersPageContent() {
                                   return (
                                     <span
                                       key={`${month.key}-empty-${index}`}
+                                      className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                      aria-hidden="true"
+                                    />
+                                  );
+                                }
+                                if (date < todayIsoDate) {
+                                  return (
+                                    <span
+                                      key={date}
                                       className="amp-training-calendar-cell amp-training-calendar-cell--empty"
                                       aria-hidden="true"
                                     />
@@ -7461,7 +7501,7 @@ function AdminMembersPageContent() {
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">
-                {scheduleEventStep === "type" ? "Насрочи събитие" : "Мач"}
+                {scheduleEventStep === "type" ? "Насрочи събитие" : "Мач / Двубой / Състезание"}
               </span>
               <button
                 className="amp-modal-close"
@@ -7521,7 +7561,7 @@ function AdminMembersPageContent() {
                     }}
                   >
                     <span className="amp-schedule-event-type-icon amp-schedule-event-type-icon--match" aria-hidden="true" />
-                    Мач
+                    Мач / Двубой / Състезание
                   </button>
                 </div>
               ) : (
@@ -7596,7 +7636,13 @@ function AdminMembersPageContent() {
                   {scheduleEventStep === "match-days" && (
                     <>
                       <div className="amp-training-calendar" style={{ order: 1 }}>
-                        {matchCalendarMonths.map((month) => (
+                        {matchCalendarMonthsTrimmed.length > 1 && (
+                          <div className="amp-training-month-nav">
+                            <button type="button" className="amp-training-month-nav-btn" onClick={() => setMatchCalendarVisibleMonthIdx((i) => Math.max(0, i - 1))} disabled={matchCalendarVisibleMonthIdx === 0} aria-label="Предишен месец">‹</button>
+                            <button type="button" className="amp-training-month-nav-btn" onClick={() => setMatchCalendarVisibleMonthIdx((i) => Math.min(matchCalendarMonthsTrimmed.length - 1, i + 1))} disabled={matchCalendarVisibleMonthIdx === matchCalendarMonths.length - 1} aria-label="Следващ месец">›</button>
+                          </div>
+                        )}
+                        {matchCalendarMonthsTrimmed.slice(matchCalendarVisibleMonthIdx, matchCalendarVisibleMonthIdx + 1).map((month) => (
                           <div key={month.key} className="amp-training-month">
                             <div className="amp-training-month-title">{month.label}</div>
                             <div className="amp-training-weekdays-row">
@@ -8015,32 +8061,17 @@ function AdminMembersPageContent() {
                   {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && (
                     <div className="amp-training-time-panel" style={{ marginTop: "8px", textAlign: "center", order: 2 }}>
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Задай час за:</span>
-                      <div className="amp-pills amp-training-time-mode-buttons" style={{ justifyContent: "center" }}>
-                        <button
-                          type="button"
-                          className={`amp-pill${trainingTimeMode === "all" ? " amp-pill--active" : ""}`}
-                          onClick={() => handleTrainingTimeModeChange("all")}
-                          disabled={trainingDaysEditorSaving}
-                        >
-                          Всички тренировки
-                        </button>
-                        <button
-                          type="button"
-                          className={`amp-pill${trainingTimeMode === "perDay" ? " amp-pill--active" : ""}`}
-                          onClick={() => handleTrainingTimeModeChange("perDay")}
-                          disabled={trainingDaysEditorSaving}
-                        >
-                          По една тренировка
-                        </button>
-                        <button
-                          type="button"
-                          className={`amp-pill${trainingTimeMode === "byWeekday" ? " amp-pill--active" : ""}`}
-                          onClick={() => handleTrainingTimeModeChange("byWeekday")}
-                          disabled={trainingDaysEditorSaving}
-                        >
-                          За седмица
-                        </button>
-                      </div>
+                      <select
+                        className="amp-edit-input"
+                        style={{ textAlign: "center" }}
+                        value={trainingTimeMode}
+                        onChange={(e) => void handleTrainingTimeModeChange(e.target.value as "all" | "perDay" | "byWeekday")}
+                        disabled={trainingDaysEditorSaving}
+                      >
+                        <option value="all">Всички тренировки</option>
+                        <option value="perDay">Различни тренировки</option>
+                        <option value="byWeekday">Всяка седмица</option>
+                      </select>
                     </div>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && trainingTimeMode === "all" && (
@@ -8204,7 +8235,13 @@ function AdminMembersPageContent() {
                   )}
                   {trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep === "days" && (
                     <div className="amp-training-calendar" style={{ order: 1 }}>
-                      {schedulerCalendarMonths.map((month) => (
+                      {schedulerCalendarMonthsTrimmed.length > 1 && (
+                        <div className="amp-training-month-nav">
+                          <button type="button" className="amp-training-month-nav-btn" onClick={() => setSchedulerCalendarVisibleMonthIdx((i) => Math.max(0, i - 1))} disabled={schedulerCalendarVisibleMonthIdx === 0} aria-label="Предишен месец">‹</button>
+                          <button type="button" className="amp-training-month-nav-btn" onClick={() => setSchedulerCalendarVisibleMonthIdx((i) => Math.min(schedulerCalendarMonthsTrimmed.length - 1, i + 1))} disabled={schedulerCalendarVisibleMonthIdx === schedulerCalendarMonths.length - 1} aria-label="Следващ месец">›</button>
+                        </div>
+                      )}
+                      {schedulerCalendarMonthsTrimmed.slice(schedulerCalendarVisibleMonthIdx, schedulerCalendarVisibleMonthIdx + 1).map((month) => (
                         <div key={month.key} className="amp-training-month">
                           <div className="amp-training-month-title">{month.label}</div>
                           <div className="amp-training-weekdays-row">

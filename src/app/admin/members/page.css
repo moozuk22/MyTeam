@@ -2272,6 +2272,26 @@
   border-color: rgba(50, 205, 50, 0.42);
 }
 
+.amp-training-week-session-row--clickable {
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.amp-training-week-session-row--clickable:hover {
+  background: rgba(50, 205, 50, 0.16);
+  border-color: rgba(50, 205, 50, 0.55);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.amp-training-week-session-row--clickable:focus-visible {
+  outline: 2px solid rgba(50, 205, 50, 0.7);
+  outline-offset: 1px;
+}
+
+.amp-training-week-session-row--match.amp-training-week-session-row--clickable:hover {
+  background: rgba(249, 115, 22, 0.18);
+  border-color: rgba(249, 115, 22, 0.6);
+}
+
 .amp-training-week-session-row--match {
   background: rgba(249, 115, 22, 0.1);
   border-color: rgba(249, 115, 22, 0.38);

@@ -410,6 +410,7 @@ export async function GET(
         select: {
           id: true,
           name: true,
+          fieldType: true,
           pieces: {
             select: { id: true, name: true },
             orderBy: { sortOrder: "asc" },
