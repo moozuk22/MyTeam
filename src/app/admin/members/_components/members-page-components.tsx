@@ -464,42 +464,45 @@ function AttendanceDashboard({
       `;
     }
 
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.open();
-    win.document.write(`<!doctype html>
-<html lang="bg">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Присъствия</title>
-  <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
-    .page { padding: 20px; }
-    h1 { margin: 0 0 16px; font-size: 20px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    .close-btn { display: inline-block; margin: 0 0 16px; padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; cursor: pointer; }
-    @media print { .close-btn { display: none; } }
-    @page { size: landscape; margin: 10mm; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <h1>Отчет присъствия (${from} до ${to})</h1>
-    ${scopeTitle ? `<p style="margin: 0 0 12px; color: #6b7280; font-size: 13px;">${escapeHtml(scopeTitle)}</p>` : ""}
-    <button onclick="window.close()" class="close-btn">✕ Затвори</button>
-    <table>
-      <thead>${tHeadHtml}</thead>
-      <tbody>${tbodyHtml}</tbody>
-      ${tfootHtml ? `<tfoot>${tfootHtml}</tfoot>` : ""}
-    </table>
-  </div>
-</body>
-</html>`);
-    win.document.close();
-    win.addEventListener("afterprint", () => win.close());
-    win.focus();
-    win.print();
+    const removeOverlay = () => {
+      document.getElementById("__print-overlay")?.remove();
+      document.getElementById("__print-overlay-style")?.remove();
+    };
+
+    const style = document.createElement("style");
+    style.id = "__print-overlay-style";
+    style.textContent = `@media print { body > *:not(#__print-overlay) { display: none !important; } }`;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement("div");
+    overlay.id = "__print-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:#fff;overflow:auto;padding:20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;";
+    overlay.innerHTML = `
+      <div id="__print-toolbar" style="display:flex;gap:8px;margin:0 0 16px;">
+        <button id="__print-close-btn" style="padding:8px 16px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;font-size:14px;cursor:pointer;">✕ Затвори</button>
+        <button id="__print-print-btn" style="padding:8px 16px;background:#111827;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🖨 Принтирай</button>
+      </div>
+      <div style="font-size:20px;font-weight:700;margin:0 0 16px;">Отчет присъствия (${from} до ${to})</div>
+      ${scopeTitle ? `<p style="margin:0 0 12px;color:#6b7280;font-size:13px;">${escapeHtml(scopeTitle)}</p>` : ""}
+      <style>
+        #__print-overlay table { width:100%;border-collapse:collapse;font-size:11px; }
+        #__print-overlay th,#__print-overlay td { border:1px solid #e5e7eb;padding:4px 6px; }
+        #__print-overlay th { background:#f9fafb; }
+        @media print { #__print-toolbar { display:none; } }
+        @page { size:landscape;margin:10mm; }
+      </style>
+      <table>
+        <thead>${tHeadHtml}</thead>
+        <tbody>${tbodyHtml}</tbody>
+        ${tfootHtml ? `<tfoot>${tfootHtml}</tfoot>` : ""}
+      </table>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById("__print-close-btn")?.addEventListener("click", removeOverlay);
+    document.getElementById("__print-print-btn")?.addEventListener("click", () => {
+      window.addEventListener("afterprint", removeOverlay, { once: true });
+      window.print();
+    });
   };
 
   return (
@@ -1109,60 +1112,54 @@ function ReportsDialog({
         .join("")
       : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
 
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.open();
-    win.document.write(`<!doctype html>
-<html lang="bg">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</title>
-  <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
-    .page { padding: 24px; }
-    h1 { margin: 0 0 4px; font-size: 22px; }
-    .sub { margin: 0 0 14px; color: #6b7280; font-size: 13px; }
-    .stats { display: flex; gap: 12px; margin: 0 0 16px; flex-wrap: wrap; }
-    .stat { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 13px; min-width: 140px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border: 1px solid #e5e7eb; padding: 7px 8px; text-align: left; }
-    th { background: #f9fafb; }
-    .close-btn { display: inline-block; margin: 0 0 16px; padding: 8px 16px; background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; cursor: pointer; }
-    @media print { .close-btn { display: none; } }
-    @page { margin: 10mm; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <h1>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</h1>
-    <p class="sub">Период: ${escapeHtml(periodTitle)}</p>
-    ${scopeTitle ? `<p class="sub">${escapeHtml(scopeTitle)}</p>` : ""}
-    <button onclick="window.close()" class="close-btn">✕ Затвори</button>
-    <div class="stats">
-      <div class="stat">Платили: <strong>${paid}</strong> / ${totalRows}</div>
-      <div class="stat">Събираемост: <strong>${percent}%</strong></div>
-      <div class="stat">Неплатили: <strong>${unpaid}</strong></div>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Име</th>
-          <th>Сума</th>
-          <th>Дата на плащане</th>
-          <th>Статус</th>
-        </tr>
-      </thead>
-      <tbody>${tableRowsHtml}</tbody>
-    </table>
-  </div>
-</body>
-</html>`);
-    win.document.close();
-    win.addEventListener("afterprint", () => win.close());
-    win.focus();
-    win.print();
+    const removeOverlay = () => {
+      document.getElementById("__print-overlay")?.remove();
+      document.getElementById("__print-overlay-style")?.remove();
+    };
+
+    const style = document.createElement("style");
+    style.id = "__print-overlay-style";
+    style.textContent = `@media print { body > *:not(#__print-overlay) { display: none !important; } }`;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement("div");
+    overlay.id = "__print-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:#fff;overflow:auto;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;";
+    overlay.innerHTML = `
+      <div id="__print-toolbar" style="display:flex;gap:8px;margin:0 0 16px;">
+        <button id="__print-close-btn" style="padding:8px 16px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;font-size:14px;cursor:pointer;">✕ Затвори</button>
+        <button id="__print-print-btn" style="padding:8px 16px;background:#111827;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🖨 Принтирай</button>
+      </div>
+      <div style="font-size:22px;font-weight:700;margin:0 0 4px;">${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</div>
+      <p style="margin:0 0 14px;color:#6b7280;font-size:13px;">Период: ${escapeHtml(periodTitle)}</p>
+      ${scopeTitle ? `<p style="margin:0 0 14px;color:#6b7280;font-size:13px;">${escapeHtml(scopeTitle)}</p>` : ""}
+      <div style="display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap;">
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">Платили: <strong>${paid}</strong> / ${totalRows}</div>
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">Събираемост: <strong>${percent}%</strong></div>
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">Неплатили: <strong>${unpaid}</strong></div>
+      </div>
+      <style>
+        #__print-overlay table { width:100%;border-collapse:collapse;font-size:13px; }
+        #__print-overlay th,#__print-overlay td { border:1px solid #e5e7eb;padding:7px 8px;text-align:left; }
+        #__print-overlay th { background:#f9fafb; }
+        @media print { #__print-toolbar { display:none; } }
+        @page { margin:10mm; }
+      </style>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Име</th><th>Сума</th><th>Дата на плащане</th><th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>${tableRowsHtml}</tbody>
+      </table>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById("__print-close-btn")?.addEventListener("click", removeOverlay);
+    document.getElementById("__print-print-btn")?.addEventListener("click", () => {
+      window.addEventListener("afterprint", removeOverlay, { once: true });
+      window.print();
+    });
   };
 
   return (
