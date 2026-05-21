@@ -22,7 +22,9 @@ export function PwaClientBootstrap() {
 
   useEffect(() => {
     const update = () => {
-      const hasOverlay = document.querySelector(".amp-overlay, .pm-overlay") !== null;
+      const hasOverlay = document.querySelector(
+        ".amp-overlay, .pm-overlay, .modal-overlay, .add-member-modal-overlay, .popup-overlay, .lightbox-overlay, .birthday-card-overlay, .receipt-overlay, .tp-overlay, .rd-overlay"
+      ) !== null;
       document.documentElement.style.overflow = hasOverlay ? "hidden" : "";
     };
 
