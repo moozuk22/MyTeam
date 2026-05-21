@@ -5091,7 +5091,7 @@ function AdminMembersPageContent() {
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              <span>Управление на група</span>
+              <span>Управление на треньорска група</span>
             </button>
           )}
           {isAdmin && clubId && (
@@ -5144,6 +5144,18 @@ function AdminMembersPageContent() {
             >
               <UsersIcon />
               <span>Треньори</span>
+            </button>
+          )}
+          {(isAdmin || isCoach) && clubId && (
+            <button
+              className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+              onClick={openTrainingGroupCreateModal}
+              type="button"
+              disabled={isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor}
+              title={isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor ? "Всички цветове са заети" : undefined}
+            >
+              <PlusIcon />
+              <span>Създай подгрупа</span>
             </button>
           )}
           <button className="amp-reports-btn amp-btn--compact" onClick={() => setReportsOpen(true)}>
@@ -6530,30 +6542,6 @@ function AdminMembersPageContent() {
               ) : (
                 <>
                   <div style={{ marginBottom: "12px" }}>
-                    <div style={{ marginBottom: "10px" }}>
-                      <button
-                        type="button"
-                        className="amp-btn amp-btn--primary"
-                        onClick={openTrainingGroupCreateModal}
-                        disabled={
-                          trainingNoteSaving ||
-                          trainingGroupCreateSaving ||
-                          (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
-                        }
-                        style={{ width: "100%" }}
-                        title={
-                          isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor
-                            ? "Всички цветове са заети"
-                            : undefined
-                        }
-                      >
-                        {trainingGroupCreateSaving
-                          ? "Запазване..."
-                          : isCustomTrainingGroupMode
-                            ? "Създай група"
-                            : "Създай сборен отбор"}
-                      </button>
-                    </div>
                     {trainingScheduleGroupsLoading ? (
                       <p className="amp-empty amp-empty--modal">Зареждане...</p>
                     ) : (isCustomTrainingGroupMode ? customTrainingGroups.length === 0 : (trainingScheduleGroups.length === 0 && standaloneTeamGroups.length === 0)) ? (
@@ -7242,7 +7230,7 @@ function AdminMembersPageContent() {
           <div className="amp-modal amp-modal--confirm amp-modal--training-days-editor" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">{isCustomTrainingGroupMode ? "Създай група" : "Създай сборен отбор"}</span>
+              <span className="amp-modal-title-gradient">{isCustomTrainingGroupMode ? "Създай подгрупа" : "Създай сборен отбор"}</span>
               <button
                 className="amp-modal-close"
                 onClick={() => {
@@ -7422,7 +7410,7 @@ function AdminMembersPageContent() {
                   {trainingGroupCreateSaving
                     ? "Създаване..."
                     : isCustomTrainingGroupMode
-                      ? "Създай група"
+                      ? "Създай подгрупа"
                       : "Създай сборен отбор"}
                 </button>
               </div>
