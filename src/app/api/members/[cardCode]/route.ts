@@ -7,7 +7,7 @@ import {
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { cloudinary } from "@/lib/cloudinary";
 import { publishMemberUpdated } from "@/lib/memberEvents";
-import { isCurrentMonthWaived, resolveRollingThirtyDayStatus } from "@/lib/paymentStatus";
+import { getRollingThirtyDayPaymentWindow, isCurrentMonthWaived, resolveRollingThirtyDayStatus } from "@/lib/paymentStatus";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 
 export const runtime = "nodejs";
@@ -232,6 +232,11 @@ export async function GET(
     const paymentWorkflow = card.player.club?.paymentWorkflow ?? "calendar_month";
     const resolvedStatus = paymentWorkflow === "training_credits"
       ? (card.player.remainingTrainingCredits > 0 ? "paid" : "overdue")
+      : paymentWorkflow === "training_credits_30_days"
+        ? card.player.remainingTrainingCredits > 0 &&
+          (getRollingThirtyDayPaymentWindow({ paidDates: paymentLogs.map((item) => item.paidFor) })?.remainingDays ?? 0) > 0
+            ? "paid"
+            : "overdue"
       : paymentWorkflow === "rolling_30_days"
         ? resolveRollingThirtyDayStatus({
           paidDates: paymentLogs.map((item) => item.paidFor),

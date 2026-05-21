@@ -1546,6 +1546,16 @@
   text-align: center;
 }
 
+.training-credit-success {
+  order: 12;
+  width: 100%;
+  margin: 0;
+  color: #7dff8d;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .member-edit-btn {
   color: #ffffff;
 }

@@ -8,6 +8,7 @@ import {
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
 import {
+  getRollingThirtyDayPaymentWindow,
   isCurrentMonthWaived,
   normalizeToMonthStart,
   resolveRollingThirtyDayStatus,
@@ -90,6 +91,11 @@ export async function GET(
     const pausedThisMonth = isCurrentMonthWaived(waivedDates);
     const resolvedStatus = player.club.paymentWorkflow === "training_credits"
       ? (player.remainingTrainingCredits > 0 ? "paid" : "overdue")
+      : player.club.paymentWorkflow === "training_credits_30_days"
+        ? player.remainingTrainingCredits > 0 &&
+          (getRollingThirtyDayPaymentWindow({ paidDates: player.paymentLogs.map((item) => item.paidFor) })?.remainingDays ?? 0) > 0
+            ? "paid"
+            : "overdue"
       : player.club.paymentWorkflow === "rolling_30_days"
         ? resolveRollingThirtyDayStatus({
           paidDates: player.paymentLogs.map((item) => item.paidFor),
@@ -307,6 +313,10 @@ export async function PUT(
       },
       include: {
         cards: { orderBy: { createdAt: "desc" } },
+        paymentLogs: {
+          orderBy: { paidFor: "desc" },
+          take: 1,
+        },
         club: true,
         images: true,
       },
@@ -329,6 +339,11 @@ export async function PUT(
       ...updatedPlayer,
       status: updatedPlayer.club.paymentWorkflow === "training_credits"
         ? (updatedPlayer.remainingTrainingCredits > 0 ? "paid" : "overdue")
+        : updatedPlayer.club.paymentWorkflow === "training_credits_30_days"
+          ? updatedPlayer.remainingTrainingCredits > 0 &&
+            (getRollingThirtyDayPaymentWindow({ paidDates: updatedPlayer.paymentLogs.map((item) => item.paidFor) })?.remainingDays ?? 0) > 0
+              ? "paid"
+              : "overdue"
         : updatedPlayer.status,
       imageUrl: imagePath,
       avatarUrl: buildAvatarUrlFromPath(imagePath, cloudName),
@@ -506,6 +521,12 @@ export async function PATCH(
             select: {
               status: true,
               remainingTrainingCredits: true,
+              firstBillingMonth: true,
+              paymentLogs: {
+                orderBy: { paidFor: "desc" },
+                take: 1,
+                select: { paidFor: true },
+              },
               club: {
                 select: { paymentWorkflow: true },
               },
@@ -517,6 +538,11 @@ export async function PATCH(
       const pausedThisMonth = isCurrentMonthWaived(paymentWaivers.map((row) => row.waivedFor));
       const responseStatus = player?.club.paymentWorkflow === "training_credits"
         ? (player.remainingTrainingCredits > 0 ? "paid" : "overdue")
+        : player?.club.paymentWorkflow === "training_credits_30_days"
+          ? player.remainingTrainingCredits > 0 &&
+            (getRollingThirtyDayPaymentWindow({ paidDates: player.paymentLogs.map((item) => item.paidFor) })?.remainingDays ?? 0) > 0
+              ? "paid"
+              : "overdue"
         : player?.club.paymentWorkflow === "calendar_month" && pausedThisMonth
           ? "paused"
           : (player?.status ?? "paid");

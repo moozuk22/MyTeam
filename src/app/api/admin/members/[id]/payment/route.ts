@@ -72,24 +72,22 @@ export async function POST(
 
     const isRollingThirtyDay = player.club.paymentWorkflow === "rolling_30_days";
     const isTrainingCredits = player.club.paymentWorkflow === "training_credits";
-    const paidForDate = isRollingThirtyDay || isTrainingCredits
+    const isTrainingCreditsThirtyDay = player.club.paymentWorkflow === "training_credits_30_days";
+    const paidForDate = isRollingThirtyDay || isTrainingCredits || isTrainingCreditsThirtyDay
       ? normalizeToDayStart(parsedPaidFor)
       : normalizeToMonthStart(parsedPaidFor);
 
-    if (player.firstBillingMonth) {
-      const isBeforeBillingStart = isRollingThirtyDay || isTrainingCredits
-        ? paidForDate < normalizeToDayStart(player.firstBillingMonth)
-        : compareYearMonth(toYearMonth(paidForDate), toYearMonth(player.firstBillingMonth)) < 0;
-      if (isBeforeBillingStart) {
+    if (player.firstBillingMonth && !isRollingThirtyDay && !isTrainingCredits && !isTrainingCreditsThirtyDay) {
+      if (compareYearMonth(toYearMonth(paidForDate), toYearMonth(player.firstBillingMonth)) < 0) {
         return NextResponse.json(
-          { error: isRollingThirtyDay || isTrainingCredits ? "Cannot record payment before billing start date" : "Cannot record payment before billing start month" },
+          { error: "Cannot record payment before billing start month" },
           { status: 400 },
         );
       }
     }
 
     let remainingTrainingCreditsUpdate: number | undefined;
-    if (isTrainingCredits) {
+    if (isTrainingCredits || isTrainingCreditsThirtyDay) {
       const parsedRemainingTrainings = Number(remainingTrainingsRaw);
       if (!Number.isInteger(parsedRemainingTrainings) || parsedRemainingTrainings < 1 || parsedRemainingTrainings > 999) {
         return NextResponse.json(
@@ -116,6 +114,23 @@ export async function POST(
       }
     }
 
+    if (isTrainingCreditsThirtyDay) {
+      const activeWindow = getRollingThirtyDayPaymentWindow({
+        paidDates: player.paymentLogs.map((log) => log.paidFor),
+      });
+      if (activeWindow && activeWindow.remainingDays > 0 && player.remainingTrainingCredits > 0) {
+        return NextResponse.json(
+          {
+            error: `Subscription is still active. Remaining trainings: ${player.remainingTrainingCredits}, remaining days: ${activeWindow.remainingDays}.`,
+            remainingTrainings: player.remainingTrainingCredits,
+            remainingDays: activeWindow.remainingDays,
+            paidUntil: activeWindow.paidUntil,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     // Check if this month/year is already paid
     const existingPayment = await prisma.paymentLog.findFirst({
       where: {
@@ -131,7 +146,7 @@ export async function POST(
       select: { id: true },
     });
 
-    if (existingPayment) {
+    if (existingPayment && !isTrainingCredits && !isTrainingCreditsThirtyDay) {
       return NextResponse.json(
         { error: `Този период (${paidForDate.toLocaleDateString("bg-BG")}) вече е платен` },
         { status: 400 }

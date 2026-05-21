@@ -66,6 +66,7 @@ export async function POST(
         player: {
           select: {
             firstBillingMonth: true,
+            remainingTrainingCredits: true,
             club: {
               select: { paymentWorkflow: true },
             },
@@ -82,6 +83,7 @@ export async function POST(
       card.player.firstBillingMonth ?? normalizeToMonthStart(new Date());
     const isRollingThirtyDay = card.player.club.paymentWorkflow === "rolling_30_days";
     const isTrainingCredits = card.player.club.paymentWorkflow === "training_credits";
+    const isTrainingCreditsThirtyDay = card.player.club.paymentWorkflow === "training_credits_30_days";
 
     const [existingLogs, existingWaivers] = await Promise.all([
       prisma.paymentLog.findMany({
@@ -99,7 +101,7 @@ export async function POST(
 
     let remainingTrainingCreditsUpdate: number | undefined;
 
-    if (isTrainingCredits) {
+    if (isTrainingCredits || isTrainingCreditsThirtyDay) {
       const parsedRemainingTrainings = Number(remainingTrainingsRaw);
       if (!Number.isInteger(parsedRemainingTrainings) || parsedRemainingTrainings < 1 || parsedRemainingTrainings > 999) {
         return NextResponse.json(
@@ -109,24 +111,27 @@ export async function POST(
       }
 
       const paidForDate = normalizeToDayStart(parsedPaidFor);
-      if (card.player.firstBillingMonth && paidForDate < normalizeToDayStart(card.player.firstBillingMonth)) {
-        return NextResponse.json(
-          { error: "Cannot record payment before billing start date" },
-          { status: 400 },
-        );
+      if (isTrainingCreditsThirtyDay) {
+        const activeWindow = getRollingThirtyDayPaymentWindow({
+          paidDates: existingLogs.map((log) => log.paidFor),
+        });
+        if (activeWindow && activeWindow.remainingDays > 0 && card.player.remainingTrainingCredits > 0) {
+          return NextResponse.json(
+            {
+              error: `Subscription is still active. Remaining trainings: ${card.player.remainingTrainingCredits}, remaining days: ${activeWindow.remainingDays}.`,
+              remainingTrainings: card.player.remainingTrainingCredits,
+              remainingDays: activeWindow.remainingDays,
+              paidUntil: activeWindow.paidUntil,
+            },
+            { status: 400 },
+          );
+        }
       }
 
       remainingTrainingCreditsUpdate = parsedRemainingTrainings;
       monthsToCreate = [paidForDate];
     } else if (isRollingThirtyDay) {
       const paidForDate = normalizeToDayStart(parsedPaidFor);
-
-      if (card.player.firstBillingMonth && paidForDate < normalizeToDayStart(card.player.firstBillingMonth)) {
-        return NextResponse.json(
-          { error: "Cannot record payment before billing start date" },
-          { status: 400 },
-        );
-      }
 
       const activeWindow = getRollingThirtyDayPaymentWindow({
         paidDates: existingLogs.map((log) => log.paidFor),
