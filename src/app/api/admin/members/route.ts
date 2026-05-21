@@ -7,6 +7,7 @@ import {
   buildCloudinaryUrlFromUploadPath,
 } from "@/lib/cloudinaryImagePath";
 import {
+  getRollingThirtyDayPaymentWindow,
   normalizeToMonthStart,
   resolveRollingThirtyDayStatus,
 } from "@/lib/paymentStatus";
@@ -482,6 +483,11 @@ export async function GET(request: NextRequest) {
           ? "paused"
           : rest.club.paymentWorkflow === "training_credits"
             ? (rest.remainingTrainingCredits > 0 ? "paid" : "overdue")
+            : rest.club.paymentWorkflow === "training_credits_30_days"
+              ? rest.remainingTrainingCredits > 0 &&
+                (getRollingThirtyDayPaymentWindow({ paidDates: rest.paymentLogs.map((log) => log.paidFor) })?.remainingDays ?? 0) > 0
+                  ? "paid"
+                  : "overdue"
             : rest.club.paymentWorkflow === "rolling_30_days"
               ? resolveRollingThirtyDayStatus({
                   paidDates: rest.paymentLogs.map((log) => log.paidFor),

@@ -18,6 +18,7 @@ enum PaymentWorkflow {
   calendar_month
   rolling_30_days
   training_credits
+  training_credits_30_days
 
   @@map("payment_workflow")
 }

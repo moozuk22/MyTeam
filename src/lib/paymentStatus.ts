@@ -83,7 +83,7 @@ export function getRollingThirtyDayPaymentWindow(input: {
 }
 
 export function resolvePaymentStatus(input: {
-  workflow?: "calendar_month" | "rolling_30_days" | "training_credits" | string | null;
+  workflow?: "calendar_month" | "rolling_30_days" | "training_credits" | "training_credits_30_days" | string | null;
   paidDates: Date[];
   waivedDates: Date[];
   remainingTrainingCredits?: number | null;
@@ -93,6 +93,15 @@ export function resolvePaymentStatus(input: {
 }): "paid" | "warning" | "overdue" {
   if (input.workflow === "training_credits") {
     return (input.remainingTrainingCredits ?? 0) > 0 ? "paid" : "overdue";
+  }
+
+  if (input.workflow === "training_credits_30_days") {
+    if ((input.remainingTrainingCredits ?? 0) <= 0) return "overdue";
+    const activeWindow = getRollingThirtyDayPaymentWindow({
+      paidDates: input.paidDates,
+      now: input.now,
+    });
+    return activeWindow && activeWindow.remainingDays > 0 ? "paid" : "overdue";
   }
 
   if (input.workflow === "rolling_30_days") {

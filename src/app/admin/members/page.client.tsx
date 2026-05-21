@@ -523,7 +523,7 @@ function AdminMembersPageContent() {
   const [clubName, setClubName] = useState("Всички отбори");
   const [clubSport, setClubSport] = useState("");
   const [clubBillingStatus, setClubBillingStatus] = useState<string>("");
-  type PaymentWorkflow = "calendar_month" | "rolling_30_days" | "training_credits";
+  type PaymentWorkflow = "calendar_month" | "rolling_30_days" | "training_credits" | "training_credits_30_days";
   const [clubPaymentWorkflow, setClubPaymentWorkflow] = useState<PaymentWorkflow>("calendar_month");
   const [paymentWorkflowModalOpen, setPaymentWorkflowModalOpen] = useState(false);
   const [paymentWorkflowDraft, setPaymentWorkflowDraft] = useState<PaymentWorkflow>("calendar_month");
@@ -1339,6 +1339,8 @@ function AdminMembersPageContent() {
                     ? ("rolling_30_days" as const)
                     : item.paymentWorkflow === "training_credits"
                       ? ("training_credits" as const)
+                      : item.paymentWorkflow === "training_credits_30_days"
+                        ? ("training_credits_30_days" as const)
                       : ("calendar_month" as const),
                 };
               })
@@ -1778,6 +1780,8 @@ function AdminMembersPageContent() {
               ? "rolling_30_days"
               : workflow === "training_credits"
                 ? "training_credits"
+                : workflow === "training_credits_30_days"
+                  ? "training_credits_30_days"
                 : "calendar_month",
           );
           const defaultPaymentAmount = (selectedClub as Record<string, unknown>).defaultPaymentAmount;
@@ -1861,6 +1865,8 @@ function AdminMembersPageContent() {
             ? "rolling_30_days"
             : workflow === "training_credits"
               ? "training_credits"
+              : workflow === "training_credits_30_days"
+                ? "training_credits_30_days"
               : "calendar_month",
         );
         const defaultPaymentAmount = (selectedClub as Record<string, unknown> | null)?.defaultPaymentAmount;
@@ -5743,6 +5749,26 @@ function AdminMembersPageContent() {
                     <span className="amp-payment-workflow-title">Брой тренировки</span>
                     <span className="amp-payment-workflow-desc">
                       Треньорът задава колко тренировки остават при плащане. Всяко чекиране намалява броя с 1.
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={paymentWorkflowDraft === "training_credits_30_days"}
+                  className={`amp-payment-workflow-option${paymentWorkflowDraft === "training_credits_30_days" ? " is-selected" : ""}`}
+                  onClick={() => {
+                    setPaymentWorkflowDraft("training_credits_30_days");
+                    setPaymentWorkflowError("");
+                    setPaymentWorkflowSuccess("");
+                  }}
+                  disabled={paymentWorkflowSaving}
+                >
+                  <span className="amp-payment-workflow-check" aria-hidden="true" />
+                  <span className="amp-payment-workflow-copy">
+                    <span className="amp-payment-workflow-title">Брой тренировки за 30 дни</span>
+                    <span className="amp-payment-workflow-desc">
+                      Плащането задава брой тренировки и 30-дневен срок. Играчът е просрочен, когато изтече срокът или тренировките станат 0.
                     </span>
                   </span>
                 </button>

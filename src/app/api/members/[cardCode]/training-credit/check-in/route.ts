@@ -5,6 +5,7 @@ import { publishMemberUpdated } from "@/lib/memberEvents";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
+import { getRollingThirtyDayPaymentWindow } from "@/lib/paymentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,11 @@ export async function POST(
           select: {
             fullName: true,
             remainingTrainingCredits: true,
+            paymentLogs: {
+              orderBy: { paidFor: "desc" },
+              take: 1,
+              select: { paidFor: true },
+            },
             club: {
               select: {
                 paymentWorkflow: true,
@@ -49,11 +55,25 @@ export async function POST(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    if (card.player.club.paymentWorkflow !== "training_credits") {
+    const isTrainingCreditsThirtyDay = card.player.club.paymentWorkflow === "training_credits_30_days";
+
+    if (card.player.club.paymentWorkflow !== "training_credits" && !isTrainingCreditsThirtyDay) {
       return NextResponse.json(
         { error: "Training check-in is available only for training credits payment workflow" },
         { status: 400 },
       );
+    }
+
+    if (isTrainingCreditsThirtyDay) {
+      const activeWindow = getRollingThirtyDayPaymentWindow({
+        paidDates: card.player.paymentLogs.map((log) => log.paidFor),
+      });
+      if (!activeWindow || activeWindow.remainingDays <= 0) {
+        return NextResponse.json(
+          { error: "The 30-day training subscription has expired", remainingTrainingCredits: card.player.remainingTrainingCredits },
+          { status: 400 },
+        );
+      }
     }
 
     if (card.player.remainingTrainingCredits <= 0) {
