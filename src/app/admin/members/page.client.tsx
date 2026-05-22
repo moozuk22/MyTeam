@@ -2336,6 +2336,9 @@ function AdminMembersPageContent() {
     trainingDaysEditorMode === "coachGroup";
   const canShowTrainingDaysSpotsStep = canShowTrainingDaysFieldStep && spotsStepSupportedByMode;
   const canShowTrainingDaysNotesStep = canShowTrainingDaysFieldStep;
+  const stepSequence: TrainingDaysStep[] = spotsStepSupportedByMode
+    ? ["days", "time", "spots", "field", "notes"]
+    : ["days", "time", "field", "notes"];
   const schedulerLimitedSpotsValue = parseInt(schedulerLimitedSpots, 10);
   const isSchedulerLimitedSpotsValid =
     Number.isInteger(schedulerLimitedSpotsValue) && schedulerLimitedSpotsValue >= 1 && schedulerLimitedSpotsValue <= 200;
@@ -2371,6 +2374,7 @@ function AdminMembersPageContent() {
             : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
               ? "days"
               : trainingDaysActiveStep;
+  const currentStepOrder = stepSequence.indexOf(effectiveTrainingDaysActiveStep);
   const trainingWeekdayBuckets = Array.from(
     new Set(
       normalizedTrainingDaysSelection
@@ -6726,7 +6730,7 @@ function AdminMembersPageContent() {
                             type="button"
                             className="amp-training-month-nav-btn"
                             onClick={() => void handleTrainingAttendanceMonthChange(-1)}
-                            disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
+                            disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening || trainingAttendanceMonth <= todayIsoDate.slice(0, 7)}
                             aria-label="Предишен месец"
                           >
                             ‹
@@ -8075,9 +8079,9 @@ function AdminMembersPageContent() {
                       </button>
                       <button
                         type="button"
-                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "time" ? " is-active" : ""}${canShowTrainingDaysFieldStep ? " is-complete" : ""}`}
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "time" ? " is-active" : ""}${currentStepOrder > stepSequence.indexOf("time") ? " is-complete" : ""}`}
                         onClick={() => setTrainingDaysActiveStep("time")}
-                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysTimeStep}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysTimeStep || stepSequence.indexOf("time") > currentStepOrder}
                       >
                         <span className="amp-training-step-index">2</span>
                         Час
@@ -8085,9 +8089,9 @@ function AdminMembersPageContent() {
                       {spotsStepSupportedByMode && (
                         <button
                           type="button"
-                          className={`amp-training-step${effectiveTrainingDaysActiveStep === "spots" ? " is-active" : ""}${canShowTrainingDaysSpotsStep && effectiveTrainingDaysActiveStep === "field" ? " is-complete" : ""}`}
+                          className={`amp-training-step${effectiveTrainingDaysActiveStep === "spots" ? " is-active" : ""}${currentStepOrder > stepSequence.indexOf("spots") ? " is-complete" : ""}`}
                           onClick={() => setTrainingDaysActiveStep("spots")}
-                          disabled={trainingDaysEditorSaving || !canShowTrainingDaysSpotsStep}
+                          disabled={trainingDaysEditorSaving || !canShowTrainingDaysSpotsStep || stepSequence.indexOf("spots") > currentStepOrder}
                         >
                           <span className="amp-training-step-index">3</span>
                           Места
@@ -8095,9 +8099,9 @@ function AdminMembersPageContent() {
                       )}
                       <button
                         type="button"
-                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}${canShowTrainingDaysNotesStep && effectiveTrainingDaysActiveStep === "notes" ? " is-complete" : ""}`}
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}${currentStepOrder > stepSequence.indexOf("field") ? " is-complete" : ""}`}
                         onClick={() => setTrainingDaysActiveStep("field")}
-                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysFieldStep}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysFieldStep || stepSequence.indexOf("field") > currentStepOrder}
                       >
                         <span className="amp-training-step-index">{spotsStepSupportedByMode ? 4 : 3}</span>
                         Терен
@@ -8106,7 +8110,7 @@ function AdminMembersPageContent() {
                         type="button"
                         className={`amp-training-step${effectiveTrainingDaysActiveStep === "notes" ? " is-active" : ""}`}
                         onClick={() => setTrainingDaysActiveStep("notes")}
-                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysNotesStep}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysNotesStep || stepSequence.indexOf("notes") > currentStepOrder}
                       >
                         <span className="amp-training-step-index">{spotsStepSupportedByMode ? 5 : 4}</span>
                         Описание
@@ -8804,26 +8808,28 @@ function AdminMembersPageContent() {
                     >
                       Отказ
                     </button>
-                    <button
-                      type="button"
-                      className="amp-btn amp-btn--primary"
-                      onClick={() => void (trainingDaysEditorMode === "createGroup" ? saveTrainingDaysForSelectedGroups() : saveTrainingDaysFromTrainingModal())}
-                      disabled={
-                        trainingDaysEditorSaving ||
-                        trainingDaysEditorLoading ||
-                        (trainingDaysEditorMode !== "createGroup" && isTrainingDaysScheduleUnchanged) ||
-                        (trainingDaysEditorMode !== "createGroup" &&
-                          hasMissingTrainingTime) ||
-                        hasMissingTrainingField ||
-                        hasInvalidTrainingDuration
-                      }
-                    >
-                      {trainingDaysEditorSaving
-                        ? "Запазване..."
-                        : trainingDaysEditorMode === "createGroup"
-                          ? "Създай сборен отбор"
-                          : "Запази дни"}
-                    </button>
+                    {(trainingDaysEditorMode === "createGroup" || effectiveTrainingDaysActiveStep === "notes") && (
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--primary"
+                        onClick={() => void (trainingDaysEditorMode === "createGroup" ? saveTrainingDaysForSelectedGroups() : saveTrainingDaysFromTrainingModal())}
+                        disabled={
+                          trainingDaysEditorSaving ||
+                          trainingDaysEditorLoading ||
+                          (trainingDaysEditorMode !== "createGroup" && isTrainingDaysScheduleUnchanged) ||
+                          (trainingDaysEditorMode !== "createGroup" &&
+                            hasMissingTrainingTime) ||
+                          hasMissingTrainingField ||
+                          hasInvalidTrainingDuration
+                        }
+                      >
+                        {trainingDaysEditorSaving
+                          ? "Запазване..."
+                          : trainingDaysEditorMode === "createGroup"
+                            ? "Създай сборен отбор"
+                            : "Запази дни"}
+                      </button>
+                    )}
                   </div>
                 </>
               )}
