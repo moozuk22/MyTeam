@@ -809,6 +809,8 @@ function AdminMembersPageContent() {
   const [matchViewMatch, setMatchViewMatch] = useState<ClubMatch | null>(null);
   const [trainingDayDetailsTab, setTrainingDayDetailsTab] = useState<string>("training");
   const [trainingDayDetailsTabLoading, setTrainingDayDetailsTabLoading] = useState(false);
+  const [trainingDaySessionCancelled, setTrainingDaySessionCancelled] = useState(false);
+  const [trainingDayCancelLoading, setTrainingDayCancelLoading] = useState(false);
   const [limitedEvent, setLimitedEvent] = useState<LimitedEventDetail | null>(null);
   const [limitedEventLoading, setLimitedEventLoading] = useState(false);
   const [limitedSpotsInput, setLimitedSpotsInput] = useState("10");
@@ -4416,6 +4418,9 @@ function AdminMembersPageContent() {
           ? (payload.trainingFieldPieceIds as unknown[]).map(String)
           : [],
       );
+      setTrainingDaySessionCancelled(
+        typeof payload?.sessionStatus === "string" ? payload.sessionStatus === "cancelled" : false,
+      );
     } catch (error) {
       setTrainingAttendancePlayers([]);
       setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
@@ -4426,6 +4431,7 @@ function AdminMembersPageContent() {
       setTrainingDayTime(null);
       setTrainingDayField(null);
       setTrainingDayFieldPieceIds([]);
+      setTrainingDaySessionCancelled(false);
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
       setTrainingAttendanceLoading(false);
@@ -4867,6 +4873,35 @@ function AdminMembersPageContent() {
       }
     } finally {
       setTrainingDayDetailsTabLoading(false);
+    }
+  };
+
+  const handleCancelTrainingDay = async () => {
+    if (!clubId || !trainingAttendanceDate || trainingDayCancelLoading) return;
+    setTrainingDayCancelLoading(true);
+    try {
+      const newStatus = trainingDaySessionCancelled ? "scheduled" : "cancelled";
+      const body: Record<string, unknown> = { date: trainingAttendanceDate, status: newStatus };
+      if (trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId) {
+        body[isCustomTrainingGroupMode ? "customTrainingGroupId" : "trainingGroupId"] = selectedTrainingGroupId;
+      } else if (trainingAttendanceView === "teamGroup") {
+        const tg = parseSelectedTeamGroup(trainingGroupScope);
+        if (tg !== null) body.teamGroup = tg;
+      }
+      const res = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/session`,
+        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+      );
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(payload.error ?? "Грешка при промяна на статус.");
+      }
+      setTrainingDaySessionCancelled(!trainingDaySessionCancelled);
+      await fetchTrainingWeekSessions();
+    } catch (error) {
+      setTrainingAttendanceError(error instanceof Error ? error.message : "Грешка при промяна на статус.");
+    } finally {
+      setTrainingDayCancelLoading(false);
     }
   };
 
@@ -9155,6 +9190,9 @@ function AdminMembersPageContent() {
                     <span>Присъстващи: {trainingAttendanceStats.attending}</span>
                     <span>Отсъстващи: {trainingAttendanceStats.optedOut}</span>
                     <span>Продължителност: {trainingDayDurationMinutes} мин.</span>
+                    {trainingDaySessionCancelled && (
+                      <span style={{ color: "#ff6b6b", fontWeight: 700, background: "rgba(255,107,107,0.12)", border: "1px solid rgba(255,107,107,0.35)", borderRadius: 6, padding: "2px 8px" }}>ОТМЕНЕНА</span>
+                    )}
                   </div>
                   {trainingDayField && (() => {
                     const isWholeFieldSelected = trainingDayFieldPieceIds.length === 0;
@@ -9245,19 +9283,20 @@ function AdminMembersPageContent() {
                         setTrainingDayDetailsOpen(false);
                         void openSingleTrainingDayEditForCurrentScope(trainingAttendanceDate);
                       }}
-                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading}
+                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading || trainingDayCancelLoading}
                     >
                       Редактирай тренировка
                     </button>
                     <button
-                      className="amp-btn amp-btn--primary"
-                      onClick={() => {
-                        setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : []);
-                        setTrainingBulkNoteOpen(true);
-                      }}
-                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading}
+                      className={`amp-btn ${trainingDaySessionCancelled ? "amp-btn--ghost" : "amp-btn--danger"}`}
+                      onClick={() => void handleCancelTrainingDay()}
+                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading || trainingDayCancelLoading}
                     >
-                      Добави описание
+                      {trainingDayCancelLoading
+                        ? "..."
+                        : trainingDaySessionCancelled
+                          ? "Активирай тренировка"
+                          : "Отмени тренировка"}
                     </button>
                   </div>
                   {limitedEvent && !limitedEventLoading && (

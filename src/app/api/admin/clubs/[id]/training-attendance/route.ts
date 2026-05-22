@@ -486,7 +486,7 @@ export async function GET(
   const trainingDateAsDate = isoDateToUtcMidnight(trainingDate);
   const upcomingDatesAsDate = upcomingDates.map((date) => isoDateToUtcMidnight(date));
 
-  const [allOptOuts, note] = await Promise.all([
+  const [allOptOuts, note, sessionForDate] = await Promise.all([
     playerIds.length > 0 && upcomingDatesAsDate.length > 0
       ? prisma.trainingOptOut.findMany({
           where: {
@@ -512,6 +512,10 @@ export async function GET(
       select: {
         note: true,
       },
+    }),
+    prisma.trainingSession.findFirst({
+      where: { clubId: id, scopeKey, trainingDate: trainingDateAsDate },
+      select: { status: true },
     }),
   ]);
 
@@ -548,6 +552,7 @@ export async function GET(
       trainingFieldId: effectiveTrainingFieldId,
       trainingFieldPieceIds: effectiveTrainingFieldPieceIds,
       trainingField,
+      sessionStatus: sessionForDate?.status ?? "scheduled",
       stats: {
         total: totalPlayers,
         optedOut: playersWithStatus.filter((player) => player.optedOut).length,
