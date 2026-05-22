@@ -110,7 +110,7 @@ export async function GET(
   const dates = getSevenDates(todayIso);
 
   try {
-    const [club, teamSchedules, trainingGroups, customTrainingGroups, clubMatches, limitedEvents] = await Promise.all([
+    const [club, teamSchedules, trainingGroups, customTrainingGroups, clubMatches, limitedEvents, cancelledSessions] = await Promise.all([
       prisma.club.findUnique({
         where: { id },
         select: {
@@ -170,7 +170,16 @@ export async function GET(
         where: { clubId: id, trainingDate: { in: dates.map((d) => new Date(d + "T00:00:00.000Z")) } },
         select: { id: true, scopeKey: true, trainingDate: true, maxSpots: true, _count: { select: { registrations: true } } },
       }),
+      prisma.trainingSession.findMany({
+        where: { clubId: id, status: "cancelled", trainingDate: { in: dates.map((d) => new Date(d + "T00:00:00.000Z")) } },
+        select: { scopeKey: true, trainingDate: true },
+      }),
     ]);
+
+    const cancelledSet = new Set<string>();
+    for (const cs of cancelledSessions) {
+      cancelledSet.add(`${cs.scopeKey}|${cs.trainingDate.toISOString().slice(0, 10)}`);
+    }
 
     if (!club) {
       return NextResponse.json({ error: "Club not found" }, { status: 404 });
@@ -199,6 +208,7 @@ export async function GET(
             windowDays: group.trainingWindowDays,
           });
           if (!hasTraining) continue;
+          if (cancelledSet.has(`custom_group:${group.id}|${date}`)) continue;
           sessions.push({
             id: `${date}-custom-${group.id}`,
             date,
@@ -276,6 +286,7 @@ export async function GET(
           windowDays: group.trainingWindowDays,
         });
         if (!hasTraining) continue;
+        if (cancelledSet.has(`training_group:${group.id}|${date}`)) continue;
 
         for (const tg of normalizedGroups) coveredTeamGroups.add(tg);
         sessions.push({
@@ -300,6 +311,7 @@ export async function GET(
           windowDays: override?.trainingWindowDays ?? groupSchedule?.trainingWindowDays ?? club.trainingWindowDays,
         });
         if (!hasTraining) continue;
+        if (cancelledSet.has(`team_group:${teamGroup}|${date}`) || cancelledSet.has(`club|${date}`)) continue;
 
         const resolvedSchedule = groupSchedule ?? null;
         sessions.push({

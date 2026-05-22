@@ -811,6 +811,7 @@ function AdminMembersPageContent() {
   const [trainingDayDetailsTabLoading, setTrainingDayDetailsTabLoading] = useState(false);
   const [trainingDaySessionCancelled, setTrainingDaySessionCancelled] = useState(false);
   const [trainingDayCancelLoading, setTrainingDayCancelLoading] = useState(false);
+  const [trainingDayCancelConfirmOpen, setTrainingDayCancelConfirmOpen] = useState(false);
   const [limitedEvent, setLimitedEvent] = useState<LimitedEventDetail | null>(null);
   const [limitedEventLoading, setLimitedEventLoading] = useState(false);
   const [limitedSpotsInput, setLimitedSpotsInput] = useState("10");
@@ -4421,6 +4422,7 @@ function AdminMembersPageContent() {
       setTrainingDaySessionCancelled(
         typeof payload?.sessionStatus === "string" ? payload.sessionStatus === "cancelled" : false,
       );
+      setTrainingDayCancelConfirmOpen(false);
     } catch (error) {
       setTrainingAttendancePlayers([]);
       setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
@@ -4432,6 +4434,7 @@ function AdminMembersPageContent() {
       setTrainingDayField(null);
       setTrainingDayFieldPieceIds([]);
       setTrainingDaySessionCancelled(false);
+      setTrainingDayCancelConfirmOpen(false);
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
       setTrainingAttendanceLoading(false);
@@ -4878,10 +4881,10 @@ function AdminMembersPageContent() {
 
   const handleCancelTrainingDay = async () => {
     if (!clubId || !trainingAttendanceDate || trainingDayCancelLoading) return;
+    setTrainingDayCancelConfirmOpen(false);
     setTrainingDayCancelLoading(true);
     try {
-      const newStatus = trainingDaySessionCancelled ? "scheduled" : "cancelled";
-      const body: Record<string, unknown> = { date: trainingAttendanceDate, status: newStatus };
+      const body: Record<string, unknown> = { date: trainingAttendanceDate, status: "cancelled" };
       if (trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId) {
         body[isCustomTrainingGroupMode ? "customTrainingGroupId" : "trainingGroupId"] = selectedTrainingGroupId;
       } else if (trainingAttendanceView === "teamGroup") {
@@ -4896,7 +4899,7 @@ function AdminMembersPageContent() {
         const payload = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(payload.error ?? "Грешка при промяна на статус.");
       }
-      setTrainingDaySessionCancelled(!trainingDaySessionCancelled);
+      setTrainingDayDetailsOpen(false);
       await fetchTrainingWeekSessions();
     } catch (error) {
       setTrainingAttendanceError(error instanceof Error ? error.message : "Грешка при промяна на статус.");
@@ -9287,18 +9290,42 @@ function AdminMembersPageContent() {
                     >
                       Редактирай тренировка
                     </button>
-                    <button
-                      className={`amp-btn ${trainingDaySessionCancelled ? "amp-btn--ghost" : "amp-btn--danger"}`}
-                      onClick={() => void handleCancelTrainingDay()}
-                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading || trainingDayCancelLoading}
-                    >
-                      {trainingDayCancelLoading
-                        ? "..."
-                        : trainingDaySessionCancelled
-                          ? "Активирай тренировка"
-                          : "Отмени тренировка"}
-                    </button>
+                    {!trainingDaySessionCancelled && (
+                      <button
+                        className="amp-btn amp-btn--danger"
+                        onClick={() => setTrainingDayCancelConfirmOpen(true)}
+                        disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading || trainingDayCancelLoading}
+                      >
+                        {trainingDayCancelLoading ? "..." : "Отмени тренировка"}
+                      </button>
+                    )}
                   </div>
+                  {trainingDayCancelConfirmOpen && (
+                    <div style={{ background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.35)", borderRadius: 8, padding: "12px 16px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#ff6b6b" }}>
+                        Сигурни ли сте, че искате да отмените тренировката на {trainingAttendanceDate ? formatIsoDateForDisplay(trainingAttendanceDate) : "тази дата"}?
+                      </p>
+                      <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+                        Тренировката ще бъде премахната от графика и не може да бъде възстановена.
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          className="amp-btn amp-btn--danger"
+                          onClick={() => void handleCancelTrainingDay()}
+                          disabled={trainingDayCancelLoading}
+                        >
+                          {trainingDayCancelLoading ? "..." : "Да, отмени"}
+                        </button>
+                        <button
+                          className="amp-btn amp-btn--ghost"
+                          onClick={() => setTrainingDayCancelConfirmOpen(false)}
+                          disabled={trainingDayCancelLoading}
+                        >
+                          Назад
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {limitedEvent && !limitedEventLoading && (
                     <p style={{ fontSize: 12, color: "rgba(240,160,48,0.9)", background: "rgba(240,160,48,0.08)", border: "1px solid rgba(240,160,48,0.25)", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
                       Ограничен режим — всички маркирани като отсъстващи. Маркирайте ръчно кой е присъствал.
