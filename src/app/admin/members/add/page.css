@@ -474,3 +474,199 @@
     flex-direction: column;
   }
 }
+
+/* ── Custom group multi-select dropdown (mirrors amp- pattern) ── */
+.amp-info-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.amp-info-cell--full {
+  grid-column: 1 / -1;
+}
+
+.amp-info-cell--dropdown {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
+}
+
+.amp-info-cell-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 10px 12px;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.amp-info-cell-trigger:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.amp-info-cell-trigger .amp-acc-chevron {
+  margin-left: auto;
+}
+
+.amp-info-cell-trigger-text {
+  text-align: left;
+  min-width: 0;
+}
+
+.amp-lbl {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.amp-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.amp-acc-chevron {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px;
+  transition: transform 0.2s ease, background 0.15s;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.amp-info-cell-trigger:hover .amp-acc-chevron {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.amp-acc-chevron.open {
+  transform: rotate(180deg);
+}
+
+.amp-acc-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease;
+}
+
+.amp-acc-body.open {
+  grid-template-rows: 1fr;
+}
+
+.amp-acc-inner {
+  overflow: hidden;
+}
+
+.amp-coach-group-picker {
+  padding: 8px 8px 8px;
+}
+
+.amp-coach-group-picker-list {
+  display: grid;
+  gap: 6px;
+}
+
+.amp-coach-group-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.amp-coach-group-option:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.amp-coach-group-option:has(.amp-group-check-input:focus-visible) {
+  border-color: rgba(50, 205, 50, 0.65);
+  box-shadow: 0 0 0 2px rgba(50, 205, 50, 0.18);
+}
+
+.amp-coach-group-option.is-selected {
+  border-color: rgba(50, 205, 50, 0.42);
+  background: rgba(50, 205, 50, 0.11);
+  color: #e8ffe8;
+}
+
+.amp-coach-group-option.is-selected .amp-group-check-box {
+  border-color: rgba(50, 205, 50, 0.8);
+  background: rgba(50, 205, 50, 0.2);
+}
+
+.amp-coach-group-option.is-selected .amp-group-check-box::after {
+  border-left-color: #b9ffb9;
+  border-bottom-color: #b9ffb9;
+}
+
+.amp-coach-group-option-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.amp-group-check-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+}
+
+.amp-group-check-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.amp-group-check-box::after {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  transform: rotate(-45deg) translateY(-1px);
+  transition: border-color 0.18s ease;
+}

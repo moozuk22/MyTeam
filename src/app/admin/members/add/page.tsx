@@ -17,6 +17,11 @@ interface ClubData {
   paymentWorkflow?: string | null;
 }
 
+interface CustomGroup {
+  id: string;
+  name: string;
+}
+
 interface DuplicateMember {
   id: string;
   fullName: string;
@@ -51,6 +56,9 @@ function AddMemberPageContent() {
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateMember | null>(null);
   const [isClubValidated, setIsClubValidated] = useState(false);
   const [isValidatingClubId, setIsValidatingClubId] = useState(true);
+  const [customGroups, setCustomGroups] = useState<CustomGroup[]>([]);
+  const [selectedCustomGroupIds, setSelectedCustomGroupIds] = useState<Set<string>>(new Set());
+  const [customGroupDropdownOpen, setCustomGroupDropdownOpen] = useState(false);
   const router = useRouter();
   const returnUrl = `/admin/members?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`;
   useEffect(() => {
@@ -104,6 +112,25 @@ function AddMemberPageContent() {
           paymentWorkflow: typeof raw.paymentWorkflow === "string" ? raw.paymentWorkflow : null,
         });
         setIsClubValidated(true);
+
+        if (coachGroupId) {
+          try {
+            const groupsRes = await fetch(`/api/admin/clubs/${clubId}/custom-training-groups?coachGroupId=${encodeURIComponent(coachGroupId)}`, { cache: "no-store" });
+            if (groupsRes.ok) {
+              const groupsData: unknown = await groupsRes.json();
+              if (Array.isArray(groupsData)) {
+                setCustomGroups(
+                  (groupsData as Array<{ id: string; name: string }>).map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                  })),
+                );
+              }
+            }
+          } catch {
+            // groups are optional, ignore errors
+          }
+        }
       } catch (validationError) {
         console.error("Failed to validate club id:", validationError);
         router.replace("/404");
@@ -253,6 +280,25 @@ function AddMemberPageContent() {
       });
 
       if (response.ok) {
+        if (selectedCustomGroupIds.size > 0) {
+          try {
+            const created = await response.json() as { id?: string };
+            const newPlayerId = created.id;
+            if (newPlayerId) {
+              await Promise.all(
+                [...selectedCustomGroupIds].map((groupId) =>
+                  fetch(`/api/admin/clubs/${clubId}/custom-training-groups/${groupId}/players`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ playerId: newPlayerId }),
+                  }),
+                ),
+              );
+            }
+          } catch {
+            // non-fatal, player was created
+          }
+        }
         router.push(returnUrl);
       } else {
         const data = await response.json();
@@ -438,6 +484,65 @@ function AddMemberPageContent() {
                 />
               </div>
             </div>
+
+            {customGroups.length > 0 && (
+              <div className="amp-info-cell amp-info-cell--full amp-info-cell--dropdown">
+                <button
+                  type="button"
+                  className="amp-info-cell-trigger"
+                  onClick={() => setCustomGroupDropdownOpen((v) => !v)}
+                >
+                  <div className="amp-info-cell-trigger-text">
+                    <p className="amp-lbl">Групи</p>
+                    <p className="amp-val">
+                      {selectedCustomGroupIds.size === 0
+                        ? "Без група"
+                        : selectedCustomGroupIds.size === 1
+                          ? customGroups.find((g) => selectedCustomGroupIds.has(g.id))?.name
+                          : `${selectedCustomGroupIds.size} групи избрани`}
+                    </p>
+                  </div>
+                  <span className={`amp-acc-chevron${customGroupDropdownOpen ? " open" : ""}`}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </span>
+                </button>
+                <div className={`amp-acc-body${customGroupDropdownOpen ? " open" : ""}`}>
+                  <div className="amp-acc-inner">
+                    <div className="amp-coach-group-picker">
+                      <div className="amp-coach-group-picker-list">
+                        {customGroups.map((g) => {
+                          const checked = selectedCustomGroupIds.has(g.id);
+                          return (
+                            <label
+                              key={g.id}
+                              className={`amp-coach-group-option${checked ? " is-selected" : ""}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="amp-group-check-input"
+                                checked={checked}
+                                onChange={(e) => {
+                                  setSelectedCustomGroupIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(g.id);
+                                    else next.delete(g.id);
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <span className="amp-group-check-box" aria-hidden="true" />
+                              <span className="amp-coach-group-option-name">{g.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="add-member-field">
               <label className="add-member-label">Снимка на състезател</label>
