@@ -200,15 +200,7 @@ function AddMemberPageContent() {
   };
 
   const submitMember = async (skipDuplicateCheck = false) => {
-    if (!birthDate.trim()) {
-      setError("Birth date is required.");
-      return;
-    }
-    if (!parentPhone.trim()) {
-      setError("Parent phone is required.");
-      return;
-    }
-    if (!isValidPhone(parentPhone)) {
+    if (parentPhone.trim() && !isValidPhone(parentPhone)) {
       setError("Parent phone is invalid.");
       return;
     }
@@ -260,9 +252,9 @@ function AddMemberPageContent() {
         fullName: fullName.trim(),
         status,
         clubId,
-        birthDate: birthDate.trim(),
-        parentPhone: parentPhone.trim(),
       };
+      if (birthDate.trim()) payload.birthDate = birthDate.trim();
+      if (parentPhone.trim()) payload.parentPhone = parentPhone.trim();
       if (coachGroupId) payload.coachGroupId = coachGroupId;
 
       if (jerseyNumber.trim()) payload.jerseyNumber = jerseyNumber.trim();
@@ -408,7 +400,6 @@ function AddMemberPageContent() {
                 <label className="add-member-label">Дата на раждане</label>
                 <input
                   type="date"
-                  required
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
                   className="add-member-input"
@@ -430,12 +421,9 @@ function AddMemberPageContent() {
 
             <div className="add-member-row">
               <div className="add-member-field">
-                <label className="add-member-label">
-                  Телефон на родител <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>
-                </label>
+                <label className="add-member-label">Телефон на родител</label>
                 <input
                   type="tel"
-                  required
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
                   className="add-member-input"

@@ -801,7 +801,7 @@ function AdminMembersPageContent() {
   const [matchEditorSaving, setMatchEditorSaving] = useState(false);
   const [matchEditorError, setMatchEditorError] = useState("");
   const [matchSelectedDates, setMatchSelectedDates] = useState<string[]>([]);
-  const [matchDetailsPerDay, setMatchDetailsPerDay] = useState<Record<string, { opponent: string; location: string; time: string; duration: string; isHome: boolean }>>({});
+  const [matchDetailsPerDay, setMatchDetailsPerDay] = useState<Record<string, { opponent: string; location: string; time: string; duration: string; isHome: boolean | null }>>({});
   const [matchTeamGroups, setMatchTeamGroups] = useState<number[]>([]);
   const [matchExistingIdByDate, setMatchExistingIdByDate] = useState<Record<string, string>>({});
   const [clubMatches, setClubMatches] = useState<ClubMatch[]>([]);
@@ -4708,7 +4708,7 @@ function AdminMembersPageContent() {
     const warnings: string[] = [];
     try {
       for (const date of matchSelectedDates) {
-        const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: true };
+        const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: null };
         const durationMinutes = Number.parseInt(details.duration || "90", 10);
         const existingId = matchExistingIdByDate[date];
         const url = existingId
@@ -7895,7 +7895,7 @@ function AdminMembersPageContent() {
                       </div>
                       <div className="amp-match-details-per-day">
                         {matchSelectedDates.map((date) => {
-                          const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: true };
+                          const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: null };
                           return (
                             <div key={date} className="amp-match-day-section">
                               <span className="amp-lbl amp-match-day-label">{formatIsoDateForDisplay(date)}</span>
@@ -7929,16 +7929,16 @@ function AdminMembersPageContent() {
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button
                                     type="button"
-                                    className={`amp-btn${details.isHome ? " amp-btn--primary" : " amp-btn--ghost"}`}
-                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: true } }))}
+                                    className={`amp-btn${details.isHome === true ? " amp-btn--primary" : " amp-btn--ghost"}`}
+                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: details.isHome === true ? null : true } }))}
                                     disabled={matchEditorSaving}
                                   >
                                     Домакин
                                   </button>
                                   <button
                                     type="button"
-                                    className={`amp-btn${!details.isHome ? " amp-btn--primary" : " amp-btn--ghost"}`}
-                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: false } }))}
+                                    className={`amp-btn${details.isHome === false ? " amp-btn--primary" : " amp-btn--ghost"}`}
+                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: details.isHome === false ? null : false } }))}
                                     disabled={matchEditorSaving}
                                   >
                                     Гост
@@ -7990,10 +7990,10 @@ function AdminMembersPageContent() {
                           disabled={matchEditorSaving || !matchSelectedDates.every((d) => {
                             const det = matchDetailsPerDay[d];
                             const dur = Number.parseInt(det?.duration ?? "", 10);
-                            return det?.opponent?.trim() && det?.location?.trim() && det?.time && Number.isInteger(dur) && dur >= 1;
+                            return det?.location?.trim() && det?.time && Number.isInteger(dur) && dur >= 1;
                           })}
                         >
-                          {matchEditorSaving ? "Запазване..." : matchSelectedDates.length > 1 ? `Запази ${matchSelectedDates.length} мача` : "Запази мач"}
+                          {matchEditorSaving ? "Запазване..." : matchSelectedDates.length > 1 ? `Запази ${matchSelectedDates.length} събития` : "Запази събитие"}
                         </button>
                       </div>
                     </>
