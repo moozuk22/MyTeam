@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { isIsoDate, isoDateToUtcMidnight } from "@/lib/training";
 import { getTrainingSessionScopeKey } from "@/lib/trainingSessions";
+import { sendTrainingCancellationNotifications } from "@/lib/push/trainingCancellationNotifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,6 +78,16 @@ export async function PATCH(
         status: rawStatus,
       },
     });
+
+    if (rawStatus === "cancelled") {
+      sendTrainingCancellationNotifications({
+        clubId,
+        trainingDate: date,
+        teamGroup: teamGroup ?? null,
+        trainingGroupId,
+        customTrainingGroupId,
+      }).catch((error) => console.error("Training cancellation notifications failed:", error));
+    }
 
     return NextResponse.json({ success: true, status: rawStatus });
   } catch (error) {
