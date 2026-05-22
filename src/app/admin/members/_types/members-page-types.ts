@@ -194,6 +194,7 @@ interface TrainingWeekSessionItem {
 
 interface ClubMatch {
   id: string;
+  customGroupId: string | null;
   opponent: string;
   location: string;
   matchDate: string;

@@ -358,7 +358,6 @@ function WeeklyGrid({
               <ul className="amp-training-week-session-rows" aria-label={`График за ${weekdayLong}`}>
                 {daySessions.map((session) => {
                   const accent =
-                    session.eventType !== "match" &&
                     session.color &&
                     isCustomTrainingGroupPaletteColor(session.color)
                       ? session.color
@@ -372,14 +371,13 @@ function WeeklyGrid({
                   const timeStyle: CSSProperties | undefined = accent
                     ? { color: customTrainingGroupReadableOnAccent(accent) === "#fafafa" ? "rgba(255,255,255,0.75)" : accent }
                     : undefined;
-                  const badgeStyle: CSSProperties | undefined =
-                    accent && session.eventType !== "match"
-                      ? {
-                          background: accent,
-                          borderColor: customTrainingGroupAccentRgba(accent, 0.55),
-                          color: customTrainingGroupReadableOnAccent(accent),
-                        }
-                      : undefined;
+                  const badgeStyle: CSSProperties | undefined = accent
+                    ? {
+                        background: accent,
+                        borderColor: customTrainingGroupAccentRgba(accent, 0.55),
+                        color: customTrainingGroupReadableOnAccent(accent),
+                      }
+                    : undefined;
                   return (
                   <li
                     key={session.id}
@@ -2218,16 +2216,23 @@ function AdminMembersPageContent() {
   }, [isCustomTrainingGroupMode, customTrainingGroups, customTrainingGroupCoachScope]);
   const trainingAttendanceMatchesByDate = new Map<string, ClubMatch[]>();
   for (const match of clubMatches) {
-    const appliesToAll = match.teamGroups.length === 0;
+    const appliesToAll = match.teamGroups.length === 0 && match.customGroupId === null;
     const appliesToSelectedTeam =
       selectedTeamGroup === null || match.teamGroups.includes(selectedTeamGroup);
     const appliesToSelectedTrainingGroup =
       selectedTrainingGroup?.teamGroups.some((teamGroup) => match.teamGroups.includes(teamGroup)) ?? false;
-    const appliesToCurrentScope =
-      appliesToAll ||
-      (trainingAttendanceView === "trainingGroups" && !isCustomTrainingGroupMode
-        ? appliesToSelectedTrainingGroup
-        : appliesToSelectedTeam);
+    let appliesToCurrentScope: boolean;
+    if (match.customGroupId !== null) {
+      appliesToCurrentScope = isCustomTrainingGroupMode && match.customGroupId === selectedCustomGroup?.id;
+    } else {
+      appliesToCurrentScope =
+        appliesToAll ||
+        (isCustomTrainingGroupMode
+          ? false
+          : trainingAttendanceView === "trainingGroups"
+            ? appliesToSelectedTrainingGroup
+            : appliesToSelectedTeam);
+    }
     if (!appliesToCurrentScope) continue;
     const matchesForDate = trainingAttendanceMatchesByDate.get(match.matchDate) ?? [];
     matchesForDate.push(match);
@@ -4717,7 +4722,7 @@ function AdminMembersPageContent() {
         const res = await fetch(url, {
           method: existingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ opponent: details.opponent, location: details.location, matchDate: date, matchTime: details.time, durationMinutes, isHome: details.isHome, teamGroups: matchTeamGroups }),
+          body: JSON.stringify({ opponent: details.opponent, location: details.location, matchDate: date, matchTime: details.time, durationMinutes, isHome: details.isHome, teamGroups: matchTeamGroups, customGroupId: isCustomTrainingGroupMode ? (selectedCustomGroup?.id ?? null) : null }),
         });
         const data = await res.json() as { error?: string; warning?: string };
         if (!res.ok) { setMatchEditorError(data.error ?? "Грешка при запазване."); return; }
@@ -6702,10 +6707,17 @@ function AdminMembersPageContent() {
                       )}
                       <WeeklyGrid
                         dates={trainingWeekDates}
-                        sessions={weekColorFilter
-                          ? trainingWeekSessions.filter((s) => s.color === weekColorFilter || s.eventType === "match")
-                          : trainingWeekSessions
-                        }
+                        sessions={(() => {
+                          const matchColor = isCustomTrainingGroupMode
+                            ? (weekColorFilter ?? selectedCustomGroup?.color ?? null)
+                            : null;
+                          const base = weekColorFilter
+                            ? trainingWeekSessions.filter((s) => s.color === weekColorFilter || s.eventType === "match")
+                            : trainingWeekSessions;
+                          return matchColor
+                            ? base.map((s) => s.eventType === "match" ? { ...s, color: matchColor } : s)
+                            : base;
+                        })()}
                         todayIso={todayIsoDate}
                         onDateClick={(date, sid) => void openTrainingDayDetails(date, sid)}
                       />
@@ -7037,6 +7049,7 @@ function AdminMembersPageContent() {
                         setMatchDetailsPerDay({});
                         setMatchExistingIdByDate({});
                         setMatchEditorError("");
+                        setMatchCalendarVisibleMonthIdx(0);
                         void fetchClubMatches();
                       }}
                       disabled={trainingNoteSaving || trainingDaysEditorSaving}
@@ -7663,7 +7676,7 @@ function AdminMembersPageContent() {
       {scheduleEventModalOpen && (
         <div
           className="amp-overlay amp-overlay--confirm"
-          onClick={() => { if (!matchEditorSaving) setScheduleEventModalOpen(false); }}
+          onClick={() => { if (!matchEditorSaving) { setScheduleEventModalOpen(false); setScheduleEventStep("type"); } }}
         >
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
@@ -7673,7 +7686,7 @@ function AdminMembersPageContent() {
               </span>
               <button
                 className="amp-modal-close"
-                onClick={() => setScheduleEventModalOpen(false)}
+                onClick={() => { setScheduleEventModalOpen(false); setScheduleEventStep("type"); }}
                 aria-label="Затвори"
                 disabled={matchEditorSaving}
               >
@@ -7705,26 +7718,9 @@ function AdminMembersPageContent() {
                             ? [selectedTeamGroup]
                             : [];
                       setMatchTeamGroups(scopeTeamGroups);
-                      const seenDates = new Set<string>();
-                      const preDates: string[] = [];
-                      const preDetails: Record<string, { opponent: string; location: string; time: string; duration: string; isHome: boolean }> = {};
-                      const preIds: Record<string, string> = {};
-                      for (const match of clubMatches) {
-                        if (!matchCalendarDateSet.has(match.matchDate) || seenDates.has(match.matchDate)) continue;
-                        seenDates.add(match.matchDate);
-                        preDates.push(match.matchDate);
-                        preDetails[match.matchDate] = {
-                          opponent: match.opponent,
-                          location: match.location,
-                          time: match.matchTime,
-                          duration: String(match.durationMinutes),
-                          isHome: match.isHome,
-                        };
-                        preIds[match.matchDate] = match.id;
-                      }
-                      setMatchSelectedDates(preDates.sort());
-                      setMatchDetailsPerDay(preDetails);
-                      setMatchExistingIdByDate(preIds);
+                      setMatchSelectedDates([]);
+                      setMatchDetailsPerDay({});
+                      setMatchExistingIdByDate({});
                       setScheduleEventStep("match-days");
                     }}
                   >
@@ -7842,7 +7838,12 @@ function AdminMembersPageContent() {
                                   );
                                 }
                                 const isSelected = matchSelectedDates.includes(date);
-                                const matchesForDate = matchCalendarMatchesByDate.get(date) ?? [];
+                                const matchesForDate = (matchCalendarMatchesByDate.get(date) ?? []).filter((m) => {
+                                  if (m.customGroupId !== null) {
+                                    return isCustomTrainingGroupMode && m.customGroupId === selectedCustomGroup?.id;
+                                  }
+                                  return matchTeamGroups.length === 0 || m.teamGroups.length === 0 || m.teamGroups.some((tg) => matchTeamGroups.includes(tg));
+                                });
                                 return (
                                   <button
                                     key={date}
@@ -7989,8 +7990,7 @@ function AdminMembersPageContent() {
                           onClick={() => void handleSaveMatch()}
                           disabled={matchEditorSaving || !matchSelectedDates.every((d) => {
                             const det = matchDetailsPerDay[d];
-                            const dur = Number.parseInt(det?.duration ?? "", 10);
-                            return det?.location?.trim() && det?.time && Number.isInteger(dur) && dur >= 1;
+                            return det?.location?.trim() && det?.time;
                           })}
                         >
                           {matchEditorSaving ? "Запазване..." : matchSelectedDates.length > 1 ? `Запази ${matchSelectedDates.length} събития` : "Запази събитие"}
