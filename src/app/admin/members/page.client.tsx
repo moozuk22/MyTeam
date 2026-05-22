@@ -4900,7 +4900,7 @@ function AdminMembersPageContent() {
         throw new Error(payload.error ?? "Грешка при промяна на статус.");
       }
       setTrainingDayDetailsOpen(false);
-      await fetchTrainingWeekSessions();
+      await Promise.all([fetchTrainingWeekSessions(), fetchTrainingAttendance()]);
     } catch (error) {
       setTrainingAttendanceError(error instanceof Error ? error.message : "Грешка при промяна на статус.");
     } finally {
@@ -7026,6 +7026,7 @@ function AdminMembersPageContent() {
                     </label>
                       </>
                   )}
+                  {(!isCustomTrainingGroupMode || customTrainingGroups.length > 0) && (
                   <div className="amp-modal-actions amp-modal-actions--end">
                     <button
                       className="amp-btn amp-btn--ghost"
@@ -7043,6 +7044,7 @@ function AdminMembersPageContent() {
                       Насрочи график
                     </button>
                   </div>
+                  )}
                   {trainingAttendanceError && <p className="amp-confirm-error">{trainingAttendanceError}</p>}
                   <div className="amp-training-table-wrap">
                     {trainingAttendanceLoading ? (
