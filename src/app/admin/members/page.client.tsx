@@ -5253,10 +5253,12 @@ function AdminMembersPageContent() {
 
         {/* ── Buttons grid ── */}
         <div className="amp-buttons-grid">
-          <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`)}>
-            <PlusIcon />
-            Добави състезател
-          </button>
+          {(isAdmin || (isCoach && coachGroupId)) && (
+            <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`)}>
+              <PlusIcon />
+              Добави състезател
+            </button>
+          )}
           {clubId && coachGroupId && (
             <button
               className="amp-import-sheets-btn amp-btn--compact"
@@ -5325,7 +5327,7 @@ function AdminMembersPageContent() {
               <span>Треньори</span>
             </button>
           )}
-          {(isAdmin || isCoach) && clubId && (
+          {(isAdmin || (isCoach && coachGroupId)) && clubId && (
             <button
               className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
               onClick={openTrainingGroupCreateModal}
@@ -5343,14 +5345,16 @@ function AdminMembersPageContent() {
           </button>
           {(isAdmin || isCoach) && clubId && (
             <>
-              <button
-                className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
-                onClick={() => void openSchedulerSettings()}
-                type="button"
-              >
-                <CalendarIcon />
-                <span>Напомняния</span>
-              </button>
+              {isAdmin && (
+                <button
+                  className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+                  onClick={() => void openSchedulerSettings()}
+                  type="button"
+                >
+                  <CalendarIcon />
+                  <span>Напомняния</span>
+                </button>
+              )}
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => {
@@ -5375,18 +5379,7 @@ function AdminMembersPageContent() {
                 <ClipboardListIcon />
                 <span>Присъствия</span>
               </button>
-              {isCoach && !isAdmin ? (
-                <span className="amp-coming-soon-wrap" data-tooltip="Очаквайте скоро">
-                  <button
-                    className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
-                    type="button"
-                    disabled
-                  >
-                    <ClipboardListIcon />
-                    <span>Планове за тренировки</span>
-                  </button>
-                </span>
-              ) : (
+              {isAdmin && (
                 <button
                   className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
                   onClick={() => router.push(`/admin/training-plans?clubId=${encodeURIComponent(clubId)}`)}
