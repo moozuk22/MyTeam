@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
-import { isValidPhone } from "@/lib/phone";
 import "./page.css";
 
 interface ClubData {
@@ -200,20 +199,6 @@ function AddMemberPageContent() {
   };
 
   const submitMember = async (skipDuplicateCheck = false) => {
-    if (parentPhone.trim() && !isValidPhone(parentPhone)) {
-      setError("Parent phone is invalid.");
-      return;
-    }
-    if (playerPhone.trim() && !isValidPhone(playerPhone)) {
-      setError("Player phone is invalid.");
-      return;
-    }
-    const isRolling = clubData?.paymentWorkflow === "rolling_30_days";
-    if (clubData?.billingStatus === "active" && !isRolling && !firstBillingMonth.trim()) {
-      setError("First billing month is required for active billing clubs.");
-      return;
-    }
-
     setIsSubmitting(true);
     setError("");
 
@@ -447,11 +432,9 @@ function AddMemberPageContent() {
               <div className="add-member-field">
                 <label className="add-member-label">
                   Начален месец на таксуване
-                  {clubData?.billingStatus === "active" && <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>}
                 </label>
                 <input
                   type="month"
-                  required={clubData?.billingStatus === "active"}
                   value={firstBillingMonth}
                   onChange={(e) => setFirstBillingMonth(e.target.value)}
                   className="add-member-input"
