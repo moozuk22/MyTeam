@@ -1628,25 +1628,7 @@ export default function MemberCardPage({
     const safePeriod = escapeHtml(period);
     const safePaidAt = escapeHtml(paidAt);
 
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument;
-    const win = iframe.contentWindow;
-    if (!doc || !win) {
-      document.body.removeChild(iframe);
-      return;
-    }
-
-    doc.open();
-    doc.write(`<!doctype html>
+    const receiptHtml = `<!doctype html>
 <html lang="bg">
 <head>
   <meta charset="utf-8" />
@@ -1683,19 +1665,15 @@ export default function MemberCardPage({
       <div class="stamp-wrap"><div class="stamp">ПЛАТЕНО</div></div>
     </div>
   </div>
+  <script>window.onload=function(){window.print();window.addEventListener('afterprint',function(){window.close();},{once:true});}</script>
 </body>
-</html>`);
-    doc.close();
+</html>`;
 
-    window.setTimeout(() => {
-      win.focus();
-      win.print();
-      window.setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }, 100);
+    const blob = new Blob([receiptHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) { URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   const rawStatusKey = member?.status ?? "paid";

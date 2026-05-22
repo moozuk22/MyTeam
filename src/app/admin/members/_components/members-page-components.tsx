@@ -498,10 +498,11 @@ function AttendanceDashboard({
 </body>
 </html>`;
 
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(fullHtml);
-    win.document.close();
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) { URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   return (
@@ -1152,10 +1153,11 @@ function ReportsDialog({
 </body>
 </html>`;
 
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(fullHtml);
-    win.document.close();
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) { URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   return (
