@@ -471,7 +471,7 @@ function AttendanceDashboard({
 
     const style = document.createElement("style");
     style.id = "__print-overlay-style";
-    style.textContent = `@media print { body > *:not(#__print-overlay) { display: none !important; } }`;
+    style.textContent = `@media print { body > *:not(#__print-overlay) { display: none !important; } #__print-overlay, #__print-overlay * { visibility: visible !important; } }`;
     document.head.appendChild(style);
 
     const overlay = document.createElement("div");
@@ -1119,7 +1119,7 @@ function ReportsDialog({
 
     const style = document.createElement("style");
     style.id = "__print-overlay-style";
-    style.textContent = `@media print { body > *:not(#__print-overlay) { display: none !important; } }`;
+    style.textContent = `@media print { body > *:not(#__print-overlay) { display: none !important; } #__print-overlay, #__print-overlay * { visibility: visible !important; } }`;
     document.head.appendChild(style);
 
     const overlay = document.createElement("div");
