@@ -2889,6 +2889,22 @@
   transform: rotate(180deg);
 }
 
+.amp-training-players-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s ease;
+  overflow: hidden;
+}
+
+.amp-training-players-body--open {
+  grid-template-rows: 1fr;
+}
+
+.amp-training-players-body > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .amp-edit-input {
   width: 100%;
   height: 36px;

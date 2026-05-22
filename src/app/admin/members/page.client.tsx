@@ -9275,8 +9275,8 @@ function AdminMembersPageContent() {
                       <span>Играчи ({trainingAttendanceStats.total})</span>
                       <span className={`amp-training-players-toggle-arrow${trainingPlayersExpanded ? " amp-training-players-toggle-arrow--open" : ""}`}>▾</span>
                     </button>
-                    {trainingPlayersExpanded && (
-                      trainingAttendanceLoading || trainingDayDetailsTabLoading ? (
+                    <div className={`amp-training-players-body${trainingPlayersExpanded ? " amp-training-players-body--open" : ""}`}>
+                      {trainingAttendanceLoading || trainingDayDetailsTabLoading ? (
                         <p className="amp-empty amp-empty--modal">Зареждане...</p>
                       ) : trainingAttendancePlayers.length === 0 ? (
                         <p className="amp-empty amp-empty--modal">Няма състезатели за този отбор.</p>
@@ -9303,8 +9303,8 @@ function AdminMembersPageContent() {
                             ))}
                           </tbody>
                         </table>
-                      )
-                    )}
+                      )}
+                    </div>
                   </div>
                   {/* ── Limited spots section ── */}
                   {(() => {
