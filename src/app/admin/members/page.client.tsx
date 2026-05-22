@@ -515,8 +515,8 @@ const ALL_GUIDE_STEPS: GuideStep[] = [
   },
   {
     id: 'subgroup',
-    title: 'Създаване на подгрупа',
-    description: 'Бутонът „Създай подгрупа“ отваря формата за нова подгрупа. Въведете име, изберете цвят и добавете желаните спортисти. Подгрупите се използват за по-фино разделение в рамките на отбора — например сутрешна и вечерна група.',
+    title: 'Създаване на група',
+    description: 'Бутонът „Създай / редактирай група” отваря формата за нова група или редактиране на съществуваща. Въведете име, изберете цвят и добавете желаните спортисти. Групите се използват за по-фино разделение в рамките на отбора — например сутрешна и вечерна група.',
     icon: "<circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='16'/><line x1='8' y1='12' x2='16' y2='12'/>",
   },
   {
@@ -823,6 +823,7 @@ function AdminMembersPageContent() {
   const [trainingDaysInitialFieldPieceIds, setTrainingDaysInitialFieldPieceIds] = useState<string[]>([]);
   const [trainingDaysSuccessOpen, setTrainingDaysSuccessOpen] = useState(false);
   const [trainingDaysSuccessMessage, setTrainingDaysSuccessMessage] = useState("");
+  const [trainingDayScheduleNotes, setTrainingDayScheduleNotes] = useState<Record<string, string>>({});
   const [trainingGroupMode, setTrainingGroupMode] = useState<"team_group" | "custom_group">("team_group");
   const [trainingGroupModeDraft, setTrainingGroupModeDraft] = useState<"team_group" | "custom_group">("team_group");
   const [trainingGroupModeSettingsOpen, setTrainingGroupModeSettingsOpen] = useState(false);
@@ -833,6 +834,8 @@ function AdminMembersPageContent() {
   const [trainingDaysEditorGroupName, setTrainingDaysEditorGroupName] = useState("");
   const [trainingDaysEditorCreateOpen, setTrainingDaysEditorCreateOpen] = useState(false);
   const [trainingGroupCreateOpen, setTrainingGroupCreateOpen] = useState(false);
+  const [trainingGroupCreateStep, setTrainingGroupCreateStep] = useState<"picker" | "create" | "edit-pick">("picker");
+  const [trainingGroupEditPickId, setTrainingGroupEditPickId] = useState("");
   const [trainingGroupCreateSaving, setTrainingGroupCreateSaving] = useState(false);
   const [trainingGroupCreateError, setTrainingGroupCreateError] = useState("");
   const [trainingGroupCreateGroups, setTrainingGroupCreateGroups] = useState<string[]>([]);
@@ -2332,6 +2335,7 @@ function AdminMembersPageContent() {
     trainingDaysEditorMode === "customGroup" ||
     trainingDaysEditorMode === "coachGroup";
   const canShowTrainingDaysSpotsStep = canShowTrainingDaysFieldStep && spotsStepSupportedByMode;
+  const canShowTrainingDaysNotesStep = canShowTrainingDaysFieldStep;
   const schedulerLimitedSpotsValue = parseInt(schedulerLimitedSpots, 10);
   const isSchedulerLimitedSpotsValid =
     Number.isInteger(schedulerLimitedSpotsValue) && schedulerLimitedSpotsValue >= 1 && schedulerLimitedSpotsValue <= 200;
@@ -2346,19 +2350,27 @@ function AdminMembersPageContent() {
   const effectiveTrainingDaysActiveStep: TrainingDaysStep =
     trainingDaysEditorMode === "createGroup"
       ? "days"
-      : trainingDaysActiveStep === "field" && !canShowTrainingDaysFieldStep
-        ? canShowTrainingDaysSpotsStep
-          ? "spots"
-          : canShowTrainingDaysTimeStep
-            ? "time"
-            : "days"
-        : trainingDaysActiveStep === "spots" && !canShowTrainingDaysSpotsStep
-          ? canShowTrainingDaysTimeStep
-            ? "time"
-            : "days"
-          : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
-            ? "days"
-            : trainingDaysActiveStep;
+      : trainingDaysActiveStep === "notes" && !canShowTrainingDaysNotesStep
+        ? canShowTrainingDaysFieldStep
+          ? "field"
+          : canShowTrainingDaysSpotsStep
+            ? "spots"
+            : canShowTrainingDaysTimeStep
+              ? "time"
+              : "days"
+        : trainingDaysActiveStep === "field" && !canShowTrainingDaysFieldStep
+          ? canShowTrainingDaysSpotsStep
+            ? "spots"
+            : canShowTrainingDaysTimeStep
+              ? "time"
+              : "days"
+          : trainingDaysActiveStep === "spots" && !canShowTrainingDaysSpotsStep
+            ? canShowTrainingDaysTimeStep
+              ? "time"
+              : "days"
+            : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
+              ? "days"
+              : trainingDaysActiveStep;
   const trainingWeekdayBuckets = Array.from(
     new Set(
       normalizedTrainingDaysSelection
@@ -2398,7 +2410,7 @@ function AdminMembersPageContent() {
     effectiveTrainingDaysActiveStep !== "days";
   const showTrainingStepNext =
     trainingDaysEditorMode !== "createGroup" &&
-    effectiveTrainingDaysActiveStep !== "field";
+    effectiveTrainingDaysActiveStep !== "notes";
   const isTrainingStepNextDisabled =
     trainingDaysEditorSaving ||
     (effectiveTrainingDaysActiveStep === "days" && !canShowTrainingDaysTimeStep) ||
@@ -3181,6 +3193,9 @@ function AdminMembersPageContent() {
     const firstFree =
       CUSTOM_TRAINING_GROUP_COLOR_PALETTE.find((c) => !used.has(c)) ?? CUSTOM_TRAINING_GROUP_COLOR_PALETTE[0];
     setTrainingGroupCreateColor(firstFree);
+    setTrainingGroupCreateStep("picker");
+    const firstGroup = isCustomTrainingGroupMode ? customTrainingGroups[0] : trainingScheduleGroups[0];
+    setTrainingGroupEditPickId(firstGroup?.id ?? "");
     setTrainingGroupCreateOpen(true);
   };
 
@@ -3261,6 +3276,7 @@ function AdminMembersPageContent() {
           throw new Error(payload?.error || "Failed to create custom training group.");
         }
         setTrainingGroupCreateOpen(false);
+        setTrainingGroupCreateStep("picker");
         await loadCustomTrainingGroups();
         void refreshMembersList();
         return;
@@ -3287,6 +3303,7 @@ function AdminMembersPageContent() {
       }
 
       setTrainingGroupCreateOpen(false);
+      setTrainingGroupCreateStep("picker");
       await loadTrainingScheduleGroups();
     } catch (error) {
       setTrainingGroupCreateError(error instanceof Error ? error.message : "Възникна грешка.");
@@ -3452,6 +3469,7 @@ function AdminMembersPageContent() {
 
     setTrainingDaysEditorMode(mode);
     setTrainingDaysActiveStep("days");
+    setTrainingDayScheduleNotes({});
     setTrainingDaysEditorGroups([]);
     setTrainingDaysEditorGroupName("");
     setTrainingDaysEditorCreateOpen(true);
@@ -3759,6 +3777,16 @@ function AdminMembersPageContent() {
           })
         ));
       }
+      const datesToNote = schedulerForm.trainingDates.filter((d) => (trainingDayScheduleNotes[d] ?? "").trim());
+      if (datesToNote.length > 0) {
+        await Promise.allSettled(datesToNote.map((date) =>
+          fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ trainingDate: date, note: trainingDayScheduleNotes[date]!.trim(), teamGroup: selectedTeamGroup }),
+          })
+        ));
+      }
     }
 
     setTrainingDaysEditorCreateOpen(false);
@@ -3879,6 +3907,22 @@ function AdminMembersPageContent() {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ scopeKey, scopeId, teamGroup: null, trainingDate: date, maxSpots: spots }),
+                })
+              ));
+            }
+          }
+          if (trainingDaysEditorMode !== "coachGroup") {
+            const datesToNote = nextTrainingDates.filter((d) => (trainingDayScheduleNotes[d] ?? "").trim());
+            if (datesToNote.length > 0) {
+              const noteBody = (date: string) =>
+                trainingDaysEditorMode === "customGroup"
+                  ? { trainingDate: date, note: trainingDayScheduleNotes[date]!.trim(), customTrainingGroupId: selectedTrainingGroupId }
+                  : { trainingDate: date, note: trainingDayScheduleNotes[date]!.trim(), trainingGroupId: selectedTrainingGroupId };
+              await Promise.allSettled(datesToNote.map((date) =>
+                fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(noteBody(date)),
                 })
               ));
             }
@@ -5214,7 +5258,7 @@ function AdminMembersPageContent() {
               title={isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor ? "Всички цветове са заети" : undefined}
             >
               <PlusIcon />
-              <span>Създай подгрупа</span>
+              <span>Създай / редактирай група</span>
             </button>
           )}
           <button className="amp-reports-btn amp-btn--compact" onClick={() => setReportsOpen(true)}>
@@ -6545,7 +6589,7 @@ function AdminMembersPageContent() {
                     onClick={() => void handleTrainingAttendanceViewChange("trainingGroups")}
                     disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving}
                   >
-                    Отбори / Групи
+                    Създай график
                   </button>
                 </div>
               )}
@@ -6605,7 +6649,7 @@ function AdminMembersPageContent() {
                     {trainingScheduleGroupsLoading ? (
                       <p className="amp-empty amp-empty--modal">Зареждане...</p>
                     ) : (isCustomTrainingGroupMode ? customTrainingGroups.length === 0 : (trainingScheduleGroups.length === 0 && standaloneTeamGroups.length === 0)) ? (
-                      <p className="amp-empty amp-empty--modal">Няма създадени групи. Използвайте бутона „Създай подгрупа“ в треньорския панел.</p>
+                      <p className="amp-empty amp-empty--modal">Няма създадени групи. Използвайте бутона „Създай / редактирай група” в треньорския панел.</p>
                     ) : (
                       <>
                         <label className="amp-edit-field" style={{ marginBottom: "12px", textAlign: "center" }}>
@@ -6655,34 +6699,6 @@ function AdminMembersPageContent() {
                           </select>
                           </div>
                         </label>
-                        {trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId && (
-                          <div className="amp-training-group-actions">
-                            <button
-                              type="button"
-                              className="amp-btn amp-btn--ghost"
-                              onClick={() => openTrainingGroupEditModal(selectedTrainingGroupId)}
-                              disabled={trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
-                            >
-                              {trainingGroupEditSaving
-                                ? "Отваряне..."
-                                : isCustomTrainingGroupMode
-                                  ? "Редактирай група"
-                                  : "Редактирай сборен отбор"}
-                            </button>
-                            <button
-                              type="button"
-                              className="amp-btn amp-btn--danger"
-                              onClick={() => setTrainingGroupDeleteConfirmOpen(true)}
-                              disabled={trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
-                            >
-                              {trainingGroupDeleteSaving
-                                ? "Изтриване..."
-                                : isCustomTrainingGroupMode
-                                  ? "Изтрий група"
-                                  : "Изтрий сборен отбор"}
-                            </button>
-                          </div>
-                        )}
                       </>
                     )}
                   </div>
@@ -6956,18 +6972,6 @@ function AdminMembersPageContent() {
                       disabled={trainingNoteSaving || trainingDaysEditorSaving}
                     >
                       Насрочи график
-                    </button>
-                    <button
-                      className="amp-btn amp-btn--primary"
-                      onClick={() => {
-                        setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : []);
-                        setTrainingBulkNoteOpen(true);
-                      }}
-                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate}
-                    >
-                      {trainingNoteSaving
-                        ? "Запазване..."
-                        : `Добави описание`}
                     </button>
                   </div>
                   {trainingAttendanceError && <p className="amp-confirm-error">{trainingAttendanceError}</p>}
@@ -7297,18 +7301,26 @@ function AdminMembersPageContent() {
             if (!trainingGroupCreateSaving) {
               setTrainingGroupCreateOpen(false);
               setTrainingGroupCreateError("");
+              setTrainingGroupCreateStep("picker");
             }
           }}
         >
           <div className="amp-modal amp-modal--confirm amp-modal--training-days-editor" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">{isCustomTrainingGroupMode ? "Създай подгрупа" : "Създай сборен отбор"}</span>
+              <span className="amp-modal-title-gradient">
+                {trainingGroupCreateStep === "create"
+                  ? (isCustomTrainingGroupMode ? "Нова група" : "Нов сборен отбор")
+                  : trainingGroupCreateStep === "edit-pick"
+                    ? (isCustomTrainingGroupMode ? "Редактирай група" : "Редактирай сборен отбор")
+                    : (isCustomTrainingGroupMode ? "Създай / редактирай група" : "Управление на сборни отбори")}
+              </span>
               <button
                 className="amp-modal-close"
                 onClick={() => {
                   setTrainingGroupCreateOpen(false);
                   setTrainingGroupCreateError("");
+                  setTrainingGroupCreateStep("picker");
                 }}
                 aria-label="Затвори"
                 disabled={trainingGroupCreateSaving}
@@ -7317,176 +7329,262 @@ function AdminMembersPageContent() {
               </button>
             </h2>
             <div className="amp-modal-body">
-              {isCustomTrainingGroupMode && (
+              {trainingGroupCreateStep === "picker" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <button
+                    type="button"
+                    className="amp-btn amp-btn--primary"
+                    style={{ width: "100%", justifyContent: "center", padding: "14px 20px", fontSize: "15px" }}
+                    disabled={isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor}
+                    onClick={() => setTrainingGroupCreateStep("create")}
+                  >
+                    Създай група
+                  </button>
+                  <button
+                    type="button"
+                    className="amp-btn amp-btn--ghost"
+                    style={{ width: "100%", justifyContent: "center", padding: "14px 20px", fontSize: "15px" }}
+                    disabled={isCustomTrainingGroupMode ? customTrainingGroups.length === 0 : trainingScheduleGroups.length === 0}
+                    onClick={() => setTrainingGroupCreateStep("edit-pick")}
+                  >
+                    Редактирай група
+                  </button>
+                </div>
+              )}
+              {trainingGroupCreateStep === "edit-pick" && (
                 <>
-                  <label className="amp-edit-field">
-                    <span className="amp-lbl">Име на групата</span>
-                    <input
-                      className="amp-edit-input"
-                      value={trainingGroupCreateName}
-                      onChange={(e) => setTrainingGroupCreateName(e.target.value)}
-                      placeholder="Например: Сутрешна група"
-                      disabled={trainingGroupCreateSaving}
-                    />
+                  <label className="amp-edit-field" style={{ marginBottom: "16px" }}>
+                    <span className="amp-lbl">Избери група</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      {isCustomTrainingGroupMode && (() => {
+                        const color = customTrainingGroups.find((g) => g.id === trainingGroupEditPickId)?.color;
+                        return color ? <span className="amp-custom-group-select-swatch" style={{ backgroundColor: color }} aria-hidden /> : null;
+                      })()}
+                      <select
+                        className="amp-edit-input"
+                        style={{ flex: 1, textAlign: "center", textAlignLast: "center" }}
+                        value={trainingGroupEditPickId}
+                        onChange={(e) => setTrainingGroupEditPickId(e.target.value)}
+                      >
+                        {isCustomTrainingGroupMode
+                          ? customTrainingGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)
+                          : trainingScheduleGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)
+                        }
+                      </select>
+                    </div>
                   </label>
-                  <CustomTrainingGroupColorPicker
-                    value={trainingGroupCreateColor}
-                    onChange={setTrainingGroupCreateColor}
-                    disabled={trainingGroupCreateSaving || noFreeCustomTrainingGroupColor}
-                    coachScopeKey={customTrainingGroupCoachScope}
-                    groups={customTrainingGroups}
-                  />
-                  {noFreeCustomTrainingGroupColor && (
-                    <p className="amp-empty amp-empty--modal" style={{ marginTop: 8 }}>
-                      Всички цветове са заети за тази треньорска група.
-                    </p>
-                  )}
-                  <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "10px",
-                        flexWrap: "wrap",
-                        marginBottom: "4px",
+                  <div className="amp-modal-actions" style={{ justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--ghost"
+                        onClick={() => setTrainingGroupCreateStep("picker")}
+                      >
+                        Назад
+                      </button>
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--danger"
+                        disabled={!trainingGroupEditPickId}
+                        onClick={() => {
+                          setSelectedTrainingGroupId(trainingGroupEditPickId);
+                          setTrainingGroupCreateOpen(false);
+                          setTrainingGroupCreateError("");
+                          setTrainingGroupCreateStep("picker");
+                          setTrainingGroupDeleteConfirmOpen(true);
+                        }}
+                      >
+                        Изтрий
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--primary"
+                      disabled={!trainingGroupEditPickId}
+                      onClick={() => {
+                        setTrainingGroupCreateOpen(false);
+                        setTrainingGroupCreateError("");
+                        setTrainingGroupCreateStep("picker");
+                        openTrainingGroupEditModal(trainingGroupEditPickId);
                       }}
                     >
-                      <span className="amp-lbl" style={{ margin: 0 }}>състезателите в групата</span>
-                      {availablePlayersForCustomGroupCreate.length > 0 ? (
-                        <button
-                          type="button"
-                          className="amp-btn amp-btn--ghost amp-btn--compact"
-                          disabled={trainingGroupCreateSaving}
-                          onClick={() => {
-                            const ids = availablePlayersForCustomGroupCreate.map((m) => m.id);
-                            const allSelected =
-                              ids.length > 0 && ids.every((id) => trainingGroupCreatePlayerIds.includes(id));
-                            if (allSelected) {
-                              setTrainingGroupCreatePlayerIds((prev) => prev.filter((id) => !ids.includes(id)));
-                            } else {
-                              setTrainingGroupCreatePlayerIds((prev) => [...new Set([...prev, ...ids])]);
-                            }
-                          }}
-                        >
-                          {availablePlayersForCustomGroupCreate.every((m) =>
-                            trainingGroupCreatePlayerIds.includes(m.id),
-                          )
-                            ? "Премахни всички"
-                            : "Избери всички"}
-                        </button>
-                      ) : null}
-                    </div>
-                    <input
-                      className="amp-edit-input"
-                      type="search"
-                      placeholder="Търси състезател..."
-                      value={customGroupCreateSearch}
-                      onChange={(e) => setCustomGroupCreateSearch(e.target.value)}
-                      disabled={trainingGroupCreateSaving}
-                      style={{ marginBottom: "8px" }}
-                    />
-                    <div className="amp-group-check-grid">
-                      {filteredPlayersForCustomGroupCreate.map((member) => {
-                        const isChecked = trainingGroupCreatePlayerIds.includes(member.id);
-                        return (
-                          <label key={`custom-training-group-create-${member.id}`} className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}>
-                            <input
-                              className="amp-group-check-input"
-                              type="checkbox"
-                              checked={isChecked}
-                              disabled={trainingGroupCreateSaving}
-                              onChange={(e) => {
-                                setTrainingGroupCreatePlayerIds((prev) => e.target.checked
-                                  ? [...new Set([...prev, member.id])]
-                                  : prev.filter((item) => item !== member.id));
-                              }}
-                            />
-                            <span className="amp-group-check-box" aria-hidden="true" />
-                            <span className="amp-lbl amp-group-check-label">{member.fullName}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {availablePlayersForCustomGroupCreate.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма свободни състезатели за добавяне.</p>
-                    )}
-                    {availablePlayersForCustomGroupCreate.length > 0 && filteredPlayersForCustomGroupCreate.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма състезатели, отговарящи на търсенето.</p>
-                    )}
+                      Редактирай
+                    </button>
                   </div>
                 </>
               )}
-              {!isCustomTrainingGroupMode && (
+              {trainingGroupCreateStep === "create" && (
                 <>
-              <div className="amp-training-days-editor-header amp-training-days-editor-header--stack">
-                <span className="amp-lbl">Набори за групата (минимум 2):</span>
-                <div className="amp-group-check-grid">
-                  {groupOptions.map((group) => {
-                    const value = String(group);
-                    const isChecked = trainingGroupCreateGroups.includes(value);
-                    return (
-                      <label
-                        key={`training-group-create-${group}`}
-                        className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}
-                      >
+                  {isCustomTrainingGroupMode && (
+                    <>
+                      <label className="amp-edit-field">
+                        <span className="amp-lbl">Име на групата</span>
                         <input
-                          className="amp-group-check-input"
-                          type="checkbox"
-                          checked={isChecked}
+                          className="amp-edit-input"
+                          value={trainingGroupCreateName}
+                          onChange={(e) => setTrainingGroupCreateName(e.target.value)}
+                          placeholder="Например: Сутрешна група"
                           disabled={trainingGroupCreateSaving}
-                          onChange={(e) => {
-                            setTrainingGroupCreateGroups((prev) => {
-                              if (e.target.checked) {
-                                return [...new Set([...prev, value])].sort((a, b) => Number(a) - Number(b));
-                              }
-                              return prev.filter((item) => item !== value);
-                            });
-                          }}
                         />
-                        <span className="amp-group-check-box" aria-hidden="true" />
-                        <span className="amp-lbl amp-group-check-label">Набор {group}</span>
                       </label>
-                    );
-                  })}
-                </div>
-                <span className="amp-lbl amp-group-check-hint">
-                  {trainingGroupCreateGroups.length === 0
-                    ? "Изберете поне 2 набора."
-                    : `Избрани набори: ${trainingGroupCreateGroups.join(", ")} — Името ще бъде: ${trainingGroupCreateGroups.join("/")}`}
-                </span>
-              </div>
+                      <CustomTrainingGroupColorPicker
+                        value={trainingGroupCreateColor}
+                        onChange={setTrainingGroupCreateColor}
+                        disabled={trainingGroupCreateSaving || noFreeCustomTrainingGroupColor}
+                        coachScopeKey={customTrainingGroupCoachScope}
+                        groups={customTrainingGroups}
+                      />
+                      {noFreeCustomTrainingGroupColor && (
+                        <p className="amp-empty amp-empty--modal" style={{ marginTop: 8 }}>
+                          Всички цветове са заети за тази треньорска група.
+                        </p>
+                      )}
+                      <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "10px",
+                            flexWrap: "wrap",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <span className="amp-lbl" style={{ margin: 0 }}>Състезателите в групата</span>
+                          {availablePlayersForCustomGroupCreate.length > 0 ? (
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--ghost amp-btn--compact"
+                              disabled={trainingGroupCreateSaving}
+                              onClick={() => {
+                                const ids = availablePlayersForCustomGroupCreate.map((m) => m.id);
+                                const allSelected =
+                                  ids.length > 0 && ids.every((id) => trainingGroupCreatePlayerIds.includes(id));
+                                if (allSelected) {
+                                  setTrainingGroupCreatePlayerIds((prev) => prev.filter((id) => !ids.includes(id)));
+                                } else {
+                                  setTrainingGroupCreatePlayerIds((prev) => [...new Set([...prev, ...ids])]);
+                                }
+                              }}
+                            >
+                              {availablePlayersForCustomGroupCreate.every((m) =>
+                                trainingGroupCreatePlayerIds.includes(m.id),
+                              )
+                                ? "Премахни всички"
+                                : "Избери всички"}
+                            </button>
+                          ) : null}
+                        </div>
+                        <input
+                          className="amp-edit-input"
+                          type="search"
+                          placeholder="Търси състезател..."
+                          value={customGroupCreateSearch}
+                          onChange={(e) => setCustomGroupCreateSearch(e.target.value)}
+                          disabled={trainingGroupCreateSaving}
+                          style={{ marginBottom: "8px" }}
+                        />
+                        <div className="amp-group-check-grid">
+                          {filteredPlayersForCustomGroupCreate.map((member) => {
+                            const isChecked = trainingGroupCreatePlayerIds.includes(member.id);
+                            return (
+                              <label key={`custom-training-group-create-${member.id}`} className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}>
+                                <input
+                                  className="amp-group-check-input"
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  disabled={trainingGroupCreateSaving}
+                                  onChange={(e) => {
+                                    setTrainingGroupCreatePlayerIds((prev) => e.target.checked
+                                      ? [...new Set([...prev, member.id])]
+                                      : prev.filter((item) => item !== member.id));
+                                  }}
+                                />
+                                <span className="amp-group-check-box" aria-hidden="true" />
+                                <span className="amp-lbl amp-group-check-label">{member.fullName}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {availablePlayersForCustomGroupCreate.length === 0 && (
+                          <p className="amp-empty amp-empty--modal">Няма свободни състезатели за добавяне.</p>
+                        )}
+                        {availablePlayersForCustomGroupCreate.length > 0 && filteredPlayersForCustomGroupCreate.length === 0 && (
+                          <p className="amp-empty amp-empty--modal">Няма състезатели, отговарящи на търсенето.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {!isCustomTrainingGroupMode && (
+                    <div className="amp-training-days-editor-header amp-training-days-editor-header--stack">
+                      <span className="amp-lbl">Набори за групата (минимум 2):</span>
+                      <div className="amp-group-check-grid">
+                        {groupOptions.map((group) => {
+                          const value = String(group);
+                          const isChecked = trainingGroupCreateGroups.includes(value);
+                          return (
+                            <label
+                              key={`training-group-create-${group}`}
+                              className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}
+                            >
+                              <input
+                                className="amp-group-check-input"
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={trainingGroupCreateSaving}
+                                onChange={(e) => {
+                                  setTrainingGroupCreateGroups((prev) => {
+                                    if (e.target.checked) {
+                                      return [...new Set([...prev, value])].sort((a, b) => Number(a) - Number(b));
+                                    }
+                                    return prev.filter((item) => item !== value);
+                                  });
+                                }}
+                              />
+                              <span className="amp-group-check-box" aria-hidden="true" />
+                              <span className="amp-lbl amp-group-check-label">Набор {group}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <span className="amp-lbl amp-group-check-hint">
+                        {trainingGroupCreateGroups.length === 0
+                          ? "Изберете поне 2 набора."
+                          : `Избрани набори: ${trainingGroupCreateGroups.join(", ")} — Името ще бъде: ${trainingGroupCreateGroups.join("/")}`}
+                      </span>
+                    </div>
+                  )}
+                  {trainingGroupCreateError && <p className="amp-confirm-error">{trainingGroupCreateError}</p>}
+                  <div className="amp-modal-actions" style={{ justifyContent: "space-between" }}>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--ghost"
+                      onClick={() => {
+                        setTrainingGroupCreateStep("picker");
+                        setTrainingGroupCreateError("");
+                      }}
+                      disabled={trainingGroupCreateSaving}
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--primary"
+                      onClick={() => void saveTrainingGroupFromModal()}
+                      disabled={
+                        trainingGroupCreateSaving ||
+                        (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
+                      }
+                    >
+                      {trainingGroupCreateSaving
+                        ? "Създаване..."
+                        : isCustomTrainingGroupMode
+                          ? "Създай група"
+                          : "Създай сборен отбор"}
+                    </button>
+                  </div>
                 </>
               )}
-              {trainingGroupCreateError && <p className="amp-confirm-error">{trainingGroupCreateError}</p>}
-              <div className="amp-modal-actions amp-modal-actions--end">
-                <button
-                  type="button"
-                  className="amp-btn amp-btn--ghost"
-                  onClick={() => {
-                    setTrainingGroupCreateOpen(false);
-                    setTrainingGroupCreateError("");
-                  }}
-                  disabled={trainingGroupCreateSaving}
-                >
-                  Отказ
-                </button>
-                <button
-                  type="button"
-                  className="amp-btn amp-btn--primary"
-                  onClick={() => void saveTrainingGroupFromModal()}
-                  disabled={
-                    trainingGroupCreateSaving ||
-                    (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
-                  }
-                >
-                  {trainingGroupCreateSaving
-                    ? "Създаване..."
-                    : isCustomTrainingGroupMode
-                      ? "Създай подгрупа"
-                      : "Създай сборен отбор"}
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -7997,12 +8095,21 @@ function AdminMembersPageContent() {
                       )}
                       <button
                         type="button"
-                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}`}
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}${canShowTrainingDaysNotesStep && effectiveTrainingDaysActiveStep === "notes" ? " is-complete" : ""}`}
                         onClick={() => setTrainingDaysActiveStep("field")}
                         disabled={trainingDaysEditorSaving || !canShowTrainingDaysFieldStep}
                       >
                         <span className="amp-training-step-index">{spotsStepSupportedByMode ? 4 : 3}</span>
                         Терен
+                      </button>
+                      <button
+                        type="button"
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "notes" ? " is-active" : ""}`}
+                        onClick={() => setTrainingDaysActiveStep("notes")}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysNotesStep}
+                      >
+                        <span className="amp-training-step-index">{spotsStepSupportedByMode ? 5 : 4}</span>
+                        Описание
                       </button>
                     </div>
                   )}
@@ -8615,6 +8722,27 @@ function AdminMembersPageContent() {
                   {canShowTrainingDaysFieldStep && effectiveTrainingDaysActiveStep === "field" && hasMissingTrainingField && (
                       <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>{missingTrainingFieldMessage}</p>
                   )}
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysNotesStep && effectiveTrainingDaysActiveStep === "notes" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px", order: 3 }}>
+                      <p style={{ margin: 0, textAlign: "center", opacity: 0.65, fontSize: "0.85em" }}>
+                        Описанието е по избор. Можете да зададете различен текст за всяка тренировка.
+                      </p>
+                      {normalizedTrainingDaysSelection.map((date) => (
+                        <label key={`note-${date}`} className="amp-edit-field" style={{ textAlign: "center" }}>
+                          <span className="amp-lbl" style={{ textAlign: "center" }}>{formatIsoDateForDisplay(date)}</span>
+                          <textarea
+                            className="amp-edit-input amp-training-note"
+                            value={trainingDayScheduleNotes[date] ?? ""}
+                            onChange={(e) => setTrainingDayScheduleNotes((prev) => ({ ...prev, [date]: e.target.value }))}
+                            rows={2}
+                            maxLength={1000}
+                            placeholder="Инструкции, сборен час, локация..."
+                            disabled={trainingDaysEditorSaving}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
                   {trainingDaysEditorError && <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>{trainingDaysEditorError}</p>}
                   {isTrainingDaysScheduleUnchanged && !trainingDaysEditorError && (
                     <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>Графикът е същият като предишния.</p>
@@ -8626,7 +8754,9 @@ function AdminMembersPageContent() {
                           type="button"
                           className="amp-btn amp-btn--ghost"
                           onClick={() => {
-                            if (effectiveTrainingDaysActiveStep === "field") {
+                            if (effectiveTrainingDaysActiveStep === "notes") {
+                              setTrainingDaysActiveStep("field");
+                            } else if (effectiveTrainingDaysActiveStep === "field") {
                               setTrainingDaysActiveStep(canShowTrainingDaysSpotsStep ? "spots" : "time");
                             } else if (effectiveTrainingDaysActiveStep === "spots") {
                               setTrainingDaysActiveStep("time");
@@ -8648,8 +8778,10 @@ function AdminMembersPageContent() {
                               setTrainingDaysActiveStep("time");
                             } else if (effectiveTrainingDaysActiveStep === "time") {
                               setTrainingDaysActiveStep(canShowTrainingDaysSpotsStep ? "spots" : "field");
-                            } else {
+                            } else if (effectiveTrainingDaysActiveStep === "spots") {
                               setTrainingDaysActiveStep("field");
+                            } else {
+                              setTrainingDaysActiveStep("notes");
                             }
                           }}
                           disabled={isTrainingStepNextDisabled}

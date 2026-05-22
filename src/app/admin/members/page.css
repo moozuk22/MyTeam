@@ -2973,6 +2973,9 @@
 }
 
 .amp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 10px;
   height: 36px;
@@ -3140,6 +3143,7 @@
   min-width: 0;
   border-radius: 999px;
   font-weight: 700;
+  text-align: center;
 }
 
 .amp-training-view-btn.is-active {
