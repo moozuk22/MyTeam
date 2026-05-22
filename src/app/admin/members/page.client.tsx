@@ -7667,7 +7667,7 @@ function AdminMembersPageContent() {
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">
-                {scheduleEventStep === "type" ? "Насрочи събитие" : "Мач / Двубой / Състезание"}
+                {scheduleEventStep === "type" ? "Насрочи събитие" : "Мач / Двубой / Състезание / Участие"}
               </span>
               <button
                 className="amp-modal-close"
@@ -7727,7 +7727,7 @@ function AdminMembersPageContent() {
                     }}
                   >
                     <span className="amp-schedule-event-type-icon amp-schedule-event-type-icon--match" aria-hidden="true" />
-                    Мач / Двубой / Състезание
+                    Мач / Двубой / Състезание / Участие
                   </button>
                 </div>
               ) : (
