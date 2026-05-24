@@ -163,6 +163,7 @@ model ClubCustomTrainingGroup {
   club                    Club                            @relation(fields: [clubId], references: [id], onDelete: Cascade)
   coachGroup              CoachGroup?                     @relation(fields: [coachGroupId], references: [id], onDelete: Cascade)
   players                 ClubCustomTrainingGroupPlayer[]
+  matches                 ClubMatch[]
 
   @@index([clubId])
   @@index([clubId, coachGroupId])
@@ -298,13 +299,14 @@ model TrainingNote {
   id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clubId          String   @map("club_id") @db.Uuid
   trainingDate    DateTime @map("training_date") @db.Date
+  scopeKey        String   @default("club") @map("scope_key")
   note            String?
   createdByUserId String?  @map("created_by_user_id")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
   club            Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
-  @@unique([clubId, trainingDate])
+  @@unique([clubId, trainingDate, scopeKey])
   @@index([trainingDate])
   @@map("training_notes")
 }
@@ -355,21 +357,24 @@ model TrainingSessionPlayer {
 }
 
 model ClubMatch {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clubId          String   @map("club_id") @db.Uuid
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId          String                   @map("club_id") @db.Uuid
+  customGroupId   String?                  @map("custom_group_id") @db.Uuid
   opponent        String
   location        String
-  matchDate       String   @map("match_date")
-  matchTime       String   @map("match_time")
-  durationMinutes Int      @default(90) @map("duration_minutes")
-  isHome          Boolean  @default(true) @map("is_home")
-  teamGroups      Int[]    @default([]) @map("team_groups")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  club            Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  matchDate       String                   @map("match_date")
+  matchTime       String                   @map("match_time")
+  durationMinutes Int                      @default(90) @map("duration_minutes")
+  isHome          Boolean                  @default(true) @map("is_home")
+  teamGroups      Int[]                    @default([]) @map("team_groups")
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  club            Club                     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  customGroup     ClubCustomTrainingGroup? @relation(fields: [customGroupId], references: [id], onDelete: SetNull)
 
   @@index([clubId])
   @@index([matchDate])
+  @@index([customGroupId])
   @@map("club_matches")
 }
 

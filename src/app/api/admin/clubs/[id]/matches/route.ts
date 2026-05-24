@@ -50,6 +50,7 @@ export async function GET(
     orderBy: [{ matchDate: "asc" }, { matchTime: "asc" }],
     select: {
       id: true,
+      customGroupId: true,
       opponent: true,
       location: true,
       matchDate: true,
@@ -78,7 +79,6 @@ export async function POST(
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
 
   const opponent = String(body.opponent ?? "").trim();
-  if (!opponent) return NextResponse.json({ error: "Съперник е задължителен." }, { status: 400 });
   if (opponent.length > 200) return NextResponse.json({ error: "Съперник е твърде дълъг." }, { status: 400 });
 
   const location = String(body.location ?? "").trim();
@@ -98,14 +98,17 @@ export async function POST(
 
   const teamGroups = normalizeTeamGroups(body.teamGroups);
 
+  const customGroupIdRaw = typeof body.customGroupId === "string" ? body.customGroupId.trim() : null;
+  const customGroupId = customGroupIdRaw || null;
+
   let matchConflictWarning: string | null = null;
   const conflict = await checkAwayMatchTrainingConflict({ clubId: id, matchDate, matchTime, durationMinutes, teamGroups, isHome });
   if (conflict.blocking) return NextResponse.json({ error: conflict.blocking }, { status: 400 });
   matchConflictWarning = conflict.warning;
 
   const match = await prisma.clubMatch.create({
-    data: { clubId: id, opponent, location, matchDate, matchTime, durationMinutes, isHome, teamGroups },
-    select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
+    data: { clubId: id, customGroupId, opponent, location, matchDate, matchTime, durationMinutes, isHome, teamGroups },
+    select: { id: true, customGroupId: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
   });
 
   let notifications = null;

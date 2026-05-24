@@ -134,6 +134,18 @@ export function buildNotificationPayload(
         data: { type: input.type, trainingDate: input.trainingDate ?? null },
       };
     }
+    case "training_cancelled": {
+      const suffix = input.trainingDate ? ` на ${input.trainingDate}` : "";
+      return {
+        title: "Тренировката е отменена",
+        body: `Тренировката${suffix} е отменена.`,
+        url,
+        icon: DEFAULT_ICON,
+        badge: DEFAULT_ICON,
+        tag: "training-cancelled",
+        data: { type: input.type, trainingDate: input.trainingDate ?? null },
+      };
+    }
     case "birthday":
       return {
         title: "🎂 Честит рожден ден!",

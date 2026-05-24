@@ -453,6 +453,7 @@ type LimitedEventComputed = {
 
 type SessionItem = {
   scopeKey: string;
+  note: string;
   trainingTime: string;
   trainingDurationMinutes: number;
   trainingFieldName: string | null;
@@ -467,6 +468,7 @@ function buildGroupSession(
   date: string,
   limitedEventsForDate: LimitedEventComputed[],
   fieldById: Map<string, { id: string; name: string; pieces: { id: string; name: string }[] }>,
+  noteByScopeDate: Map<string, string>,
 ): SessionItem {
   const groupDateTimes = normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates);
   const trainingTime = groupDateTimes[date] ?? safeNormalizeTrainingTime(group.trainingTime) ?? "";
@@ -485,8 +487,10 @@ function buildGroupSession(
   const limitedEvent = leRow
     ? { id: leRow.id, maxSpots: leRow.maxSpots, isRegistered: leRow.isRegistered, isConfirmed: leRow.isConfirmed, waitlistPosition: leRow.waitlistPosition, spotsRemaining: leRow.spotsRemaining }
     : null;
+  const note = noteByScopeDate.get(`${scopeKey}:${date}`) ?? noteByScopeDate.get(`club:${date}`) ?? "";
   return {
     scopeKey,
+    note,
     trainingTime,
     trainingDurationMinutes: group.trainingDurationMinutes,
     trainingFieldName: field?.name ?? null,
@@ -565,11 +569,17 @@ export async function GET(
         trainingDate: {
           in: trainingDatesAsUtc,
         },
+        OR: [
+          { scopeKey: "club" },
+          ...(playerScopeKeys.length > 0 ? [{ scopeKey: { in: playerScopeKeys } }] : []),
+        ],
       },
       select: {
         trainingDate: true,
         note: true,
+        scopeKey: true,
       },
+      orderBy: { scopeKey: "asc" },
     }),
     prisma.trainingSession.findMany({
       where: {
@@ -663,11 +673,18 @@ export async function GET(
       },
     ] as const),
   );
-  const noteByDate = new Map(
-    noteRows
-      .map((item) => [utcDateToIsoDate(item.trainingDate), item.note?.trim() ?? ""] as const)
-      .filter(([, note]) => note.length > 0),
-  );
+  const noteByScopeDate = new Map<string, string>();
+  const noteByDate = new Map<string, string>();
+  for (const item of noteRows) {
+    const date = utcDateToIsoDate(item.trainingDate);
+    const note = item.note?.trim() ?? "";
+    if (!note) continue;
+    noteByScopeDate.set(`${item.scopeKey}:${date}`, note);
+    const existing = noteByDate.get(date);
+    if (!existing || item.scopeKey !== "club") {
+      noteByDate.set(date, note);
+    }
+  }
 
   return NextResponse.json({
     clubId: context.clubId,
@@ -685,14 +702,14 @@ export async function GET(
           (g) => g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday),
         );
         sessions = matchingGroups.map((g) =>
-          buildGroupSession(g, `coach_group:${g.id}`, date, limitedEventsForDate, fieldById),
+          buildGroupSession(g, `coach_group:${g.id}`, date, limitedEventsForDate, fieldById, noteByScopeDate),
         );
       } else if (context.hasCustomGroupSchedule) {
         const matchingGroups = context.scheduledCustomGroups.filter(
           (g) => g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday),
         );
         sessions = matchingGroups.map((g) =>
-          buildGroupSession(g, `custom_group:${g.id}`, date, limitedEventsForDate, fieldById),
+          buildGroupSession(g, `custom_group:${g.id}`, date, limitedEventsForDate, fieldById, noteByScopeDate),
         );
       } else {
         const session = sessionByDate.get(date);
@@ -708,9 +725,11 @@ export async function GET(
             ? fieldPieceIds.map((pid) => field.pieces.find((p) => p.id === pid)?.name).filter((n): n is string => Boolean(n))
             : [];
         const leRow = limitedEventsForDate[0] ?? null;
+        const singleScopeKey = context.playerTeamGroup !== null ? `team_group:${context.playerTeamGroup}` : "club";
         sessions = [
           {
             scopeKey: context.playerTeamGroup !== null ? `team_group:${context.playerTeamGroup}` : "",
+            note: noteByScopeDate.get(`${singleScopeKey}:${date}`) ?? noteByScopeDate.get(`club:${date}`) ?? "",
             trainingTime: session?.trainingTime ?? context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
             trainingDurationMinutes: session?.trainingDurationMinutes ?? context.trainingDurationMinutes,
             trainingFieldName: field?.name ?? null,
@@ -727,6 +746,7 @@ export async function GET(
         sessions = [
           {
             scopeKey: "",
+            note: noteByScopeDate.get(`club:${date}`) ?? "",
             trainingTime: context.fallbackTrainingTime ?? "",
             trainingDurationMinutes: context.trainingDurationMinutes,
             trainingFieldName: null,

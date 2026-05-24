@@ -407,23 +407,7 @@ function AttendanceDashboard({
   };
 
   const printAttendance = () => {
-    if (!data || typeof window === "undefined" || typeof document === "undefined") return;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument;
-    const win = iframe.contentWindow;
-    if (!doc || !win) {
-      document.body.removeChild(iframe);
-      return;
-    }
+    if (!data || typeof window === "undefined") return;
 
     const escapeHtml = (value: string) =>
       value
@@ -445,11 +429,11 @@ function AttendanceDashboard({
     const tbodyHtml = data.players.map((player) => {
       const presentCount = data.trainingDates.filter(d => player.attendance[d]?.present ?? true).length;
       const pct = data.trainingDates.length > 0 ? Math.round((presentCount / data.trainingDates.length) * 100) : 0;
-      
+
       const cellsHtml = data.trainingDates.map((d) => {
         const cell = player.attendance[d];
         if (!cell) return `<td style="padding: 4px; text-align: center; color: #999;">–</td>`;
-        return cell.present 
+        return cell.present
           ? `<td style="padding: 4px; text-align: center; color: #16a34a; font-weight: bold;">&#x2713;</td>`
           : `<td style="padding: 4px; text-align: center; color: #dc2626;">&#x2717;</td>`;
       }).join('');
@@ -480,44 +464,45 @@ function AttendanceDashboard({
       `;
     }
 
-    doc.open();
-    doc.write(`<!doctype html>
+    const fullHtml = `<!DOCTYPE html>
 <html lang="bg">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Присъствия</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Отчет присъствия (${from} до ${to})</title>
   <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
-    .page { padding: 20px; }
-    h1 { margin: 0 0 16px; font-size: 20px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111827; padding: 20px; margin: 0; }
+    .pt { display: flex; gap: 8px; margin: 0 0 16px; }
+    .pt button { padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .pt-p { background: #111827; color: #fff; border: none; }
+    .pt-c { background: #f3f4f6; border: 1px solid #d1d5db; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    @page { size: landscape; margin: 10mm; }
+    th, td { border: 1px solid #e5e7eb; padding: 4px 6px; }
+    th { background: #f9fafb; }
+    @media print { .pt { display: none; } @page { size: landscape; margin: 10mm; } }
   </style>
 </head>
 <body>
-  <div class="page">
-    <h1>Отчет присъствия (${from} до ${to})</h1>
-    ${scopeTitle ? `<p style="margin: 0 0 12px; color: #6b7280; font-size: 13px;">${escapeHtml(scopeTitle)}</p>` : ""}
-    <table>
-      <thead>${tHeadHtml}</thead>
-      <tbody>${tbodyHtml}</tbody>
-      ${tfootHtml ? `<tfoot>${tfootHtml}</tfoot>` : ""}
-    </table>
+  <div class="pt">
+    <button class="pt-c" onclick="window.close()">✕ Затвори</button>
+    <button class="pt-p" onclick="window.print()">🖨 Принтирай</button>
   </div>
+  <div style="font-size:20px;font-weight:700;margin:0 0 16px;">Отчет присъствия (${from} до ${to})</div>
+  ${scopeTitle ? `<p style="margin:0 0 12px;color:#6b7280;font-size:13px;">${escapeHtml(scopeTitle)}</p>` : ""}
+  <table>
+    <thead>${tHeadHtml}</thead>
+    <tbody>${tbodyHtml}</tbody>
+    ${tfootHtml ? `<tfoot>${tfootHtml}</tfoot>` : ""}
+  </table>
+  <script>window.onload=function(){window.print();window.addEventListener('afterprint',function(){window.close();},{once:true});}</script>
 </body>
-</html>`);
-    doc.close();
+</html>`;
 
-    window.setTimeout(() => {
-      win.focus();
-      win.print();
-      window.setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }, 80);
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) { URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   return (
@@ -1111,23 +1096,7 @@ function ReportsDialog({
         : `Треньор: ${activeGroupName}`
       : "";
 
-    if (typeof window === "undefined" || typeof document === "undefined") return;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument;
-    const win = iframe.contentWindow;
-    if (!doc || !win) {
-      document.body.removeChild(iframe);
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     const tableRowsHtml = rowsToPrint.length > 0
       ? rowsToPrint
@@ -1143,62 +1112,52 @@ function ReportsDialog({
         .join("")
       : `<tr><td colspan="5" style="text-align:center;color:#6b7280;">Няма данни за избраните филтри.</td></tr>`;
 
-    doc.open();
-    doc.write(`<!doctype html>
+    const fullHtml = `<!DOCTYPE html>
 <html lang="bg">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"} — ${escapeHtml(periodTitle)}</title>
   <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
-    .page { padding: 24px; }
-    h1 { margin: 0 0 4px; font-size: 22px; }
-    .sub { margin: 0 0 14px; color: #6b7280; font-size: 13px; }
-    .stats { display: flex; gap: 12px; margin: 0 0 16px; flex-wrap: wrap; }
-    .stat { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 13px; min-width: 140px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111827; padding: 24px; margin: 0; }
+    .pt { display: flex; gap: 8px; margin: 0 0 16px; }
+    .pt button { padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .pt-p { background: #111827; color: #fff; border: none; }
+    .pt-c { background: #f3f4f6; border: 1px solid #d1d5db; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { border: 1px solid #e5e7eb; padding: 7px 8px; text-align: left; }
     th { background: #f9fafb; }
-    @page { margin: 10mm; }
+    @media print { .pt { display: none; } @page { margin: 10mm; } }
   </style>
 </head>
 <body>
-  <div class="page">
-    <h1>${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</h1>
-    <p class="sub">Период: ${escapeHtml(periodTitle)}</p>
-    ${scopeTitle ? `<p class="sub">${escapeHtml(scopeTitle)}</p>` : ""}
-    <div class="stats">
-      <div class="stat">Платили: <strong>${paid}</strong> / ${totalRows}</div>
-      <div class="stat">Събираемост: <strong>${percent}%</strong></div>
-      <div class="stat">Неплатили: <strong>${unpaid}</strong></div>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Име</th>
-          <th>Сума</th>
-          <th>Дата на плащане</th>
-          <th>Статус</th>
-        </tr>
-      </thead>
-      <tbody>${tableRowsHtml}</tbody>
-    </table>
+  <div class="pt">
+    <button class="pt-c" onclick="window.close()">✕ Затвори</button>
+    <button class="pt-p" onclick="window.print()">🖨 Принтирай</button>
   </div>
+  <div style="font-size:22px;font-weight:700;margin:0 0 4px;">${kind === "monthly" ? "Месечен отчет" : "Годишен отчет"}</div>
+  <p style="margin:0 0 14px;color:#6b7280;font-size:13px;">Период: ${escapeHtml(periodTitle)}</p>
+  ${scopeTitle ? `<p style="margin:0 0 14px;color:#6b7280;font-size:13px;">${escapeHtml(scopeTitle)}</p>` : ""}
+  <div style="display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap;">
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">Платили: <strong>${paid}</strong> / ${totalRows}</div>
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">Събираемост: <strong>${percent}%</strong></div>
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">Неплатили: <strong>${unpaid}</strong></div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Име</th><th>Сума</th><th>Дата на плащане</th><th>Статус</th></tr>
+    </thead>
+    <tbody>${tableRowsHtml}</tbody>
+  </table>
+  <script>window.onload=function(){window.print();window.addEventListener('afterprint',function(){window.close();},{once:true});}</script>
 </body>
-</html>`);
-    doc.close();
+</html>`;
 
-    window.setTimeout(() => {
-      win.focus();
-      win.print();
-      window.setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }, 80);
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) { URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   return (

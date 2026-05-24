@@ -708,10 +708,10 @@ export async function checkAwayMatchTrainingConflict(input: {
 
   if (isHome) {
     for (const g of customGroups) {
-      schedules.push({ label: `РїРµСЂСЃРѕРЅР°Р»РёР·РёСЂР°РЅР° РіСЂСѓРїР° ${g.name}`, trainingTime: g.trainingTime, trainingDateTimes: g.trainingDateTimes, trainingDurationMinutes: g.trainingDurationMinutes });
+      schedules.push({ label: `персонализирана група ${g.name}`, trainingTime: g.trainingTime, trainingDateTimes: g.trainingDateTimes, trainingDurationMinutes: g.trainingDurationMinutes });
     }
     for (const g of coachGroups) {
-      schedules.push({ label: `С‚СЂРµРЅСЊРѕСЂСЃРєР° РіСЂСѓРїР° ${g.name}`, trainingTime: g.trainingTime, trainingDateTimes: g.trainingDateTimes, trainingDurationMinutes: g.trainingDurationMinutes });
+      schedules.push({ label: `треньорска група ${g.name}`, trainingTime: g.trainingTime, trainingDateTimes: g.trainingDateTimes, trainingDurationMinutes: g.trainingDurationMinutes });
     }
   }
 

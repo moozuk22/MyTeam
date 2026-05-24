@@ -317,10 +317,12 @@ function WeeklyGrid({
   dates,
   sessions,
   todayIso,
+  onDateClick,
 }: {
   dates: string[];
   sessions: TrainingWeekSessionItem[];
   todayIso: string;
+  onDateClick?: (date: string, sessionId: string) => void;
 }) {
   const sessionsByDate = new Map<string, TrainingWeekSessionItem[]>();
   for (const d of dates) sessionsByDate.set(d, []);
@@ -356,7 +358,6 @@ function WeeklyGrid({
               <ul className="amp-training-week-session-rows" aria-label={`График за ${weekdayLong}`}>
                 {daySessions.map((session) => {
                   const accent =
-                    session.eventType !== "match" &&
                     session.color &&
                     isCustomTrainingGroupPaletteColor(session.color)
                       ? session.color
@@ -370,21 +371,24 @@ function WeeklyGrid({
                   const timeStyle: CSSProperties | undefined = accent
                     ? { color: customTrainingGroupReadableOnAccent(accent) === "#fafafa" ? "rgba(255,255,255,0.75)" : accent }
                     : undefined;
-                  const badgeStyle: CSSProperties | undefined =
-                    accent && session.eventType !== "match"
-                      ? {
-                          background: accent,
-                          borderColor: customTrainingGroupAccentRgba(accent, 0.55),
-                          color: customTrainingGroupReadableOnAccent(accent),
-                        }
-                      : undefined;
+                  const badgeStyle: CSSProperties | undefined = accent
+                    ? {
+                        background: accent,
+                        borderColor: customTrainingGroupAccentRgba(accent, 0.55),
+                        color: customTrainingGroupReadableOnAccent(accent),
+                      }
+                    : undefined;
                   return (
                   <li
                     key={session.id}
                     className={`amp-training-week-session-row${
                       session.eventType === "match" ? " amp-training-week-session-row--match" : ""
-                    }`}
-                    style={rowStyle}
+                    }${onDateClick ? " amp-training-week-session-row--clickable" : ""}`}
+                    style={onDateClick ? { ...rowStyle, cursor: "pointer" } : rowStyle}
+                    onClick={onDateClick ? () => onDateClick(session.date, session.id) : undefined}
+                    role={onDateClick ? "button" : undefined}
+                    tabIndex={onDateClick ? 0 : undefined}
+                    onKeyDown={onDateClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onDateClick(session.date, session.id); } } : undefined}
                   >
                     <span className="amp-training-week-session-row-time" style={timeStyle}>
                       {session.trainingTime?.trim()
@@ -417,6 +421,9 @@ function WeeklyGrid({
                     >
                       {session.eventType === "match" ? "М" : "Т"}
                     </span>
+                    {onDateClick && (
+                      <span className="amp-training-week-session-row-info" aria-hidden="true">i</span>
+                    )}
                   </li>
                   );
                 })}
@@ -451,6 +458,160 @@ function getCalendarDatesForMonth(monthKey: string) {
     `${year}-${String(month).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
   );
 }
+
+interface GuideStep {
+  id: string;
+  title: string;
+  description: string;
+  adminOnly?: boolean;
+  icon: string;
+}
+
+const ALL_GUIDE_STEPS: GuideStep[] = [
+  {
+    id: 'welcome',
+    title: 'Добре дошли в Наръчника',
+    description: 'Това ръководство ще ви запознае с всички функции на страницата. Използвайте бутоните „Назад“ и „Напред“, за да преминавате между стъпките. В края ще намерите списък с всички теми, за да се върнете бързо към нужната.',
+    icon: "<path d='M4 19.5A2.5 2.5 0 016.5 17H20'/><path d='M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z'/>",
+  },
+  {
+    id: 'cards',
+    title: 'Картичките на спортистите',
+    description: 'Всяка картичка показва снимка, пълно име и статус на плащане. Зелено = платено. Жълто = предупреждение (текущият месец не е платен). Червено = просрочено (два или повече месеца неплатени). Търсете по горните полета и филтрирайте по отбор или група.',
+    icon: "<rect x='1' y='4' width='22' height='16' rx='2' ry='2'/><line x1='1' y1='10' x2='23' y2='10'/><line x1='6' y1='15' x2='10' y2='15'/>",
+  },
+  {
+    id: 'add-member',
+    title: 'Добавяне на нов спортист',
+    description: 'Зеленият бутон „Добави състезател” отваря регистрационна форма. Попълнете: пълно име, дата на раждане, статус, телефон на родител (задължително), телефон на състезател (по желание), начален месец на таксуване, номер в отбора и снимка. Кодът на картата се генерира автоматично.',
+    icon: "<path d='M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2'/><circle cx='8.5' cy='7' r='4'/><line x1='20' y1='8' x2='20' y2='14'/><line x1='23' y1='11' x2='17' y2='11'/>",
+  },
+  {
+    id: 'member-details',
+    title: 'Детайли на спортиста',
+    description: 'Кликнете върху картичка, за да отворите детайлите на спортиста. Виждате статус, активна карта, телефони, последно плащане и история на плащанията. Тук можете да назначите спортиста към треньорска група, да напишете бележка (вижда се само от треньора) и да редактирате данните му.',
+    icon: "<path d='M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2'/><circle cx='12' cy='7' r='4'/>",
+  },
+  {
+    id: 'member-profile',
+    title: 'Клубна карта на спортиста',
+    description: 'Натиснете бутона „Профил" върху картичката на спортиста, за да отворите личната му страница. Тук се отбелязват плащания, вижда се графикът на тренировките и може да се архивира спортистът. Това е същата страница, която се отваря при сканиране на картата.',
+    icon: "<rect x='2' y='3' width='20' height='14' rx='2'/><path d='M8 21h8m-4-4v4'/>",
+  },
+  {
+    id: 'monthly-fee',
+    title: 'Месечна такса',
+    description: 'Бутонът „Месечна такса“ задава стандартния размер на членската такса за клуба. При нужда може да се зададе индивидуална такса за конкретен спортист при редактиране на профила му.',
+    icon: "<line x1='12' y1='1' x2='12' y2='23'/><path d='M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6'/>",
+  },
+  {
+    id: 'groups',
+    title: 'Настройки на групите',
+    description: 'Бутонът „Групи“ управлява режима на тренировъчните групи: по набори (по годишнини) или по персонализирани групи с избран цвят. Тук се създават, редактират и изтриват групи.',
+    adminOnly: true,
+    icon: "<path d='M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M23 21v-2a4 4 0 00-3-3.87'/><path d='M16 3.13a4 4 0 010 7.75'/>",
+  },
+  {
+    id: 'subgroup',
+    title: 'Създаване на група',
+    description: 'Бутонът „Създай / редактирай група” отваря формата за нова група или редактиране на съществуваща. Въведете име, изберете цвят и добавете желаните спортисти. Групите се използват за по-фино разделение в рамките на отбора — например сутрешна и вечерна група.',
+    icon: "<circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='16'/><line x1='8' y1='12' x2='16' y2='12'/>",
+  },
+  {
+    id: 'coaches',
+    title: 'Управление на треньори',
+    description: 'Бутонът „Треньори“ задава кои спортисти са достъпни за всеки треньорски акаунт. Всеки треньор вижда само назначената му група. Тук добавяте и управлявате треньорски групи.',
+    adminOnly: true,
+    icon: "<circle cx='12' cy='8' r='6'/><path d='M15.477 12.89L17 22l-5-3-5 3 1.523-9.11'/>",
+  },
+  {
+    id: 'schedule',
+    title: 'График на тренировките',
+    description: 'Бутонът „График“ отваря тренировъчния календар. Тук добавяте тренировъчни дни по седмица, задавате часове и терени, и планирате паузи или извънредни тренировки. Промените се отразяват на всички устройства на спортистите.',
+    icon: "<rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/>",
+  },
+  {
+    id: 'attendance',
+    title: 'Присъствия на тренировки',
+    description: 'Бутонът „Присъствия“ отваря справка с мрежа от спортисти и тренировъчни дати. Можете да филтрирате по период, треньор и група, и да отпечатате справката. За да редактирате присъствията, натиснете „Редактирай“ — клетките стават кликаеми и можете да превключвате присъствие/отсъствие.',
+    icon: "<polyline points='9 11 12 14 22 4'/><path d='M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11'/>",
+  },
+  {
+    id: 'notifications-settings',
+    title: 'Настройки на напомнянията',
+    description: 'Бутонът „Напомняния“ управлява автоматичните напомняния за плащане. Можете да настроите до две месечни напомняния (ден и час) и отделно напомняне за просрочени. Спортистите получават известие на телефона или компютъра си, ако са го активирали от личната си страница.',
+    icon: "<path d='M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9'/><path d='M13.73 21a2 2 0 01-3.46 0'/>",
+  },
+  {
+    id: 'message',
+    title: 'Изпращане на съобщение',
+    description: 'Бутонът „Съобщение“ позволява да изпратите персонализирано push известие до избрани спортисти или цели групи. Съобщението се появява на телефона или компютъра им веднага.',
+    icon: "<path d='M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z'/>",
+  },
+  {
+    id: 'reports',
+    title: 'Отчети',
+    description: 'Бутонът „Отчети“ показва финансова статистика за избран месец: брой платили, в предупреждение и просрочени. Подходящ за проверка преди родителска среща или при отчитане на приходите.',
+    icon: "<line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/>",
+  },
+  {
+    id: 'import-sheets',
+    title: 'Импорт от Google Sheets',
+    description: 'Бутонът „Импорт“ позволява да заредите списък спортисти от Google Таблица. Посочете URL на таблицата и системата ще импортира имена, дати на раждане и номера в отбора автоматично. Удобно при прехвърляне от стара система.',
+    adminOnly: true,
+    icon: "<path d='M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z'/><polyline points='14 2 14 8 20 8'/><line x1='16' y1='13' x2='8' y2='13'/><line x1='16' y1='17' x2='8' y2='17'/>",
+  },
+  {
+    id: 'import-photos',
+    title: 'Импорт на снимки от Drive',
+    description: 'Бутонът „Снимки“ зарежда снимки от Google Drive масово. Снимките трябва да са именувани по код на картата или пълно име — системата ги свързва автоматично с профилите.',
+    adminOnly: true,
+    icon: "<rect x='3' y='3' width='18' height='18' rx='2' ry='2'/><circle cx='8.5' cy='8.5' r='1.5'/><polyline points='21 15 16 10 5 21'/>",
+  },
+  {
+    id: 'excel',
+    title: 'Изтегляне на Excel',
+    description: 'Бутонът „Excel“ изтегля актуален списък на всички активни спортисти като .xlsx файл, включващ имена, рождени дати, телефони и статуси на плащане. Удобно за архив или споделяне.',
+    adminOnly: true,
+    icon: "<path d='M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4'/><polyline points='7 10 12 15 17 10'/><line x1='12' y1='15' x2='12' y2='3'/>",
+  },
+  {
+    id: 'inactive',
+    title: 'Неактивни спортисти',
+    description: 'Бутонът „Неактивни“ показва деактивираните спортисти. Можете да ги върнете в активния списък или да ги изтриете трайно от базата данни. Деактивирането не изтрива данните — просто ги скрива от основния списък.',
+    adminOnly: true,
+    icon: "<path d='M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2'/><circle cx='8.5' cy='7' r='4'/><line x1='18' y1='8' x2='23' y2='13'/><line x1='23' y1='8' x2='18' y2='13'/>",
+  },
+  {
+    id: 'links',
+    title: 'Изтегляне на линкове',
+    description: 'Бутонът „Линкове“ изтегля текстов файл с персоналните URL адреси на всички спортисти — за разпечатване или изпращане. Всеки линк отваря личната страница на спортиста (за NFC карта или QR код).',
+    adminOnly: true,
+    icon: "<path d='M15 7h3a5 5 0 015 5 5 5 0 01-5 5h-3m-6 0H6a5 5 0 01-5-5 5 5 0 015-5h3'/><line x1='8' y1='12' x2='16' y2='12'/>",
+  },
+  {
+    id: 'payment-workflow',
+    title: 'Метод на плащане',
+    description: 'Бутонът „Метод плащане“ избира как се изчисляват месечните такси: по календарен месец (стандартно) или Rolling 30 дни — 30 дни след датата на последното плащане. Промяната засяга статусите на всички спортисти.',
+    adminOnly: true,
+    icon: "<polyline points='23 4 23 10 17 10'/><polyline points='1 20 1 14 7 14'/><path d='M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15'/>",
+  },
+  {
+    id: 'billing',
+    title: 'Абонамент и такси',
+    description: 'Бутонът „Такси“ показва информация за абонамента на клуба в платформата и историята на фактурирането.',
+    adminOnly: true,
+    icon: "<path d='M20 12V22H4V12'/><path d='M22 7H2v5h20V7z'/><path d='M12 22V7'/><path d='M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z'/><path d='M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z'/>",
+  },
+  {
+    id: 'edit-team',
+    title: 'Редактиране на отбора',
+    description: 'Бутонът „Редактирай“ отваря настройките на отбора: промяна на логото, името, вида спорт и конфигурация. Тук се управляват и основните данни на клуба като стандартни времена за тренировки и терени.',
+    adminOnly: true,
+    icon: "<circle cx='12' cy='12' r='3'/><path d='M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z'/>",
+  },
+];
+
 
 function AdminMembersPageContent() {
   const router = useRouter();
@@ -596,6 +757,8 @@ function AdminMembersPageContent() {
   const [trainingAttendanceOpen, setTrainingAttendanceOpen] = useState(false);
   /** Club members page without `coachGroupId`: show week list only (hide «Отбори» tab). */
   const [trainingAttendanceHideTeamsTab, setTrainingAttendanceHideTeamsTab] = useState(false);
+  const [schedulerCalendarVisibleMonthIdx, setSchedulerCalendarVisibleMonthIdx] = useState(0);
+  const [matchCalendarVisibleMonthIdx, setMatchCalendarVisibleMonthIdx] = useState(0);
   const [trainingAttendanceView, setTrainingAttendanceView] = useState<"teamGroup" | "trainingGroups" | "today">("today");
   const [trainingAttendanceLoading, setTrainingAttendanceLoading] = useState(false);
   const [trainingAttendanceError, setTrainingAttendanceError] = useState("");
@@ -616,25 +779,27 @@ function AdminMembersPageContent() {
   const [trainingNoteSaving, setTrainingNoteSaving] = useState(false);
   const [trainingNoteTargetDates, setTrainingNoteTargetDates] = useState<string[]>([]);
   const [trainingBulkNoteOpen, setTrainingBulkNoteOpen] = useState(false);
-  const [trainingNoteSuccessOpen, setTrainingNoteSuccessOpen] = useState(false);
-  const [trainingNoteSuccessMessage, setTrainingNoteSuccessMessage] = useState("");
   const [trainingNotesByDate, setTrainingNotesByDate] = useState<Record<string, string>>({});
   const [trainingNoteComparisonLoading, setTrainingNoteComparisonLoading] = useState(false);
   const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
   const [trainingDayDetailsOpening, setTrainingDayDetailsOpening] = useState(false);
   const [trainingDayDurationMinutes, setTrainingDayDurationMinutes] = useState(DEFAULT_TRAINING_DURATION_MINUTES);
+  const [trainingDayTime, setTrainingDayTime] = useState<string | null>(null);
   const [trainingDayField, setTrainingDayField] = useState<{ id: string; name: string; fieldType: string; pieces: { id: string; name: string }[] } | null>(null);
   const [trainingDayFieldPieceIds, setTrainingDayFieldPieceIds] = useState<string[]>([]);
+  const [trainingPlayersExpanded, setTrainingPlayersExpanded] = useState(false);
   const [trainingDaysEditorOpen, setTrainingDaysEditorOpen] = useState(false);
   const [trainingDaysEditorLoading, setTrainingDaysEditorLoading] = useState(false);
   const [trainingDaysEditorSaving, setTrainingDaysEditorSaving] = useState(false);
   const [trainingDaysEditorError, setTrainingDaysEditorError] = useState("");
+  const [trainingDaysPreExistingDates, setTrainingDaysPreExistingDates] = useState<string[]>([]);
+  const [trainingDaysSingleEditDate, setTrainingDaysSingleEditDate] = useState<string | null>(null);
   const [scheduleEventModalOpen, setScheduleEventModalOpen] = useState(false);
   const [scheduleEventStep, setScheduleEventStep] = useState<"type" | "match-days" | "match-details">("type");
   const [matchEditorSaving, setMatchEditorSaving] = useState(false);
   const [matchEditorError, setMatchEditorError] = useState("");
   const [matchSelectedDates, setMatchSelectedDates] = useState<string[]>([]);
-  const [matchDetailsPerDay, setMatchDetailsPerDay] = useState<Record<string, { opponent: string; location: string; time: string; duration: string; isHome: boolean }>>({});
+  const [matchDetailsPerDay, setMatchDetailsPerDay] = useState<Record<string, { opponent: string; location: string; time: string; duration: string; isHome: boolean | null }>>({});
   const [matchTeamGroups, setMatchTeamGroups] = useState<number[]>([]);
   const [matchExistingIdByDate, setMatchExistingIdByDate] = useState<Record<string, string>>({});
   const [clubMatches, setClubMatches] = useState<ClubMatch[]>([]);
@@ -642,6 +807,9 @@ function AdminMembersPageContent() {
   const [matchViewMatch, setMatchViewMatch] = useState<ClubMatch | null>(null);
   const [trainingDayDetailsTab, setTrainingDayDetailsTab] = useState<string>("training");
   const [trainingDayDetailsTabLoading, setTrainingDayDetailsTabLoading] = useState(false);
+  const [trainingDaySessionCancelled, setTrainingDaySessionCancelled] = useState(false);
+  const [trainingDayCancelLoading, setTrainingDayCancelLoading] = useState(false);
+  const [trainingDayCancelConfirmOpen, setTrainingDayCancelConfirmOpen] = useState(false);
   const [limitedEvent, setLimitedEvent] = useState<LimitedEventDetail | null>(null);
   const [limitedEventLoading, setLimitedEventLoading] = useState(false);
   const [limitedSpotsInput, setLimitedSpotsInput] = useState("10");
@@ -660,6 +828,7 @@ function AdminMembersPageContent() {
   const [trainingDaysInitialFieldPieceIds, setTrainingDaysInitialFieldPieceIds] = useState<string[]>([]);
   const [trainingDaysSuccessOpen, setTrainingDaysSuccessOpen] = useState(false);
   const [trainingDaysSuccessMessage, setTrainingDaysSuccessMessage] = useState("");
+  const [trainingDayScheduleNotes, setTrainingDayScheduleNotes] = useState<Record<string, string>>({});
   const [trainingGroupMode, setTrainingGroupMode] = useState<"team_group" | "custom_group">("team_group");
   const [trainingGroupModeDraft, setTrainingGroupModeDraft] = useState<"team_group" | "custom_group">("team_group");
   const [trainingGroupModeSettingsOpen, setTrainingGroupModeSettingsOpen] = useState(false);
@@ -670,6 +839,8 @@ function AdminMembersPageContent() {
   const [trainingDaysEditorGroupName, setTrainingDaysEditorGroupName] = useState("");
   const [trainingDaysEditorCreateOpen, setTrainingDaysEditorCreateOpen] = useState(false);
   const [trainingGroupCreateOpen, setTrainingGroupCreateOpen] = useState(false);
+  const [trainingGroupCreateStep, setTrainingGroupCreateStep] = useState<"picker" | "create" | "edit-pick">("picker");
+  const [trainingGroupEditPickId, setTrainingGroupEditPickId] = useState("");
   const [trainingGroupCreateSaving, setTrainingGroupCreateSaving] = useState(false);
   const [trainingGroupCreateError, setTrainingGroupCreateError] = useState("");
   const [trainingGroupCreateGroups, setTrainingGroupCreateGroups] = useState<string[]>([]);
@@ -696,6 +867,9 @@ function AdminMembersPageContent() {
   const [pendingTeamGroupWarningGroups, setPendingTeamGroupWarningGroups] = useState<Array<{ id: string; name: string }>>([]);
   const [importSheetsOpen, setImportSheetsOpen] = useState(false);
   const [importPhotosOpen, setImportPhotosOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guideStep, setGuideStep] = useState(0);
+  const [guideImgExpanded, setGuideImgExpanded] = useState(false);
   const [notifyPanelOpen, setNotifyPanelOpen] = useState(false);
   const [notifyMessage, setNotifyMessage] = useState("");
   const [notifySelectedIds, setNotifySelectedIds] = useState<Set<string>>(new Set());
@@ -734,6 +908,13 @@ function AdminMembersPageContent() {
   const matchCalendarDates = getNextTrainingCalendarDates(30);
   const matchCalendarDateSet = new Set(matchCalendarDates);
   const matchCalendarMonths = buildCalendarMonths(matchCalendarDates);
+  const trimCalendarMonthCells = (months: ReturnType<typeof buildCalendarMonths>, fromDate: string) =>
+    months.map((m) => {
+      const firstIdx = m.cells.findIndex((d) => d !== null && d >= fromDate);
+      return { ...m, cells: m.cells.slice(firstIdx >= 0 ? Math.floor(firstIdx / 7) * 7 : 0) };
+    });
+  const schedulerCalendarMonthsTrimmed = trimCalendarMonthCells(schedulerCalendarMonths, getTodayIsoDate());
+  const matchCalendarMonthsTrimmed = trimCalendarMonthCells(matchCalendarMonths, getTodayIsoDate());
   const matchCalendarMatchesByDate = new Map<string, ClubMatch[]>();
   for (const match of clubMatches) {
     if (!matchCalendarDateSet.has(match.matchDate)) continue;
@@ -745,6 +926,7 @@ function AdminMembersPageContent() {
   const trainingUpcomingByDate = new Map(trainingUpcomingDates.map((item) => [item.date, item]));
   const trainingAttendanceCalendarDates = getCalendarDatesForMonth(trainingAttendanceMonth);
   const trainingAttendanceCalendarMonths = buildCalendarMonths(trainingAttendanceCalendarDates);
+  const trainingAttendanceCalendarMonthsTrimmed = trimCalendarMonthCells(trainingAttendanceCalendarMonths, getTodayIsoDate());
   const todayIsoDate = getTodayIsoDate();
   const clubNotificationTeamGroups = Array.from(
     new Set(
@@ -2034,16 +2216,23 @@ function AdminMembersPageContent() {
   }, [isCustomTrainingGroupMode, customTrainingGroups, customTrainingGroupCoachScope]);
   const trainingAttendanceMatchesByDate = new Map<string, ClubMatch[]>();
   for (const match of clubMatches) {
-    const appliesToAll = match.teamGroups.length === 0;
+    const appliesToAll = match.teamGroups.length === 0 && match.customGroupId === null;
     const appliesToSelectedTeam =
       selectedTeamGroup === null || match.teamGroups.includes(selectedTeamGroup);
     const appliesToSelectedTrainingGroup =
       selectedTrainingGroup?.teamGroups.some((teamGroup) => match.teamGroups.includes(teamGroup)) ?? false;
-    const appliesToCurrentScope =
-      appliesToAll ||
-      (trainingAttendanceView === "trainingGroups" && !isCustomTrainingGroupMode
-        ? appliesToSelectedTrainingGroup
-        : appliesToSelectedTeam);
+    let appliesToCurrentScope: boolean;
+    if (match.customGroupId !== null) {
+      appliesToCurrentScope = isCustomTrainingGroupMode && match.customGroupId === selectedCustomGroup?.id;
+    } else {
+      appliesToCurrentScope =
+        appliesToAll ||
+        (isCustomTrainingGroupMode
+          ? false
+          : trainingAttendanceView === "trainingGroups"
+            ? appliesToSelectedTrainingGroup
+            : appliesToSelectedTeam);
+    }
     if (!appliesToCurrentScope) continue;
     const matchesForDate = trainingAttendanceMatchesByDate.get(match.matchDate) ?? [];
     matchesForDate.push(match);
@@ -2158,6 +2347,10 @@ function AdminMembersPageContent() {
     trainingDaysEditorMode === "customGroup" ||
     trainingDaysEditorMode === "coachGroup";
   const canShowTrainingDaysSpotsStep = canShowTrainingDaysFieldStep && spotsStepSupportedByMode;
+  const canShowTrainingDaysNotesStep = canShowTrainingDaysFieldStep;
+  const stepSequence: TrainingDaysStep[] = spotsStepSupportedByMode
+    ? ["days", "time", "spots", "field", "notes"]
+    : ["days", "time", "field", "notes"];
   const schedulerLimitedSpotsValue = parseInt(schedulerLimitedSpots, 10);
   const isSchedulerLimitedSpotsValid =
     Number.isInteger(schedulerLimitedSpotsValue) && schedulerLimitedSpotsValue >= 1 && schedulerLimitedSpotsValue <= 200;
@@ -2172,19 +2365,28 @@ function AdminMembersPageContent() {
   const effectiveTrainingDaysActiveStep: TrainingDaysStep =
     trainingDaysEditorMode === "createGroup"
       ? "days"
-      : trainingDaysActiveStep === "field" && !canShowTrainingDaysFieldStep
-        ? canShowTrainingDaysSpotsStep
-          ? "spots"
-          : canShowTrainingDaysTimeStep
-            ? "time"
-            : "days"
-        : trainingDaysActiveStep === "spots" && !canShowTrainingDaysSpotsStep
-          ? canShowTrainingDaysTimeStep
-            ? "time"
-            : "days"
-          : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
-            ? "days"
-            : trainingDaysActiveStep;
+      : trainingDaysActiveStep === "notes" && !canShowTrainingDaysNotesStep
+        ? canShowTrainingDaysFieldStep
+          ? "field"
+          : canShowTrainingDaysSpotsStep
+            ? "spots"
+            : canShowTrainingDaysTimeStep
+              ? "time"
+              : "days"
+        : trainingDaysActiveStep === "field" && !canShowTrainingDaysFieldStep
+          ? canShowTrainingDaysSpotsStep
+            ? "spots"
+            : canShowTrainingDaysTimeStep
+              ? "time"
+              : "days"
+          : trainingDaysActiveStep === "spots" && !canShowTrainingDaysSpotsStep
+            ? canShowTrainingDaysTimeStep
+              ? "time"
+              : "days"
+            : trainingDaysActiveStep === "time" && !canShowTrainingDaysTimeStep
+              ? "days"
+              : trainingDaysActiveStep;
+  const currentStepOrder = stepSequence.indexOf(effectiveTrainingDaysActiveStep);
   const trainingWeekdayBuckets = Array.from(
     new Set(
       normalizedTrainingDaysSelection
@@ -2224,7 +2426,7 @@ function AdminMembersPageContent() {
     effectiveTrainingDaysActiveStep !== "days";
   const showTrainingStepNext =
     trainingDaysEditorMode !== "createGroup" &&
-    effectiveTrainingDaysActiveStep !== "field";
+    effectiveTrainingDaysActiveStep !== "notes";
   const isTrainingStepNextDisabled =
     trainingDaysEditorSaving ||
     (effectiveTrainingDaysActiveStep === "days" && !canShowTrainingDaysTimeStep) ||
@@ -2379,6 +2581,11 @@ function AdminMembersPageContent() {
     }
     return list;
   }, [bulkCoachGroupAllMembers, bulkCoachGroupSearchTerm]);
+
+  const guideSteps = useMemo(
+    () => ALL_GUIDE_STEPS.filter((s) => !s.adminOnly || isAdmin),
+    [isAdmin],
+  );
 
   const openBulkCoachGroupModal = async (groupId: string) => {
     setBulkCoachGroupTargetId(groupId);
@@ -3002,6 +3209,9 @@ function AdminMembersPageContent() {
     const firstFree =
       CUSTOM_TRAINING_GROUP_COLOR_PALETTE.find((c) => !used.has(c)) ?? CUSTOM_TRAINING_GROUP_COLOR_PALETTE[0];
     setTrainingGroupCreateColor(firstFree);
+    setTrainingGroupCreateStep("picker");
+    const firstGroup = isCustomTrainingGroupMode ? customTrainingGroups[0] : trainingScheduleGroups[0];
+    setTrainingGroupEditPickId(firstGroup?.id ?? "");
     setTrainingGroupCreateOpen(true);
   };
 
@@ -3082,6 +3292,7 @@ function AdminMembersPageContent() {
           throw new Error(payload?.error || "Failed to create custom training group.");
         }
         setTrainingGroupCreateOpen(false);
+        setTrainingGroupCreateStep("picker");
         await loadCustomTrainingGroups();
         void refreshMembersList();
         return;
@@ -3108,6 +3319,7 @@ function AdminMembersPageContent() {
       }
 
       setTrainingGroupCreateOpen(false);
+      setTrainingGroupCreateStep("picker");
       await loadTrainingScheduleGroups();
     } catch (error) {
       setTrainingGroupCreateError(error instanceof Error ? error.message : "Възникна грешка.");
@@ -3263,7 +3475,7 @@ function AdminMembersPageContent() {
     }
   };
 
-  const openTrainingDaysEditor = async (mode: "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup" = "teamGroup") => {
+  const openTrainingDaysEditor = async (mode: "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup" = "teamGroup", editDate?: string) => {
     if (!clubId) return;
     if (trainingDaysEditorOpen) {
       setTrainingDaysEditorOpen(false);
@@ -3272,7 +3484,9 @@ function AdminMembersPageContent() {
     }
 
     setTrainingDaysEditorMode(mode);
-    setTrainingDaysActiveStep("days");
+    setTrainingDaysSingleEditDate(editDate ?? null);
+    setTrainingDaysActiveStep(editDate ? "time" : "days");
+    setTrainingDayScheduleNotes(editDate && trainingNote.trim() ? { [editDate]: trainingNote } : {});
     setTrainingDaysEditorGroups([]);
     setTrainingDaysEditorGroupName("");
     setTrainingDaysEditorCreateOpen(true);
@@ -3319,15 +3533,17 @@ function AdminMembersPageContent() {
           nextWindowDates,
           { trainingFieldId: resolvedGroup.trainingFieldId ?? null, trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [] },
         );
+        const customEditDates = editDate ? [editDate].filter(d => nextWindowDates.includes(d)) : [];
+        setTrainingDaysPreExistingDates(nextWindowDates);
         setSchedulerForm((prev) => ({
           ...prev,
-          trainingDates: nextWindowDates,
+          trainingDates: customEditDates,
           trainingTime: resolvedUniformTime,
           trainingDurationMinutes: getTrainingDurationFormValue(resolvedGroup.trainingDurationMinutes),
           trainingFieldId: resolvedGroup.trainingFieldId ?? "",
           trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [],
         }));
-        setTrainingDaysInitialDates(nextWindowDates);
+        setTrainingDaysInitialDates(customEditDates);
         setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(resolvedGroup.trainingDurationMinutes));
         setTrainingDaysInitialFieldId(resolvedGroup.trainingFieldId ?? "");
         setTrainingDaysInitialFieldPieceIds(resolvedGroup.trainingFieldPieceIds ?? []);
@@ -3335,7 +3551,7 @@ function AdminMembersPageContent() {
         setTrainingDaysInitialDateTimes(resolvedDateTimes);
         setTrainingFieldSelections(resolvedFieldSelections);
         setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
-        setTrainingFieldActiveDate(nextWindowDates[0] ?? "");
+        setTrainingFieldActiveDate(editDate ?? nextWindowDates[0] ?? "");
         setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
         setTrainingDaysEditorOpen(true);
         return;
@@ -3363,15 +3579,17 @@ function AdminMembersPageContent() {
           nextWindowDates,
           { trainingFieldId: resolvedGroup.trainingFieldId ?? null, trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [] },
         );
+        const trainingGroupEditDates = editDate ? [editDate].filter(d => nextWindowDates.includes(d)) : [];
+        setTrainingDaysPreExistingDates(nextWindowDates);
         setSchedulerForm((prev) => ({
           ...prev,
-          trainingDates: nextWindowDates,
+          trainingDates: trainingGroupEditDates,
           trainingTime: resolvedUniformTime,
           trainingDurationMinutes: getTrainingDurationFormValue(resolvedGroup.trainingDurationMinutes),
           trainingFieldId: resolvedGroup.trainingFieldId ?? "",
           trainingFieldPieceIds: resolvedGroup.trainingFieldPieceIds ?? [],
         }));
-        setTrainingDaysInitialDates(nextWindowDates);
+        setTrainingDaysInitialDates(trainingGroupEditDates);
         setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(resolvedGroup.trainingDurationMinutes));
         setTrainingDaysInitialFieldId(resolvedGroup.trainingFieldId ?? "");
         setTrainingDaysInitialFieldPieceIds(resolvedGroup.trainingFieldPieceIds ?? []);
@@ -3379,7 +3597,7 @@ function AdminMembersPageContent() {
         setTrainingDaysInitialDateTimes(resolvedDateTimes);
         setTrainingFieldSelections(resolvedFieldSelections);
         setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
-        setTrainingFieldActiveDate(nextWindowDates[0] ?? "");
+        setTrainingFieldActiveDate(editDate ?? nextWindowDates[0] ?? "");
         setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
         setTrainingDaysEditorOpen(true);
         return;
@@ -3412,15 +3630,17 @@ function AdminMembersPageContent() {
           nextWindowDates,
           { trainingFieldId: normalizeOptionalId(cgPayload.trainingFieldId), trainingFieldPieceIds: Array.isArray(cgPayload.trainingFieldPieceIds) ? cgPayload.trainingFieldPieceIds.map(String) : [] },
         );
+        const coachGroupEditDates = editDate ? [editDate].filter(d => nextWindowDates.includes(d)) : [];
+        setTrainingDaysPreExistingDates(nextWindowDates);
         setSchedulerForm((prev) => ({
           ...prev,
-          trainingDates: nextWindowDates,
+          trainingDates: coachGroupEditDates,
           trainingTime: resolvedUniformTime,
           trainingDurationMinutes: getTrainingDurationFormValue(cgPayload.trainingDurationMinutes),
           trainingFieldId: normalizeOptionalId(cgPayload.trainingFieldId) ?? "",
           trainingFieldPieceIds: Array.isArray(cgPayload.trainingFieldPieceIds) ? cgPayload.trainingFieldPieceIds.map(String) : [],
         }));
-        setTrainingDaysInitialDates(nextWindowDates);
+        setTrainingDaysInitialDates(coachGroupEditDates);
         setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(cgPayload.trainingDurationMinutes));
         setTrainingDaysInitialFieldId(normalizeOptionalId(cgPayload.trainingFieldId) ?? "");
         setTrainingDaysInitialFieldPieceIds(Array.isArray(cgPayload.trainingFieldPieceIds) ? cgPayload.trainingFieldPieceIds.map(String) : []);
@@ -3428,7 +3648,7 @@ function AdminMembersPageContent() {
         setTrainingDaysInitialDateTimes(resolvedDateTimes);
         setTrainingFieldSelections(resolvedFieldSelections);
         setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
-        setTrainingFieldActiveDate(nextWindowDates[0] ?? "");
+        setTrainingFieldActiveDate(editDate ?? nextWindowDates[0] ?? "");
         setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
         setTrainingDaysEditorOpen(true);
         return;
@@ -3476,6 +3696,8 @@ function AdminMembersPageContent() {
         Number.isInteger(payload.thirdReminderDay) &&
         Number.isInteger(payload.thirdReminderHour) &&
         Number.isInteger(payload.thirdReminderMinute);
+      const teamGroupEditDates = editDate ? [editDate].filter(d => resolvedTrainingDates.includes(d)) : [];
+      setTrainingDaysPreExistingDates(mode === "createGroup" ? [] : resolvedTrainingDates);
       setSchedulerForm({
         reminderDay: String(payload.reminderDay ?? 25),
         overdueDay: String(payload.overdueDay ?? 1),
@@ -3489,7 +3711,7 @@ function AdminMembersPageContent() {
         thirdReminderMinute: hasThirdReminder ? String(payload.thirdReminderMinute) : "0",
         overdueHour: String(payload.overdueHour ?? 10),
         overdueMinute: String(payload.overdueMinute ?? 0),
-        trainingDates: resolvedTrainingDates,
+        trainingDates: mode === "createGroup" ? [] : teamGroupEditDates,
         trainingTime: resolvedUniformTime,
         trainingDurationMinutes: getTrainingDurationFormValue(payload.trainingDurationMinutes),
         trainingFieldId: normalizeOptionalId(payload.trainingFieldId) ?? "",
@@ -3497,7 +3719,7 @@ function AdminMembersPageContent() {
       });
       setSecondReminderEnabled(hasSecondReminder);
       setThirdReminderEnabled(hasThirdReminder);
-      setTrainingDaysInitialDates(resolvedTrainingDates);
+      setTrainingDaysInitialDates(mode === "createGroup" ? [] : teamGroupEditDates);
       setTrainingDaysInitialDurationMinutes(normalizeTrainingDurationInput(payload.trainingDurationMinutes));
       setTrainingDaysInitialFieldId(normalizeOptionalId(payload.trainingFieldId) ?? "");
       setTrainingDaysInitialFieldPieceIds(Array.isArray(payload.trainingFieldPieceIds) ? payload.trainingFieldPieceIds.map(String) : []);
@@ -3505,7 +3727,7 @@ function AdminMembersPageContent() {
       setTrainingDaysInitialDateTimes(resolvedDateTimes);
       setTrainingFieldSelections(resolvedFieldSelections);
       setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
-      setTrainingFieldActiveDate(resolvedTrainingDates[0] ?? "");
+      setTrainingFieldActiveDate(editDate ?? resolvedTrainingDates[0] ?? "");
       setTrainingTimeMode(inferTrainingTimeMode(resolvedTrainingDates, resolvedDateTimes));
       setTrainingDaysEditorOpen(true);
     } catch (error) {
@@ -3526,6 +3748,8 @@ function AdminMembersPageContent() {
     if (hasMissingTrainingField) {
       throw new Error(missingTrainingFieldMessage);
     }
+    const _preExistingSet = new Set(trainingDaysPreExistingDates);
+    const _mergedDates = [...trainingDaysPreExistingDates, ...schedulerForm.trainingDates.filter(d => !_preExistingSet.has(d))].sort((a, b) => a.localeCompare(b));
     const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/scheduler`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -3542,7 +3766,7 @@ function AdminMembersPageContent() {
         thirdReminderMinute: thirdReminderEnabled ? Number.parseInt(schedulerForm.thirdReminderMinute, 10) : null,
         overdueHour: Number.parseInt(schedulerForm.overdueHour, 10),
         overdueMinute: Number.parseInt(schedulerForm.overdueMinute, 10),
-        trainingDates: schedulerForm.trainingDates,
+        trainingDates: _mergedDates,
         trainingTime: normalizedTrainingTime || null,
         trainingDurationMinutes: normalizedTrainingDurationSelection,
         trainingFieldId: primaryTrainingFieldSelection.trainingFieldId || null,
@@ -3550,7 +3774,7 @@ function AdminMembersPageContent() {
         trainingFieldSelections,
         trainingDateTimes: normalizeTrainingDateTimes(
           trainingDateTimes,
-          schedulerForm.trainingDates,
+          _mergedDates,
           trainingTimeMode === "all" ? normalizedTrainingTime : null,
         ),
         teamGroup: selectedTeamGroup,
@@ -3580,14 +3804,24 @@ function AdminMembersPageContent() {
           })
         ));
       }
+      const datesToNote = schedulerForm.trainingDates.filter((d) => (trainingDayScheduleNotes[d] ?? "").trim());
+      if (datesToNote.length > 0) {
+        await Promise.allSettled(datesToNote.map((date) =>
+          fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ trainingDate: date, note: trainingDayScheduleNotes[date]!.trim(), teamGroup: selectedTeamGroup }),
+          })
+        ));
+      }
     }
 
     setTrainingDaysEditorCreateOpen(false);
     setTrainingDaysEditorGroupName("");
     setTrainingDaysEditorGroups([]);
     setTrainingDaysEditorOpen(false);
-    const schedulerBaseMsg = schedulerForm.trainingDates.length > 1
-      ? `Промените по графика са изпратени успешно за ${schedulerForm.trainingDates.length} дни.`
+    const schedulerBaseMsg = _mergedDates.length > 1
+      ? `Промените по графика са изпратени успешно за ${_mergedDates.length} дни.`
       : "Промените по графика са изпратени успешно.";
     setTrainingDaysSuccessMessage(schedulerPayload.warning ? `${schedulerBaseMsg} Внимание: ${schedulerPayload.warning}` : schedulerBaseMsg);
     setTrainingDaysSuccessOpen(true);
@@ -3628,6 +3862,8 @@ function AdminMembersPageContent() {
           .map((value) => String(value ?? "").trim())
           .filter((value) => schedulerCalendarDateSet.has(value))
           .sort((a, b) => a.localeCompare(b));
+        const _groupPreExistingSet = new Set(trainingDaysPreExistingDates);
+        const mergedTrainingDates = [...trainingDaysPreExistingDates, ...nextTrainingDates.filter(d => !_groupPreExistingSet.has(d))].sort((a, b) => a.localeCompare(b));
         const nextTrainingDateTimes = normalizeTrainingDateTimes(
           trainingDateTimes,
           nextTrainingDates,
@@ -3657,7 +3893,7 @@ function AdminMembersPageContent() {
             method: trainingDaysEditorMode === "coachGroup" ? "PUT" : "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              trainingDates: nextTrainingDates,
+              trainingDates: mergedTrainingDates,
               trainingTime: normalizedTrainingTime || null,
               trainingDurationMinutes: normalizedTrainingDurationSelection,
               trainingFieldId: primaryTrainingFieldSelection.trainingFieldId || null,
@@ -3665,7 +3901,7 @@ function AdminMembersPageContent() {
               trainingFieldSelections,
               trainingDateTimes: normalizeTrainingDateTimes(
                 trainingDateTimes,
-                nextTrainingDates,
+                mergedTrainingDates,
                 trainingTimeMode === "all" ? normalizedTrainingTime : null,
               ),
             }),
@@ -3700,6 +3936,22 @@ function AdminMembersPageContent() {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ scopeKey, scopeId, teamGroup: null, trainingDate: date, maxSpots: spots }),
+                })
+              ));
+            }
+          }
+          if (trainingDaysEditorMode !== "coachGroup") {
+            const datesToNote = nextTrainingDates.filter((d) => (trainingDayScheduleNotes[d] ?? "").trim());
+            if (datesToNote.length > 0) {
+              const noteBody = (date: string) =>
+                trainingDaysEditorMode === "customGroup"
+                  ? { trainingDate: date, note: trainingDayScheduleNotes[date]!.trim(), customTrainingGroupId: selectedTrainingGroupId }
+                  : { trainingDate: date, note: trainingDayScheduleNotes[date]!.trim(), trainingGroupId: selectedTrainingGroupId };
+              await Promise.allSettled(datesToNote.map((date) =>
+                fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(noteBody(date)),
                 })
               ));
             }
@@ -3979,6 +4231,7 @@ function AdminMembersPageContent() {
   };
 
   const toggleTrainingDate = (date: string) => {
+    if (trainingDaysSingleEditDate === date) return;
     setSchedulerForm((prev) => {
       const hasDate = prev.trainingDates.includes(date);
       const nextDates = hasDate
@@ -4142,6 +4395,12 @@ function AdminMembersPageContent() {
           ? payload.trainingDurationMinutes
           : DEFAULT_TRAINING_DURATION_MINUTES,
       );
+      setTrainingDayTime(
+        typeof payload?.trainingTime === "string" && TRAINING_TIME_REGEX.test(payload.trainingTime.trim())
+          ? payload.trainingTime.trim()
+          : null,
+      );
+      setTrainingPlayersExpanded(false);
       const rawField = payload?.trainingField;
       setTrainingDayField(
         rawField && typeof rawField === "object" && rawField !== null
@@ -4165,6 +4424,10 @@ function AdminMembersPageContent() {
           ? (payload.trainingFieldPieceIds as unknown[]).map(String)
           : [],
       );
+      setTrainingDaySessionCancelled(
+        typeof payload?.sessionStatus === "string" ? payload.sessionStatus === "cancelled" : false,
+      );
+      setTrainingDayCancelConfirmOpen(false);
     } catch (error) {
       setTrainingAttendancePlayers([]);
       setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
@@ -4172,8 +4435,11 @@ function AdminMembersPageContent() {
       setTrainingNote("");
       setTrainingNoteTargetDates([]);
       setTrainingDayDurationMinutes(DEFAULT_TRAINING_DURATION_MINUTES);
+      setTrainingDayTime(null);
       setTrainingDayField(null);
       setTrainingDayFieldPieceIds([]);
+      setTrainingDaySessionCancelled(false);
+      setTrainingDayCancelConfirmOpen(false);
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
       setTrainingAttendanceLoading(false);
@@ -4233,10 +4499,12 @@ function AdminMembersPageContent() {
         : [];
       setTrainingWeekDates(dates);
       setTrainingWeekSessions(sessions);
+      return sessions;
     } catch (error) {
       setTrainingWeekDates([]);
       setTrainingWeekSessions([]);
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
+      return [];
     } finally {
       setTrainingWeekLoading(false);
     }
@@ -4256,7 +4524,31 @@ function AdminMembersPageContent() {
     setTrainingDaysEditorError("");
     setTrainingNoteTargetDates([]);
     setWeekColorFilter(null);
-    await Promise.all([fetchTrainingWeekSessions(), fetchClubMatches()]);
+    setSchedulerCalendarVisibleMonthIdx(0);
+    setMatchCalendarVisibleMonthIdx(0);
+    const [sessions = []] = await Promise.all([fetchTrainingWeekSessions(), fetchClubMatches()]);
+    if (!options?.hideTeamsTab && sessions.length === 0) {
+      setTrainingAttendanceView("trainingGroups");
+      const groups = isCustomTrainingGroupMode
+        ? (customTrainingGroups.length > 0 ? customTrainingGroups : await loadCustomTrainingGroups())
+        : (trainingScheduleGroups.length > 0 ? trainingScheduleGroups : await loadTrainingScheduleGroups());
+      const resolvedGroupId =
+        selectedTrainingGroupId && groups.some((g) => g.id === selectedTrainingGroupId)
+          ? selectedTrainingGroupId
+          : (groups[0]?.id ?? "");
+      setSelectedTrainingGroupId(resolvedGroupId);
+      if (!resolvedGroupId) {
+        if (!isCustomTrainingGroupMode && standaloneTeamGroups.length > 0) {
+          const firstYear = String(standaloneTeamGroups[0]);
+          setTrainingAttendanceView("teamGroup");
+          setTrainingGroupScope(firstYear);
+          await fetchTrainingAttendance(undefined, firstYear, undefined, "teamGroup");
+          return;
+        }
+        return;
+      }
+      await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
+    }
   };
 
   const handleTrainingGroupScopeChange = async (nextScope: string) => {
@@ -4386,6 +4678,15 @@ function AdminMembersPageContent() {
     await openTrainingDaysEditor("teamGroup");
   };
 
+  const openSingleTrainingDayEditForCurrentScope = async (date: string) => {
+    if (trainingAttendanceView === "trainingGroups") {
+      if (!selectedTrainingGroupId) return;
+      await openTrainingDaysEditor(isCustomTrainingGroupMode ? "customGroup" : "trainingGroup", date);
+      return;
+    }
+    await openTrainingDaysEditor("teamGroup", date);
+  };
+
   const fetchClubMatches = async () => {
     if (!clubId) return;
     try {
@@ -4412,7 +4713,7 @@ function AdminMembersPageContent() {
     const warnings: string[] = [];
     try {
       for (const date of matchSelectedDates) {
-        const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: true };
+        const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: null };
         const durationMinutes = Number.parseInt(details.duration || "90", 10);
         const existingId = matchExistingIdByDate[date];
         const url = existingId
@@ -4421,7 +4722,7 @@ function AdminMembersPageContent() {
         const res = await fetch(url, {
           method: existingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ opponent: details.opponent, location: details.location, matchDate: date, matchTime: details.time, durationMinutes, isHome: details.isHome, teamGroups: matchTeamGroups }),
+          body: JSON.stringify({ opponent: details.opponent, location: details.location, matchDate: date, matchTime: details.time, durationMinutes, isHome: details.isHome, teamGroups: matchTeamGroups, customGroupId: isCustomTrainingGroupMode ? (selectedCustomGroup?.id ?? null) : null }),
         });
         const data = await res.json() as { error?: string; warning?: string };
         if (!res.ok) { setMatchEditorError(data.error ?? "Грешка при запазване."); return; }
@@ -4517,21 +4818,33 @@ function AdminMembersPageContent() {
     }
   };
 
-  const openTrainingDayDetails = async (date: string) => {
+  const openTrainingDayDetails = async (date: string, sessionId?: string) => {
     const month = getMonthKeyFromIsoDate(date);
     setTrainingDayDetailsOpening(true);
     setTrainingAttendanceDate(date);
     setTrainingAttendanceMonth(month);
     const firstSession = trainingWeekSessions.find((s) => s.date === date && s.eventType !== "match");
-    const firstSessionId = firstSession?.id ?? "training";
+    const firstSessionId = sessionId ?? (firstSession?.id ?? "training");
     setTrainingDayDetailsTab(firstSessionId);
     setLimitedEvent(null);
     setShowLimitedForm(false);
     setLimitedEventError("");
     setLimitedSpotsInput("10");
+    // Resolve scope from session ID so the right group data is fetched
+    let _viewOverride: "teamGroup" | "trainingGroups" | undefined;
+    let _groupScopeOverride: string | undefined;
+    let _trainingGroupIdOverride: string | undefined;
+    if (sessionId && !sessionId.startsWith("match-")) {
+      const customM = sessionId.match(/^\d{4}-\d{2}-\d{2}-custom-(.+)$/);
+      const groupM = sessionId.match(/^\d{4}-\d{2}-\d{2}-group-(.+)$/);
+      const teamM = sessionId.match(/^\d{4}-\d{2}-\d{2}-team-(\d+)$/);
+      if (customM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = customM[1]; setTrainingAttendanceView("trainingGroups"); setSelectedTrainingGroupId(customM[1]); }
+      else if (groupM) { _viewOverride = "trainingGroups"; _trainingGroupIdOverride = groupM[1]; setTrainingAttendanceView("trainingGroups"); setSelectedTrainingGroupId(groupM[1]); }
+      else if (teamM) { _viewOverride = "teamGroup"; _groupScopeOverride = teamM[1]; setTrainingAttendanceView("teamGroup"); setTrainingGroupScope(teamM[1]); }
+    }
     try {
       await Promise.all([
-        fetchTrainingAttendance(date, undefined, undefined, undefined, month),
+        fetchTrainingAttendance(date, _groupScopeOverride, _trainingGroupIdOverride, _viewOverride, month),
         fetchClubMatches(),
         fetchLimitedEventForSession(date, firstSessionId),
       ]);
@@ -4548,6 +4861,8 @@ function AdminMembersPageContent() {
       if (session.scopeType === "teamGroup") {
         const tg = session.teamGroups[0];
         const groupScope = tg !== undefined && Number.isInteger(tg) ? String(tg) : "all";
+        setTrainingAttendanceView("teamGroup");
+        setTrainingGroupScope(groupScope);
         await fetchTrainingAttendance(date, groupScope, undefined, "teamGroup", month);
       } else {
         const groupPrefix = `${date}-group-`;
@@ -4559,11 +4874,42 @@ function AdminMembersPageContent() {
           groupId = session.id.slice(customPrefix.length);
         }
         if (groupId) {
+          setTrainingAttendanceView("trainingGroups");
+          setSelectedTrainingGroupId(groupId);
           await fetchTrainingAttendance(date, undefined, groupId, "trainingGroups", month);
         }
       }
     } finally {
       setTrainingDayDetailsTabLoading(false);
+    }
+  };
+
+  const handleCancelTrainingDay = async () => {
+    if (!clubId || !trainingAttendanceDate || trainingDayCancelLoading) return;
+    setTrainingDayCancelConfirmOpen(false);
+    setTrainingDayCancelLoading(true);
+    try {
+      const body: Record<string, unknown> = { date: trainingAttendanceDate, status: "cancelled" };
+      if (trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId) {
+        body[isCustomTrainingGroupMode ? "customTrainingGroupId" : "trainingGroupId"] = selectedTrainingGroupId;
+      } else if (trainingAttendanceView === "teamGroup") {
+        const tg = parseSelectedTeamGroup(trainingGroupScope);
+        if (tg !== null) body.teamGroup = tg;
+      }
+      const res = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/session`,
+        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+      );
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(payload.error ?? "Грешка при промяна на статус.");
+      }
+      setTrainingDayDetailsOpen(false);
+      await Promise.all([fetchTrainingWeekSessions(), fetchTrainingAttendance()]);
+    } catch (error) {
+      setTrainingAttendanceError(error instanceof Error ? error.message : "Грешка при промяна на статус.");
+    } finally {
+      setTrainingDayCancelLoading(false);
     }
   };
 
@@ -4673,14 +5019,8 @@ function AdminMembersPageContent() {
         }
         return next;
       });
-      await fetchTrainingAttendance();
+      await fetchTrainingAttendance(trainingAttendanceDate || undefined);
       setTrainingBulkNoteOpen(false);
-      setTrainingNoteSuccessMessage(
-        datesToSave.length > 1
-          ? `Промените са изпратени успешно за ${datesToSave.length} дни.`
-          : "Промените са изпратени успешно.",
-      );
-      setTrainingNoteSuccessOpen(true);
     } catch (error) {
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
@@ -4918,10 +5258,12 @@ function AdminMembersPageContent() {
 
         {/* ── Buttons grid ── */}
         <div className="amp-buttons-grid">
-          <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`)}>
-            <PlusIcon />
-            Добави състезател
-          </button>
+          {(isAdmin || (isCoach && coachGroupId)) && (
+            <button className="amp-add-btn" onClick={() => router.push(`/admin/members/add?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`)}>
+              <PlusIcon />
+              Добави състезател
+            </button>
+          )}
           {clubId && coachGroupId && (
             <button
               className="amp-import-sheets-btn amp-btn--compact"
@@ -4935,7 +5277,7 @@ function AdminMembersPageContent() {
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              <span>Управление на група</span>
+              <span>Управление на треньорска група</span>
             </button>
           )}
           {isAdmin && clubId && (
@@ -4990,20 +5332,34 @@ function AdminMembersPageContent() {
               <span>Треньори</span>
             </button>
           )}
+          {(isAdmin || (isCoach && coachGroupId)) && clubId && (
+            <button
+              className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+              onClick={openTrainingGroupCreateModal}
+              type="button"
+              disabled={isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor}
+              title={isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor ? "Всички цветове са заети" : undefined}
+            >
+              <PlusIcon />
+              <span>Създай / редактирай група</span>
+            </button>
+          )}
           <button className="amp-reports-btn amp-btn--compact" onClick={() => setReportsOpen(true)}>
             <ChartColumnIcon size={16} />
             <span>Отчети</span>
           </button>
           {(isAdmin || isCoach) && clubId && (
             <>
-              <button
-                className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
-                onClick={() => void openSchedulerSettings()}
-                type="button"
-              >
-                <CalendarIcon />
-                <span>Известия</span>
-              </button>
+              {isAdmin && (
+                <button
+                  className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
+                  onClick={() => void openSchedulerSettings()}
+                  type="button"
+                >
+                  <CalendarIcon />
+                  <span>Напомняния</span>
+                </button>
+              )}
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => {
@@ -5028,18 +5384,7 @@ function AdminMembersPageContent() {
                 <ClipboardListIcon />
                 <span>Присъствия</span>
               </button>
-              {isCoach && !isAdmin ? (
-                <span className="amp-coming-soon-wrap" data-tooltip="Очаквайте скоро">
-                  <button
-                    className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
-                    type="button"
-                    disabled
-                  >
-                    <ClipboardListIcon />
-                    <span>Планове за тренировки</span>
-                  </button>
-                </span>
-              ) : (
+              {isAdmin && (
                 <button
                   className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
                   onClick={() => router.push(`/admin/training-plans?clubId=${encodeURIComponent(clubId)}`)}
@@ -5133,6 +5478,18 @@ function AdminMembersPageContent() {
               <span>Съобщение</span>
             </button>
           )}
+          <button
+            className="amp-guide-btn amp-btn--compact"
+            type="button"
+            onClick={() => { setGuideStep(0); setGuideOpen(true); }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <circle cx="12" cy="17" r="0.5" fill="currentColor" />
+            </svg>
+            <span>Наръчник</span>
+          </button>
         </div>
         {(isClubPushSupported || (isClubIPhone && !isClubStandalone)) && clubId && (
           <>
@@ -6306,7 +6663,7 @@ function AdminMembersPageContent() {
                     onClick={() => void handleTrainingAttendanceViewChange("trainingGroups")}
                     disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDaysEditorSaving}
                   >
-                    Отбори
+                    Създай график
                   </button>
                 </div>
               )}
@@ -6350,11 +6707,19 @@ function AdminMembersPageContent() {
                       )}
                       <WeeklyGrid
                         dates={trainingWeekDates}
-                        sessions={weekColorFilter
-                          ? trainingWeekSessions.filter((s) => s.color === weekColorFilter || s.eventType === "match")
-                          : trainingWeekSessions
-                        }
+                        sessions={(() => {
+                          const matchColor = isCustomTrainingGroupMode
+                            ? (weekColorFilter ?? selectedCustomGroup?.color ?? null)
+                            : null;
+                          const base = weekColorFilter
+                            ? trainingWeekSessions.filter((s) => s.color === weekColorFilter || s.eventType === "match")
+                            : trainingWeekSessions;
+                          return matchColor
+                            ? base.map((s) => s.eventType === "match" ? { ...s, color: matchColor } : s)
+                            : base;
+                        })()}
                         todayIso={todayIsoDate}
+                        onDateClick={(date, sid) => void openTrainingDayDetails(date, sid)}
                       />
                     </>
                   )}
@@ -6362,34 +6727,10 @@ function AdminMembersPageContent() {
               ) : (
                 <>
                   <div style={{ marginBottom: "12px" }}>
-                    <div style={{ marginBottom: "10px" }}>
-                      <button
-                        type="button"
-                        className="amp-btn amp-btn--primary"
-                        onClick={openTrainingGroupCreateModal}
-                        disabled={
-                          trainingNoteSaving ||
-                          trainingGroupCreateSaving ||
-                          (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
-                        }
-                        style={{ width: "100%" }}
-                        title={
-                          isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor
-                            ? "Всички цветове са заети"
-                            : undefined
-                        }
-                      >
-                        {trainingGroupCreateSaving
-                          ? "Запазване..."
-                          : isCustomTrainingGroupMode
-                            ? "Създай група"
-                            : "Създай сборен отбор"}
-                      </button>
-                    </div>
                     {trainingScheduleGroupsLoading ? (
                       <p className="amp-empty amp-empty--modal">Зареждане...</p>
                     ) : (isCustomTrainingGroupMode ? customTrainingGroups.length === 0 : (trainingScheduleGroups.length === 0 && standaloneTeamGroups.length === 0)) ? (
-                      <p className="amp-empty amp-empty--modal">Няма групи.</p>
+                      <p className="amp-empty amp-empty--modal">Няма създадени групи. Използвайте бутона „Създай / редактирай група” в треньорския панел.</p>
                     ) : (
                       <>
                         <label className="amp-edit-field" style={{ marginBottom: "12px", textAlign: "center" }}>
@@ -6439,279 +6780,265 @@ function AdminMembersPageContent() {
                           </select>
                           </div>
                         </label>
-                        {trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId && (
-                          <div className="amp-training-group-actions">
-                            <button
-                              type="button"
-                              className="amp-btn amp-btn--ghost"
-                              onClick={() => openTrainingGroupEditModal(selectedTrainingGroupId)}
-                              disabled={trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
-                            >
-                              {trainingGroupEditSaving
-                                ? "Отваряне..."
-                                : isCustomTrainingGroupMode
-                                  ? "Редактирай група"
-                                  : "Редактирай сборен отбор"}
-                            </button>
-                            <button
-                              type="button"
-                              className="amp-btn amp-btn--danger"
-                              onClick={() => setTrainingGroupDeleteConfirmOpen(true)}
-                              disabled={trainingScheduleGroupsLoading || trainingGroupEditSaving || trainingGroupDeleteSaving}
-                            >
-                              {trainingGroupDeleteSaving
-                                ? "Изтриване..."
-                                : isCustomTrainingGroupMode
-                                  ? "Изтрий група"
-                                  : "Изтрий сборен отбор"}
-                            </button>
-                          </div>
-                        )}
                       </>
                     )}
                   </div>
-                  {trainingDayDetailsOpening && (
-                    <div className="amp-modal-loading-overlay">
-                      <div className="amp-loading" style={{ minHeight: 120 }}>
-                        <div className="amp-spinner" />
-                      </div>
-                    </div>
-                  )}
-                  <label className="amp-edit-field" style={{ position: "relative" }}>
-                    {trainingAttendanceLoading && (
-                      <div className="amp-modal-loading-overlay" style={{ position: "absolute", inset: 0, zIndex: 10 }}>
-                        <div className="amp-loading" style={{ minHeight: 200 }}>
+                  {!(isCustomTrainingGroupMode ? customTrainingGroups.length === 0 : (trainingScheduleGroups.length === 0 && standaloneTeamGroups.length === 0)) && !trainingScheduleGroupsLoading && (
+                    <>
+                    {trainingDayDetailsOpening && (
+                      <div className="amp-modal-loading-overlay">
+                        <div className="amp-loading" style={{ minHeight: 120 }}>
                           <div className="amp-spinner" />
-                          <p style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>Зареждане...</p>
                         </div>
                       </div>
                     )}
-                    <div className="amp-training-calendar amp-training-calendar--attendance">
-                      <div className="amp-training-month-nav">
-                        <button
-                          type="button"
-                          className="amp-training-month-nav-btn"
-                          onClick={() => void handleTrainingAttendanceMonthChange(-1)}
-                          disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
-                          aria-label="Предишен месец"
-                        >
-                          ‹
-                        </button>
-                        <span className="amp-training-month-nav-title">
-                          {trainingAttendanceCalendarMonths[0]?.label ?? trainingAttendanceMonth}
-                        </span>
-                        <button
-                          type="button"
-                          className="amp-training-month-nav-btn"
-                          onClick={() => void handleTrainingAttendanceMonthChange(1)}
-                          disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
-                          aria-label="Следващ месец"
-                        >
-                          ›
-                        </button>
-                      </div>
-                      {trainingAttendanceCalendarMonths.map((month) => (
-                        <div key={month.key} className="amp-training-month">
-                          <div className="amp-training-month-title">{month.label}</div>
-                          <div className="amp-training-weekdays-row">
-                            {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
-                              <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
-                                {weekday}
-                              </span>
-                            ))}
+                    <label className="amp-edit-field" style={{ position: "relative" }}>
+                      {trainingAttendanceLoading && (
+                        <div className="amp-modal-loading-overlay" style={{ position: "absolute", inset: 0, zIndex: 10 }}>
+                          <div className="amp-loading" style={{ minHeight: 200 }}>
+                            <div className="amp-spinner" />
+                            <p style={{ marginTop: 16, fontSize: 14, color: "rgba(255,255,255,0.7)" }}>Зареждане...</p>
                           </div>
-                          <div className="amp-training-month-grid">
-                            {month.cells.map((date, index) => {
-                              if (!date) {
-                                return (
-                                  <span
-                                    key={`${month.key}-empty-${index}`}
-                                    className="amp-training-calendar-cell amp-training-calendar-cell--empty"
-                                    aria-hidden="true"
-                                  />
-                                );
-                              }
-                              const dayNumber = Number.parseInt(date.slice(8, 10), 10);
-                              const dateData = trainingUpcomingByDate.get(date);
-                              const matchesForDate = trainingAttendanceMatchesByDate.get(date) ?? [];
-                              const hasMatch = matchesForDate.length > 0;
-                              if ((!dateData || !trainingUpcomingDateSet.has(date)) && !hasMatch) {
-                                return (
-                                  <span
-                                    key={date}
-                                    className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
-                                    aria-hidden="true"
-                                  >
-                                    <span className="amp-training-day-number">{dayNumber}</span>
-                                  </span>
-                                );
-                              }
-                              if (!dateData && hasMatch) {
-                                return (
-                                  <button
-                                    key={date}
-                                    type="button"
-                                    className="amp-training-date-btn amp-training-date-btn--calendar-match-only"
-                                    aria-label={`Мач на ${formatIsoDateForDisplay(date)}`}
-                                    onClick={() => { setMatchViewMatch(matchesForDate[0]!); setMatchViewPopupOpen(true); }}
-                                  >
-                                    <span className="amp-training-day-number">{dayNumber}</span>
-                                    {matchesForDate[0]?.matchTime && (
-                                      <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
-                                    )}
-                                    <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
-                                  </button>
-                                );
-                              }
-
-                              const isActive = trainingAttendanceDate === date;
-                              const isToday = todayIsoDate === date;
-                              const trainingTimeLabel = dateData!.trainingTime?.trim() ?? "";
-                              const hasTrainingAndMatch = hasMatch;
-                              return (
-                                <button
-                                  key={date}
-                                  type="button"
-                                  className={`amp-training-date-btn amp-training-date-btn--training${hasTrainingAndMatch ? " amp-training-date-btn--training-match" : ""}${isActive ? " amp-training-date-btn--active" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
-                                  onClick={() => void openTrainingDayDetails(date)}
-                                  disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
-                                >
-                                  <span className="amp-training-day-number">{dayNumber}</span>
-                                  {hasTrainingAndMatch && matchesForDate[0]?.matchTime && (
-                                    <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
-                                  )}
-                                  {hasTrainingAndMatch && (
-                                    <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
-                                  )}
-                                  {!hasTrainingAndMatch && trainingTimeLabel && (
-                                    <span className="amp-training-day-time">{trainingTimeLabel}</span>
-                                  )}
-                                  {!hasTrainingAndMatch && (
-                                    <span className="amp-training-day-meta">
-                                      {dateData!.stats.attending}/{dateData!.stats.total}
+                        </div>
+                      )}
+                      <div className="amp-training-calendar amp-training-calendar--attendance">
+                        <div className="amp-training-month-nav">
+                          <button
+                            type="button"
+                            className="amp-training-month-nav-btn"
+                            onClick={() => void handleTrainingAttendanceMonthChange(-1)}
+                            disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening || trainingAttendanceMonth <= todayIsoDate.slice(0, 7)}
+                            aria-label="Предишен месец"
+                          >
+                            ‹
+                          </button>
+                          <span className="amp-training-month-nav-title">
+                            {trainingAttendanceCalendarMonths[0]?.label ?? trainingAttendanceMonth}
+                          </span>
+                          <button
+                            type="button"
+                            className="amp-training-month-nav-btn"
+                            onClick={() => void handleTrainingAttendanceMonthChange(1)}
+                            disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
+                            aria-label="Следващ месец"
+                          >
+                            ›
+                          </button>
+                        </div>
+                        {trainingAttendanceCalendarMonthsTrimmed.map((month) => (
+                          <div key={month.key} className="amp-training-month">
+                            <div className="amp-training-month-title">{month.label}</div>
+                            <div className="amp-training-weekdays-row">
+                              {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                                <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
+                                  {weekday}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="amp-training-month-grid">
+                              {month.cells.map((date, index) => {
+                                if (!date) {
+                                  return (
+                                    <span
+                                      key={`${month.key}-empty-${index}`}
+                                      className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                      aria-hidden="true"
+                                    />
+                                  );
+                                }
+                                if (date < todayIsoDate) {
+                                  return (
+                                    <span
+                                      key={date}
+                                      className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                      aria-hidden="true"
+                                    />
+                                  );
+                                }
+                                const dayNumber = Number.parseInt(date.slice(8, 10), 10);
+                                const dateData = trainingUpcomingByDate.get(date);
+                                const matchesForDate = trainingAttendanceMatchesByDate.get(date) ?? [];
+                                const hasMatch = matchesForDate.length > 0;
+                                if ((!dateData || !trainingUpcomingDateSet.has(date)) && !hasMatch) {
+                                  return (
+                                    <span
+                                      key={date}
+                                      className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
+                                      aria-hidden="true"
+                                    >
+                                      <span className="amp-training-day-number">{dayNumber}</span>
                                     </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {false && trainingDaysEditorOpen && (
-                      <div className="amp-training-days-editor">
-                        <div className="amp-training-days-editor-header">
-                          <span className="amp-lbl">Избери тренировъчни дни (следващи 30 дни)</span>
-                          <span className="amp-lbl">Избрани: {schedulerForm.trainingDates.length}</span>
-                        </div>
-                        <div className="amp-training-calendar">
-                          {schedulerCalendarMonths.map((month) => (
-                            <div key={month.key} className="amp-training-month">
-                              <div className="amp-training-month-title">{month.label}</div>
-                              <div className="amp-training-weekdays-row">
-                                {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
-                                  <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
-                                    {weekday}
-                                  </span>
-                                ))}
-                              </div>
-                              <div className="amp-training-month-grid">
-                                {month.cells.map((date, index) => {
-                                  if (!date) {
-                                    return (
-                                      <span
-                                        key={`${month.key}-empty-${index}`}
-                                        className="amp-training-calendar-cell amp-training-calendar-cell--empty"
-                                        aria-hidden="true"
-                                      />
-                                    );
-                                  }
-                                  const dayNumber = Number.parseInt(date.slice(8, 10), 10);
-                                  const isSelectable = schedulerCalendarDateSet.has(date);
-                                  if (!isSelectable) {
-                                    return (
-                                      <span
-                                        key={date}
-                                        className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
-                                        aria-hidden="true"
-                                      >
-                                        <span className="amp-training-day-number">{dayNumber}</span>
-                                      </span>
-                                    );
-                                  }
-
-                                  const isSelected = schedulerForm.trainingDates.includes(date);
-                                  const isToday = todayIsoDate === date;
+                                  );
+                                }
+                                if (!dateData && hasMatch) {
                                   return (
                                     <button
                                       key={date}
                                       type="button"
-                                      className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
-                                      onClick={() => toggleTrainingDate(date)}
-                                      disabled={trainingDaysEditorSaving}
+                                      className="amp-training-date-btn amp-training-date-btn--calendar-match-only"
+                                      aria-label={`Мач на ${formatIsoDateForDisplay(date)}`}
+                                      onClick={() => { setMatchViewMatch(matchesForDate[0]!); setMatchViewPopupOpen(true); }}
                                     >
                                       <span className="amp-training-day-number">{dayNumber}</span>
+                                      {matchesForDate[0]?.matchTime && (
+                                        <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
+                                      )}
+                                      <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
                                     </button>
                                   );
-                                })}
-                              </div>
+                                }
+  
+                                const isActive = trainingAttendanceDate === date;
+                                const isToday = todayIsoDate === date;
+                                const trainingTimeLabel = dateData!.trainingTime?.trim() ?? "";
+                                const hasTrainingAndMatch = hasMatch;
+                                return (
+                                  <button
+                                    key={date}
+                                    type="button"
+                                    className={`amp-training-date-btn amp-training-date-btn--training${hasTrainingAndMatch ? " amp-training-date-btn--training-match" : ""}${isActive ? " amp-training-date-btn--active" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
+                                    onClick={() => void openTrainingDayDetails(date)}
+                                    disabled={trainingAttendanceLoading || trainingNoteSaving || trainingDayDetailsOpening}
+                                  >
+                                    <span className="amp-training-day-number">{dayNumber}</span>
+                                    {hasTrainingAndMatch && matchesForDate[0]?.matchTime && (
+                                      <span className="amp-training-day-match">{matchesForDate[0].matchTime}</span>
+                                    )}
+                                    {hasTrainingAndMatch && (
+                                      <span className="amp-training-day-match amp-training-day-match--location">{matchesForDate[0]?.isHome ? "Д" : "Г"}</span>
+                                    )}
+                                    {!hasTrainingAndMatch && trainingTimeLabel && (
+                                      <span className="amp-training-day-time">{trainingTimeLabel}</span>
+                                    )}
+                                    {!hasTrainingAndMatch && (
+                                      <span className="amp-training-day-meta">
+                                        {dateData!.stats.attending}/{dateData!.stats.total}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
-                          ))}
-                        </div>
-                        {trainingDaysEditorError && <p className="amp-confirm-error">{trainingDaysEditorError}</p>}
-                        <div className="amp-modal-actions amp-modal-actions--end">
-                          <button
-                            type="button"
-                            className="amp-btn amp-btn--ghost"
-                            onClick={() => setTrainingDaysEditorOpen(false)}
-                            disabled={trainingDaysEditorSaving}
-                          >
-                            Отказ
-                          </button>
-                          <button
-                            type="button"
-                            className="amp-btn amp-btn--primary"
-                            onClick={() => void saveTrainingDaysForSelectedGroups()}
-                            disabled={trainingDaysEditorSaving || trainingDaysEditorLoading}
-                          >
-                            {trainingDaysEditorSaving ? "Запазване..." : "Запази дни"}
-                          </button>
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                    <div className="amp-training-note-targets">
-                      <button
-                        type="button"
-                        className="amp-btn amp-btn--ghost"
-                        onClick={() => toggleTrainingNoteTargetDate(trainingAttendanceDate)}
-                        disabled={trainingNoteSaving || trainingAttendanceLoading || !trainingAttendanceDate}
-                      >
-                        {trainingNoteTargetDates.includes(trainingAttendanceDate)
-                          ? "Премахни ден от избора"
-                          : "Добави ден към избора"}
-                      </button>
-                      <button
-                        type="button"
-                        className="amp-btn amp-btn--ghost"
-                        onClick={() => setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : [])}
+                      {false && trainingDaysEditorOpen && (
+                        <div className="amp-training-days-editor">
+                          <div className="amp-training-days-editor-header">
+                            <span className="amp-lbl">Избери тренировъчни дни (следващи 30 дни)</span>
+                            <span className="amp-lbl">Избрани: {schedulerForm.trainingDates.length}</span>
+                          </div>
+                          <div className="amp-training-calendar">
+                            {schedulerCalendarMonths.map((month) => (
+                              <div key={month.key} className="amp-training-month">
+                                <div className="amp-training-month-title">{month.label}</div>
+                                <div className="amp-training-weekdays-row">
+                                  {TRAINING_WEEKDAY_SHORT_BG.map((weekday) => (
+                                    <span key={`${month.key}-${weekday}`} className="amp-training-weekday-cell">
+                                      {weekday}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="amp-training-month-grid">
+                                  {month.cells.map((date, index) => {
+                                    if (!date) {
+                                      return (
+                                        <span
+                                          key={`${month.key}-empty-${index}`}
+                                          className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                          aria-hidden="true"
+                                        />
+                                      );
+                                    }
+                                    const dayNumber = Number.parseInt(date.slice(8, 10), 10);
+                                    const isSelectable = schedulerCalendarDateSet.has(date);
+                                    if (!isSelectable) {
+                                      return (
+                                        <span
+                                          key={date}
+                                          className="amp-training-calendar-cell amp-training-calendar-cell--disabled"
+                                          aria-hidden="true"
+                                        >
+                                          <span className="amp-training-day-number">{dayNumber}</span>
+                                        </span>
+                                      );
+                                    }
+  
+                                    const isSelected = schedulerForm.trainingDates.includes(date);
+                                    const isToday = todayIsoDate === date;
+                                    return (
+                                      <button
+                                        key={date}
+                                        type="button"
+                                        className={`amp-training-date-btn${isSelected ? " amp-training-date-btn--active" : ""}${isToday ? " amp-training-date-btn--today" : ""}`}
+                                        onClick={() => toggleTrainingDate(date)}
+                                        disabled={trainingDaysEditorSaving}
+                                      >
+                                        <span className="amp-training-day-number">{dayNumber}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {trainingDaysEditorError && <p className="amp-confirm-error">{trainingDaysEditorError}</p>}
+                          <div className="amp-modal-actions amp-modal-actions--end">
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--ghost"
+                              onClick={() => setTrainingDaysEditorOpen(false)}
+                              disabled={trainingDaysEditorSaving}
+                            >
+                              Отказ
+                            </button>
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--primary"
+                              onClick={() => void saveTrainingDaysForSelectedGroups()}
+                              disabled={trainingDaysEditorSaving || trainingDaysEditorLoading}
+                            >
+                              {trainingDaysEditorSaving ? "Запазване..." : "Запази дни"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="amp-training-note-targets">
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost"
+                          onClick={() => toggleTrainingNoteTargetDate(trainingAttendanceDate)}
+                          disabled={trainingNoteSaving || trainingAttendanceLoading || !trainingAttendanceDate}
+                        >
+                          {trainingNoteTargetDates.includes(trainingAttendanceDate)
+                            ? "Премахни ден от избора"
+                            : "Добави ден към избора"}
+                        </button>
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost"
+                          onClick={() => setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : [])}
+                          disabled={trainingNoteSaving || trainingAttendanceLoading}
+                        >
+                          Остави само текущия ден
+                        </button>
+                        <span className="amp-lbl">
+                          Избрани дни за добавяне на описание: {trainingNoteTargetDates.length}
+                        </span>
+                      </div>
+                      <textarea
+                        className="amp-edit-input amp-training-note"
+                        value={trainingNote}
+                        onChange={(e) => setTrainingNote(e.target.value)}
+                        rows={3}
+                        maxLength={1000}
+                        placeholder="Добавете инструкции, сборен час, локация..."
                         disabled={trainingNoteSaving || trainingAttendanceLoading}
-                      >
-                        Остави само текущия ден
-                      </button>
-                      <span className="amp-lbl">
-                        Избрани дни за добавяне на описание: {trainingNoteTargetDates.length}
-                      </span>
-                    </div>
-                    <textarea
-                      className="amp-edit-input amp-training-note"
-                      value={trainingNote}
-                      onChange={(e) => setTrainingNote(e.target.value)}
-                      rows={3}
-                      maxLength={1000}
-                      placeholder="Добавете инструкции, сборен час, локация..."
-                      disabled={trainingNoteSaving || trainingAttendanceLoading}
-                    />
-                  </label>
+                      />
+                    </label>
+                      </>
+                  )}
+                  {(!isCustomTrainingGroupMode || customTrainingGroups.length > 0) && (
                   <div className="amp-modal-actions amp-modal-actions--end">
                     <button
                       className="amp-btn amp-btn--ghost"
@@ -6722,25 +7049,15 @@ function AdminMembersPageContent() {
                         setMatchDetailsPerDay({});
                         setMatchExistingIdByDate({});
                         setMatchEditorError("");
+                        setMatchCalendarVisibleMonthIdx(0);
                         void fetchClubMatches();
                       }}
                       disabled={trainingNoteSaving || trainingDaysEditorSaving}
                     >
                       Насрочи график
                     </button>
-                    <button
-                      className="amp-btn amp-btn--primary"
-                      onClick={() => {
-                        setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : []);
-                        setTrainingBulkNoteOpen(true);
-                      }}
-                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate}
-                    >
-                      {trainingNoteSaving
-                        ? "Запазване..."
-                        : `Добави описание`}
-                    </button>
                   </div>
+                  )}
                   {trainingAttendanceError && <p className="amp-confirm-error">{trainingAttendanceError}</p>}
                   <div className="amp-training-table-wrap">
                     {trainingAttendanceLoading ? (
@@ -7068,18 +7385,26 @@ function AdminMembersPageContent() {
             if (!trainingGroupCreateSaving) {
               setTrainingGroupCreateOpen(false);
               setTrainingGroupCreateError("");
+              setTrainingGroupCreateStep("picker");
             }
           }}
         >
           <div className="amp-modal amp-modal--confirm amp-modal--training-days-editor" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">{isCustomTrainingGroupMode ? "Създай група" : "Създай сборен отбор"}</span>
+              <span className="amp-modal-title-gradient">
+                {trainingGroupCreateStep === "create"
+                  ? (isCustomTrainingGroupMode ? "Нова група" : "Нов сборен отбор")
+                  : trainingGroupCreateStep === "edit-pick"
+                    ? (isCustomTrainingGroupMode ? "Редактирай група" : "Редактирай сборен отбор")
+                    : (isCustomTrainingGroupMode ? "Създай / редактирай група" : "Управление на сборни отбори")}
+              </span>
               <button
                 className="amp-modal-close"
                 onClick={() => {
                   setTrainingGroupCreateOpen(false);
                   setTrainingGroupCreateError("");
+                  setTrainingGroupCreateStep("picker");
                 }}
                 aria-label="Затвори"
                 disabled={trainingGroupCreateSaving}
@@ -7088,176 +7413,262 @@ function AdminMembersPageContent() {
               </button>
             </h2>
             <div className="amp-modal-body">
-              {isCustomTrainingGroupMode && (
+              {trainingGroupCreateStep === "picker" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <button
+                    type="button"
+                    className="amp-btn amp-btn--primary"
+                    style={{ width: "100%", justifyContent: "center", padding: "14px 20px", fontSize: "15px" }}
+                    disabled={isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor}
+                    onClick={() => setTrainingGroupCreateStep("create")}
+                  >
+                    Създай група
+                  </button>
+                  <button
+                    type="button"
+                    className="amp-btn amp-btn--ghost"
+                    style={{ width: "100%", justifyContent: "center", padding: "14px 20px", fontSize: "15px" }}
+                    disabled={isCustomTrainingGroupMode ? customTrainingGroups.length === 0 : trainingScheduleGroups.length === 0}
+                    onClick={() => setTrainingGroupCreateStep("edit-pick")}
+                  >
+                    Редактирай група
+                  </button>
+                </div>
+              )}
+              {trainingGroupCreateStep === "edit-pick" && (
                 <>
-                  <label className="amp-edit-field">
-                    <span className="amp-lbl">Име на групата</span>
-                    <input
-                      className="amp-edit-input"
-                      value={trainingGroupCreateName}
-                      onChange={(e) => setTrainingGroupCreateName(e.target.value)}
-                      placeholder="Например: Сутрешна група"
-                      disabled={trainingGroupCreateSaving}
-                    />
+                  <label className="amp-edit-field" style={{ marginBottom: "16px" }}>
+                    <span className="amp-lbl">Избери група</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      {isCustomTrainingGroupMode && (() => {
+                        const color = customTrainingGroups.find((g) => g.id === trainingGroupEditPickId)?.color;
+                        return color ? <span className="amp-custom-group-select-swatch" style={{ backgroundColor: color }} aria-hidden /> : null;
+                      })()}
+                      <select
+                        className="amp-edit-input"
+                        style={{ flex: 1, textAlign: "center", textAlignLast: "center" }}
+                        value={trainingGroupEditPickId}
+                        onChange={(e) => setTrainingGroupEditPickId(e.target.value)}
+                      >
+                        {isCustomTrainingGroupMode
+                          ? customTrainingGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)
+                          : trainingScheduleGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)
+                        }
+                      </select>
+                    </div>
                   </label>
-                  <CustomTrainingGroupColorPicker
-                    value={trainingGroupCreateColor}
-                    onChange={setTrainingGroupCreateColor}
-                    disabled={trainingGroupCreateSaving || noFreeCustomTrainingGroupColor}
-                    coachScopeKey={customTrainingGroupCoachScope}
-                    groups={customTrainingGroups}
-                  />
-                  {noFreeCustomTrainingGroupColor && (
-                    <p className="amp-empty amp-empty--modal" style={{ marginTop: 8 }}>
-                      Всички цветове са заети за тази треньорска група.
-                    </p>
-                  )}
-                  <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "10px",
-                        flexWrap: "wrap",
-                        marginBottom: "4px",
+                  <div className="amp-modal-actions" style={{ justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--ghost"
+                        onClick={() => setTrainingGroupCreateStep("picker")}
+                      >
+                        Назад
+                      </button>
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--danger"
+                        disabled={!trainingGroupEditPickId}
+                        onClick={() => {
+                          setSelectedTrainingGroupId(trainingGroupEditPickId);
+                          setTrainingGroupCreateOpen(false);
+                          setTrainingGroupCreateError("");
+                          setTrainingGroupCreateStep("picker");
+                          setTrainingGroupDeleteConfirmOpen(true);
+                        }}
+                      >
+                        Изтрий
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--primary"
+                      disabled={!trainingGroupEditPickId}
+                      onClick={() => {
+                        setTrainingGroupCreateOpen(false);
+                        setTrainingGroupCreateError("");
+                        setTrainingGroupCreateStep("picker");
+                        openTrainingGroupEditModal(trainingGroupEditPickId);
                       }}
                     >
-                      <span className="amp-lbl" style={{ margin: 0 }}>състезателите в групата</span>
-                      {availablePlayersForCustomGroupCreate.length > 0 ? (
-                        <button
-                          type="button"
-                          className="amp-btn amp-btn--ghost amp-btn--compact"
-                          disabled={trainingGroupCreateSaving}
-                          onClick={() => {
-                            const ids = availablePlayersForCustomGroupCreate.map((m) => m.id);
-                            const allSelected =
-                              ids.length > 0 && ids.every((id) => trainingGroupCreatePlayerIds.includes(id));
-                            if (allSelected) {
-                              setTrainingGroupCreatePlayerIds((prev) => prev.filter((id) => !ids.includes(id)));
-                            } else {
-                              setTrainingGroupCreatePlayerIds((prev) => [...new Set([...prev, ...ids])]);
-                            }
-                          }}
-                        >
-                          {availablePlayersForCustomGroupCreate.every((m) =>
-                            trainingGroupCreatePlayerIds.includes(m.id),
-                          )
-                            ? "Премахни всички"
-                            : "Избери всички"}
-                        </button>
-                      ) : null}
-                    </div>
-                    <input
-                      className="amp-edit-input"
-                      type="search"
-                      placeholder="Търси състезател..."
-                      value={customGroupCreateSearch}
-                      onChange={(e) => setCustomGroupCreateSearch(e.target.value)}
-                      disabled={trainingGroupCreateSaving}
-                      style={{ marginBottom: "8px" }}
-                    />
-                    <div className="amp-group-check-grid">
-                      {filteredPlayersForCustomGroupCreate.map((member) => {
-                        const isChecked = trainingGroupCreatePlayerIds.includes(member.id);
-                        return (
-                          <label key={`custom-training-group-create-${member.id}`} className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}>
-                            <input
-                              className="amp-group-check-input"
-                              type="checkbox"
-                              checked={isChecked}
-                              disabled={trainingGroupCreateSaving}
-                              onChange={(e) => {
-                                setTrainingGroupCreatePlayerIds((prev) => e.target.checked
-                                  ? [...new Set([...prev, member.id])]
-                                  : prev.filter((item) => item !== member.id));
-                              }}
-                            />
-                            <span className="amp-group-check-box" aria-hidden="true" />
-                            <span className="amp-lbl amp-group-check-label">{member.fullName}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {availablePlayersForCustomGroupCreate.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма свободни състезатели за добавяне.</p>
-                    )}
-                    {availablePlayersForCustomGroupCreate.length > 0 && filteredPlayersForCustomGroupCreate.length === 0 && (
-                      <p className="amp-empty amp-empty--modal">Няма състезатели, отговарящи на търсенето.</p>
-                    )}
+                      Редактирай
+                    </button>
                   </div>
                 </>
               )}
-              {!isCustomTrainingGroupMode && (
+              {trainingGroupCreateStep === "create" && (
                 <>
-              <div className="amp-training-days-editor-header amp-training-days-editor-header--stack">
-                <span className="amp-lbl">Набори за групата (минимум 2):</span>
-                <div className="amp-group-check-grid">
-                  {groupOptions.map((group) => {
-                    const value = String(group);
-                    const isChecked = trainingGroupCreateGroups.includes(value);
-                    return (
-                      <label
-                        key={`training-group-create-${group}`}
-                        className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}
-                      >
+                  {isCustomTrainingGroupMode && (
+                    <>
+                      <label className="amp-edit-field">
+                        <span className="amp-lbl">Име на групата</span>
                         <input
-                          className="amp-group-check-input"
-                          type="checkbox"
-                          checked={isChecked}
+                          className="amp-edit-input"
+                          value={trainingGroupCreateName}
+                          onChange={(e) => setTrainingGroupCreateName(e.target.value)}
+                          placeholder="Например: Сутрешна група"
                           disabled={trainingGroupCreateSaving}
-                          onChange={(e) => {
-                            setTrainingGroupCreateGroups((prev) => {
-                              if (e.target.checked) {
-                                return [...new Set([...prev, value])].sort((a, b) => Number(a) - Number(b));
-                              }
-                              return prev.filter((item) => item !== value);
-                            });
-                          }}
                         />
-                        <span className="amp-group-check-box" aria-hidden="true" />
-                        <span className="amp-lbl amp-group-check-label">Набор {group}</span>
                       </label>
-                    );
-                  })}
-                </div>
-                <span className="amp-lbl amp-group-check-hint">
-                  {trainingGroupCreateGroups.length === 0
-                    ? "Изберете поне 2 набора."
-                    : `Избрани набори: ${trainingGroupCreateGroups.join(", ")} — Името ще бъде: ${trainingGroupCreateGroups.join("/")}`}
-                </span>
-              </div>
+                      <CustomTrainingGroupColorPicker
+                        value={trainingGroupCreateColor}
+                        onChange={setTrainingGroupCreateColor}
+                        disabled={trainingGroupCreateSaving || noFreeCustomTrainingGroupColor}
+                        coachScopeKey={customTrainingGroupCoachScope}
+                        groups={customTrainingGroups}
+                      />
+                      {noFreeCustomTrainingGroupColor && (
+                        <p className="amp-empty amp-empty--modal" style={{ marginTop: 8 }}>
+                          Всички цветове са заети за тази треньорска група.
+                        </p>
+                      )}
+                      <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "10px",
+                            flexWrap: "wrap",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          <span className="amp-lbl" style={{ margin: 0 }}>Състезателите в групата</span>
+                          {availablePlayersForCustomGroupCreate.length > 0 ? (
+                            <button
+                              type="button"
+                              className="amp-btn amp-btn--ghost amp-btn--compact"
+                              disabled={trainingGroupCreateSaving}
+                              onClick={() => {
+                                const ids = availablePlayersForCustomGroupCreate.map((m) => m.id);
+                                const allSelected =
+                                  ids.length > 0 && ids.every((id) => trainingGroupCreatePlayerIds.includes(id));
+                                if (allSelected) {
+                                  setTrainingGroupCreatePlayerIds((prev) => prev.filter((id) => !ids.includes(id)));
+                                } else {
+                                  setTrainingGroupCreatePlayerIds((prev) => [...new Set([...prev, ...ids])]);
+                                }
+                              }}
+                            >
+                              {availablePlayersForCustomGroupCreate.every((m) =>
+                                trainingGroupCreatePlayerIds.includes(m.id),
+                              )
+                                ? "Премахни всички"
+                                : "Избери всички"}
+                            </button>
+                          ) : null}
+                        </div>
+                        <input
+                          className="amp-edit-input"
+                          type="search"
+                          placeholder="Търси състезател..."
+                          value={customGroupCreateSearch}
+                          onChange={(e) => setCustomGroupCreateSearch(e.target.value)}
+                          disabled={trainingGroupCreateSaving}
+                          style={{ marginBottom: "8px" }}
+                        />
+                        <div className="amp-group-check-grid">
+                          {filteredPlayersForCustomGroupCreate.map((member) => {
+                            const isChecked = trainingGroupCreatePlayerIds.includes(member.id);
+                            return (
+                              <label key={`custom-training-group-create-${member.id}`} className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}>
+                                <input
+                                  className="amp-group-check-input"
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  disabled={trainingGroupCreateSaving}
+                                  onChange={(e) => {
+                                    setTrainingGroupCreatePlayerIds((prev) => e.target.checked
+                                      ? [...new Set([...prev, member.id])]
+                                      : prev.filter((item) => item !== member.id));
+                                  }}
+                                />
+                                <span className="amp-group-check-box" aria-hidden="true" />
+                                <span className="amp-lbl amp-group-check-label">{member.fullName}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {availablePlayersForCustomGroupCreate.length === 0 && (
+                          <p className="amp-empty amp-empty--modal">Няма свободни състезатели за добавяне.</p>
+                        )}
+                        {availablePlayersForCustomGroupCreate.length > 0 && filteredPlayersForCustomGroupCreate.length === 0 && (
+                          <p className="amp-empty amp-empty--modal">Няма състезатели, отговарящи на търсенето.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {!isCustomTrainingGroupMode && (
+                    <div className="amp-training-days-editor-header amp-training-days-editor-header--stack">
+                      <span className="amp-lbl">Набори за групата (минимум 2):</span>
+                      <div className="amp-group-check-grid">
+                        {groupOptions.map((group) => {
+                          const value = String(group);
+                          const isChecked = trainingGroupCreateGroups.includes(value);
+                          return (
+                            <label
+                              key={`training-group-create-${group}`}
+                              className={`amp-group-check-chip${isChecked ? " is-selected" : ""}${trainingGroupCreateSaving ? " is-disabled" : ""}`}
+                            >
+                              <input
+                                className="amp-group-check-input"
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={trainingGroupCreateSaving}
+                                onChange={(e) => {
+                                  setTrainingGroupCreateGroups((prev) => {
+                                    if (e.target.checked) {
+                                      return [...new Set([...prev, value])].sort((a, b) => Number(a) - Number(b));
+                                    }
+                                    return prev.filter((item) => item !== value);
+                                  });
+                                }}
+                              />
+                              <span className="amp-group-check-box" aria-hidden="true" />
+                              <span className="amp-lbl amp-group-check-label">Набор {group}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <span className="amp-lbl amp-group-check-hint">
+                        {trainingGroupCreateGroups.length === 0
+                          ? "Изберете поне 2 набора."
+                          : `Избрани набори: ${trainingGroupCreateGroups.join(", ")} — Името ще бъде: ${trainingGroupCreateGroups.join("/")}`}
+                      </span>
+                    </div>
+                  )}
+                  {trainingGroupCreateError && <p className="amp-confirm-error">{trainingGroupCreateError}</p>}
+                  <div className="amp-modal-actions" style={{ justifyContent: "space-between" }}>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--ghost"
+                      onClick={() => {
+                        setTrainingGroupCreateStep("picker");
+                        setTrainingGroupCreateError("");
+                      }}
+                      disabled={trainingGroupCreateSaving}
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
+                      className="amp-btn amp-btn--primary"
+                      onClick={() => void saveTrainingGroupFromModal()}
+                      disabled={
+                        trainingGroupCreateSaving ||
+                        (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
+                      }
+                    >
+                      {trainingGroupCreateSaving
+                        ? "Създаване..."
+                        : isCustomTrainingGroupMode
+                          ? "Създай група"
+                          : "Създай сборен отбор"}
+                    </button>
+                  </div>
                 </>
               )}
-              {trainingGroupCreateError && <p className="amp-confirm-error">{trainingGroupCreateError}</p>}
-              <div className="amp-modal-actions amp-modal-actions--end">
-                <button
-                  type="button"
-                  className="amp-btn amp-btn--ghost"
-                  onClick={() => {
-                    setTrainingGroupCreateOpen(false);
-                    setTrainingGroupCreateError("");
-                  }}
-                  disabled={trainingGroupCreateSaving}
-                >
-                  Отказ
-                </button>
-                <button
-                  type="button"
-                  className="amp-btn amp-btn--primary"
-                  onClick={() => void saveTrainingGroupFromModal()}
-                  disabled={
-                    trainingGroupCreateSaving ||
-                    (isCustomTrainingGroupMode && noFreeCustomTrainingGroupColor)
-                  }
-                >
-                  {trainingGroupCreateSaving
-                    ? "Създаване..."
-                    : isCustomTrainingGroupMode
-                      ? "Създай група"
-                      : "Създай сборен отбор"}
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -7265,17 +7676,17 @@ function AdminMembersPageContent() {
       {scheduleEventModalOpen && (
         <div
           className="amp-overlay amp-overlay--confirm"
-          onClick={() => { if (!matchEditorSaving) setScheduleEventModalOpen(false); }}
+          onClick={() => { if (!matchEditorSaving) { setScheduleEventModalOpen(false); setScheduleEventStep("type"); } }}
         >
           <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
               <span className="amp-modal-title-gradient">
-                {scheduleEventStep === "type" ? "Насрочи събитие" : "Мач"}
+                {scheduleEventStep === "type" ? "Насрочи събитие" : "Мач / Двубой / Състезание / Участие"}
               </span>
               <button
                 className="amp-modal-close"
-                onClick={() => setScheduleEventModalOpen(false)}
+                onClick={() => { setScheduleEventModalOpen(false); setScheduleEventStep("type"); }}
                 aria-label="Затвори"
                 disabled={matchEditorSaving}
               >
@@ -7307,31 +7718,14 @@ function AdminMembersPageContent() {
                             ? [selectedTeamGroup]
                             : [];
                       setMatchTeamGroups(scopeTeamGroups);
-                      const seenDates = new Set<string>();
-                      const preDates: string[] = [];
-                      const preDetails: Record<string, { opponent: string; location: string; time: string; duration: string; isHome: boolean }> = {};
-                      const preIds: Record<string, string> = {};
-                      for (const match of clubMatches) {
-                        if (!matchCalendarDateSet.has(match.matchDate) || seenDates.has(match.matchDate)) continue;
-                        seenDates.add(match.matchDate);
-                        preDates.push(match.matchDate);
-                        preDetails[match.matchDate] = {
-                          opponent: match.opponent,
-                          location: match.location,
-                          time: match.matchTime,
-                          duration: String(match.durationMinutes),
-                          isHome: match.isHome,
-                        };
-                        preIds[match.matchDate] = match.id;
-                      }
-                      setMatchSelectedDates(preDates.sort());
-                      setMatchDetailsPerDay(preDetails);
-                      setMatchExistingIdByDate(preIds);
+                      setMatchSelectedDates([]);
+                      setMatchDetailsPerDay({});
+                      setMatchExistingIdByDate({});
                       setScheduleEventStep("match-days");
                     }}
                   >
                     <span className="amp-schedule-event-type-icon amp-schedule-event-type-icon--match" aria-hidden="true" />
-                    Мач
+                    Мач / Двубой / Състезание / Участие
                   </button>
                 </div>
               ) : (
@@ -7406,7 +7800,13 @@ function AdminMembersPageContent() {
                   {scheduleEventStep === "match-days" && (
                     <>
                       <div className="amp-training-calendar" style={{ order: 1 }}>
-                        {matchCalendarMonths.map((month) => (
+                        {matchCalendarMonthsTrimmed.length > 1 && (
+                          <div className="amp-training-month-nav">
+                            <button type="button" className="amp-training-month-nav-btn" onClick={() => setMatchCalendarVisibleMonthIdx((i) => Math.max(0, i - 1))} disabled={matchCalendarVisibleMonthIdx === 0} aria-label="Предишен месец">‹</button>
+                            <button type="button" className="amp-training-month-nav-btn" onClick={() => setMatchCalendarVisibleMonthIdx((i) => Math.min(matchCalendarMonthsTrimmed.length - 1, i + 1))} disabled={matchCalendarVisibleMonthIdx === matchCalendarMonths.length - 1} aria-label="Следващ месец">›</button>
+                          </div>
+                        )}
+                        {matchCalendarMonthsTrimmed.slice(matchCalendarVisibleMonthIdx, matchCalendarVisibleMonthIdx + 1).map((month) => (
                           <div key={month.key} className="amp-training-month">
                             <div className="amp-training-month-title">{month.label}</div>
                             <div className="amp-training-weekdays-row">
@@ -7438,7 +7838,12 @@ function AdminMembersPageContent() {
                                   );
                                 }
                                 const isSelected = matchSelectedDates.includes(date);
-                                const matchesForDate = matchCalendarMatchesByDate.get(date) ?? [];
+                                const matchesForDate = (matchCalendarMatchesByDate.get(date) ?? []).filter((m) => {
+                                  if (m.customGroupId !== null) {
+                                    return isCustomTrainingGroupMode && m.customGroupId === selectedCustomGroup?.id;
+                                  }
+                                  return matchTeamGroups.length === 0 || m.teamGroups.length === 0 || m.teamGroups.some((tg) => matchTeamGroups.includes(tg));
+                                });
                                 return (
                                   <button
                                     key={date}
@@ -7491,7 +7896,7 @@ function AdminMembersPageContent() {
                       </div>
                       <div className="amp-match-details-per-day">
                         {matchSelectedDates.map((date) => {
-                          const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: true };
+                          const details = matchDetailsPerDay[date] ?? { opponent: "", location: "", time: "", duration: "90", isHome: null };
                           return (
                             <div key={date} className="amp-match-day-section">
                               <span className="amp-lbl amp-match-day-label">{formatIsoDateForDisplay(date)}</span>
@@ -7525,16 +7930,16 @@ function AdminMembersPageContent() {
                                 <div style={{ display: "flex", gap: 8 }}>
                                   <button
                                     type="button"
-                                    className={`amp-btn${details.isHome ? " amp-btn--primary" : " amp-btn--ghost"}`}
-                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: true } }))}
+                                    className={`amp-btn${details.isHome === true ? " amp-btn--primary" : " amp-btn--ghost"}`}
+                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: details.isHome === true ? null : true } }))}
                                     disabled={matchEditorSaving}
                                   >
                                     Домакин
                                   </button>
                                   <button
                                     type="button"
-                                    className={`amp-btn${!details.isHome ? " amp-btn--primary" : " amp-btn--ghost"}`}
-                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: false } }))}
+                                    className={`amp-btn${details.isHome === false ? " amp-btn--primary" : " amp-btn--ghost"}`}
+                                    onClick={() => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, isHome: details.isHome === false ? null : false } }))}
                                     disabled={matchEditorSaving}
                                   >
                                     Гост
@@ -7585,11 +7990,10 @@ function AdminMembersPageContent() {
                           onClick={() => void handleSaveMatch()}
                           disabled={matchEditorSaving || !matchSelectedDates.every((d) => {
                             const det = matchDetailsPerDay[d];
-                            const dur = Number.parseInt(det?.duration ?? "", 10);
-                            return det?.opponent?.trim() && det?.location?.trim() && det?.time && Number.isInteger(dur) && dur >= 1;
+                            return det?.location?.trim() && det?.time;
                           })}
                         >
-                          {matchEditorSaving ? "Запазване..." : matchSelectedDates.length > 1 ? `Запази ${matchSelectedDates.length} мача` : "Запази мач"}
+                          {matchEditorSaving ? "Запазване..." : matchSelectedDates.length > 1 ? `Запази ${matchSelectedDates.length} събития` : "Запази събитие"}
                         </button>
                       </div>
                     </>
@@ -7686,8 +8090,11 @@ function AdminMembersPageContent() {
                             ? "Тренировъчен график"
                             : "Избери тренировъчни дни (следващи 30 дни)"}
                     </span>
-                    {trainingDaysEditorMode !== "createGroup" && (
+                    {trainingDaysEditorMode !== "createGroup" && trainingDaysSingleEditDate === null && (
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Избрани: {schedulerForm.trainingDates.length}</span>
+                    )}
+                    {trainingDaysEditorMode !== "createGroup" && trainingDaysSingleEditDate !== null && (
+                      <span className="amp-lbl" style={{ textAlign: "center" }}>Редактирате: {formatIsoDateForDisplay(trainingDaysSingleEditDate)}</span>
                     )}
                   </div>
                   <div className="amp-training-days-editor-header" style={{ marginTop: "8px", flexDirection: "column", alignItems: "center", gap: "10px", textAlign: "center" }}>
@@ -7742,9 +8149,9 @@ function AdminMembersPageContent() {
                       </button>
                       <button
                         type="button"
-                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "time" ? " is-active" : ""}${canShowTrainingDaysFieldStep ? " is-complete" : ""}`}
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "time" ? " is-active" : ""}${currentStepOrder > stepSequence.indexOf("time") ? " is-complete" : ""}`}
                         onClick={() => setTrainingDaysActiveStep("time")}
-                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysTimeStep}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysTimeStep || stepSequence.indexOf("time") > currentStepOrder}
                       >
                         <span className="amp-training-step-index">2</span>
                         Час
@@ -7752,9 +8159,9 @@ function AdminMembersPageContent() {
                       {spotsStepSupportedByMode && (
                         <button
                           type="button"
-                          className={`amp-training-step${effectiveTrainingDaysActiveStep === "spots" ? " is-active" : ""}${canShowTrainingDaysSpotsStep && effectiveTrainingDaysActiveStep === "field" ? " is-complete" : ""}`}
+                          className={`amp-training-step${effectiveTrainingDaysActiveStep === "spots" ? " is-active" : ""}${currentStepOrder > stepSequence.indexOf("spots") ? " is-complete" : ""}`}
                           onClick={() => setTrainingDaysActiveStep("spots")}
-                          disabled={trainingDaysEditorSaving || !canShowTrainingDaysSpotsStep}
+                          disabled={trainingDaysEditorSaving || !canShowTrainingDaysSpotsStep || stepSequence.indexOf("spots") > currentStepOrder}
                         >
                           <span className="amp-training-step-index">3</span>
                           Места
@@ -7762,12 +8169,21 @@ function AdminMembersPageContent() {
                       )}
                       <button
                         type="button"
-                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}`}
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "field" ? " is-active" : ""}${currentStepOrder > stepSequence.indexOf("field") ? " is-complete" : ""}`}
                         onClick={() => setTrainingDaysActiveStep("field")}
-                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysFieldStep}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysFieldStep || stepSequence.indexOf("field") > currentStepOrder}
                       >
                         <span className="amp-training-step-index">{spotsStepSupportedByMode ? 4 : 3}</span>
                         Терен
+                      </button>
+                      <button
+                        type="button"
+                        className={`amp-training-step${effectiveTrainingDaysActiveStep === "notes" ? " is-active" : ""}`}
+                        onClick={() => setTrainingDaysActiveStep("notes")}
+                        disabled={trainingDaysEditorSaving || !canShowTrainingDaysNotesStep || stepSequence.indexOf("notes") > currentStepOrder}
+                      >
+                        <span className="amp-training-step-index">{spotsStepSupportedByMode ? 5 : 4}</span>
+                        Описание
                       </button>
                     </div>
                   )}
@@ -7825,32 +8241,17 @@ function AdminMembersPageContent() {
                   {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && (
                     <div className="amp-training-time-panel" style={{ marginTop: "8px", textAlign: "center", order: 2 }}>
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Задай час за:</span>
-                      <div className="amp-pills amp-training-time-mode-buttons" style={{ justifyContent: "center" }}>
-                        <button
-                          type="button"
-                          className={`amp-pill${trainingTimeMode === "all" ? " amp-pill--active" : ""}`}
-                          onClick={() => handleTrainingTimeModeChange("all")}
-                          disabled={trainingDaysEditorSaving}
-                        >
-                          Всички тренировки
-                        </button>
-                        <button
-                          type="button"
-                          className={`amp-pill${trainingTimeMode === "perDay" ? " amp-pill--active" : ""}`}
-                          onClick={() => handleTrainingTimeModeChange("perDay")}
-                          disabled={trainingDaysEditorSaving}
-                        >
-                          По една тренировка
-                        </button>
-                        <button
-                          type="button"
-                          className={`amp-pill${trainingTimeMode === "byWeekday" ? " amp-pill--active" : ""}`}
-                          onClick={() => handleTrainingTimeModeChange("byWeekday")}
-                          disabled={trainingDaysEditorSaving}
-                        >
-                          За седмица
-                        </button>
-                      </div>
+                      <select
+                        className="amp-edit-input"
+                        style={{ textAlign: "center" }}
+                        value={trainingTimeMode}
+                        onChange={(e) => void handleTrainingTimeModeChange(e.target.value as "all" | "perDay" | "byWeekday")}
+                        disabled={trainingDaysEditorSaving}
+                      >
+                        <option value="all">Всички тренировки</option>
+                        <option value="perDay">Различни тренировки</option>
+                        <option value="byWeekday">Всяка седмица</option>
+                      </select>
                     </div>
                   )}
                   {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysTimeStep && effectiveTrainingDaysActiveStep === "time" && trainingTimeMode === "all" && (
@@ -8014,7 +8415,13 @@ function AdminMembersPageContent() {
                   )}
                   {trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep === "days" && (
                     <div className="amp-training-calendar" style={{ order: 1 }}>
-                      {schedulerCalendarMonths.map((month) => (
+                      {schedulerCalendarMonthsTrimmed.length > 1 && (
+                        <div className="amp-training-month-nav">
+                          <button type="button" className="amp-training-month-nav-btn" onClick={() => setSchedulerCalendarVisibleMonthIdx((i) => Math.max(0, i - 1))} disabled={schedulerCalendarVisibleMonthIdx === 0} aria-label="Предишен месец">‹</button>
+                          <button type="button" className="amp-training-month-nav-btn" onClick={() => setSchedulerCalendarVisibleMonthIdx((i) => Math.min(schedulerCalendarMonthsTrimmed.length - 1, i + 1))} disabled={schedulerCalendarVisibleMonthIdx === schedulerCalendarMonths.length - 1} aria-label="Следващ месец">›</button>
+                        </div>
+                      )}
+                      {schedulerCalendarMonthsTrimmed.slice(schedulerCalendarVisibleMonthIdx, schedulerCalendarVisibleMonthIdx + 1).map((month) => (
                         <div key={month.key} className="amp-training-month">
                           <div className="amp-training-month-title">{month.label}</div>
                           <div className="amp-training-weekdays-row">
@@ -8035,6 +8442,15 @@ function AdminMembersPageContent() {
                                   />
                                 );
                               }
+                              if (date < todayIsoDate) {
+                                return (
+                                  <span
+                                    key={date}
+                                    className="amp-training-calendar-cell amp-training-calendar-cell--empty"
+                                    aria-hidden="true"
+                                  />
+                                );
+                              }
                               const dayNumber = Number.parseInt(date.slice(8, 10), 10);
                               const isSelectable = schedulerCalendarDateSet.has(date);
                               if (!isSelectable) {
@@ -8050,6 +8466,18 @@ function AdminMembersPageContent() {
                               }
 
                               const isSelected = schedulerForm.trainingDates.includes(date);
+                              const isPreExisting = trainingDaysPreExistingDates.includes(date) && !isSelected;
+                              if (isPreExisting) {
+                                return (
+                                  <span
+                                    key={date}
+                                    className="amp-training-calendar-cell amp-training-calendar-cell--existing"
+                                    title="Вече насрочена"
+                                  >
+                                    <span className="amp-training-day-number">{dayNumber}</span>
+                                  </span>
+                                );
+                              }
                               return (
                                 <button
                                   key={date}
@@ -8380,6 +8808,27 @@ function AdminMembersPageContent() {
                   {canShowTrainingDaysFieldStep && effectiveTrainingDaysActiveStep === "field" && hasMissingTrainingField && (
                       <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>{missingTrainingFieldMessage}</p>
                   )}
+                  {trainingDaysEditorMode !== "createGroup" && canShowTrainingDaysNotesStep && effectiveTrainingDaysActiveStep === "notes" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px", order: 3 }}>
+                      <p style={{ margin: 0, textAlign: "center", opacity: 0.65, fontSize: "0.85em" }}>
+                        Описанието е по избор. Можете да зададете различен текст за всяка тренировка.
+                      </p>
+                      {normalizedTrainingDaysSelection.map((date) => (
+                        <label key={`note-${date}`} className="amp-edit-field" style={{ textAlign: "center" }}>
+                          <span className="amp-lbl" style={{ textAlign: "center" }}>{formatIsoDateForDisplay(date)}</span>
+                          <textarea
+                            className="amp-edit-input amp-training-note"
+                            value={trainingDayScheduleNotes[date] ?? ""}
+                            onChange={(e) => setTrainingDayScheduleNotes((prev) => ({ ...prev, [date]: e.target.value }))}
+                            rows={2}
+                            maxLength={1000}
+                            placeholder="Инструкции, сборен час, локация..."
+                            disabled={trainingDaysEditorSaving}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
                   {trainingDaysEditorError && <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>{trainingDaysEditorError}</p>}
                   {isTrainingDaysScheduleUnchanged && !trainingDaysEditorError && (
                     <p className="amp-confirm-error" style={{ textAlign: "center", order: 4 }}>Графикът е същият като предишния.</p>
@@ -8391,7 +8840,9 @@ function AdminMembersPageContent() {
                           type="button"
                           className="amp-btn amp-btn--ghost"
                           onClick={() => {
-                            if (effectiveTrainingDaysActiveStep === "field") {
+                            if (effectiveTrainingDaysActiveStep === "notes") {
+                              setTrainingDaysActiveStep("field");
+                            } else if (effectiveTrainingDaysActiveStep === "field") {
                               setTrainingDaysActiveStep(canShowTrainingDaysSpotsStep ? "spots" : "time");
                             } else if (effectiveTrainingDaysActiveStep === "spots") {
                               setTrainingDaysActiveStep("time");
@@ -8413,8 +8864,10 @@ function AdminMembersPageContent() {
                               setTrainingDaysActiveStep("time");
                             } else if (effectiveTrainingDaysActiveStep === "time") {
                               setTrainingDaysActiveStep(canShowTrainingDaysSpotsStep ? "spots" : "field");
-                            } else {
+                            } else if (effectiveTrainingDaysActiveStep === "spots") {
                               setTrainingDaysActiveStep("field");
+                            } else {
+                              setTrainingDaysActiveStep("notes");
                             }
                           }}
                           disabled={isTrainingStepNextDisabled}
@@ -8437,26 +8890,28 @@ function AdminMembersPageContent() {
                     >
                       Отказ
                     </button>
-                    <button
-                      type="button"
-                      className="amp-btn amp-btn--primary"
-                      onClick={() => void (trainingDaysEditorMode === "createGroup" ? saveTrainingDaysForSelectedGroups() : saveTrainingDaysFromTrainingModal())}
-                      disabled={
-                        trainingDaysEditorSaving ||
-                        trainingDaysEditorLoading ||
-                        (trainingDaysEditorMode !== "createGroup" && isTrainingDaysScheduleUnchanged) ||
-                        (trainingDaysEditorMode !== "createGroup" &&
-                          hasMissingTrainingTime) ||
-                        hasMissingTrainingField ||
-                        hasInvalidTrainingDuration
-                      }
-                    >
-                      {trainingDaysEditorSaving
-                        ? "Запазване..."
-                        : trainingDaysEditorMode === "createGroup"
-                          ? "Създай сборен отбор"
-                          : "Запази дни"}
-                    </button>
+                    {(trainingDaysEditorMode === "createGroup" || effectiveTrainingDaysActiveStep === "notes") && (
+                      <button
+                        type="button"
+                        className="amp-btn amp-btn--primary"
+                        onClick={() => void (trainingDaysEditorMode === "createGroup" ? saveTrainingDaysForSelectedGroups() : saveTrainingDaysFromTrainingModal())}
+                        disabled={
+                          trainingDaysEditorSaving ||
+                          trainingDaysEditorLoading ||
+                          (trainingDaysEditorMode !== "createGroup" && isTrainingDaysScheduleUnchanged) ||
+                          (trainingDaysEditorMode !== "createGroup" &&
+                            hasMissingTrainingTime) ||
+                          hasMissingTrainingField ||
+                          hasInvalidTrainingDuration
+                        }
+                      >
+                        {trainingDaysEditorSaving
+                          ? "Запазване..."
+                          : trainingDaysEditorMode === "createGroup"
+                            ? "Създай сборен отбор"
+                            : "Запази дни"}
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -8728,10 +9183,14 @@ function AdminMembersPageContent() {
                 <>
                   <div className="amp-training-stats">
                     <span>Дата: {trainingAttendanceDate ? formatIsoDateForDisplay(trainingAttendanceDate) : "-"}</span>
+                    {trainingDayTime && <span>Час: {trainingDayTime}</span>}
                     <span>Общо: {trainingAttendanceStats.total}</span>
                     <span>Присъстващи: {trainingAttendanceStats.attending}</span>
                     <span>Отсъстващи: {trainingAttendanceStats.optedOut}</span>
                     <span>Продължителност: {trainingDayDurationMinutes} мин.</span>
+                    {trainingDaySessionCancelled && (
+                      <span style={{ color: "#ff6b6b", fontWeight: 700, background: "rgba(255,107,107,0.12)", border: "1px solid rgba(255,107,107,0.35)", borderRadius: 6, padding: "2px 8px" }}>ОТМЕНЕНА</span>
+                    )}
                   </div>
                   {trainingDayField && (() => {
                     const isWholeFieldSelected = trainingDayFieldPieceIds.length === 0;
@@ -8816,50 +9275,97 @@ function AdminMembersPageContent() {
                   </div>
                   <div className="amp-modal-actions amp-modal-actions--end">
                     <button
-                      className="amp-btn amp-btn--primary"
+                      className="amp-btn amp-btn--ghost"
                       onClick={() => {
-                        setTrainingNoteTargetDates(trainingAttendanceDate ? [trainingAttendanceDate] : []);
-                        setTrainingBulkNoteOpen(true);
+                        if (!trainingAttendanceDate) return;
+                        setTrainingDayDetailsOpen(false);
+                        void openSingleTrainingDayEditForCurrentScope(trainingAttendanceDate);
                       }}
-                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading}
+                      disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading || trainingDayCancelLoading}
                     >
-                      Добави описание
+                      Редактирай тренировка
                     </button>
+                    {!trainingDaySessionCancelled && (
+                      <button
+                        className="amp-btn amp-btn--danger"
+                        onClick={() => setTrainingDayCancelConfirmOpen(true)}
+                        disabled={trainingAttendanceLoading || trainingNoteSaving || !trainingAttendanceDate || trainingDayDetailsTabLoading || trainingDayCancelLoading}
+                      >
+                        {trainingDayCancelLoading ? "..." : "Отмени тренировка"}
+                      </button>
+                    )}
                   </div>
+                  {trainingDayCancelConfirmOpen && (
+                    <div style={{ background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.35)", borderRadius: 8, padding: "12px 16px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#ff6b6b" }}>
+                        Сигурни ли сте, че искате да отмените тренировката на {trainingAttendanceDate ? formatIsoDateForDisplay(trainingAttendanceDate) : "тази дата"}?
+                      </p>
+                      <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+                        Тренировката ще бъде премахната от графика и не може да бъде възстановена.
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          className="amp-btn amp-btn--danger"
+                          onClick={() => void handleCancelTrainingDay()}
+                          disabled={trainingDayCancelLoading}
+                        >
+                          {trainingDayCancelLoading ? "..." : "Да, отмени"}
+                        </button>
+                        <button
+                          className="amp-btn amp-btn--ghost"
+                          onClick={() => setTrainingDayCancelConfirmOpen(false)}
+                          disabled={trainingDayCancelLoading}
+                        >
+                          Назад
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {limitedEvent && !limitedEventLoading && (
                     <p style={{ fontSize: 12, color: "rgba(240,160,48,0.9)", background: "rgba(240,160,48,0.08)", border: "1px solid rgba(240,160,48,0.25)", borderRadius: 6, padding: "6px 10px", marginBottom: 8 }}>
                       Ограничен режим — всички маркирани като отсъстващи. Маркирайте ръчно кой е присъствал.
                     </p>
                   )}
                   <div className="amp-training-table-wrap">
-                    {trainingAttendanceLoading || trainingDayDetailsTabLoading ? (
-                      <p className="amp-empty amp-empty--modal">Зареждане...</p>
-                    ) : trainingAttendancePlayers.length === 0 ? (
-                      <p className="amp-empty amp-empty--modal">Няма състезатели за този отбор.</p>
-                    ) : (
-                      <table className="amp-training-table">
-                        <thead>
-                          <tr>
-                            <th>Име</th>
-                            <th>Набор</th>
-                            <th>Статус</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {trainingAttendancePlayers.map((player) => (
-                            <tr key={player.id}>
-                              <td>{player.fullName}</td>
-                              <td>{player.teamGroup ?? "-"}</td>
-                              <td>
-                                <span className={player.optedOut ? "amp-training-tag amp-training-tag--out" : "amp-training-tag amp-training-tag--in"}>
-                                  {player.optedOut ? "Няма да присъства" : "Ще присъства"}
-                                </span>
-                              </td>
+                    <button
+                      type="button"
+                      className="amp-training-players-toggle"
+                      onClick={() => setTrainingPlayersExpanded((prev) => !prev)}
+                      disabled={trainingAttendanceLoading || trainingDayDetailsTabLoading}
+                    >
+                      <span>Играчи ({trainingAttendanceStats.total})</span>
+                      <span className={`amp-training-players-toggle-arrow${trainingPlayersExpanded ? " amp-training-players-toggle-arrow--open" : ""}`}>▾</span>
+                    </button>
+                    <div className={`amp-training-players-body${trainingPlayersExpanded ? " amp-training-players-body--open" : ""}`}>
+                      {trainingAttendanceLoading || trainingDayDetailsTabLoading ? (
+                        <p className="amp-empty amp-empty--modal">Зареждане...</p>
+                      ) : trainingAttendancePlayers.length === 0 ? (
+                        <p className="amp-empty amp-empty--modal">Няма състезатели за този отбор.</p>
+                      ) : (
+                        <table className="amp-training-table">
+                          <thead>
+                            <tr>
+                              <th>Име</th>
+                              <th>Набор</th>
+                              <th>Статус</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
+                          </thead>
+                          <tbody>
+                            {trainingAttendancePlayers.map((player) => (
+                              <tr key={player.id}>
+                                <td>{player.fullName}</td>
+                                <td>{player.teamGroup ?? "-"}</td>
+                                <td>
+                                  <span className={player.optedOut ? "amp-training-tag amp-training-tag--out" : "amp-training-tag amp-training-tag--in"}>
+                                    {player.optedOut ? "Няма да присъства" : "Ще присъства"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
                   </div>
                   {/* ── Limited spots section ── */}
                   {(() => {
@@ -9230,31 +9736,6 @@ function AdminMembersPageContent() {
                   {trainingNoteSaving
                     ? "Запазване..."
                     : `Запази описание за ${effectiveTrainingNoteTargetDates.length} ден(дни)`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {trainingNoteSuccessOpen && (
-        <div className="amp-overlay amp-overlay--confirm" onClick={() => setTrainingNoteSuccessOpen(false)}>
-          <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
-            <div className="amp-modal-tint" aria-hidden="true" />
-            <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">Изпратено</span>
-              <button
-                className="amp-modal-close"
-                onClick={() => setTrainingNoteSuccessOpen(false)}
-                aria-label="Затвори"
-              >
-                <XIcon />
-              </button>
-            </h2>
-            <div className="amp-modal-body">
-              <p className="amp-confirm-text">{trainingNoteSuccessMessage}</p>
-              <div className="amp-modal-actions amp-modal-actions--end">
-                <button className="amp-btn amp-btn--primary" onClick={() => setTrainingNoteSuccessOpen(false)}>
-                  Добре
                 </button>
               </div>
             </div>
@@ -9876,6 +10357,101 @@ function AdminMembersPageContent() {
                 >
                   {notifyBusy ? "Изпращане..." : `Изпрати до ${notifySelectedIds.size}`}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {guideOpen && (
+        <div className="amp-overlay" onClick={() => setGuideOpen(false)}>
+          <div className="amp-modal amp-modal--guide" onClick={(e) => e.stopPropagation()}>
+            <div className="amp-modal-tint" aria-hidden="true" />
+            <div className="amp-guide-sidebar">
+              <div className="amp-guide-sidebar-title">Наръчник</div>
+              {guideSteps.map((step, idx) => (
+                <button
+                  key={step.id}
+                  className={`amp-guide-sidebar-item${idx === guideStep ? ' is-active' : ''}`}
+                  type="button"
+                  onClick={() => { setGuideStep(idx); setGuideImgExpanded(false); }}
+                >
+                  <span className="amp-guide-sidebar-num">{idx + 1}</span>
+                  <span className="amp-guide-sidebar-name">{step.title}</span>
+                </button>
+              ))}
+            </div>
+            <div className="amp-guide-content">
+              <div className="amp-guide-content-header">
+                <span className="amp-guide-step-counter">{guideStep + 1} / {guideSteps.length}</span>
+                <button className="amp-modal-close" onClick={() => setGuideOpen(false)} aria-label="Затвори">
+                  <XIcon />
+                </button>
+              </div>
+              <div className="amp-guide-content-scroll">
+                <div
+                  key={guideSteps[guideStep]?.id}
+                  className="amp-guide-step-img-wrap"
+                  style={{ display: 'none' }}
+                >
+                  <img
+                    src={'/guide/' + (guideSteps[guideStep]?.id ?? '') + '.png'}
+                    alt=""
+                    className="amp-guide-step-img"
+                    onLoad={(e) => { if (e.currentTarget.parentElement) (e.currentTarget.parentElement as HTMLElement).style.display = 'flex'; }}
+                    onError={(e) => { if (e.currentTarget.parentElement) (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+                    onClick={() => setGuideImgExpanded(true)}
+                  />
+                  <span className="amp-guide-step-img-hint">🔍 Кликни за увеличение</span>
+                </div>
+                {guideImgExpanded && (
+                  <div className="amp-guide-lightbox" onClick={() => setGuideImgExpanded(false)}>
+                    <img
+                      src={'/guide/' + (guideSteps[guideStep]?.id ?? '') + '.png'}
+                      alt=""
+                      className="amp-guide-lightbox-img"
+                    />
+                  </div>
+                )}
+                <div className="amp-guide-step-body">
+                  <div
+                    className="amp-guide-step-icon-wrap"
+                    aria-hidden="true"
+                    dangerouslySetInnerHTML={{
+                      __html: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (guideSteps[guideStep]?.icon ?? '') + '</svg>'
+                    }}
+                  />
+                  <div>
+                    <h3 className="amp-guide-step-title">{guideSteps[guideStep]?.title}</h3>
+                    <p className="amp-guide-step-desc">{guideSteps[guideStep]?.description}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="amp-guide-nav">
+                <button
+                  className="amp-btn amp-btn--ghost amp-btn--compact"
+                  type="button"
+                  onClick={() => { setGuideStep((s) => Math.max(0, s - 1)); setGuideImgExpanded(false); }}
+                  disabled={guideStep === 0}
+                >
+                  ← Назад
+                </button>
+                {guideStep === guideSteps.length - 1 ? (
+                  <button
+                    className="amp-btn amp-btn--primary amp-btn--compact"
+                    type="button"
+                    onClick={() => setGuideOpen(false)}
+                  >
+                    Готово ✓
+                  </button>
+                ) : (
+                  <button
+                    className="amp-btn amp-btn--primary amp-btn--compact"
+                    type="button"
+                    onClick={() => { setGuideStep((s) => s + 1); setGuideImgExpanded(false); }}
+                  >
+                    Напред →
+                  </button>
+                )}
               </div>
             </div>
           </div>

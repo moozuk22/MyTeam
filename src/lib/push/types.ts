@@ -10,6 +10,7 @@ export type NotificationTemplateType =
   | "member_push_enabled"
   | "limited_training_created"
   | "limited_training_promoted"
+  | "training_cancelled"
   | "birthday";
 
 export interface PushNotificationPayload {

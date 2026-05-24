@@ -84,6 +84,21 @@ function parseOptionalCustomTrainingGroupId(raw: unknown): string | null {
   return value ? value : null;
 }
 
+function isValidTrainingDateForConfig(input: {
+  date: string;
+  trainingDates: string[];
+  weekdays: number[];
+  timeZone: string;
+}): boolean {
+  if (input.trainingDates.length > 0) {
+    return input.trainingDates.includes(input.date);
+  }
+  if (input.weekdays.length === 0) {
+    return false;
+  }
+  return input.weekdays.includes(getWeekdayMondayFirst(input.date, input.timeZone));
+}
+
 function parseMonthKey(raw: string | null, fallbackDate: string) {
   const value = raw?.trim() ?? "";
   if (/^\d{4}-\d{2}$/.test(value)) {
@@ -410,6 +425,7 @@ export async function GET(
         select: {
           id: true,
           name: true,
+          fieldType: true,
           pieces: {
             select: { id: true, name: true },
             orderBy: { sortOrder: "asc" },
@@ -470,7 +486,7 @@ export async function GET(
   const trainingDateAsDate = isoDateToUtcMidnight(trainingDate);
   const upcomingDatesAsDate = upcomingDates.map((date) => isoDateToUtcMidnight(date));
 
-  const [allOptOuts, note] = await Promise.all([
+  const [allOptOuts, note, sessionForDate] = await Promise.all([
     playerIds.length > 0 && upcomingDatesAsDate.length > 0
       ? prisma.trainingOptOut.findMany({
           where: {
@@ -487,16 +503,19 @@ export async function GET(
           },
         })
       : Promise.resolve([]),
-    prisma.trainingNote.findUnique({
+    prisma.trainingNote.findFirst({
       where: {
-        clubId_trainingDate: {
-          clubId: id,
-          trainingDate: trainingDateAsDate,
-        },
+        clubId: id,
+        trainingDate: trainingDateAsDate,
+        scopeKey,
       },
       select: {
         note: true,
       },
+    }),
+    prisma.trainingSession.findFirst({
+      where: { clubId: id, scopeKey, trainingDate: trainingDateAsDate },
+      select: { status: true },
     }),
   ]);
 
@@ -533,6 +552,7 @@ export async function GET(
       trainingFieldId: effectiveTrainingFieldId,
       trainingFieldPieceIds: effectiveTrainingFieldPieceIds,
       trainingField,
+      sessionStatus: sessionForDate?.status ?? "scheduled",
       stats: {
         total: totalPlayers,
         optedOut: playersWithStatus.filter((player) => player.optedOut).length,
@@ -597,13 +617,7 @@ export async function PUT(
   try {
     const club = await prisma.club.findUnique({
     where: { id },
-    select: {
-      id: true,
-      trainingDates: true,
-      trainingWeekdays: true,
-      trainingWindowDays: true,
-      trainingGroupMode: true,
-    },
+    select: { id: true },
   });
   if (!club) {
     return NextResponse.json({ error: "Club not found" }, { status: 404 });
@@ -611,17 +625,8 @@ export async function PUT(
 
   const trainingGroup = trainingGroupId
     ? await prisma.clubTrainingScheduleGroup.findFirst({
-        where: {
-          id: trainingGroupId,
-          clubId: id,
-        },
-        select: {
-          id: true,
-          teamGroups: true,
-          trainingDates: true,
-          trainingWeekdays: true,
-          trainingWindowDays: true,
-        },
+        where: { id: trainingGroupId, clubId: id },
+        select: { id: true, teamGroups: true },
       })
     : null;
   if (trainingGroupId && !trainingGroup) {
@@ -630,87 +635,23 @@ export async function PUT(
 
   const customTrainingGroup = customTrainingGroupId
     ? await prisma.clubCustomTrainingGroup.findFirst({
-        where: {
-          id: customTrainingGroupId,
-          clubId: id,
-        },
-        select: {
-          id: true,
-          trainingDates: true,
-          trainingWeekdays: true,
-          trainingWindowDays: true,
-          players: { select: { playerId: true } },
-        },
+        where: { id: customTrainingGroupId, clubId: id },
+        select: { id: true, players: { select: { playerId: true } } },
       })
     : null;
   if (customTrainingGroupId && !customTrainingGroup) {
     return NextResponse.json({ error: "Custom training group not found" }, { status: 404 });
   }
 
-  const groupSchedule = teamGroup === null
-    ? null
-    : await prisma.clubTrainingGroupSchedule.findUnique({
-        where: {
-          clubId_teamGroup: {
-            clubId: id,
-            teamGroup,
-          },
-        },
-        select: {
-          trainingDates: true,
-          trainingWeekdays: true,
-          trainingWindowDays: true,
-        },
-      });
-
-  const trainingGroupOverride = !trainingGroup && teamGroup !== null
-    ? await prisma.clubTrainingScheduleGroup.findFirst({
-        where: {
-          clubId: id,
-          teamGroups: {
-            has: teamGroup,
-          },
-          trainingDates: {
-            isEmpty: false,
-          },
-        },
-        orderBy: {
-          updatedAt: "desc",
-        },
-        select: {
-          trainingDates: true,
-          trainingWeekdays: true,
-          trainingWindowDays: true,
-        },
-      })
-    : null;
-
-  const upcomingDates = getConfiguredTrainingDates({
-    trainingDates:
-      customTrainingGroup
-        ? customTrainingGroup.trainingDates ?? []
-        : trainingGroup
-        ? trainingGroup.trainingDates ?? []
-        : trainingGroupOverride?.trainingDates ?? groupSchedule?.trainingDates ?? club.trainingDates ?? [],
-    weekdays:
-      customTrainingGroup
-        ? customTrainingGroup.trainingWeekdays ?? []
-        : trainingGroup
-        ? trainingGroup.trainingWeekdays ?? []
-        : trainingGroupOverride?.trainingWeekdays ?? groupSchedule?.trainingWeekdays ?? club.trainingWeekdays ?? [],
-    windowDays:
-      customTrainingGroup?.trainingWindowDays ??
-      trainingGroup?.trainingWindowDays ??
-      trainingGroupOverride?.trainingWindowDays ??
-      groupSchedule?.trainingWindowDays ??
-      club.trainingWindowDays ??
-      TRAINING_SELECTION_WINDOW_DAYS,
-    timeZone: FIXED_TIME_ZONE,
-    maxDays: TRAINING_SELECTION_WINDOW_DAYS,
-  });
-  if (!upcomingDates.includes(trainingDate)) {
-    return NextResponse.json({ error: "Date is outside configured training window" }, { status: 400 });
-  }
+  const scopeKey = getTrainingSessionScopeKey(
+    customTrainingGroup
+      ? { type: "customGroup", id: customTrainingGroup.id }
+      : trainingGroup
+        ? { type: "trainingGroup", id: trainingGroup.id }
+        : teamGroup !== null
+          ? { type: "teamGroup", teamGroup }
+          : { type: "club" },
+  );
 
   const trainingDateAsDate = isoDateToUtcMidnight(trainingDate);
   const customPlayerIds = customTrainingGroup
@@ -746,6 +687,7 @@ export async function PUT(
       where: {
         clubId: id,
         trainingDate: trainingDateAsDate,
+        scopeKey,
       },
     });
     for (const cardCode of affectedCardCodes) {
@@ -763,29 +705,20 @@ export async function PUT(
     return NextResponse.json({ error: "Note is too long (max 1000 chars)" }, { status: 400 });
   }
 
-  const saved = await prisma.trainingNote.upsert({
-    where: {
-      clubId_trainingDate: {
-        clubId: id,
-        trainingDate: trainingDateAsDate,
-      },
-    },
-    update: {
-      note,
-      createdByUserId: session.sub,
-      updatedAt: new Date(),
-    },
-    create: {
-      clubId: id,
-      trainingDate: trainingDateAsDate,
-      note,
-      createdByUserId: session.sub,
-    },
-    select: {
-      trainingDate: true,
-      note: true,
-    },
+  const existing = await prisma.trainingNote.findFirst({
+    where: { clubId: id, trainingDate: trainingDateAsDate, scopeKey },
+    select: { id: true },
   });
+  const saved = existing
+    ? await prisma.trainingNote.update({
+        where: { id: existing.id },
+        data: { note, createdByUserId: session.sub, updatedAt: new Date() },
+        select: { trainingDate: true, note: true },
+      })
+    : await prisma.trainingNote.create({
+        data: { clubId: id, trainingDate: trainingDateAsDate, scopeKey, note, createdByUserId: session.sub },
+        select: { trainingDate: true, note: true },
+      });
   for (const cardCode of affectedCardCodes) {
     publishMemberUpdated(cardCode, "training-updated");
   }

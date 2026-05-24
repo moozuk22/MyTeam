@@ -41,6 +41,7 @@ export async function PATCH(
     where: { id: matchId, clubId: id },
     select: {
       id: true,
+      customGroupId: true,
       opponent: true,
       location: true,
       matchDate: true,
@@ -57,7 +58,6 @@ export async function PATCH(
 
   if (Object.hasOwn(body, "opponent")) {
     const opponent = String(body.opponent ?? "").trim();
-    if (!opponent) return NextResponse.json({ error: "Съперник е задължителен." }, { status: 400 });
     if (opponent.length > 200) return NextResponse.json({ error: "Съперник е твърде дълъг." }, { status: 400 });
     update.opponent = opponent;
   }
@@ -88,6 +88,10 @@ export async function PATCH(
   if (Object.hasOwn(body, "teamGroups")) {
     update.teamGroups = normalizeTeamGroups(body.teamGroups);
   }
+  if (Object.hasOwn(body, "customGroupId")) {
+    const raw = typeof body.customGroupId === "string" ? body.customGroupId.trim() : null;
+    update.customGroupId = raw || null;
+  }
 
   let matchConflictWarning: string | null = null;
   const finalDate = (update.matchDate as string | undefined) ?? existing.matchDate;
@@ -102,7 +106,7 @@ export async function PATCH(
   const match = await prisma.clubMatch.update({
     where: { id: matchId },
     data: update,
-    select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
+    select: { id: true, customGroupId: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
   });
 
   let notifications = null;

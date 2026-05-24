@@ -11,7 +11,7 @@ import {
   normalizeToMonthStart,
   resolveRollingThirtyDayStatus,
 } from "@/lib/paymentStatus";
-import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { normalizePhone } from "@/lib/phone";
 import { parsePaymentAmount } from "@/lib/paymentAmount";
 import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
 
@@ -71,27 +71,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const parentPhone = normalizePhone(body.parentPhone);
-    if (!parentPhone) {
-      return NextResponse.json(
-        { error: "parentPhone is required" },
-        { status: 400 }
-      );
-    }
-    if (!isValidPhone(parentPhone)) {
-      return NextResponse.json(
-        { error: "parentPhone is invalid" },
-        { status: 400 }
-      );
-    }
-    const playerPhoneRaw = normalizePhone(body.playerPhone);
-    if (playerPhoneRaw && !isValidPhone(playerPhoneRaw)) {
-      return NextResponse.json(
-        { error: "playerPhone is invalid" },
-        { status: 400 }
-      );
-    }
-    const playerPhone = playerPhoneRaw || null;
+    const parentPhone = normalizePhone(body.parentPhone) || null;
+    const playerPhone = normalizePhone(body.playerPhone) || null;
 
     let clubId = String(body.clubId ?? "").trim();
     if (!clubId) {
@@ -163,17 +144,10 @@ export async function POST(request: NextRequest) {
     };
 
     const birthDateRaw = String(body.birthDate ?? "").trim();
-    if (!birthDateRaw) {
-      return NextResponse.json({ error: "birthDate is required" }, { status: 400 });
-    }
-
     const birthDate = parseDate(birthDateRaw);
-    if (!birthDate) {
-      return NextResponse.json({ error: "Invalid birthDate" }, { status: 400 });
-    }
 
     const confirmDuplicate = body.confirmDuplicate === true;
-    if (!confirmDuplicate) {
+    if (!confirmDuplicate && birthDate) {
       const duplicateCandidates = await prisma.player.findMany({
         where: {
           clubId,
@@ -208,7 +182,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid lastPaymentDate" }, { status: 400 });
     }
 
-    const teamGroup = birthDate.getUTCFullYear();
+    const teamGroup = birthDate ? birthDate.getUTCFullYear() : null;
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const rawCoachGroupId = body.coachGroupId != null ? String(body.coachGroupId).trim() : null;

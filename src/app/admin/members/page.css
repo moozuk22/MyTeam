@@ -1918,6 +1918,16 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+.amp-training-calendar-cell--existing {
+  background: rgba(50, 205, 50, 0.08);
+  color: rgba(50, 205, 50, 0.55);
+  border-color: rgba(50, 205, 50, 0.2);
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .amp-training-day-number {
   font-size: 10px;
   font-weight: 700;
@@ -2272,6 +2282,26 @@
   border-color: rgba(50, 205, 50, 0.42);
 }
 
+.amp-training-week-session-row--clickable {
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.amp-training-week-session-row--clickable:hover {
+  background: rgba(50, 205, 50, 0.16);
+  border-color: rgba(50, 205, 50, 0.55);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.amp-training-week-session-row--clickable:focus-visible {
+  outline: 2px solid rgba(50, 205, 50, 0.7);
+  outline-offset: 1px;
+}
+
+.amp-training-week-session-row--match.amp-training-week-session-row--clickable:hover {
+  background: rgba(249, 115, 22, 0.18);
+  border-color: rgba(249, 115, 22, 0.6);
+}
+
 .amp-training-week-session-row--match {
   background: rgba(249, 115, 22, 0.1);
   border-color: rgba(249, 115, 22, 0.38);
@@ -2340,6 +2370,30 @@
   background: linear-gradient(145deg, #fb923c 0%, #ea580c 100%);
   border-color: rgba(255, 200, 150, 0.45);
   color: #1a0a04;
+}
+
+.amp-training-week-session-row-info {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, serif;
+  color: rgba(255, 255, 255, 0.3);
+  transition: border-color 0.15s, color 0.15s;
+  pointer-events: none;
+}
+
+.amp-training-week-session-row--clickable:hover .amp-training-week-session-row-info {
+  border-color: rgba(50, 205, 50, 0.65);
+  color: rgba(50, 205, 50, 0.85);
 }
 
 .amp-schedule-event-type-picker {
@@ -2769,7 +2823,7 @@
   padding: 8px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: #ffffff;
-  text-align: left;
+  text-align: center;
 }
 
 .amp-training-table th {
@@ -2799,6 +2853,56 @@
   background: rgba(255, 77, 77, 0.16);
   color: #ffb0b0;
   border: 1px solid rgba(255, 77, 77, 0.35);
+}
+
+.amp-training-players-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.amp-training-players-toggle:hover:not(:disabled) {
+  color: #ffffff;
+}
+
+.amp-training-players-toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.amp-training-players-toggle-arrow {
+  font-size: 16px;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.amp-training-players-toggle-arrow--open {
+  transform: rotate(180deg);
+}
+
+.amp-training-players-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s ease;
+  overflow: hidden;
+}
+
+.amp-training-players-body--open {
+  grid-template-rows: 1fr;
+}
+
+.amp-training-players-body > * {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .amp-edit-input {
@@ -2929,6 +3033,9 @@
 }
 
 .amp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 10px;
   height: 36px;
@@ -3096,6 +3203,7 @@
   min-width: 0;
   border-radius: 999px;
   font-weight: 700;
+  text-align: center;
 }
 
 .amp-training-view-btn.is-active {
@@ -5105,4 +5213,334 @@
   gap: 8px;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Guide modal ─────────────────────────────────────────────────────── */
+.amp-modal--guide {
+  max-width: 860px;
+  width: 96vw;
+  display: flex;
+  flex-direction: row;
+  padding: 0;
+  overflow: hidden;
+  max-height: 90vh;
+}
+
+/* Sidebar */
+.amp-guide-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.28);
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 197, 94, 0.2) transparent;
+  padding: 16px 8px;
+  gap: 2px;
+}
+
+.amp-guide-sidebar-title {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.28);
+  padding: 4px 8px 10px;
+  font-weight: 600;
+}
+
+.amp-guide-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12.5px;
+  text-align: left;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  line-height: 1.3;
+}
+
+.amp-guide-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.amp-guide-sidebar-item.is-active {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.28);
+  color: #4ade80;
+}
+
+.amp-guide-sidebar-num {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.amp-guide-sidebar-item.is-active .amp-guide-sidebar-num {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.amp-guide-sidebar-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Content panel */
+.amp-guide-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.amp-guide-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 14px 18px 0;
+}
+
+.amp-guide-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 22px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 197, 94, 0.2) transparent;
+}
+
+/* Image */
+.amp-guide-step-img-wrap {
+  border-radius: 10px;
+  overflow: visible;
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  position: relative;
+}
+
+.amp-guide-step-img {
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  display: block;
+  border-radius: 10px 10px 0 0;
+  cursor: zoom-in;
+}
+
+.amp-guide-step-img-hint {
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 5px 0 6px;
+}
+
+/* Lightbox */
+.amp-guide-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 24px;
+}
+
+.amp-guide-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.6);
+}
+
+/* Step body */
+.amp-guide-step-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  min-height: 100px;
+}
+
+.amp-guide-step-icon-wrap {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #22c55e;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.12);
+}
+
+.amp-guide-step-icon-wrap svg {
+  display: block;
+  color: #22c55e;
+  stroke: #22c55e;
+}
+
+.amp-guide-step-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 2px 0 10px;
+  line-height: 1.25;
+}
+
+.amp-guide-step-desc {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0;
+}
+
+/* Nav */
+.amp-guide-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 14px 22px;
+}
+
+/* Guide trigger button */
+.amp-guide-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(34, 197, 94, 0.6);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18) 0%, rgba(16, 185, 129, 0.1) 100%);
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  white-space: nowrap;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: guide-btn-pulse 3s linear 1.5s infinite;
+}
+
+@keyframes guide-btn-pulse {
+  0%   { box-shadow: 0 0 6px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+  25%  { box-shadow: 0 0 12px rgba(34, 197, 94, 0.35), 0 0 24px rgba(34, 197, 94, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+  50%  { box-shadow: 0 0 18px rgba(34, 197, 94, 0.55), 0 0 36px rgba(34, 197, 94, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+  75%  { box-shadow: 0 0 12px rgba(34, 197, 94, 0.35), 0 0 24px rgba(34, 197, 94, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+  100% { box-shadow: 0 0 6px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+}
+
+.amp-guide-btn:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(16, 185, 129, 0.2) 100%);
+  border-color: rgba(34, 197, 94, 0.9);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.5), 0 0 40px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: none;
+}
+
+.amp-guide-btn:hover svg {
+  filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.8));
+}
+
+/* ── Guide modal responsive ───────────────────────────────── */
+/* Show step counter — hidden on desktop since sidebar covers it */
+.amp-guide-step-counter {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .amp-modal--guide {
+    flex-direction: column;
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 48px);
+    border-radius: 16px;
+  }
+
+  .amp-guide-sidebar {
+    display: none;
+  }
+
+  .amp-guide-content {
+    min-height: 0;
+  }
+
+  .amp-guide-content-header {
+    padding: 14px 16px 0;
+    justify-content: space-between;
+  }
+
+  .amp-guide-step-counter {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.5px;
+    line-height: 32px;
+  }
+
+  .amp-guide-content-scroll {
+    padding: 10px 16px 8px;
+  }
+
+  .amp-guide-step-img {
+    max-height: 170px;
+  }
+
+  .amp-guide-step-body {
+    padding: 13px 14px;
+    gap: 12px;
+  }
+
+  .amp-guide-step-icon-wrap {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+  }
+
+  .amp-guide-step-title {
+    font-size: 14px;
+  }
+
+  .amp-guide-step-desc {
+    font-size: 13px;
+  }
+
+  .amp-guide-nav {
+    padding: 12px 16px;
+  }
 }

@@ -162,7 +162,7 @@ interface TrainingField {
 
 type TrainingTimeMode = "all" | "perDay" | "byWeekday";
 
-type TrainingDaysStep = "days" | "time" | "spots" | "field";
+type TrainingDaysStep = "days" | "time" | "spots" | "field" | "notes";
 
 interface TrainingTodaySessionItem {
   id: string;
@@ -194,6 +194,7 @@ interface TrainingWeekSessionItem {
 
 interface ClubMatch {
   id: string;
+  customGroupId: string | null;
   opponent: string;
   location: string;
   matchDate: string;

@@ -67,6 +67,7 @@ interface LimitedEventInfo {
 
 interface TrainingSessionItem {
   scopeKey: string;
+  note?: string;
   trainingTime?: string;
   trainingDurationMinutes?: number;
   trainingFieldName?: string | null;
@@ -751,6 +752,7 @@ export default function MemberCardPage({
                   return [
                     {
                       scopeKey: "",
+                      note: String(raw.note ?? "").trim(),
                       trainingTime: String(raw.trainingTime ?? "").trim(),
                       trainingDurationMinutes: Number.isInteger(Number(raw.trainingDurationMinutes)) ? Number(raw.trainingDurationMinutes) : undefined,
                       trainingFieldName: String(raw.trainingFieldName ?? "").trim() || null,
@@ -764,6 +766,7 @@ export default function MemberCardPage({
                   const rs = typeof s === "object" && s !== null ? (s as Record<string, unknown>) : {};
                   return {
                     scopeKey: String(rs.scopeKey ?? ""),
+                    note: String(rs.note ?? "").trim(),
                     trainingTime: String(rs.trainingTime ?? "").trim(),
                     trainingDurationMinutes: Number.isInteger(Number(rs.trainingDurationMinutes)) ? Number(rs.trainingDurationMinutes) : undefined,
                     trainingFieldName: String(rs.trainingFieldName ?? "").trim() || null,
@@ -1625,25 +1628,7 @@ export default function MemberCardPage({
     const safePeriod = escapeHtml(period);
     const safePaidAt = escapeHtml(paidAt);
 
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument;
-    const win = iframe.contentWindow;
-    if (!doc || !win) {
-      document.body.removeChild(iframe);
-      return;
-    }
-
-    doc.open();
-    doc.write(`<!doctype html>
+    const receiptHtml = `<!doctype html>
 <html lang="bg">
 <head>
   <meta charset="utf-8" />
@@ -1680,19 +1665,15 @@ export default function MemberCardPage({
       <div class="stamp-wrap"><div class="stamp">ПЛАТЕНО</div></div>
     </div>
   </div>
+  <script>window.onload=function(){window.print();window.addEventListener('afterprint',function(){window.close();},{once:true});}</script>
 </body>
-</html>`);
-    doc.close();
+</html>`;
 
-    window.setTimeout(() => {
-      win.focus();
-      win.print();
-      window.setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1000);
-    }, 100);
+    const blob = new Blob([receiptHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) { URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   const rawStatusKey = member?.status ?? "paid";
@@ -2228,7 +2209,7 @@ export default function MemberCardPage({
                   setPauseModalOpen(true);
                 }}
               >
-                Пауза
+                Архивирай
               </button>
             )}
             {trainingCreditError && (
@@ -3008,9 +2989,15 @@ export default function MemberCardPage({
                                   </button>
                                 </div>
                               )}
+                              {session.note?.trim() && (
+                                <div className="training-attendance-note-card" style={{ marginTop: 8 }}>
+                                  <p className="training-attendance-note-label">Описание</p>
+                                  <p className="training-attendance-note-text">{session.note}</p>
+                                </div>
+                              )}
                             </div>
                           ))}
-                          {trainingDetailsItem.note?.trim() && (
+                          {trainingDetailsItem.sessions.length === 1 && trainingDetailsItem.note?.trim() && (
                             <div className="training-attendance-note-card">
                               <p className="training-attendance-note-label">Описание</p>
                               <p className="training-attendance-note-text">{trainingDetailsItem.note}</p>
@@ -3783,7 +3770,7 @@ export default function MemberCardPage({
               <div className="pm-header">
                 <div className="pm-title-icon">II</div>
                 <div>
-                  <h2 className="pm-title">Пауза</h2>
+                  <h2 className="pm-title">Архивирай</h2>
                   <p className="pm-name">{member.name}</p>
                 </div>
               </div>

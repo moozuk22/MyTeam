@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
-import { isValidPhone } from "@/lib/phone";
 import "./page.css";
 
 interface ClubData {
@@ -14,6 +13,12 @@ interface ClubData {
   imageUrl?: string | null;
   billingStatus?: "demo" | "active";
   firstBillingMonth?: string | null;
+  paymentWorkflow?: string | null;
+}
+
+interface CustomGroup {
+  id: string;
+  name: string;
 }
 
 interface DuplicateMember {
@@ -50,6 +55,9 @@ function AddMemberPageContent() {
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateMember | null>(null);
   const [isClubValidated, setIsClubValidated] = useState(false);
   const [isValidatingClubId, setIsValidatingClubId] = useState(true);
+  const [customGroups, setCustomGroups] = useState<CustomGroup[]>([]);
+  const [selectedCustomGroupIds, setSelectedCustomGroupIds] = useState<Set<string>>(new Set());
+  const [customGroupDropdownOpen, setCustomGroupDropdownOpen] = useState(false);
   const router = useRouter();
   const returnUrl = `/admin/members?clubId=${encodeURIComponent(clubId)}${coachGroupId ? `&coachGroupId=${encodeURIComponent(coachGroupId)}` : ""}`;
   useEffect(() => {
@@ -100,8 +108,28 @@ function AddMemberPageContent() {
           imageUrl: typeof raw.imageUrl === "string" ? raw.imageUrl : null,
           billingStatus,
           firstBillingMonth: clubFirstBillingMonth,
+          paymentWorkflow: typeof raw.paymentWorkflow === "string" ? raw.paymentWorkflow : null,
         });
         setIsClubValidated(true);
+
+        if (coachGroupId) {
+          try {
+            const groupsRes = await fetch(`/api/admin/clubs/${clubId}/custom-training-groups?coachGroupId=${encodeURIComponent(coachGroupId)}`, { cache: "no-store" });
+            if (groupsRes.ok) {
+              const groupsData: unknown = await groupsRes.json();
+              if (Array.isArray(groupsData)) {
+                setCustomGroups(
+                  (groupsData as Array<{ id: string; name: string }>).map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                  })),
+                );
+              }
+            }
+          } catch {
+            // groups are optional, ignore errors
+          }
+        }
       } catch (validationError) {
         console.error("Failed to validate club id:", validationError);
         router.replace("/404");
@@ -171,27 +199,6 @@ function AddMemberPageContent() {
   };
 
   const submitMember = async (skipDuplicateCheck = false) => {
-    if (!birthDate.trim()) {
-      setError("Birth date is required.");
-      return;
-    }
-    if (!parentPhone.trim()) {
-      setError("Parent phone is required.");
-      return;
-    }
-    if (!isValidPhone(parentPhone)) {
-      setError("Parent phone is invalid.");
-      return;
-    }
-    if (playerPhone.trim() && !isValidPhone(playerPhone)) {
-      setError("Player phone is invalid.");
-      return;
-    }
-    if (clubData?.billingStatus === "active" && !firstBillingMonth.trim()) {
-      setError("First billing month is required for active billing clubs.");
-      return;
-    }
-
     setIsSubmitting(true);
     setError("");
 
@@ -230,9 +237,9 @@ function AddMemberPageContent() {
         fullName: fullName.trim(),
         status,
         clubId,
-        birthDate: birthDate.trim(),
-        parentPhone: parentPhone.trim(),
       };
+      if (birthDate.trim()) payload.birthDate = birthDate.trim();
+      if (parentPhone.trim()) payload.parentPhone = parentPhone.trim();
       if (coachGroupId) payload.coachGroupId = coachGroupId;
 
       if (jerseyNumber.trim()) payload.jerseyNumber = jerseyNumber.trim();
@@ -250,6 +257,25 @@ function AddMemberPageContent() {
       });
 
       if (response.ok) {
+        if (selectedCustomGroupIds.size > 0) {
+          try {
+            const created = await response.json() as { id?: string };
+            const newPlayerId = created.id;
+            if (newPlayerId) {
+              await Promise.all(
+                [...selectedCustomGroupIds].map((groupId) =>
+                  fetch(`/api/admin/clubs/${clubId}/custom-training-groups/${groupId}/players`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ playerId: newPlayerId }),
+                  }),
+                ),
+              );
+            }
+          } catch {
+            // non-fatal, player was created
+          }
+        }
         router.push(returnUrl);
       } else {
         const data = await response.json();
@@ -359,7 +385,6 @@ function AddMemberPageContent() {
                 <label className="add-member-label">Дата на раждане</label>
                 <input
                   type="date"
-                  required
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
                   className="add-member-input"
@@ -381,12 +406,9 @@ function AddMemberPageContent() {
 
             <div className="add-member-row">
               <div className="add-member-field">
-                <label className="add-member-label">
-                  Телефон на родител <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>
-                </label>
+                <label className="add-member-label">Телефон на родител</label>
                 <input
                   type="tel"
-                  required
                   value={parentPhone}
                   onChange={(e) => setParentPhone(e.target.value)}
                   className="add-member-input"
@@ -406,20 +428,20 @@ function AddMemberPageContent() {
             </div>
 
             <div className="add-member-row">
+              {clubData?.paymentWorkflow !== "rolling_30_days" && (
               <div className="add-member-field">
                 <label className="add-member-label">
                   Начален месец на таксуване
-                  {clubData?.billingStatus === "active" && <span style={{ color: "#ff6b6b", marginLeft: "4px" }}>*</span>}
                 </label>
                 <input
                   type="month"
-                  required={clubData?.billingStatus === "active"}
                   value={firstBillingMonth}
                   onChange={(e) => setFirstBillingMonth(e.target.value)}
                   className="add-member-input"
                   placeholder={clubData?.billingStatus !== "active" ? "НЕ Е ЗАДЪЛЖИТЕЛНО" : undefined}
                 />
               </div>
+              )}
               <div className="add-member-field">
                 <label className="add-member-label">Номер в отбора</label>
                 <input
@@ -433,6 +455,65 @@ function AddMemberPageContent() {
                 />
               </div>
             </div>
+
+            {customGroups.length > 0 && (
+              <div className="amp-info-cell amp-info-cell--full amp-info-cell--dropdown">
+                <button
+                  type="button"
+                  className="amp-info-cell-trigger"
+                  onClick={() => setCustomGroupDropdownOpen((v) => !v)}
+                >
+                  <div className="amp-info-cell-trigger-text">
+                    <p className="amp-lbl">Групи</p>
+                    <p className="amp-val">
+                      {selectedCustomGroupIds.size === 0
+                        ? "Без група"
+                        : selectedCustomGroupIds.size === 1
+                          ? customGroups.find((g) => selectedCustomGroupIds.has(g.id))?.name
+                          : `${selectedCustomGroupIds.size} групи избрани`}
+                    </p>
+                  </div>
+                  <span className={`amp-acc-chevron${customGroupDropdownOpen ? " open" : ""}`}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </span>
+                </button>
+                <div className={`amp-acc-body${customGroupDropdownOpen ? " open" : ""}`}>
+                  <div className="amp-acc-inner">
+                    <div className="amp-coach-group-picker">
+                      <div className="amp-coach-group-picker-list">
+                        {customGroups.map((g) => {
+                          const checked = selectedCustomGroupIds.has(g.id);
+                          return (
+                            <label
+                              key={g.id}
+                              className={`amp-coach-group-option${checked ? " is-selected" : ""}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="amp-group-check-input"
+                                checked={checked}
+                                onChange={(e) => {
+                                  setSelectedCustomGroupIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(g.id);
+                                    else next.delete(g.id);
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <span className="amp-group-check-box" aria-hidden="true" />
+                              <span className="amp-coach-group-option-name">{g.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="add-member-field">
               <label className="add-member-label">Снимка на състезател</label>

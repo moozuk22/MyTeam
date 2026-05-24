@@ -9,7 +9,9 @@
       "Bash(npx eslint *)",
       "Bash(netstat -ano)",
       "Bash(npx next *)",
-      "Bash(node -e ' *)"
+      "Bash(node *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ],
     "additionalDirectories": [
       "d:\\Documents\\GitHub\\MyTeam\\src\\app\\api\\admin\\clubs\\[id]\\limited-training-events",
