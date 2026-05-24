@@ -22,10 +22,13 @@ async function getClubName(clubIdRaw: string): Promise<string | null> {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const clubId = (url.searchParams.get("clubId") ?? "").trim();
-  const encodedClubId = encodeURIComponent(clubId);
-  const manifestQuery = clubId ? `?clubId=${encodedClubId}` : "";
-  const startUrl = clubId ? `/admin/members?clubId=${encodedClubId}` : "/admin/members";
+  const clubId = (url.searchParams.get("clubId") ?? url.searchParams.get("clubid") ?? "").trim();
+  const coachGroupId = (url.searchParams.get("coachGroupId") ?? "").trim();
+  const appSearch = new URLSearchParams();
+  if (clubId) appSearch.set("clubId", clubId);
+  if (coachGroupId) appSearch.set("coachGroupId", coachGroupId);
+  const manifestQuery = appSearch.size ? `?${appSearch.toString()}` : "";
+  const startUrl = `/admin/members${manifestQuery}`;
   const clubName = await getClubName(clubId);
   const appName = clubName ? `${clubName} Members` : "My Team Members";
 

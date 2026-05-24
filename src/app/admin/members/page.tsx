@@ -8,6 +8,7 @@ import AdminMembersPageClient from "./page.client";
 
 type MembersPageSearchParams = {
   clubId?: string | string[];
+  clubid?: string | string[];
   coachGroupId?: string | string[];
 };
 
@@ -35,11 +36,16 @@ export async function generateMetadata(
   { searchParams }: { searchParams: Promise<MembersPageSearchParams> },
 ): Promise<Metadata> {
   const resolvedSearchParams = await searchParams;
-  const clubIdValue = resolvedSearchParams.clubId;
+  const clubIdValue = resolvedSearchParams.clubId ?? resolvedSearchParams.clubid;
+  const coachGroupIdValue = resolvedSearchParams.coachGroupId;
   const clubId =
     (Array.isArray(clubIdValue) ? clubIdValue[0] : clubIdValue ?? "").trim();
-  const encodedClubId = encodeURIComponent(clubId);
-  const manifestQuery = clubId ? `?clubId=${encodedClubId}` : "";
+  const coachGroupId =
+    (Array.isArray(coachGroupIdValue) ? coachGroupIdValue[0] : coachGroupIdValue ?? "").trim();
+  const manifestSearch = new URLSearchParams();
+  if (clubId) manifestSearch.set("clubId", clubId);
+  if (coachGroupId) manifestSearch.set("coachGroupId", coachGroupId);
+  const manifestQuery = manifestSearch.size ? `?${manifestSearch.toString()}` : "";
   const clubData = await getClubData(clubId);
   const appName = clubData?.name ? `${clubData.name} Members` : "My Team Members";
 
