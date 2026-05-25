@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import "../legal.css";
 
 export default function PrivacyPolicy() {
+    useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
     return (
         <div className="legal-container fade-in">
             <div className="legal-header">

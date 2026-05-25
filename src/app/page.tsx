@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import "./page.css";
 import {
   Fingerprint, LayoutGrid, BadgePercent, CreditCard,
@@ -2303,8 +2304,8 @@ export default function Home() {
           gap: 32,
           marginBottom: 16,
         }}>
-          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ЗАЩИТА НА ЛИЧНИ ДАННИ</a>
-          <a href="#" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ОБЩИ УСЛОВИЯ</a>
+          <Link href="/privacy" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ЗАЩИТА НА ЛИЧНИ ДАННИ</Link>
+          <Link href="/terms" style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textDecoration: "none", transition: "color 0.2s" }} onMouseOver={e => e.currentTarget.style.color = "var(--neon-green)"} onMouseOut={e => e.currentTarget.style.color = "rgba(255,255,255,0.2)"}>ОБЩИ УСЛОВИЯ</Link>
         </div>
 
         <div style={{
@@ -2363,6 +2364,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+
     </>
   );
 }
