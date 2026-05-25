@@ -121,6 +121,18 @@ export function buildNotificationPayload(
         data: { type: input.type, trainingDate: input.trainingDate ?? null },
       };
     }
+    case "limited_training_waitlisted": {
+      const suffix = input.trainingDate ? ` на ${input.trainingDate}` : "";
+      return {
+        title: "Преместен в чакащ списък",
+        body: `Местата за тренировката${suffix} бяха намалени. Вие сте в чакащия списък.`,
+        url,
+        icon: DEFAULT_ICON,
+        badge: DEFAULT_ICON,
+        tag: "limited-training-waitlisted",
+        data: { type: input.type, trainingDate: input.trainingDate ?? null },
+      };
+    }
     case "limited_training_created": {
       const suffix = input.trainingDate ? ` на ${input.trainingDate}` : "";
       const spotsText = typeof input.maxSpots === "number" ? ` (${input.maxSpots} места)` : "";

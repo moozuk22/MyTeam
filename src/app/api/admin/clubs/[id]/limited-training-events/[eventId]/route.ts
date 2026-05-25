@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
+import { buildNotificationPayload } from "@/lib/push/templates";
+import { sendPushToMember } from "@/lib/push/service";
+import { publishMemberUpdated } from "@/lib/memberEvents";
+import { publishTrainingAttendanceUpdated } from "@/lib/trainingAttendanceEvents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,11 +130,25 @@ export async function PATCH(
   try {
     const existing = await prisma.limitedTrainingEvent.findFirst({
       where: { id: eventId, clubId: id },
-      select: { id: true },
+      select: { id: true, maxSpots: true, trainingDate: true, scopeKey: true },
     });
     if (!existing) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
+
+    const oldMaxSpots = existing.maxSpots;
+    const trainingDateUtc = existing.trainingDate;
+    const trainingDateStr = trainingDateUtc.toISOString().slice(0, 10);
+
+    // Fetch all registrations ordered by sign-up time to determine who changes status
+    const allRegs = await prisma.limitedTrainingRegistration.findMany({
+      where: { eventId },
+      select: {
+        playerId: true,
+        player: { select: { cards: { where: { isActive: true }, select: { cardCode: true }, take: 1 } } },
+      },
+      orderBy: { registeredAt: "asc" },
+    });
 
     const updated = await prisma.limitedTrainingEvent.update({
       where: { id: eventId },
@@ -144,11 +162,65 @@ export async function PATCH(
       },
     });
 
+    if (maxSpots > oldMaxSpots) {
+      // Spots increased: promote players who were on the waitlist and are now confirmed
+      // They are at 0-based indices [oldMaxSpots, min(newMaxSpots, total) - 1]
+      const newlyConfirmed = allRegs.slice(oldMaxSpots, maxSpots);
+      for (const reg of newlyConfirmed) {
+        await prisma.trainingOptOut.deleteMany({
+          where: { playerId: reg.playerId, trainingDate: trainingDateUtc, reasonCode: "limited_event" },
+        });
+        const cardCode = reg.player.cards[0]?.cardCode;
+        if (cardCode) {
+          const payload = buildNotificationPayload({
+            type: "limited_training_promoted",
+            trainingDate: trainingDateStr,
+            url: `/member/${encodeURIComponent(cardCode)}`,
+          });
+          try {
+            await sendPushToMember(reg.playerId, payload, "limited_training_promoted");
+          } catch (e) {
+            console.error("Waitlist promotion push error:", e);
+          }
+          publishMemberUpdated(cardCode, "training-updated");
+        }
+      }
+    } else if (maxSpots < oldMaxSpots) {
+      // Spots decreased: demote players who were confirmed and are now on the waitlist
+      // They are at 0-based indices [newMaxSpots, min(oldMaxSpots, total) - 1]
+      const newlyWaitlisted = allRegs.slice(maxSpots, oldMaxSpots);
+      for (const reg of newlyWaitlisted) {
+        await prisma.trainingOptOut.upsert({
+          where: { playerId_trainingDate: { playerId: reg.playerId, trainingDate: trainingDateUtc } },
+          create: { playerId: reg.playerId, trainingDate: trainingDateUtc, reasonCode: "limited_event" },
+          update: {},
+        });
+        const cardCode = reg.player.cards[0]?.cardCode;
+        if (cardCode) {
+          const payload = buildNotificationPayload({
+            type: "limited_training_waitlisted",
+            trainingDate: trainingDateStr,
+            url: `/member/${encodeURIComponent(cardCode)}`,
+          });
+          try {
+            await sendPushToMember(reg.playerId, payload, "limited_training_waitlisted");
+          } catch (e) {
+            console.error("Waitlist demotion push error:", e);
+          }
+          publishMemberUpdated(cardCode, "training-updated");
+        }
+      }
+    }
+
+    if (maxSpots !== oldMaxSpots && allRegs.length > 0) {
+      publishTrainingAttendanceUpdated(id, trainingDateStr);
+    }
+
     return NextResponse.json({
       event: {
         id: updated.id,
         scopeKey: updated.scopeKey,
-        trainingDate: updated.trainingDate.toISOString().slice(0, 10),
+        trainingDate: trainingDateStr,
         maxSpots: updated.maxSpots,
         registeredCount: updated._count.registrations,
       },
