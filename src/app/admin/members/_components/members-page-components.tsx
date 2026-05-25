@@ -494,7 +494,6 @@ function AttendanceDashboard({
     <tbody>${tbodyHtml}</tbody>
     ${tfootHtml ? `<tfoot>${tfootHtml}</tfoot>` : ""}
   </table>
-  <script>window.onload=function(){window.print();window.addEventListener('afterprint',function(){window.close();},{once:true});}</script>
 </body>
 </html>`;
 
@@ -1149,7 +1148,6 @@ function ReportsDialog({
     </thead>
     <tbody>${tableRowsHtml}</tbody>
   </table>
-  <script>window.onload=function(){window.print();window.addEventListener('afterprint',function(){window.close();},{once:true});}</script>
 </body>
 </html>`;
 

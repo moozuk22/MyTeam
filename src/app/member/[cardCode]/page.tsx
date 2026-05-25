@@ -1636,6 +1636,10 @@ export default function MemberCardPage({
   <title>Разписка - ${safePeriod}</title>
   <style>
     body { margin: 0; background: #fff; color: #111827; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .pt { display: flex; gap: 8px; margin: 16px 20px; }
+    .pt button { padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .pt-p { background: #111827; color: #fff; border: none; }
+    .pt-c { background: #f3f4f6; border: 1px solid #d1d5db; }
     .wrap { max-width: 420px; margin: 0 auto; padding: 20px; }
     .card { border-radius: 12px; border: 1px solid #e5e7eb; padding: 20px; }
     .head { text-align: center; margin-bottom: 10px; }
@@ -1647,10 +1651,15 @@ export default function MemberCardPage({
     .val { font-weight: 700; color: #111827; text-align: right; }
     .stamp-wrap { display: flex; justify-content: center; margin: 20px 0 8px; }
     .stamp { width: 96px; height: 96px; border-radius: 999px; border: 3px dashed rgba(50,205,50,.6); color: #26a826; font-size: 13px; font-weight: 900; letter-spacing: .05em; display: flex; align-items: center; justify-content: center; transform: rotate(-12deg); }
+    @media print { .pt { display: none; } }
     @page { margin: 12mm; }
   </style>
 </head>
 <body>
+  <div class="pt">
+    <button class="pt-c" onclick="window.close()">✕ Затвори</button>
+    <button class="pt-p" onclick="window.print()">🖨 Принтирай</button>
+  </div>
   <div class="wrap">
     <div class="card">
       <div class="head">
@@ -1665,7 +1674,6 @@ export default function MemberCardPage({
       <div class="stamp-wrap"><div class="stamp">ПЛАТЕНО</div></div>
     </div>
   </div>
-  <script>window.onload=function(){window.print();window.addEventListener('afterprint',function(){window.close();},{once:true});}</script>
 </body>
 </html>`;
 
