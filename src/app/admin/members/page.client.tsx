@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo, useCallback, type CSSProperties } from "react";
+import { Suspense, useState, useEffect, useMemo, useCallback, useRef, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
@@ -877,6 +877,9 @@ function AdminMembersPageContent() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
   const [guideImgExpanded, setGuideImgExpanded] = useState(false);
+  const [guideImgScale, setGuideImgScale] = useState(1);
+  const [guideImgPos, setGuideImgPos] = useState({ x: 0, y: 0 });
+  const guideImgTouchRef = useRef<{ startDist: number; startScale: number; startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const [notifyPanelOpen, setNotifyPanelOpen] = useState(false);
   const [notifyMessage, setNotifyMessage] = useState("");
   const [notifySelectedIds, setNotifySelectedIds] = useState<Set<string>>(new Set());
@@ -2593,6 +2596,61 @@ function AdminMembersPageContent() {
     () => ALL_GUIDE_STEPS.filter((s) => !s.adminOnly || isAdmin),
     [isAdmin],
   );
+
+  useEffect(() => {
+    if (!guideImgExpanded) {
+      setGuideImgScale(1);
+      setGuideImgPos({ x: 0, y: 0 });
+      guideImgTouchRef.current = null;
+    }
+  }, [guideImgExpanded]);
+
+  const handleGuideImgTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.stopPropagation();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      guideImgTouchRef.current = {
+        startDist: Math.hypot(dx, dy),
+        startScale: guideImgScale,
+        startX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        startY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        startPosX: guideImgPos.x,
+        startPosY: guideImgPos.y,
+      };
+    } else if (e.touches.length === 1 && guideImgScale > 1) {
+      e.stopPropagation();
+      guideImgTouchRef.current = {
+        startDist: 0,
+        startScale: guideImgScale,
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+        startPosX: guideImgPos.x,
+        startPosY: guideImgPos.y,
+      };
+    }
+  }, [guideImgScale, guideImgPos]);
+
+  const handleGuideImgTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!guideImgTouchRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.touches.length === 2 && guideImgTouchRef.current.startDist > 0) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const newScale = Math.min(5, Math.max(1, guideImgTouchRef.current.startScale * (dist / guideImgTouchRef.current.startDist)));
+      setGuideImgScale(newScale);
+    } else if (e.touches.length === 1 && guideImgTouchRef.current.startDist === 0) {
+      const dx = e.touches[0].clientX - guideImgTouchRef.current.startX;
+      const dy = e.touches[0].clientY - guideImgTouchRef.current.startY;
+      setGuideImgPos({ x: guideImgTouchRef.current.startPosX + dx, y: guideImgTouchRef.current.startPosY + dy });
+    }
+  }, []);
+
+  const handleGuideImgTouchEnd = useCallback(() => {
+    guideImgTouchRef.current = null;
+  }, []);
 
   const openBulkCoachGroupModal = async (groupId: string) => {
     setBulkCoachGroupTargetId(groupId);
@@ -4732,7 +4790,7 @@ function AdminMembersPageContent() {
         const res = await fetch(url, {
           method: existingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ opponent: details.opponent, location: details.location, matchDate: date, matchTime: details.time, durationMinutes, isHome: details.isHome, teamGroups: matchTeamGroups, customGroupId: isCustomTrainingGroupMode ? (selectedCustomGroup?.id ?? null) : null }),
+          body: JSON.stringify({ opponent: details.opponent, location: details.location, matchDate: date, matchTime: details.time, durationMinutes, isHome: details.isHome, teamGroups: matchTeamGroups, customGroupId: isCustomTrainingGroupMode ? (selectedCustomGroup?.id ?? (weekColorFilter ? (customTrainingGroups.find((g) => g.color === weekColorFilter)?.id ?? null) : null) ?? (customTrainingGroups.length === 1 ? customTrainingGroups[0].id : null)) : null }),
         });
         const data = await res.json() as { error?: string; warning?: string };
         if (!res.ok) { setMatchEditorError(data.error ?? "Грешка при запазване."); return; }
@@ -6766,14 +6824,15 @@ function AdminMembersPageContent() {
                       <WeeklyGrid
                         dates={trainingWeekDates}
                         sessions={(() => {
+                          const singleGroupColor = isCustomTrainingGroupMode && customTrainingGroups.length === 1 ? customTrainingGroups[0].color : null;
                           const matchColor = isCustomTrainingGroupMode
-                            ? (weekColorFilter ?? selectedCustomGroup?.color ?? null)
+                            ? (weekColorFilter ?? selectedCustomGroup?.color ?? singleGroupColor ?? null)
                             : null;
                           const base = weekColorFilter
                             ? trainingWeekSessions.filter((s) => s.color === weekColorFilter || s.eventType === "match")
                             : trainingWeekSessions;
                           return matchColor
-                            ? base.map((s) => s.eventType === "match" ? { ...s, color: matchColor } : s)
+                            ? base.map((s) => s.eventType === "match" && !s.color ? { ...s, color: matchColor } : s)
                             : base;
                         })()}
                         todayIso={todayIsoDate}
@@ -9164,11 +9223,18 @@ function AdminMembersPageContent() {
                 {dayDetailsSessions.length > 0 ? (
                   dayDetailsSessions.map((session) => {
                     const isActive = !dayDetailsIsMatchTab && (dayDetailsSessions.length === 1 || trainingDayDetailsTab === session.id);
+                    const accent = session.color && isCustomTrainingGroupPaletteColor(session.color) ? session.color : null;
+                    const tabStyle: CSSProperties | undefined = accent ? {
+                      borderColor: customTrainingGroupAccentRgba(accent, isActive ? 0.6 : 0.25),
+                      color: customTrainingGroupReadableOnAccent(accent) === "#fafafa" ? `rgba(255,255,255,${isActive ? 0.9 : 0.75})` : accent,
+                      background: isActive ? customTrainingGroupAccentRgba(accent, 0.14) : undefined,
+                    } : undefined;
                     return (
                       <button
                         key={session.id}
                         type="button"
-                        className={`amp-day-details-tab amp-day-details-tab--training${isActive ? " amp-day-details-tab--active" : ""}`}
+                        className={`amp-day-details-tab${accent ? " amp-day-details-tab--custom" : " amp-day-details-tab--training"}${isActive ? " amp-day-details-tab--active" : ""}`}
+                        style={tabStyle}
                         onClick={() => {
                           setTrainingDayDetailsTab(session.id);
                           if ((dayDetailsSessions.length > 1 || dayDetailsIsMatchTab) && trainingAttendanceDate) {
@@ -9177,6 +9243,7 @@ function AdminMembersPageContent() {
                         }}
                         disabled={trainingDayDetailsTabLoading || trainingNoteSaving}
                       >
+                        <span className="amp-day-details-tab-type">Тренировка</span>
                         <span className="amp-day-details-tab-time">{session.trainingTime ?? "—"}</span>
                         <span className="amp-day-details-tab-label">{session.label}</span>
                       </button>
@@ -9189,21 +9256,32 @@ function AdminMembersPageContent() {
                     onClick={() => setTrainingDayDetailsTab("training")}
                     disabled={trainingDayDetailsTabLoading || trainingNoteSaving}
                   >
-                    <span className="amp-day-details-tab-time">Тренировка</span>
+                    <span className="amp-day-details-tab-type">Тренировка</span>
+                    <span className="amp-day-details-tab-time">—</span>
                   </button>
                 )}
                 {dayDetailsMatchesAll.map((match) => {
                   const isActive = trainingDayDetailsTab === `match-${match.id}`;
+                  const matchGroup = customTrainingGroups.find((g) => g.id === match.customGroupId) ?? null;
+                  const matchGroupName = matchGroup?.name ?? null;
+                  const matchAccent = matchGroup?.color && isCustomTrainingGroupPaletteColor(matchGroup.color) ? matchGroup.color : null;
+                  const matchTabStyle: CSSProperties | undefined = matchAccent ? {
+                    borderColor: customTrainingGroupAccentRgba(matchAccent, isActive ? 0.6 : 0.25),
+                    color: customTrainingGroupReadableOnAccent(matchAccent) === "#fafafa" ? `rgba(255,255,255,${isActive ? 0.9 : 0.75})` : matchAccent,
+                    background: isActive ? customTrainingGroupAccentRgba(matchAccent, 0.14) : undefined,
+                  } : undefined;
                   return (
                     <button
                       key={match.id}
                       type="button"
-                      className={`amp-day-details-tab amp-day-details-tab--match${isActive ? " amp-day-details-tab--active" : ""}`}
+                      className={`amp-day-details-tab${matchAccent ? " amp-day-details-tab--custom" : " amp-day-details-tab--match"}${isActive ? " amp-day-details-tab--active" : ""}`}
+                      style={matchTabStyle}
                       onClick={() => { setTrainingDayDetailsTab(`match-${match.id}`); setDayDetailsMatchEditOpen(false); setDayDetailsMatchDeleteConfirm(false); setDayDetailsMatchError(""); }}
                       disabled={trainingDayDetailsTabLoading || trainingNoteSaving}
                     >
+                      <span className="amp-day-details-tab-type">Мач</span>
                       <span className="amp-day-details-tab-time">{match.matchTime}</span>
-                      <span className="amp-day-details-tab-label">{match.opponent}</span>
+                      {matchGroupName && <span className="amp-day-details-tab-label">{matchGroupName}</span>}
                     </button>
                   );
                 })}
@@ -10572,15 +10650,26 @@ function AdminMembersPageContent() {
                     onError={(e) => { if (e.currentTarget.parentElement) (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
                     onClick={() => setGuideImgExpanded(true)}
                   />
-                  <span className="amp-guide-step-img-hint">🔍 Кликни за увеличение</span>
+                  <span className="amp-guide-step-img-hint">🔍 Кликни за цял екран</span>
                 </div>
                 {guideImgExpanded && (
-                  <div className="amp-guide-lightbox" onClick={() => setGuideImgExpanded(false)}>
+                  <div
+                    className="amp-guide-lightbox"
+                    onClick={() => { if (guideImgScale <= 1) setGuideImgExpanded(false); }}
+                  >
                     <img
                       src={'/guide/' + (guideSteps[guideStep]?.id ?? '') + '.png'}
                       alt=""
                       className="amp-guide-lightbox-img"
+                      style={{ transform: `scale(${guideImgScale}) translate(${guideImgPos.x / guideImgScale}px, ${guideImgPos.y / guideImgScale}px)` }}
+                      onTouchStart={handleGuideImgTouchStart}
+                      onTouchMove={handleGuideImgTouchMove}
+                      onTouchEnd={handleGuideImgTouchEnd}
+                      onClick={(e) => { e.stopPropagation(); if (guideImgScale > 1) { setGuideImgScale(1); setGuideImgPos({ x: 0, y: 0 }); } else { setGuideImgExpanded(false); } }}
                     />
+                    {guideImgScale <= 1 && (
+                      <span className="amp-guide-lightbox-hint">Щипни за увеличение · Натисни за затваряне</span>
+                    )}
                   </div>
                 )}
                 <div className="amp-guide-step-body">
