@@ -396,11 +396,12 @@ function WeeklyGrid({
                         : "—"}
                     </span>
                     <div className="amp-training-week-session-row-main">
-                      <span className="amp-training-week-session-row-label">{session.label}</span>
+                      <span className="amp-training-week-session-row-label">
+                        {session.eventType === "match" ? (session.scopeLabel || session.label) : session.label}
+                      </span>
                       {session.eventType === "match" && (
                         <span className="amp-training-week-session-row-meta">
                           {session.isHome ? "Домакин" : "Гост"}
-                          {session.scopeLabel ? ` · ${session.scopeLabel}` : ""}
                         </span>
                       )}
                       {session.eventType !== "match" && session.limitedSpots && (
@@ -783,6 +784,7 @@ function AdminMembersPageContent() {
   const [trainingNoteComparisonLoading, setTrainingNoteComparisonLoading] = useState(false);
   const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
   const [trainingDayDetailsOpening, setTrainingDayDetailsOpening] = useState(false);
+  const [trainingDayDetailsViewSnapshot, setTrainingDayDetailsViewSnapshot] = useState<"teamGroup" | "trainingGroups" | "today">("today");
   const [trainingDayDurationMinutes, setTrainingDayDurationMinutes] = useState(DEFAULT_TRAINING_DURATION_MINUTES);
   const [trainingDayTime, setTrainingDayTime] = useState<string | null>(null);
   const [trainingDayField, setTrainingDayField] = useState<{ id: string; name: string; fieldType: string; pieces: { id: string; name: string }[] } | null>(null);
@@ -805,6 +807,11 @@ function AdminMembersPageContent() {
   const [clubMatches, setClubMatches] = useState<ClubMatch[]>([]);
   const [matchViewPopupOpen, setMatchViewPopupOpen] = useState(false);
   const [matchViewMatch, setMatchViewMatch] = useState<ClubMatch | null>(null);
+  const [dayDetailsMatchEditOpen, setDayDetailsMatchEditOpen] = useState(false);
+  const [dayDetailsMatchEditForm, setDayDetailsMatchEditForm] = useState<{ opponent: string; location: string; matchDate: string; matchTime: string; durationMinutes: string; isHome: boolean; customGroupId: string | null }>({ opponent: "", location: "", matchDate: "", matchTime: "", durationMinutes: "90", isHome: true, customGroupId: null });
+  const [dayDetailsMatchSaving, setDayDetailsMatchSaving] = useState(false);
+  const [dayDetailsMatchDeleteConfirm, setDayDetailsMatchDeleteConfirm] = useState(false);
+  const [dayDetailsMatchError, setDayDetailsMatchError] = useState("");
   const [trainingDayDetailsTab, setTrainingDayDetailsTab] = useState<string>("training");
   const [trainingDayDetailsTabLoading, setTrainingDayDetailsTabLoading] = useState(false);
   const [trainingDaySessionCancelled, setTrainingDaySessionCancelled] = useState(false);
@@ -2243,7 +2250,7 @@ function AdminMembersPageContent() {
     ? trainingWeekSessions.filter((s) => s.date === dayDetailsDate && s.eventType !== "match")
     : [];
   const dayDetailsMatchesAll: ClubMatch[] = dayDetailsDate
-    ? (trainingAttendanceMatchesByDate.get(dayDetailsDate) ?? [])
+    ? clubMatches.filter((m) => m.matchDate === dayDetailsDate)
     : [];
   const dayDetailsHasTabs = dayDetailsSessions.length > 1 || dayDetailsMatchesAll.length > 0;
   const dayDetailsIsMatchTab = trainingDayDetailsTab.startsWith("match-");
@@ -4356,7 +4363,7 @@ function AdminMembersPageContent() {
           .filter((item: TrainingUpcomingDateItem) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
         : [];
 
-      const resolvedDate = String(payload?.trainingDate ?? date ?? "");
+      const resolvedDate = payload?.trainingDate || date || "";
       const resolvedScopeKey =
         resolvedView === "trainingGroups"
           ? `trainingGroup:${trainingGroupFilter || "-"}`
@@ -4483,6 +4490,8 @@ function AdminMembersPageContent() {
               location: typeof raw.location === "string" ? raw.location : undefined,
               scopeLabel: typeof raw.scopeLabel === "string" ? raw.scopeLabel : undefined,
               isHome: typeof raw.isHome === "boolean" ? raw.isHome : undefined,
+              durationMinutes: typeof raw.durationMinutes === "number" ? raw.durationMinutes : undefined,
+              customGroupId: typeof raw.customGroupId === "string" ? raw.customGroupId : null,
               color: (() => {
                 const c = typeof raw.color === "string" ? raw.color.trim() : "";
                 return isCustomTrainingGroupPaletteColor(c) ? c : undefined;
@@ -4499,6 +4508,7 @@ function AdminMembersPageContent() {
         : [];
       setTrainingWeekDates(dates);
       setTrainingWeekSessions(sessions);
+      console.log("[WeekSchedule] sessions", sessions);
       return sessions;
     } catch (error) {
       setTrainingWeekDates([]);
@@ -4745,6 +4755,53 @@ function AdminMembersPageContent() {
     }
   };
 
+  const handleDayDetailsMatchSave = async () => {
+    if (!clubId || !dayDetailsActiveMatch) return;
+    setDayDetailsMatchSaving(true);
+    setDayDetailsMatchError("");
+    try {
+      const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/matches/${encodeURIComponent(dayDetailsActiveMatch.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          opponent: dayDetailsMatchEditForm.opponent,
+          location: dayDetailsMatchEditForm.location,
+          matchDate: dayDetailsMatchEditForm.matchDate,
+          matchTime: dayDetailsMatchEditForm.matchTime,
+          durationMinutes: Number.parseInt(dayDetailsMatchEditForm.durationMinutes || "90", 10),
+          isHome: dayDetailsMatchEditForm.isHome,
+          customGroupId: dayDetailsMatchEditForm.customGroupId,
+        }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { setDayDetailsMatchError(data.error ?? "Грешка при запазване."); return; }
+      setDayDetailsMatchEditOpen(false);
+      await Promise.all([fetchClubMatches(), fetchTrainingWeekSessions()]);
+    } catch {
+      setDayDetailsMatchError("Грешка при запазване.");
+    } finally {
+      setDayDetailsMatchSaving(false);
+    }
+  };
+
+  const handleDayDetailsMatchDelete = async () => {
+    if (!clubId || !dayDetailsActiveMatch) return;
+    setDayDetailsMatchSaving(true);
+    setDayDetailsMatchError("");
+    try {
+      const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/matches/${encodeURIComponent(dayDetailsActiveMatch.id)}`, { method: "DELETE" });
+      if (!res.ok) { setDayDetailsMatchError("Грешка при изтриване."); setDayDetailsMatchSaving(false); return; }
+      setTrainingDayDetailsOpen(false);
+      setDayDetailsMatchDeleteConfirm(false);
+      setDayDetailsMatchEditOpen(false);
+      await Promise.all([fetchClubMatches(), fetchTrainingWeekSessions()]);
+    } catch {
+      setDayDetailsMatchError("Грешка при изтриване.");
+    } finally {
+      setDayDetailsMatchSaving(false);
+    }
+  };
+
   const handlePostTeamGroupSavePromptConfirm = async () => {
     setPostTeamGroupSavePromptOpen(false);
     setTrainingDayDetailsOpen(false);
@@ -4821,6 +4878,7 @@ function AdminMembersPageContent() {
   const openTrainingDayDetails = async (date: string, sessionId?: string) => {
     const month = getMonthKeyFromIsoDate(date);
     setTrainingDayDetailsOpening(true);
+    setTrainingDayDetailsViewSnapshot(trainingAttendanceView);
     setTrainingAttendanceDate(date);
     setTrainingAttendanceMonth(month);
     const firstSession = trainingWeekSessions.find((s) => s.date === date && s.eventType !== "match");
@@ -9070,12 +9128,13 @@ function AdminMembersPageContent() {
           </div>
         </div>
       )}
-      {trainingDayDetailsOpen && (
+      {(trainingDayDetailsOpen || trainingDayDetailsOpening) && (
         <div
           className="amp-overlay amp-overlay--confirm"
           onClick={() => {
-            if (!trainingNoteSaving && !trainingDayDetailsTabLoading) {
+            if (!trainingNoteSaving && !trainingDayDetailsTabLoading && !trainingDayDetailsOpening) {
               setTrainingDayDetailsOpen(false);
+              setTrainingAttendanceView(trainingDayDetailsViewSnapshot);
             }
           }}
         >
@@ -9087,14 +9146,20 @@ function AdminMembersPageContent() {
               </span>
               <button
                 className="amp-modal-close"
-                onClick={() => setTrainingDayDetailsOpen(false)}
+                onClick={() => { setTrainingDayDetailsOpen(false); setDayDetailsMatchEditOpen(false); setDayDetailsMatchDeleteConfirm(false); setDayDetailsMatchError(""); setTrainingAttendanceView(trainingDayDetailsViewSnapshot); }}
                 aria-label="Затвори"
-                disabled={trainingNoteSaving || trainingDayDetailsTabLoading}
+                disabled={trainingNoteSaving || trainingDayDetailsTabLoading || dayDetailsMatchSaving || trainingDayDetailsOpening}
               >
                 <XIcon />
               </button>
             </h2>
-            {dayDetailsHasTabs && (
+            {trainingDayDetailsOpening ? (
+              <div className="amp-modal-body">
+                <div className="amp-loading">
+                  <div className="amp-spinner" />
+                </div>
+              </div>
+            ) : dayDetailsHasTabs && (
               <div className="amp-day-details-tabs">
                 {dayDetailsSessions.length > 0 ? (
                   dayDetailsSessions.map((session) => {
@@ -9106,7 +9171,7 @@ function AdminMembersPageContent() {
                         className={`amp-day-details-tab amp-day-details-tab--training${isActive ? " amp-day-details-tab--active" : ""}`}
                         onClick={() => {
                           setTrainingDayDetailsTab(session.id);
-                          if (dayDetailsSessions.length > 1 && trainingAttendanceDate) {
+                          if ((dayDetailsSessions.length > 1 || dayDetailsIsMatchTab) && trainingAttendanceDate) {
                             void loadDayDetailsSessionAttendance(session, trainingAttendanceDate);
                           }
                         }}
@@ -9134,7 +9199,7 @@ function AdminMembersPageContent() {
                       key={match.id}
                       type="button"
                       className={`amp-day-details-tab amp-day-details-tab--match${isActive ? " amp-day-details-tab--active" : ""}`}
-                      onClick={() => setTrainingDayDetailsTab(`match-${match.id}`)}
+                      onClick={() => { setTrainingDayDetailsTab(`match-${match.id}`); setDayDetailsMatchEditOpen(false); setDayDetailsMatchDeleteConfirm(false); setDayDetailsMatchError(""); }}
                       disabled={trainingDayDetailsTabLoading || trainingNoteSaving}
                     >
                       <span className="amp-day-details-tab-time">{match.matchTime}</span>
@@ -9144,41 +9209,139 @@ function AdminMembersPageContent() {
                 })}
               </div>
             )}
-            <div className="amp-modal-body">
+            {!trainingDayDetailsOpening && <div className="amp-modal-body">
               {dayDetailsIsMatchTab && dayDetailsActiveMatch ? (
-                <>
-                  <p className="amp-match-view-date">
-                    {new Date(`${dayDetailsActiveMatch.matchDate}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
-                      weekday: "long", day: "2-digit", month: "long", year: "numeric",
-                    })}
-                  </p>
-                  <div className="amp-match-view-body">
-                    <div className="amp-match-view-row">
-                      <span className="amp-match-view-label">Противник</span>
-                      <span className="amp-match-view-value">{dayDetailsActiveMatch.opponent}</span>
-                    </div>
-                    <div className="amp-match-view-row">
-                      <span className="amp-match-view-label">Час</span>
-                      <span className="amp-match-view-value">{dayDetailsActiveMatch.matchTime}</span>
-                    </div>
-                    <div className="amp-match-view-row">
-                      <span className="amp-match-view-label">Място</span>
-                      <span className="amp-match-view-value">{dayDetailsActiveMatch.location}</span>
-                    </div>
-                    <div className="amp-match-view-row">
-                      <span className="amp-match-view-label">Домакин/Гост</span>
-                      <span className={`amp-match-view-badge${dayDetailsActiveMatch.isHome ? " amp-match-view-badge--home" : " amp-match-view-badge--away"}`}>
-                        {dayDetailsActiveMatch.isHome ? "Домакин" : "Гост"}
-                      </span>
-                    </div>
-                    {dayDetailsActiveMatch.durationMinutes > 0 && (
-                      <div className="amp-match-view-row">
-                        <span className="amp-match-view-label">Продължителност</span>
-                        <span className="amp-match-view-value">{dayDetailsActiveMatch.durationMinutes} мин</span>
+                (() => {
+                  const matchGroup = customTrainingGroups.find((g) => g.id === dayDetailsActiveMatch.customGroupId) ?? null;
+                  const matchGroupColor = matchGroup?.color && isCustomTrainingGroupPaletteColor(matchGroup.color) ? matchGroup.color : null;
+                  return dayDetailsMatchEditOpen ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div className="amp-edit-field">
+                        <span className="amp-lbl">Дата</span>
+                        <input type="date" className="amp-edit-input" value={dayDetailsMatchEditForm.matchDate} onChange={(e) => setDayDetailsMatchEditForm((f) => ({ ...f, matchDate: e.target.value }))} disabled={dayDetailsMatchSaving} />
                       </div>
-                    )}
-                  </div>
-                </>
+                      <div className="amp-edit-field">
+                        <span className="amp-lbl">Час</span>
+                        <input type="time" className="amp-edit-input" value={dayDetailsMatchEditForm.matchTime} onChange={(e) => setDayDetailsMatchEditForm((f) => ({ ...f, matchTime: e.target.value }))} disabled={dayDetailsMatchSaving} />
+                      </div>
+                      <div className="amp-edit-field">
+                        <span className="amp-lbl">Продължителност (мин.)</span>
+                        <input type="number" className="amp-edit-input" min={1} max={1440} value={dayDetailsMatchEditForm.durationMinutes} onChange={(e) => setDayDetailsMatchEditForm((f) => ({ ...f, durationMinutes: e.target.value }))} disabled={dayDetailsMatchSaving} />
+                      </div>
+                      <div className="amp-edit-field">
+                        <span className="amp-lbl">Домакин / Гост</span>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button type="button" className={`amp-btn${dayDetailsMatchEditForm.isHome ? " amp-btn--primary" : " amp-btn--ghost"}`} onClick={() => setDayDetailsMatchEditForm((f) => ({ ...f, isHome: true }))} disabled={dayDetailsMatchSaving}>Домакин</button>
+                          <button type="button" className={`amp-btn${!dayDetailsMatchEditForm.isHome ? " amp-btn--primary" : " amp-btn--ghost"}`} onClick={() => setDayDetailsMatchEditForm((f) => ({ ...f, isHome: false }))} disabled={dayDetailsMatchSaving}>Гост</button>
+                        </div>
+                      </div>
+                      <div className="amp-edit-field">
+                        <span className="amp-lbl">Съперник</span>
+                        <input type="text" className="amp-edit-input" value={dayDetailsMatchEditForm.opponent} onChange={(e) => setDayDetailsMatchEditForm((f) => ({ ...f, opponent: e.target.value }))} placeholder="Съперник" disabled={dayDetailsMatchSaving} />
+                      </div>
+                      <div className="amp-edit-field">
+                        <span className="amp-lbl">Място</span>
+                        <input type="text" className="amp-edit-input" value={dayDetailsMatchEditForm.location} onChange={(e) => setDayDetailsMatchEditForm((f) => ({ ...f, location: e.target.value }))} placeholder="Стадион / адрес" disabled={dayDetailsMatchSaving} />
+                      </div>
+                      {isCustomTrainingGroupMode && customTrainingGroups.length > 0 && (
+                        <div className="amp-edit-field">
+                          <span className="amp-lbl">Група</span>
+                          <select className="amp-edit-input" value={dayDetailsMatchEditForm.customGroupId ?? ""} onChange={(e) => setDayDetailsMatchEditForm((f) => ({ ...f, customGroupId: e.target.value || null }))} disabled={dayDetailsMatchSaving}>
+                            <option value="">— без група —</option>
+                            {customTrainingGroups.map((g) => (
+                              <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {dayDetailsMatchError && <p style={{ color: "#ff6b6b", fontSize: 13, margin: 0 }}>{dayDetailsMatchError}</p>}
+                      <div className="amp-modal-actions amp-modal-actions--end">
+                        <button type="button" className="amp-btn amp-btn--ghost" onClick={() => { setDayDetailsMatchEditOpen(false); setDayDetailsMatchError(""); }} disabled={dayDetailsMatchSaving}>Назад</button>
+                        <button type="button" className="amp-btn amp-btn--primary" onClick={() => void handleDayDetailsMatchSave()} disabled={dayDetailsMatchSaving}>{dayDetailsMatchSaving ? "Запазване..." : "Запази"}</button>
+                      </div>
+                    </div>
+                  ) : dayDetailsMatchDeleteConfirm ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px", alignItems: "center", textAlign: "center", padding: "8px 0" }}>
+                      <p style={{ color: "rgba(255,255,255,0.88)", margin: 0 }}>Сигурни ли сте, че искате да изтриете този мач?</p>
+                      {dayDetailsMatchError && <p style={{ color: "#ff6b6b", fontSize: 13, margin: 0 }}>{dayDetailsMatchError}</p>}
+                      <div className="amp-modal-actions amp-modal-actions--end">
+                        <button type="button" className="amp-btn amp-btn--ghost" onClick={() => { setDayDetailsMatchDeleteConfirm(false); setDayDetailsMatchError(""); }} disabled={dayDetailsMatchSaving}>Отказ</button>
+                        <button type="button" className="amp-btn amp-btn--danger" onClick={() => void handleDayDetailsMatchDelete()} disabled={dayDetailsMatchSaving}>{dayDetailsMatchSaving ? "Изтриване..." : "Изтрий мача"}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="amp-match-view-date">
+                        {new Date(`${dayDetailsActiveMatch.matchDate}T12:00:00.000Z`).toLocaleDateString("bg-BG", {
+                          weekday: "long", day: "2-digit", month: "long", year: "numeric",
+                        })}
+                      </p>
+                      <div className="amp-match-view-body">
+                        {matchGroup && (
+                          <div className="amp-match-view-row">
+                            <span className="amp-match-view-label">Група</span>
+                            <span className="amp-match-view-value" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              {matchGroupColor && <span style={{ width: 10, height: 10, borderRadius: "50%", background: matchGroupColor, flexShrink: 0 }} />}
+                              {matchGroup.name}
+                            </span>
+                          </div>
+                        )}
+                        <div className="amp-match-view-row">
+                          <span className="amp-match-view-label">Съперник</span>
+                          <span className="amp-match-view-value">{dayDetailsActiveMatch.opponent || "—"}</span>
+                        </div>
+                        <div className="amp-match-view-row">
+                          <span className="amp-match-view-label">Домакин/Гост</span>
+                          <span className={`amp-match-view-badge${dayDetailsActiveMatch.isHome ? " amp-match-view-badge--home" : " amp-match-view-badge--away"}`}>
+                            {dayDetailsActiveMatch.isHome ? "Домакин" : "Гост"}
+                          </span>
+                        </div>
+                        <div className="amp-match-view-row">
+                          <span className="amp-match-view-label">Час</span>
+                          <span className="amp-match-view-value">{dayDetailsActiveMatch.matchTime || "—"}</span>
+                        </div>
+                        <div className="amp-match-view-row">
+                          <span className="amp-match-view-label">Място</span>
+                          <span className="amp-match-view-value">{dayDetailsActiveMatch.location || "—"}</span>
+                        </div>
+                        {dayDetailsActiveMatch.durationMinutes > 0 && (
+                          <div className="amp-match-view-row">
+                            <span className="amp-match-view-label">Продължителност</span>
+                            <span className="amp-match-view-value">{dayDetailsActiveMatch.durationMinutes} мин</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="amp-modal-actions amp-modal-actions--end" style={{ marginTop: "8px" }}>
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--danger"
+                          onClick={() => { setDayDetailsMatchDeleteConfirm(true); setDayDetailsMatchError(""); }}
+                        >
+                          Изтрий мача
+                        </button>
+                        <button
+                          type="button"
+                          className="amp-btn amp-btn--ghost"
+                          onClick={() => {
+                            setDayDetailsMatchEditForm({
+                              opponent: dayDetailsActiveMatch.opponent,
+                              location: dayDetailsActiveMatch.location,
+                              matchDate: dayDetailsActiveMatch.matchDate,
+                              matchTime: dayDetailsActiveMatch.matchTime,
+                              durationMinutes: String(dayDetailsActiveMatch.durationMinutes),
+                              isHome: dayDetailsActiveMatch.isHome,
+                              customGroupId: dayDetailsActiveMatch.customGroupId,
+                            });
+                            setDayDetailsMatchError("");
+                            setDayDetailsMatchEditOpen(true);
+                          }}
+                        >
+                          Редактирай
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()
               ) : (
                 <>
                   <div className="amp-training-stats">
@@ -9192,6 +9355,14 @@ function AdminMembersPageContent() {
                       <span style={{ color: "#ff6b6b", fontWeight: 700, background: "rgba(255,107,107,0.12)", border: "1px solid rgba(255,107,107,0.35)", borderRadius: 6, padding: "2px 8px" }}>ОТМЕНЕНА</span>
                     )}
                   </div>
+                  {(trainingAttendanceLoading || trainingDayDetailsTabLoading) && !trainingDayField && (
+                    <div className="amp-edit-field">
+                      <span className="amp-lbl">Терен</span>
+                      <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 8, height: 96, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div className="amp-spinner" style={{ width: 24, height: 24, borderWidth: 2 }} />
+                      </div>
+                    </div>
+                  )}
                   {trainingDayField && (() => {
                     const isWholeFieldSelected = trainingDayFieldPieceIds.length === 0;
                     const pieces = trainingDayField.pieces.length > 0
@@ -9581,7 +9752,7 @@ function AdminMembersPageContent() {
                   })()}
                 </>
               )}
-            </div>
+            </div>}
           </div>
         </div>
       )}

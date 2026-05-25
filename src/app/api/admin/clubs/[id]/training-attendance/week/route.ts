@@ -75,6 +75,8 @@ type WeekSession = {
   location?: string;
   scopeLabel?: string;
   isHome?: boolean;
+  durationMinutes?: number;
+  customGroupId?: string | null;
   limitedSpots?: { id: string; maxSpots: number; registeredCount: number } | null;
 };
 
@@ -164,7 +166,7 @@ export async function GET(
       }),
       prisma.clubMatch.findMany({
         where: { clubId: id, matchDate: { in: dates } },
-        select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, teamGroups: true, isHome: true },
+        select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, teamGroups: true, isHome: true, durationMinutes: true, customGroupId: true, customGroup: { select: { name: true, color: true } } },
       }),
       prisma.limitedTrainingEvent.findMany({
         where: { clubId: id, trainingDate: { in: dates.map((d) => new Date(d + "T00:00:00.000Z")) } },
@@ -233,8 +235,11 @@ export async function GET(
           label: match.opponent,
           teamGroups: match.teamGroups,
           location: match.location,
-          scopeLabel: resolveMatchScopeLabel(match.teamGroups, []),
+          scopeLabel: match.customGroup?.name ?? resolveMatchScopeLabel(match.teamGroups, []),
           isHome: match.isHome,
+          durationMinutes: match.durationMinutes,
+          color: match.customGroup?.color ?? null,
+          customGroupId: match.customGroupId ?? null,
         });
       }
 
@@ -341,8 +346,11 @@ export async function GET(
         label: match.opponent,
         teamGroups: match.teamGroups,
         location: match.location,
-        scopeLabel: resolveMatchScopeLabel(match.teamGroups, trainingGroups),
+        scopeLabel: match.customGroup?.name ?? resolveMatchScopeLabel(match.teamGroups, trainingGroups),
         isHome: match.isHome,
+        durationMinutes: match.durationMinutes,
+        color: match.customGroup?.color ?? null,
+        customGroupId: match.customGroupId ?? null,
       });
     }
 

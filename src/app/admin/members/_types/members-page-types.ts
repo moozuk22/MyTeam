@@ -189,6 +189,8 @@ interface TrainingWeekSessionItem {
   location?: string;
   scopeLabel?: string;
   isHome?: boolean;
+  durationMinutes?: number;
+  customGroupId?: string | null;
   limitedSpots?: { id: string; maxSpots: number; registeredCount: number } | null;
 }
 
