@@ -24,6 +24,8 @@ interface ExistingSchedule {
   id?: string;
   teamGroup?: number | null;
   teamGroups?: number[];
+  scopeKey: string;
+  cancelledDates: Set<string>;
   trainingDates: string[];
   trainingDateTimes: unknown;
   trainingDurationMinutes: number;
@@ -197,8 +199,25 @@ function formatTimeConflictMessage(input: {
   return `На ${formatIsoDateForBgDisplay(input.date)} вече има тренировка от ${startTime} до ${endTime} за ${input.label}.`;
 }
 
+async function loadCancelledSessionSet(clubId: string, relevantDates: string[]) {
+  if (relevantDates.length === 0) return new Set<string>();
+  const rows = await prisma.trainingSession.findMany({
+    where: {
+      clubId,
+      status: "cancelled",
+      trainingDate: { in: relevantDates.map((date) => new Date(`${date}T00:00:00.000Z`)) },
+    },
+    select: { scopeKey: true, trainingDate: true },
+  });
+  return new Set(rows.map((row) => `${row.scopeKey}|${row.trainingDate.toISOString().slice(0, 10)}`));
+}
+
+function getCancelledDatesForScope(cancelledSet: Set<string>, scopeKey: string, relevantDates: string[]) {
+  return new Set(relevantDates.filter((date) => cancelledSet.has(`${scopeKey}|${date}`)));
+}
+
 async function loadSchedules(clubId: string, relevantDates: string[]): Promise<ExistingSchedule[]> {
-  const [club, teamSchedules, trainingGroups, customGroups, coachGroups] = await Promise.all([
+  const [club, teamSchedules, trainingGroups, customGroups, coachGroups, cancelledSet] = await Promise.all([
     prisma.club.findUnique({
       where: { id: clubId },
       select: {
@@ -278,6 +297,7 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
         trainingFieldSelections: true,
       },
     }),
+    loadCancelledSessionSet(clubId, relevantDates),
   ]);
 
   const schedules: ExistingSchedule[] = [];
@@ -286,6 +306,8 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
     schedules.push({
       label: "клубен график",
       type: "club",
+      scopeKey: "club",
+      cancelledDates: getCancelledDatesForScope(cancelledSet, "club", relevantDates),
       trainingDates: club.trainingDates,
       trainingDateTimes: club.trainingDateTimes,
       trainingDurationMinutes: club.trainingDurationMinutes,
@@ -300,6 +322,8 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
       label: `набор ${schedule.teamGroup}`,
       type: "teamGroup",
       teamGroup: schedule.teamGroup,
+      scopeKey: `team_group:${schedule.teamGroup}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `team_group:${schedule.teamGroup}`, relevantDates),
       trainingDates: schedule.trainingDates,
       trainingDateTimes: schedule.trainingDateTimes,
       trainingDurationMinutes: schedule.trainingDurationMinutes,
@@ -315,6 +339,8 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
       type: "trainingGroup",
       id: group.id,
       teamGroups: group.teamGroups,
+      scopeKey: `training_group:${group.id}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `training_group:${group.id}`, relevantDates),
       trainingDates: group.trainingDates,
       trainingDateTimes: group.trainingDateTimes,
       trainingDurationMinutes: group.trainingDurationMinutes,
@@ -329,6 +355,8 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
       label: `персонализирана група ${group.name}`,
       type: "customGroup",
       id: group.id,
+      scopeKey: `custom_group:${group.id}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `custom_group:${group.id}`, relevantDates),
       trainingDates: group.trainingDates,
       trainingDateTimes: group.trainingDateTimes,
       trainingDurationMinutes: group.trainingDurationMinutes,
@@ -343,6 +371,8 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
       label: `треньорска група ${group.name}`,
       type: "coachGroup",
       id: group.id,
+      scopeKey: `coach_group:${group.id}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `coach_group:${group.id}`, relevantDates),
       trainingDates: group.trainingDates,
       trainingDateTimes: group.trainingDateTimes,
       trainingDurationMinutes: group.trainingDurationMinutes,
@@ -356,7 +386,7 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
 }
 
 async function loadAllSchedules(clubId: string, relevantDates: string[]): Promise<ExistingSchedule[]> {
-  const [club, teamSchedules, trainingGroups, customGroups, coachGroups] = await Promise.all([
+  const [club, teamSchedules, trainingGroups, customGroups, coachGroups, cancelledSet] = await Promise.all([
     prisma.club.findUnique({
       where: { id: clubId },
       select: {
@@ -420,6 +450,7 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
         trainingFieldSelections: true,
       },
     }),
+    loadCancelledSessionSet(clubId, relevantDates),
   ]);
 
   const schedules: ExistingSchedule[] = [];
@@ -428,6 +459,8 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
     schedules.push({
       label: "клубен график",
       type: "club",
+      scopeKey: "club",
+      cancelledDates: getCancelledDatesForScope(cancelledSet, "club", relevantDates),
       trainingDates: club.trainingDates,
       trainingDateTimes: club.trainingDateTimes,
       trainingDurationMinutes: club.trainingDurationMinutes,
@@ -442,6 +475,8 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
       label: `набор ${schedule.teamGroup}`,
       type: "teamGroup",
       teamGroup: schedule.teamGroup,
+      scopeKey: `team_group:${schedule.teamGroup}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `team_group:${schedule.teamGroup}`, relevantDates),
       trainingDates: schedule.trainingDates,
       trainingDateTimes: schedule.trainingDateTimes,
       trainingDurationMinutes: schedule.trainingDurationMinutes,
@@ -457,6 +492,8 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
       type: "trainingGroup",
       id: group.id,
       teamGroups: group.teamGroups,
+      scopeKey: `training_group:${group.id}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `training_group:${group.id}`, relevantDates),
       trainingDates: group.trainingDates,
       trainingDateTimes: group.trainingDateTimes,
       trainingDurationMinutes: group.trainingDurationMinutes,
@@ -471,6 +508,8 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
       label: `персонализирана група ${group.name}`,
       type: "customGroup",
       id: group.id,
+      scopeKey: `custom_group:${group.id}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `custom_group:${group.id}`, relevantDates),
       trainingDates: group.trainingDates,
       trainingDateTimes: group.trainingDateTimes,
       trainingDurationMinutes: group.trainingDurationMinutes,
@@ -485,6 +524,8 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
       label: `треньорска група ${group.name}`,
       type: "coachGroup",
       id: group.id,
+      scopeKey: `coach_group:${group.id}`,
+      cancelledDates: getCancelledDatesForScope(cancelledSet, `coach_group:${group.id}`, relevantDates),
       trainingDates: group.trainingDates,
       trainingDateTimes: group.trainingDateTimes,
       trainingDurationMinutes: group.trainingDurationMinutes,
@@ -520,6 +561,9 @@ export async function assertNoTrainingFieldConflict(input: TrainingFieldConflict
     const scheduleDateTimes = normalizeStoredDateTimes(schedule.trainingDateTimes);
     for (const date of relevantDates) {
       if (!schedule.trainingDates.includes(date)) {
+        continue;
+      }
+      if (schedule.cancelledDates.has(date)) {
         continue;
       }
       const inputSelection = input.trainingFieldSelections?.[date] ?? input;
@@ -571,6 +615,7 @@ export async function assertNoTrainingTimeConflict(input: {
     const scheduleDateTimes = normalizeStoredDateTimes(schedule.trainingDateTimes);
     for (const date of relevantDates) {
       if (!schedule.trainingDates.includes(date)) continue;
+      if (schedule.cancelledDates.has(date)) continue;
       if (input.ignoreFieldResourceSchedules && getFieldSelectionForDate(schedule, date).trainingFieldId) {
         continue;
       }
@@ -613,6 +658,9 @@ export async function getOccupiedFieldResources(input: OccupiedResourcesInput): 
 
     for (const date of relevantDates) {
       if (!schedule.trainingDates.includes(date)) {
+        continue;
+      }
+      if (schedule.cancelledDates.has(date)) {
         continue;
       }
       const scheduleSelection = getFieldSelectionForDate(schedule, date);

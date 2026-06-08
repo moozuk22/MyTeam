@@ -310,6 +310,7 @@ async function getMemberTrainingContext(cardCode: string) {
           updatedAt: "desc",
         },
         select: {
+          id: true,
           trainingDates: true,
           trainingDateTimes: true,
           trainingTime: true,
@@ -405,6 +406,13 @@ async function getMemberTrainingContext(cardCode: string) {
     playerTeamGroup: card.player.teamGroup,
     playerCustomGroupIds: card.player.customTrainingGroups.map((g) => g.group.id),
     playerCoachGroupIds: card.player.coachGroups.map((g) => g.id),
+    activeScheduleScopeKey: hasCustomGroupSchedule || hasCoachGroupSchedule
+      ? null
+      : trainingGroupOverride
+        ? `training_group:${trainingGroupOverride.id}`
+        : card.player.teamGroup !== null && groupSchedule
+          ? `team_group:${card.player.teamGroup}`
+          : "club",
     scheduledCoachGroups,
     scheduledCustomGroups,
     hasCoachGroupSchedule,
@@ -548,8 +556,13 @@ export async function GET(
   for (const coachGId of context.playerCoachGroupIds) {
     playerScopeKeys.push(`coach_group:${coachGId}`);
   }
+  if (context.activeScheduleScopeKey) {
+    playerScopeKeys.push(context.activeScheduleScopeKey);
+  }
+  playerScopeKeys.push("club");
+  const uniquePlayerScopeKeys = Array.from(new Set(playerScopeKeys));
 
-  const [optOutRows, noteRows, sessionRows, limitedEventRows] = await Promise.all([
+  const [optOutRows, noteRows, sessionRows, cancelledSessionRows, limitedEventRows] = await Promise.all([
     prisma.trainingOptOut.findMany({
       where: {
         playerId: context.playerId,
@@ -571,7 +584,7 @@ export async function GET(
         },
         OR: [
           { scopeKey: "club" },
-          ...(playerScopeKeys.length > 0 ? [{ scopeKey: { in: playerScopeKeys } }] : []),
+          ...(uniquePlayerScopeKeys.length > 0 ? [{ scopeKey: { in: uniquePlayerScopeKeys } }] : []),
         ],
       },
       select: {
@@ -604,11 +617,27 @@ export async function GET(
         trainingFieldPieceIds: true,
       },
     }),
-    playerScopeKeys.length > 0
+    prisma.trainingSession.findMany({
+      where: {
+        clubId: context.clubId,
+        status: "cancelled",
+        trainingDate: {
+          in: trainingDatesAsUtc,
+        },
+        scopeKey: {
+          in: uniquePlayerScopeKeys,
+        },
+      },
+      select: {
+        scopeKey: true,
+        trainingDate: true,
+      },
+    }),
+    uniquePlayerScopeKeys.length > 0
       ? prisma.limitedTrainingEvent.findMany({
           where: {
             clubId: context.clubId,
-            scopeKey: { in: playerScopeKeys },
+            scopeKey: { in: uniquePlayerScopeKeys },
             trainingDate: { in: trainingDatesAsUtc },
           },
           select: {
@@ -626,6 +655,9 @@ export async function GET(
   ]);
 
   const sessionByDate = new Map(sessionRows.map((session) => [utcDateToIsoDate(session.trainingDate), session]));
+  const cancelledSet = new Set(
+    cancelledSessionRows.map((session) => `${session.scopeKey}|${utcDateToIsoDate(session.trainingDate)}`),
+  );
   const limitedEventsByDate = new Map<string, LimitedEventComputed[]>();
   for (const e of limitedEventRows) {
     const dateKey = utcDateToIsoDate(e.trainingDate);
@@ -691,7 +723,7 @@ export async function GET(
     cardCode: context.cardCode,
     trainingWeekdays: context.trainingWeekdays,
     trainingWindowDays: context.trainingWindowDays,
-    dates: context.upcomingDates.map((date) => {
+    dates: context.upcomingDates.flatMap((date) => {
       const weekday = getWeekdayMondayFirst(date, FIXED_TIME_ZONE);
       const limitedEventsForDate = limitedEventsByDate.get(date) ?? [];
 
@@ -699,19 +731,27 @@ export async function GET(
 
       if (context.hasCoachGroupSchedule) {
         const matchingGroups = context.scheduledCoachGroups.filter(
-          (g) => g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday),
+          (g) =>
+            (g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday)) &&
+            !cancelledSet.has(`coach_group:${g.id}|${date}`),
         );
         sessions = matchingGroups.map((g) =>
           buildGroupSession(g, `coach_group:${g.id}`, date, limitedEventsForDate, fieldById, noteByScopeDate),
         );
       } else if (context.hasCustomGroupSchedule) {
         const matchingGroups = context.scheduledCustomGroups.filter(
-          (g) => g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday),
+          (g) =>
+            (g.trainingDates.includes(date) || g.trainingWeekdays.includes(weekday)) &&
+            !cancelledSet.has(`custom_group:${g.id}|${date}`),
         );
         sessions = matchingGroups.map((g) =>
           buildGroupSession(g, `custom_group:${g.id}`, date, limitedEventsForDate, fieldById, noteByScopeDate),
         );
       } else {
+        const singleScopeKey = context.activeScheduleScopeKey ?? (context.playerTeamGroup !== null ? `team_group:${context.playerTeamGroup}` : "club");
+        if (cancelledSet.has(`${singleScopeKey}|${date}`) || cancelledSet.has(`club|${date}`)) {
+          return [];
+        }
         const session = sessionByDate.get(date);
         const scheduleFieldSelection = resolveFieldSelectionsForDate(
           context.scheduleFieldId, context.scheduleFieldPieceIds, context.scheduleFieldSelections, date,
@@ -725,10 +765,9 @@ export async function GET(
             ? fieldPieceIds.map((pid) => field.pieces.find((p) => p.id === pid)?.name).filter((n): n is string => Boolean(n))
             : [];
         const leRow = limitedEventsForDate[0] ?? null;
-        const singleScopeKey = context.playerTeamGroup !== null ? `team_group:${context.playerTeamGroup}` : "club";
         sessions = [
           {
-            scopeKey: context.playerTeamGroup !== null ? `team_group:${context.playerTeamGroup}` : "",
+            scopeKey: singleScopeKey === "club" ? "" : singleScopeKey,
             note: noteByScopeDate.get(`${singleScopeKey}:${date}`) ?? noteByScopeDate.get(`club:${date}`) ?? "",
             trainingTime: session?.trainingTime ?? context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
             trainingDurationMinutes: session?.trainingDurationMinutes ?? context.trainingDurationMinutes,
@@ -743,18 +782,7 @@ export async function GET(
       }
 
       if (sessions.length === 0) {
-        sessions = [
-          {
-            scopeKey: "",
-            note: noteByScopeDate.get(`club:${date}`) ?? "",
-            trainingTime: context.fallbackTrainingTime ?? "",
-            trainingDurationMinutes: context.trainingDurationMinutes,
-            trainingFieldName: null,
-            trainingFieldPieces: [],
-            trainingFieldPieceNames: [],
-            limitedEvent: null,
-          },
-        ];
+        return [];
       }
 
       if (sessions.length > 1) {
@@ -762,7 +790,7 @@ export async function GET(
       }
 
       const firstSession = sessions[0]!;
-      return {
+      return [{
         date,
         weekday,
         optedOut: optedOutByDate.has(date),
@@ -777,7 +805,7 @@ export async function GET(
         trainingFieldPieceNames: firstSession.trainingFieldPieceNames,
         limitedEvent: firstSession.limitedEvent,
         sessions,
-      };
+      }];
     }),
   });
 }
