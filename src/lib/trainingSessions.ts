@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 import { isoDateToUtcMidnight, utcDateToIsoDate } from "@/lib/training";
 
 type TrainingSessionScope =
@@ -43,6 +44,39 @@ export function getTrainingSessionScopeData(scope: TrainingSessionScope) {
     teamGroup: scope.type === "teamGroup" ? scope.teamGroup : null,
     teamGroups: scope.type === "trainingGroup" ? scope.teamGroups ?? [] : [],
   };
+}
+
+export async function filterCancelledTrainingDatesForScope(input: {
+  clubId: string;
+  scope: TrainingSessionScope;
+  trainingDates: string[];
+}) {
+  if (input.trainingDates.length === 0) return [];
+  const uniqueDates = Array.from(new Set(input.trainingDates)).sort((a, b) => a.localeCompare(b));
+  const cancelled = await findCancelledSessionsForScope({
+    clubId: input.clubId,
+    scopeKey: getTrainingSessionScopeKey(input.scope),
+    trainingDates: uniqueDates,
+  });
+  if (cancelled.size === 0) return uniqueDates;
+  return uniqueDates.filter((date) => !cancelled.has(date));
+}
+
+async function findCancelledSessionsForScope(input: {
+  clubId: string;
+  scopeKey: string;
+  trainingDates: string[];
+}) {
+  const rows = await prisma.trainingSession.findMany({
+    where: {
+      clubId: input.clubId,
+      scopeKey: input.scopeKey,
+      status: "cancelled",
+      trainingDate: { in: input.trainingDates.map((date) => isoDateToUtcMidnight(date)) },
+    },
+    select: { trainingDate: true },
+  });
+  return new Set(rows.map((row) => utcDateToIsoDate(row.trainingDate)));
 }
 
 export async function syncFutureTrainingSessions(input: {

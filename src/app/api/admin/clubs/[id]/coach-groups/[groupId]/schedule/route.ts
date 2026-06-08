@@ -17,7 +17,7 @@ import {
   parseTrainingFieldSelectionsByDate,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
-import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
+import { filterCancelledTrainingDatesForScope, syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,12 +108,17 @@ export async function GET(
     return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
   }
 
-  const resolvedDates = getConfiguredTrainingDates({
+  const configuredDates = getConfiguredTrainingDates({
     trainingDates: row.trainingDates,
     weekdays: row.trainingWeekdays.filter((v) => v >= 1 && v <= 7).sort((a, b) => a - b),
     windowDays: row.trainingWindowDays,
     timeZone: FIXED_TIME_ZONE,
     maxDays: TRAINING_SELECTION_WINDOW_DAYS,
+  });
+  const resolvedDates = await filterCancelledTrainingDatesForScope({
+    clubId,
+    scope: { type: "coachGroup", id: groupId },
+    trainingDates: configuredDates,
   });
 
   const resolvedDateTimes = normalizeStoredTrainingDateTimes(row.trainingDateTimes, resolvedDates);

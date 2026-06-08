@@ -22,7 +22,7 @@ import {
   parseTrainingFieldSelectionsByDate,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
-import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
+import { filterCancelledTrainingDatesForScope, syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,6 +156,7 @@ export async function GET(
           },
         },
         select: {
+          id: true,
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,
@@ -184,6 +185,7 @@ export async function GET(
           updatedAt: "desc",
         },
         select: {
+          id: true,
           trainingDates: true,
           trainingTime: true,
           trainingDateTimes: true,
@@ -196,12 +198,21 @@ export async function GET(
         },
       });
 
-  const trainingDates = getConfiguredTrainingDates({
+  const configuredTrainingDates = getConfiguredTrainingDates({
     trainingDates: trainingGroupOverride?.trainingDates ?? groupSchedule?.trainingDates ?? club.trainingDates,
     weekdays: trainingGroupOverride?.trainingWeekdays ?? groupSchedule?.trainingWeekdays ?? club.trainingWeekdays,
     windowDays: trainingGroupOverride?.trainingWindowDays ?? groupSchedule?.trainingWindowDays ?? club.trainingWindowDays,
     timeZone: FIXED_TIME_ZONE,
     maxDays: TRAINING_SELECTION_WINDOW_DAYS,
+  });
+  const trainingDates = await filterCancelledTrainingDatesForScope({
+    clubId: id,
+    scope: trainingGroupOverride
+      ? { type: "trainingGroup", id: trainingGroupOverride.id }
+      : teamGroup !== null
+        ? { type: "teamGroup", teamGroup }
+        : { type: "club" },
+    trainingDates: configuredTrainingDates,
   });
 
   return NextResponse.json({

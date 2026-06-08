@@ -15,7 +15,7 @@ import {
 } from "@/lib/push/trainingScheduleNotifications";
 import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, checkTrainingAwayMatchConflict } from "@/lib/trainingFieldConflicts";
 import { clubHasTrainingFields, parseTrainingFieldSelection, verifyTrainingFieldSelection } from "@/lib/trainingFields";
-import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
+import { filterCancelledTrainingDatesForScope, syncFutureTrainingSessions } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -152,12 +152,19 @@ export async function GET(
         updatedAt: true,
       },
     });
-    return NextResponse.json(
-      groups.map((group) => ({
+    const serialized = await Promise.all(groups.map(async (group) => {
+      const trainingDates = await filterCancelledTrainingDatesForScope({
+        clubId: id,
+        scope: { type: "trainingGroup", id: group.id },
+        trainingDates: group.trainingDates ?? [],
+      });
+      return {
         ...group,
-        trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
-      })),
-    );
+        trainingDates,
+        trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, trainingDates),
+      };
+    }));
+    return NextResponse.json(serialized);
   } catch (error) {
     console.error("Training groups GET error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

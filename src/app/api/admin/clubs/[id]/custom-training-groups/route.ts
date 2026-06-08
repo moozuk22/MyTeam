@@ -21,7 +21,7 @@ import {
   verifyTrainingFieldSelection,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
-import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
+import { filterCancelledTrainingDatesForScope, syncFutureTrainingSessions } from "@/lib/trainingSessions";
 import { parseCustomTrainingGroupColorFromBody } from "@/lib/customTrainingGroupColors";
 import { isCustomTrainingGroupColorTakenInScope } from "@/lib/customTrainingGroupColorScope";
 
@@ -113,14 +113,14 @@ function serializeGroup(group: {
   createdAt: Date;
   updatedAt: Date;
   players: Array<{ playerId: string; player: { fullName: string; teamGroup: number | null } }>;
-}) {
+}, visibleTrainingDates = group.trainingDates) {
   return {
     id: group.id,
     name: group.name,
     color: group.color,
-    trainingDates: group.trainingDates,
+    trainingDates: visibleTrainingDates,
     trainingTime: group.trainingTime,
-    trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, group.trainingDates ?? []),
+    trainingDateTimes: normalizeStoredTrainingDateTimes(group.trainingDateTimes, visibleTrainingDates ?? []),
     trainingDurationMinutes: group.trainingDurationMinutes,
     trainingFieldId: group.trainingFieldId,
     trainingFieldPieceIds: group.trainingFieldPieceIds,
@@ -179,7 +179,15 @@ export async function GET(
         },
       },
     });
-    return NextResponse.json(groups.map(serializeGroup));
+    const serialized = await Promise.all(groups.map(async (group) => {
+      const trainingDates = await filterCancelledTrainingDatesForScope({
+        clubId: id,
+        scope: { type: "customGroup", id: group.id },
+        trainingDates: group.trainingDates ?? [],
+      });
+      return serializeGroup(group, trainingDates);
+    }));
+    return NextResponse.json(serialized);
   } catch (error) {
     console.error("Custom training groups GET error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
