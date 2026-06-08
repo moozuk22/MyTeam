@@ -2461,6 +2461,25 @@ function AdminMembersPageContent() {
       return `${date}:${selection?.trainingFieldId ?? ""}:${[...(selection?.trainingFieldPieceIds ?? [])].sort().join(",")}`;
     })
     .join("|");
+  const buildMergedTrainingDateTimes = (dates: string[], fallbackTrainingTime: string | null) =>
+    normalizeTrainingDateTimes(
+      { ...trainingDaysInitialDateTimes, ...trainingDateTimes },
+      dates,
+      fallbackTrainingTime,
+    );
+  const buildMergedTrainingFieldSelections = (dates: string[]) => {
+    const allowedDates = new Set(dates);
+    const merged: Record<string, TrainingFieldSelection> = {};
+    for (const [date, selection] of Object.entries({
+      ...trainingDaysInitialFieldSelections,
+      ...trainingFieldSelections,
+    })) {
+      if (allowedDates.has(date)) {
+        merged[date] = selection;
+      }
+    }
+    return merged;
+  };
   const isTrainingDaysScheduleUnchanged =
     trainingDaysEditorMode !== "createGroup" &&
     normalizedTrainingDaysSelection.join("|") === normalizedTrainingDaysInitial.join("|") &&
@@ -2485,10 +2504,10 @@ function AdminMembersPageContent() {
 
   useEffect(() => {
     setTrainingDateTimes((prev) => {
-      const selected = new Set(schedulerForm.trainingDates);
+      const selected = new Set([...trainingDaysPreExistingDates, ...schedulerForm.trainingDates]);
       let changed = false;
       const next: Record<string, string> = {};
-      for (const date of schedulerForm.trainingDates) {
+      for (const date of selected) {
         const value = (prev[date] ?? "").trim();
         if (value) {
           next[date] = value;
@@ -2508,7 +2527,7 @@ function AdminMembersPageContent() {
     });
     setTrainingFieldSelections((prev) => {
       const next: Record<string, TrainingFieldSelection> = {};
-      for (const date of schedulerForm.trainingDates) {
+      for (const date of new Set([...trainingDaysPreExistingDates, ...schedulerForm.trainingDates])) {
         if (prev[date]) next[date] = prev[date];
       }
       return Object.keys(next).length === Object.keys(prev).length ? prev : next;
@@ -2516,7 +2535,7 @@ function AdminMembersPageContent() {
     if (schedulerForm.trainingDates.length > 0 && !schedulerForm.trainingDates.includes(trainingFieldActiveDate)) {
       setTrainingFieldActiveDate(schedulerForm.trainingDates[0]);
     }
-  }, [schedulerForm.trainingDates]);
+  }, [schedulerForm.trainingDates, trainingDaysPreExistingDates]);
 
   useEffect(() => {
     if (trainingTimeMode === "all") {
@@ -3815,6 +3834,11 @@ function AdminMembersPageContent() {
     }
     const _preExistingSet = new Set(trainingDaysPreExistingDates);
     const _mergedDates = [...trainingDaysPreExistingDates, ...schedulerForm.trainingDates.filter(d => !_preExistingSet.has(d))].sort((a, b) => a.localeCompare(b));
+    const mergedTrainingDateTimes = buildMergedTrainingDateTimes(
+      _mergedDates,
+      trainingTimeMode === "all" ? normalizedTrainingTime : null,
+    );
+    const mergedTrainingFieldSelections = buildMergedTrainingFieldSelections(_mergedDates);
     const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/scheduler`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -3836,12 +3860,8 @@ function AdminMembersPageContent() {
         trainingDurationMinutes: normalizedTrainingDurationSelection,
         trainingFieldId: primaryTrainingFieldSelection.trainingFieldId || null,
         trainingFieldPieceIds: primaryTrainingFieldSelection.trainingFieldPieceIds,
-        trainingFieldSelections,
-        trainingDateTimes: normalizeTrainingDateTimes(
-          trainingDateTimes,
-          _mergedDates,
-          trainingTimeMode === "all" ? normalizedTrainingTime : null,
-        ),
+        trainingFieldSelections: mergedTrainingFieldSelections,
+        trainingDateTimes: mergedTrainingDateTimes,
         teamGroup: selectedTeamGroup,
       }),
     });
@@ -3929,6 +3949,11 @@ function AdminMembersPageContent() {
           .sort((a, b) => a.localeCompare(b));
         const _groupPreExistingSet = new Set(trainingDaysPreExistingDates);
         const mergedTrainingDates = [...trainingDaysPreExistingDates, ...nextTrainingDates.filter(d => !_groupPreExistingSet.has(d))].sort((a, b) => a.localeCompare(b));
+        const mergedTrainingDateTimesForPayload = buildMergedTrainingDateTimes(
+          mergedTrainingDates,
+          trainingTimeMode === "all" ? normalizedTrainingTime : null,
+        );
+        const mergedTrainingFieldSelectionsForPayload = buildMergedTrainingFieldSelections(mergedTrainingDates);
         const nextTrainingDateTimes = normalizeTrainingDateTimes(
           trainingDateTimes,
           nextTrainingDates,
@@ -3963,12 +3988,8 @@ function AdminMembersPageContent() {
               trainingDurationMinutes: normalizedTrainingDurationSelection,
               trainingFieldId: primaryTrainingFieldSelection.trainingFieldId || null,
               trainingFieldPieceIds: primaryTrainingFieldSelection.trainingFieldPieceIds,
-              trainingFieldSelections,
-              trainingDateTimes: normalizeTrainingDateTimes(
-                trainingDateTimes,
-                mergedTrainingDates,
-                trainingTimeMode === "all" ? normalizedTrainingTime : null,
-              ),
+              trainingFieldSelections: mergedTrainingFieldSelectionsForPayload,
+              trainingDateTimes: mergedTrainingDateTimesForPayload,
             }),
           },
         );
