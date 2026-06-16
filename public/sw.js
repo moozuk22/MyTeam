@@ -68,6 +68,14 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const trainingNotificationTypes = new Set([
+    "training_reminder",
+    "training_cancelled",
+    "limited_training_created",
+    "limited_training_promoted",
+    "limited_training_waitlisted",
+    "match_schedule",
+  ]);
   const cardCode =
     event.notification?.data &&
     typeof event.notification.data.cardCode === "string" &&
@@ -101,7 +109,7 @@ self.addEventListener("notificationclick", (event) => {
       typeof event.notification.data.type === "string"
         ? event.notification.data.type
         : null;
-    if (notifType === "training_reminder") {
+    if (trainingNotificationTypes.has(notifType)) {
       destinationUrl.searchParams.set("openTraining", "1");
     } else if (notifType === "birthday") {
       destinationUrl.searchParams.set("openBirthday", "1");
