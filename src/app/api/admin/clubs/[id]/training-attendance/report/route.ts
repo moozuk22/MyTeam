@@ -7,6 +7,7 @@ import {
   isoDateToUtcMidnight,
   utcDateToIsoDate,
 } from "@/lib/training";
+import { getTrainingSessionScopeKey } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,6 +103,10 @@ function getTrainingDatesInRange({
     }
   }
   return result;
+}
+
+function mergeIsoDates(...groups: string[][]): string[] {
+  return Array.from(new Set(groups.flat())).sort((a, b) => a.localeCompare(b));
 }
 
 export async function GET(
@@ -267,6 +272,41 @@ export async function GET(
       trainingWeekdays: effectiveWeekdays,
     });
 
+    const scopeKey = getTrainingSessionScopeKey(
+      customTrainingGroup
+        ? { type: "customGroup", id: customTrainingGroup.id }
+        : trainingGroup
+          ? { type: "trainingGroup", id: trainingGroup.id }
+          : teamGroup !== null
+            ? { type: "teamGroup", teamGroup }
+            : coachGroupId
+              ? { type: "coachGroup", id: coachGroupId }
+              : { type: "club" },
+    );
+
+    const storedSessions = await prisma.trainingSession.findMany({
+      where: {
+        clubId: id,
+        scopeKey,
+        trainingDate: { gte: isoDateToUtcMidnight(from), lte: isoDateToUtcMidnight(to) },
+        status: { not: "cancelled" },
+      },
+      select: {
+        trainingDate: true,
+        players: {
+          select: {
+            playerId: true,
+            present: true,
+            reasonCode: true,
+          },
+        },
+      },
+      orderBy: { trainingDate: "asc" },
+    });
+
+    const storedSessionDates = storedSessions.map((session) => utcDateToIsoDate(session.trainingDate));
+    const reportTrainingDates = mergeIsoDates(trainingDates, storedSessionDates);
+
     const players = targetPlayer
       ? [targetPlayer]
       : await prisma.player.findMany({
@@ -286,7 +326,7 @@ export async function GET(
     const toDate = isoDateToUtcMidnight(to);
 
     const optOuts =
-      players.length > 0 && trainingDates.length > 0
+      players.length > 0 && reportTrainingDates.length > 0
         ? await prisma.trainingOptOut.findMany({
             where: {
               playerId: { in: players.map((p) => p.id) },
@@ -303,14 +343,37 @@ export async function GET(
       optOutMap.get(o.playerId)!.set(iso, o.reasonCode ?? null);
     }
 
+    const sessionAttendanceMap = new Map<string, Map<string, { present: boolean; reasonCode: string | null }>>();
+    for (const session of storedSessions) {
+      const iso = utcDateToIsoDate(session.trainingDate);
+      for (const row of session.players) {
+        if (!row.playerId) continue;
+        if (!sessionAttendanceMap.has(row.playerId)) sessionAttendanceMap.set(row.playerId, new Map());
+        sessionAttendanceMap.get(row.playerId)!.set(iso, {
+          present: row.present,
+          reasonCode: row.reasonCode ?? null,
+        });
+      }
+    }
+
     return NextResponse.json({
-      trainingDates,
+      trainingDates: reportTrainingDates,
       players: players.map((p) => ({
         id: p.id,
         fullName: p.fullName,
         teamGroup: p.teamGroup,
         attendance: Object.fromEntries(
-          trainingDates.map((d) => {
+          reportTrainingDates.map((d) => {
+            const sessionAttendance = sessionAttendanceMap.get(p.id)?.get(d);
+            if (sessionAttendance) {
+              return [
+                d,
+                {
+                  present: sessionAttendance.present,
+                  reasonCode: sessionAttendance.present ? null : sessionAttendance.reasonCode,
+                },
+              ];
+            }
             const byDate = optOutMap.get(p.id);
             const optedOut = byDate?.has(d) ?? false;
             return [
