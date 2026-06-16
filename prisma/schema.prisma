@@ -189,6 +189,7 @@ model CoachGroup {
   players                 Player[]                @relation("PlayerCoachGroups")
   customTrainingGroups    ClubCustomTrainingGroup[]
   adminPushSubscriptions  AdminPushSubscription[]
+  adminNotifications      AdminNotification[]
 
   @@index([clubId])
   @@map("coach_groups")
@@ -467,21 +468,24 @@ model PlayerNotification {
 }
 
 model AdminNotification {
-  id       String    @id @default(uuid())
-  clubId   String    @map("club_id") @db.Uuid
-  playerId String?   @map("player_id") @db.Uuid
-  type     String
-  title    String
-  body     String
-  url      String?
-  sentAt   DateTime  @default(now()) @map("sent_at")
-  readAt   DateTime? @map("read_at")
-  club     Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  player   Player?   @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  id           String      @id @default(uuid())
+  clubId       String      @map("club_id") @db.Uuid
+  playerId     String?     @map("player_id") @db.Uuid
+  coachGroupId String?     @map("coach_group_id") @db.Uuid
+  type         String
+  title        String
+  body         String
+  url          String?
+  sentAt       DateTime    @default(now()) @map("sent_at")
+  readAt       DateTime?   @map("read_at")
+  club         Club        @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  player       Player?     @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  coachGroup   CoachGroup? @relation(fields: [coachGroupId], references: [id], onDelete: SetNull)
 
   @@index([clubId, sentAt])
   @@index([clubId, readAt])
   @@index([clubId, playerId])
+  @@index([clubId, coachGroupId, readAt])
   @@map("admin_notifications")
 }
 

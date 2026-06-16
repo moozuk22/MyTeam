@@ -16,11 +16,13 @@ export async function saveAdminNotificationHistory(input: {
   type: string;
   payload: PushNotificationPayload;
   playerId?: string | null;
+  coachGroupId?: string | null;
 }) {
   const saved = await prismaAdmin.adminNotification.create({
     data: {
       clubId: input.clubId,
       playerId: input.playerId ?? null,
+      coachGroupId: input.coachGroupId ?? null,
       type: input.type,
       title: input.payload.title,
       body: input.payload.body,
@@ -47,7 +49,13 @@ export async function getClubAdminNotifications(input: {
     where.playerId = input.playerId;
   }
   if (input.coachGroupId) {
-    where.player = { coachGroups: { some: { id: input.coachGroupId } } };
+    where.OR = [
+      { coachGroupId: input.coachGroupId },
+      {
+        coachGroupId: null,
+        player: { coachGroups: { some: { id: input.coachGroupId } } },
+      },
+    ];
   }
   return await prismaAdmin.adminNotification.findMany({
     where,
@@ -63,6 +71,7 @@ export async function getClubAdminNotifications(input: {
       sentAt: true,
       readAt: true,
       playerId: true,
+      coachGroupId: true,
     },
   });
 }
@@ -77,7 +86,13 @@ export async function getClubAdminUnreadCount(input: {
     where.playerId = input.playerId;
   }
   if (input.coachGroupId) {
-    where.player = { coachGroups: { some: { id: input.coachGroupId } } };
+    where.OR = [
+      { coachGroupId: input.coachGroupId },
+      {
+        coachGroupId: null,
+        player: { coachGroups: { some: { id: input.coachGroupId } } },
+      },
+    ];
   }
   return await prismaAdmin.adminNotification.count({ where });
 }
@@ -92,7 +107,13 @@ export async function markClubAdminNotificationsRead(input: {
     where.playerId = input.playerId;
   }
   if (input.coachGroupId) {
-    where.player = { coachGroups: { some: { id: input.coachGroupId } } };
+    where.OR = [
+      { coachGroupId: input.coachGroupId },
+      {
+        coachGroupId: null,
+        player: { coachGroups: { some: { id: input.coachGroupId } } },
+      },
+    ];
   }
   return await prismaAdmin.adminNotification.updateMany({
     where,

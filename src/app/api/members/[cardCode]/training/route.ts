@@ -139,7 +139,9 @@ type CoachGroupSchedule = {
   trainingFieldSelections: unknown;
 };
 
-type CustomGroupSchedule = CoachGroupSchedule;
+type CustomGroupSchedule = CoachGroupSchedule & {
+  coachGroupId: string | null;
+};
 
 function mergeScheduleDates(groups: Array<{ trainingDates: string[] }>) {
   return [...new Set(groups.flatMap((g) => g.trainingDates))].sort();
@@ -178,6 +180,24 @@ function resolveCoachGroupForDate(
   );
 }
 
+function resolveNotificationCoachGroupForDate(input: {
+  customGroups: CustomGroupSchedule[];
+  coachGroups: CoachGroupSchedule[];
+  date: string;
+  weekday: number;
+}): string | null {
+  const customGroup =
+    input.customGroups.find((g) => g.trainingDates.includes(input.date)) ??
+    input.customGroups.find((g) => g.trainingWeekdays.includes(input.weekday)) ??
+    null;
+
+  if (customGroup) {
+    return customGroup.coachGroupId;
+  }
+
+  return resolveCoachGroupForDate(input.coachGroups, input.date, input.weekday);
+}
+
 async function getMemberTrainingContext(cardCode: string) {
   const normalizedCardCode = cardCode.trim().toUpperCase();
   const card = await prisma.card.findFirst({
@@ -214,6 +234,7 @@ async function getMemberTrainingContext(cardCode: string) {
               group: {
                 select: {
                   id: true,
+                  coachGroupId: true,
                   trainingDates: true,
                   trainingDateTimes: true,
                   trainingTime: true,
@@ -869,7 +890,12 @@ export async function POST(
   });
 
   const optOutWeekday = getWeekdayMondayFirst(trainingDate, FIXED_TIME_ZONE);
-  const optOutCoachGroupId = resolveCoachGroupForDate(context.scheduledCoachGroups, trainingDate, optOutWeekday);
+  const optOutCoachGroupId = resolveNotificationCoachGroupForDate({
+    customGroups: context.scheduledCustomGroups,
+    coachGroups: context.scheduledCoachGroups,
+    date: trainingDate,
+    weekday: optOutWeekday,
+  });
 
   let coachPush = { total: 0, sent: 0, failed: 0, deactivated: 0 };
   const coachPayload = buildCoachAttendancePayload({
@@ -886,6 +912,7 @@ export async function POST(
     await saveAdminNotificationHistory({
       clubId: context.clubId,
       playerId: context.playerId,
+      coachGroupId: optOutCoachGroupId,
       type: "training_attendance",
       payload: coachPayload,
     });
@@ -945,7 +972,12 @@ export async function DELETE(
   });
 
   const optInWeekday = getWeekdayMondayFirst(trainingDate, FIXED_TIME_ZONE);
-  const optInCoachGroupId = resolveCoachGroupForDate(context.scheduledCoachGroups, trainingDate, optInWeekday);
+  const optInCoachGroupId = resolveNotificationCoachGroupForDate({
+    customGroups: context.scheduledCustomGroups,
+    coachGroups: context.scheduledCoachGroups,
+    date: trainingDate,
+    weekday: optInWeekday,
+  });
 
   let coachPush = { total: 0, sent: 0, failed: 0, deactivated: 0 };
   const coachPayload = buildCoachAttendancePayload({
@@ -960,6 +992,7 @@ export async function DELETE(
     await saveAdminNotificationHistory({
       clubId: context.clubId,
       playerId: context.playerId,
+      coachGroupId: optInCoachGroupId,
       type: "training_attendance",
       payload: coachPayload,
     });

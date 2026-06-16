@@ -1080,9 +1080,7 @@ export default function MemberCardPage({
     }
 
     if (shouldOpenTraining) {
-      setTrainingError(null);
-      setTrainingNotePopupOpen(false);
-      setTrainingModalOpen(true);
+      void openTrainingModal();
     }
 
     if (shouldOpenBirthday) {

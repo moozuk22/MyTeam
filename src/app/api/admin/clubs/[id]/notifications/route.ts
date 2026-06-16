@@ -60,6 +60,7 @@ export async function GET(
               sentAt: String(raw.sentAt ?? ""),
               readAt: raw.readAt ? String(raw.readAt) : null,
               playerId: raw.playerId ? String(raw.playerId) : null,
+              coachGroupId: raw.coachGroupId ? String(raw.coachGroupId) : null,
             };
           })
           .filter((item): item is {
@@ -71,6 +72,7 @@ export async function GET(
             sentAt: string;
             readAt: string | null;
             playerId: string | null;
+            coachGroupId: string | null;
           } => item !== null)
       : [];
 
