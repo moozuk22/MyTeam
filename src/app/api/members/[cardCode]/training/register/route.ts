@@ -37,6 +37,7 @@ function buildRegistrationPayload(input: {
   action: "registered" | "cancelled";
   spotsRemaining?: number;
   waitlistPosition?: number | null;
+  coachGroupId?: string | null;
 }): PushNotificationPayload {
   const formattedDate = formatBgDate(input.trainingDate);
   let body: string;
@@ -55,7 +56,9 @@ function buildRegistrationPayload(input: {
   return {
     title: "Записване за тренировка",
     body,
-    url: `/admin/members?clubId=${encodeURIComponent(input.clubId)}`,
+    url: input.coachGroupId
+      ? `/admin/members?clubId=${encodeURIComponent(input.clubId)}&coachGroupId=${encodeURIComponent(input.coachGroupId)}`
+      : `/admin/members?clubId=${encodeURIComponent(input.clubId)}`,
     icon: "/myteam-logo.webp",
     badge: "/myteam-logo.webp",
     tag: "training-registration",
@@ -231,12 +234,14 @@ export async function POST(
     action: "registered",
     spotsRemaining: isConfirmed ? spotsRemaining : undefined,
     waitlistPosition: isConfirmed ? null : waitlistPosition,
+    coachGroupId: pushCoachGroupId,
   });
 
   try {
     await saveAdminNotificationHistory({
       clubId: player.clubId,
       playerId: player.playerId,
+      coachGroupId: pushCoachGroupId,
       type: "training_registration",
       payload,
     });
@@ -359,12 +364,14 @@ export async function DELETE(
     playerName: player.playerName,
     trainingDate,
     action: "cancelled",
+    coachGroupId: pushCoachGroupId,
   });
 
   try {
     await saveAdminNotificationHistory({
       clubId: player.clubId,
       playerId: player.playerId,
+      coachGroupId: pushCoachGroupId,
       type: "training_registration",
       payload,
     });
