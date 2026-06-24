@@ -113,10 +113,23 @@ export async function POST(
 
   let notifications = null;
   try {
+    let notifyPlayerIds: string[] | undefined;
+    let notifyTeamGroups: number[] | undefined;
+    if (match.customGroupId) {
+      const members = await prisma.clubCustomTrainingGroupPlayer.findMany({
+        where: { groupId: match.customGroupId },
+        select: { playerId: true },
+      });
+      notifyPlayerIds = members.map((m) => m.playerId);
+    } else if (match.teamGroups.length > 0) {
+      notifyTeamGroups = match.teamGroups;
+    }
     notifications = await sendMatchScheduleNotifications({
       clubId: id,
       action: "created",
       match,
+      playerIds: notifyPlayerIds,
+      teamGroups: notifyTeamGroups,
     });
   } catch (error) {
     console.error("Match schedule notifications failed:", error);

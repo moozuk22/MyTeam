@@ -20,6 +20,7 @@ export async function GET(
     select: {
       player: {
         select: {
+          id: true,
           clubId: true,
           teamGroup: true,
         },
@@ -31,7 +32,14 @@ export async function GET(
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  const { clubId, teamGroup } = card.player;
+  const { id: playerId, clubId, teamGroup } = card.player;
+
+  // Fetch the custom group IDs this player belongs to
+  const customGroupMemberships = await prisma.clubCustomTrainingGroupPlayer.findMany({
+    where: { playerId },
+    select: { groupId: true },
+  });
+  const playerCustomGroupIds = new Set(customGroupMemberships.map((m) => m.groupId));
 
   const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
   const endDate = new Date(`${todayIso}T00:00:00.000Z`);
@@ -41,13 +49,18 @@ export async function GET(
   const allMatches = await prisma.clubMatch.findMany({
     where: { clubId, matchDate: { gte: todayIso, lte: endIso } },
     orderBy: [{ matchDate: "asc" }, { matchTime: "asc" }],
-    select: { id: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
+    select: { id: true, customGroupId: true, opponent: true, location: true, matchDate: true, matchTime: true, durationMinutes: true, isHome: true, teamGroups: true },
   });
 
-  // include match if it has no team filter OR the player's team group is listed
-  const matches = allMatches.filter(
-    (m) => m.teamGroups.length === 0 || (teamGroup !== null && m.teamGroups.includes(teamGroup)),
-  );
+  const matches = allMatches.filter((m) => {
+    // Custom-group match: only visible to members of that specific group
+    if (m.customGroupId !== null) {
+      return playerCustomGroupIds.has(m.customGroupId);
+    }
+    // Club-wide or team-group match
+    return m.teamGroups.length === 0 || (teamGroup !== null && m.teamGroups.includes(teamGroup));
+  });
 
-  return NextResponse.json({ matches });
+  // Strip customGroupId before sending to client
+  return NextResponse.json({ matches: matches.map(({ customGroupId: _cg, ...rest }) => rest) });
 }

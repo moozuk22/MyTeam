@@ -112,11 +112,21 @@ export async function sendMatchScheduleNotifications(input: {
   action: "created" | "updated";
   previousMatch?: MatchScheduleSnapshot;
   match: MatchScheduleSnapshot;
+  playerIds?: string[];
+  teamGroups?: number[];
 }): Promise<MatchScheduleNotificationSummary> {
+  const playerFilter =
+    input.playerIds && input.playerIds.length > 0
+      ? { id: { in: input.playerIds } }
+      : input.teamGroups && input.teamGroups.length > 0
+        ? { teamGroup: { in: input.teamGroups } }
+        : {};
+
   const members = await prisma.player.findMany({
     where: {
       clubId: input.clubId,
       isActive: true,
+      ...playerFilter,
     },
     select: {
       id: true,
