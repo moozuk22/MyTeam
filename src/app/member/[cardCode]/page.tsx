@@ -2,6 +2,7 @@
 
 import { use, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { NotificationText } from "@/components/NotificationText";
 import { uploadImage } from "@/lib/uploadImage";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { getCompatiblePushSubscription } from "@/lib/push/browser";
@@ -4205,7 +4206,7 @@ export default function MemberCardPage({
                           color: "rgba(255,255,255,0.7)",
                           lineHeight: "1.4",
                         }}>
-                          {notif.body}
+                          <NotificationText text={notif.body} />
                         </p>
                         <p style={{
                           margin: 0,
