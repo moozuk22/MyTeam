@@ -1,0 +1,51 @@
+.banner {
+  position: fixed;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  width: min(28rem, calc(100% - 2rem));
+  box-sizing: border-box;
+  padding: 1rem;
+  border: 1px solid #486339;
+  border-radius: 1rem;
+  background: #151a14;
+  color: #fff;
+  box-shadow: 0 6px 30px #0006;
+  font-size: 0.95rem;
+}
+
+.banner p {
+  margin: 0.4rem 0 0.85rem;
+  color: #d5ded1;
+  line-height: 1.45;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.actions button {
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border: 1px solid #697863;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.actions .install {
+  background: #a3ed59;
+  border-color: #a3ed59;
+  color: #10170b;
+  font-weight: 600;
+}
+
+.actions button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}

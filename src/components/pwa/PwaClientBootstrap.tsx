@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { InstallPrompt } from "./InstallPrompt";
 
 export function PwaClientBootstrap() {
   useEffect(() => {
     const register = () => {
-      void navigator.serviceWorker.register("/sw.js");
+      void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
+        console.error("Service worker registration failed:", error);
+      });
     };
     if ("serviceWorker" in navigator) {
       if (document.readyState === "complete") {
@@ -37,5 +40,5 @@ export function PwaClientBootstrap() {
     };
   }, []);
 
-  return null;
+  return <InstallPrompt />;
 }

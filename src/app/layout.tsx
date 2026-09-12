@@ -38,11 +38,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/myteam-logo.webp", sizes: "192x192", type: "image/png" },
-      { url: "/myteam-logo.webp", sizes: "512x512", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/myteam-logo.webp",
-    shortcut: "/myteam-logo.webp",
+    apple: "/icons/apple-touch-icon.png",
+    shortcut: "/icons/icon-192.png",
   },
   robots: {
     index: true,
