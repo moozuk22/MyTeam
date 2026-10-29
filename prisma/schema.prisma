@@ -24,6 +24,9 @@ enum PaymentWorkflow {
 }
 
 model Club {
+  financeStartedAt DateTime @default(now()) @map("finance_started_at") @db.Timestamptz(6)
+  financeCategories ClubFinanceCategory[]
+  financeEntries ClubFinanceEntry[]
   facebookPageConnection FacebookPageConnection?
   facebookConnectAttempts FacebookConnectAttempt[]
   id                      String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -878,4 +881,38 @@ model FacebookConnectAttempt {
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   @@index([expiresAt])
   @@map("facebook_connect_attempts")
+}
+
+model ClubFinanceCategory {
+  isActive Boolean @default(true) @map("is_active")
+  sortOrder Int @default(2147483647) @map("sort_order")
+  isMembership Boolean @default(false) @map("is_membership")
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  name String
+  kind String
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  entries ClubFinanceEntry[]
+  @@unique([clubId, kind, name])
+  @@unique([id, clubId])
+  @@map("club_finance_categories")
+}
+
+model ClubFinanceEntry {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+  kind String
+  amount Decimal @db.Decimal(10, 2)
+  currency String @default("EUR")
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  description String?
+  playerName String? @map("player_name")
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(6)
+  paymentReference String? @unique @map("payment_reference") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  category ClubFinanceCategory @relation(fields: [categoryId, clubId], references: [id, clubId])
+  @@index([clubId, occurredAt], map: "club_finance_entries_period")
+  @@map("club_finance_entries")
 }
