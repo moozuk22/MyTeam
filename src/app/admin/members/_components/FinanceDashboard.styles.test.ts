@@ -3,6 +3,15 @@ import { expect, it } from 'vitest';
 
 const css = readFileSync(new URL('./FinanceDashboard.module.css', import.meta.url), 'utf8');
 
+it('removes rectangular focus outlines from chart segments while highlighting keyboard focus with stroke width', () => {
+ expect(css).toMatch(/\.chartView \.chartSegment:focus\s*\{[^}]*outline:none;/);
+ expect(css).toMatch(/\.chartView \.chartSegment:focus-visible\s*\{[^}]*stroke-width:17;/);
+});
+
+it('reserves the debts overlap space beside the expense chart on desktop', () => {
+ expect(css).toMatch(/@media\(min-width:1101px\)\s*\{\s*\.chartView\s*\{[^}]*padding-right:108px;/);
+});
+
 it('reserves arrow space after compact form padding and gives native options readable colors', () => {
  const compactPadding = css.indexOf('.dashboard .expenseForm :is(input,select,textarea)');
  const selectOverride = css.lastIndexOf('.dashboard .selectWrap select {');
@@ -38,4 +47,8 @@ it('contains desktop category scrolling inside the list rather than the outer di
  expect(desktop).toMatch(/\.categoriesDialog:not\(\.categoryConfirmation\)\s*\{[^}]*overflow:hidden;/);
  expect(desktop).toMatch(/\.categoriesDialog:not\(\.categoryConfirmation\)\[open\]\s*\{[^}]*display:flex;[^}]*flex-direction:column;/);
  expect(desktop).toMatch(/\.categoryList\s*\{[^}]*flex:1;[^}]*min-height:0;[^}]*max-height:none;[^}]*overflow-y:auto;/);
+});
+
+it('sizes the category editor to its content instead of stretching between mobile inset edges', () => {
+ expect(css).toMatch(/\.categoriesDialog\.categoryEditor\s*\{[^}]*height:fit-content;[^}]*min-height:0;/);
 });

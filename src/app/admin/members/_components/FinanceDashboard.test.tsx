@@ -103,8 +103,8 @@ it('uses one category list and keeps expense charts separate from revenue in the
  expect(form).toContain('value="shared">Обща категория</option>');
  expect(html).not.toContain('Филтрирай категориите по вид"');
  expect(html).not.toContain('<label>Вид<select');
- expect(html).toContain('aria-label="Общо разходи: 35,00');
- expect(html).not.toContain('aria-label="Общо разходи: 150,00');
+ expect(html).toContain('aria-label="Разходи по категории: 35,00');
+ expect(html).not.toContain('aria-label="Разходи по категории: 150,00');
  expect(html).toContain('Приходи</small>150,00');
  expect(html).toContain('Разходи</small>35,00');
 });

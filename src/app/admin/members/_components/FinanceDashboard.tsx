@@ -2,6 +2,7 @@
 import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpRight, CreditCard, Wallet, Users, Plus, List, Save, Pencil, Trash2, X, MoreVertical, UserRound, ReceiptText, ChevronDown, CalendarDays, ChartPie, House, Bus, Trophy, Shirt, FileText } from 'lucide-react';
 import type { getClubFinance } from '@/lib/clubFinance';
+import { financeCategoryChartColor } from '@/lib/financeCategoryChartColor';
 import { financeDateKey, financePeriodLabel } from '@/lib/clubFinanceDomain';
 import styles from './FinanceDashboard.module.css';
 import { CUSTOM_TRAINING_GROUP_COLOR_PALETTE, customTrainingGroupAccentRgba, customTrainingGroupReadableOnAccent } from '@/lib/customTrainingGroupColors';
@@ -19,7 +20,7 @@ const money = (value: string, currency = 'EUR') => new Intl.NumberFormat('bg-BG'
 export default function FinanceDashboard({ clubId, data, report, month, filters, onSaved, clubName, clubLogoUrl }: { clubLogoUrl?: string | null; clubName?: string; clubId: string; data: View | null; report: View | null; month: string; filters: ReactNode; onSaved: () => Promise<void> }) {
   const [failedClubLogo,setFailedClubLogo] = useState<string | null>(null);
   const [selectedPlayerId,setSelectedPlayerId] = useState<string | null>(null);
-  const [ledgerView,setLedgerView] = useState<'history' | 'analysis'>('history');
+  const [ledgerView,setLedgerView] = useState<'history' | 'analysis' | 'chart'>('history');
   const ledgerId = useId();
   const [actionDropdown,setActionDropdown] = useState<'revenue' | 'expense' | 'debts' | null>(null);
   const analysisActionsRef = useRef<HTMLDivElement>(null);
@@ -165,13 +166,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   const cardsRef = useRef<HTMLDivElement>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const breakdownRef = useRef<HTMLDetailsElement>(null);
   const expenseDetailsRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (window.matchMedia('(max-width:700px)').matches) {
-      if (breakdownRef.current) breakdownRef.current.open = false;
-    }
-  }, []);
   useLayoutEffect(() => {
     const dashboard = dashboardRef.current;
     const form = formRef.current;
@@ -273,20 +268,25 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     setShowCategoryColors(visible);
     try { localStorage.setItem('finance-category-colors',visible ? 'visible' : 'hidden'); } catch { /* The toggle still works for this visit. */ }
   }
+  const [chartSelection,setChartSelection] = useState<{ currency:string; categoryId:string } | null>(null);
+  function selectChartCategory(currency:string, categoryId:string) {
+    setChartSelection(current => current?.currency === currency && current.categoryId === categoryId ? null : {currency,categoryId});
+  }
   const categoryCharts = (report?.totals ?? []).map(total => {
-    const colors = ['#65cf8a','#4b9ce5','#ed706d','#ad79d9','#e1bf66','#66c9be'];
-    const rows = categories.map((category,index) => ({
-      name: category.name, color: showCategoryColors ? category.color || colors[index % colors.length] : '#93988f',
+    const rows = categories.map(category => ({
+      id: category.id, name: category.name, color: financeCategoryChartColor(category),
       amount: Number(report?.subtotals.find(row => row.categoryId === category.id && row.currency === total.currency && row.kind === 'expense')?.amount ?? 0),
-    })).filter(row => row.amount > 0);
+    })).filter(row => row.amount > 0).sort((a,b) => b.amount - a.amount);
     const sum = rows.reduce((value,row) => value + row.amount,0);
     let end = 0;
     const segments = rows.map(row => {
       const start = end;
-      end += sum ? row.amount / sum * 100 : 0;
-      return `${row.color} ${start}% ${end}%`;
+      const size = sum ? row.amount / sum * 100 : 0;
+      end += size;
+      return { ...row, start, size };
     });
-    return { currency: total.currency, rows, sum, background: segments.length ? `conic-gradient(${segments.join(',')})` : '#30312c' };
+    const selectedId = chartSelection?.currency === total.currency && rows.some(row => row.id === chartSelection.categoryId) ? chartSelection.categoryId : null;
+    return { currency: total.currency, rows: segments, sum, selectedId };
   });
   const periodList = list?.month === month && list.page === page ? list : null;
   const entryForm = (<form ref={formRef} className={`${styles.box} ${styles.expenseForm} ${draft?.id ? styles.editingForm : ''} ${formKind === 'revenue' ? styles.revenueForm : ''} ${formOpen ? '' : styles.mobileFormClosed}`} onSubmit={event => { event.preventDefault(); if (draft) void mutate({ ...draft, action: `${draft.id ? 'update' : 'create'}${formKind === 'revenue' ? 'Revenue' : 'Expense'}` }); }}>
@@ -352,18 +352,29 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
           </div>}
         </div>
 
-        <details ref={breakdownRef} className={`${styles.box} ${styles.breakdown}`} open>
-          <summary><ChartPie size={21} />Категории разходи</summary>
-          {!report && <FinanceSkeleton variant="chart" />}{categoryCharts.map(chart => <div className={styles.chart} key={chart.currency}>
-            <div className={styles.donut} style={{ background: chart.background }} role="img" aria-label={`Общо разходи: ${money(String(chart.sum),chart.currency)}`}><span><strong>{money(String(chart.sum),chart.currency)}</strong><small>общо</small></span></div>
-            <ul className={styles.legend}>{chart.rows.map(row => <li key={row.name}><i style={{ background: row.color }} aria-hidden="true" /><span>{row.name}</span><strong>{money(String(row.amount),chart.currency)}</strong><small>{Math.round(row.amount/chart.sum*100)}%</small></li>)}</ul>
-            {!chart.rows.length && <p className={styles.empty}>Няма разходи за периода.</p>}
-          </div>)}
-        </details>
         <section ref={expenseDetailsRef} className={`${styles.box} ${styles.ledger}`}>
           <div className={styles.ledgerViews} role="group" aria-label="Изглед на финансите">
             <button type="button" aria-pressed={ledgerView === 'history'} aria-controls={`${ledgerId}-history`} disabled={ledgerView === 'history'} onClick={() => { setActionDropdown(null); setLedgerView('history'); }}><List size={17} aria-hidden="true" />История</button>
             <button type="button" aria-pressed={ledgerView === 'analysis'} aria-controls={`${ledgerId}-analysis`} disabled={ledgerView === 'analysis'} onClick={() => setLedgerView('analysis')}><ChartPie size={17} aria-hidden="true" />Анализ</button>
+            <button type="button" aria-pressed={ledgerView === 'chart'} aria-controls={`${ledgerId}-chart`} disabled={ledgerView === 'chart'} onClick={() => { setActionDropdown(null); setLedgerView('chart'); }}><ChartPie size={17} aria-hidden="true" />Категории разходи</button>
+          </div>
+          <div id={`${ledgerId}-chart`} className={styles.chartView} hidden={ledgerView !== 'chart'} role="region" aria-label="Категории разходи">
+          {!report && <FinanceSkeleton variant="chart" />}{categoryCharts.map(chart => <div className={styles.chart} key={chart.currency}>
+            <div className={`${styles.donut} ${styles.interactiveDonut}`}>
+              <svg viewBox="0 0 100 100" aria-label={`Разходи по категории: ${money(String(chart.sum),chart.currency)}`}>
+                <circle cx="50" cy="50" r="43" fill="none" stroke="#30312c" strokeWidth="14" />
+                {chart.rows.map(row => <circle key={row.id} className={styles.chartSegment} cx="50" cy="50" r="43" fill="none" stroke={row.color} strokeWidth="14" pathLength="100" strokeDasharray={`${row.size} ${100-row.size}`} strokeDashoffset={-row.start} transform="rotate(-90 50 50)" role="button" tabIndex={0} aria-label={`${row.name}: ${money(String(row.amount),chart.currency)}`} aria-pressed={chart.selectedId === row.id} data-dimmed={Boolean(chart.selectedId && chart.selectedId !== row.id)} onClick={() => selectChartCategory(chart.currency,row.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectChartCategory(chart.currency,row.id); } }}><title>{row.name}</title></circle>)}
+              </svg>
+              <span><strong>{money(String(chart.sum),chart.currency)}</strong><small>общо</small></span>
+            </div>
+            <ul className={styles.legend}>{chart.rows.map(row => <li key={row.id} className={styles.chartLegendItem} data-selected={chart.selectedId === row.id} data-dimmed={Boolean(chart.selectedId && chart.selectedId !== row.id)}><button type="button" className={styles.chartLegendButton} aria-pressed={chart.selectedId === row.id} onClick={() => selectChartCategory(chart.currency,row.id)}><i style={{ background: row.color }} aria-hidden="true" /><span>{row.name}</span><strong>{money(String(row.amount),chart.currency)}</strong><small>{Math.round(row.amount/chart.sum*100)}%</small></button></li>)}</ul>
+            {chart.rows.length > 0 && <div className={styles.chartInsights} aria-label="Обобщение на разходите">
+              <article><small>Най-голям разход</small><strong>{chart.rows[0].name}</strong><span>{money(String(chart.rows[0].amount),chart.currency)} · {Math.round(chart.rows[0].size)}% от разходите</span></article>
+              <article><small>Топ {Math.min(3,chart.rows.length)} категории</small><strong>{Math.round(chart.rows.slice(0,3).reduce((sum,row) => sum + row.size,0))}%</strong><span>{money(String(chart.rows.slice(0,3).reduce((sum,row) => sum + row.amount,0)),chart.currency)} от общите разходи</span></article>
+              <article><small>Категории с разходи</small><strong>{chart.rows.length}</strong><span>За избрания период</span></article>
+            </div>}
+            {!chart.rows.length && <p className={styles.empty}>Няма разходи за периода.</p>}
+          </div>)}
           </div>
           <div id={`${ledgerId}-history`} className={styles.ledgerView} hidden={ledgerView !== 'history'} role="region" aria-label="История">
           <header className={styles.panelHeading}><div className={styles.ledgerHeading}><List size={20} />{entryKind === 'all' ? 'Всички записи' : entryKind === 'revenue' ? 'Приходи' : 'Разходи'} <span>Всички записи за избрания период</span></div></header>
@@ -418,7 +429,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
       <dialog ref={categoryEditorRef} className={`${styles.categoriesDialog} ${styles.categoryConfirmation} ${styles.categoryEditor}`} aria-labelledby="finance-category-editor-title" onClose={() => setCategoryEdit(null)} onCancel={event => { if (saving) event.preventDefault(); }} onClick={event => { if (!saving && event.target === event.currentTarget) { const bounds = event.currentTarget.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setCategoryEdit(null); } }}>
         <header className={styles.dialogHeader}><h2 id="finance-category-editor-title">{categoryEdit?.id ? 'Редактирай категория' : 'Нова категория'}</h2><button type="button" disabled={saving} aria-label="Затвори" onClick={() => setCategoryEdit(null)}><X size={18} /></button></header>
         {error && <p role="alert" className={styles.error}>{error}</p>}
-        {categoryEdit && <form className={styles.categoryForm} onSubmit={event => { event.preventDefault(); void mutate({ ...categoryEdit, action: categoryEdit.id ? 'renameCategory' : 'createCategory' }); }}><label>Име<input autoFocus required maxLength={100} value={categoryEdit.name} onChange={e => setCategoryEdit({ ...categoryEdit,name:e.target.value })} /></label><fieldset className={styles.categoryColors}><legend>Цвят (незадължително)</legend><button type="button" aria-pressed={!categoryEdit.color} onClick={() => setCategoryEdit({...categoryEdit,color:null})}>Без цвят</button>{CUSTOM_TRAINING_GROUP_COLOR_PALETTE.map(color => <button key={color} type="button" aria-label={`Цвят ${color}`} aria-pressed={categoryEdit.color === color} style={{background:color,color:customTrainingGroupReadableOnAccent(color)}} onClick={() => setCategoryEdit({...categoryEdit,color})}>{categoryEdit.color === color ? '✓' : ''}</button>)}</fieldset><button type="submit" disabled={saving}>Запази</button><button type="button" disabled={saving} onClick={() => setCategoryEdit(null)}>Отказ</button></form>}
+        {categoryEdit && <form className={styles.categoryForm} onSubmit={event => { event.preventDefault(); void mutate({ ...categoryEdit, action: categoryEdit.id ? 'renameCategory' : 'createCategory' }); }}><label>Име<input autoFocus required maxLength={100} value={categoryEdit.name} onChange={e => setCategoryEdit({ ...categoryEdit,name:e.target.value })} /></label><fieldset className={styles.categoryColors}><legend>Цвят (незадължително)</legend><button type="button" aria-pressed={!categoryEdit.color} onClick={() => setCategoryEdit({...categoryEdit,color:null})}>Без цвят</button>{CUSTOM_TRAINING_GROUP_COLOR_PALETTE.filter(color => !categories.some(category => category.id !== categoryEdit.id && category.color === color)).map(color => <button key={color} type="button" aria-label={`Цвят ${color}`} aria-pressed={categoryEdit.color === color} style={{background:color,color:customTrainingGroupReadableOnAccent(color)}} onClick={() => setCategoryEdit({...categoryEdit,color})}>{categoryEdit.color === color ? '✓' : ''}</button>)}</fieldset><button type="submit" disabled={saving}>Запази</button><button type="button" disabled={saving} onClick={() => setCategoryEdit(null)}>Отказ</button></form>}
       </dialog>
       <dialog onClick={closeOnBackdrop} ref={categoryConfirmRef} className={`${styles.categoriesDialog} ${styles.categoryConfirmation}`} aria-labelledby="category-status-title" onCancel={event => { if (saving) event.preventDefault(); }}>
         <h2 id="category-status-title">{categoryStatus?.isActive ? 'Деактивиране на категория' : 'Активиране на категория'}</h2>
@@ -426,7 +437,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
         {error && <p className={styles.error} role="alert">{error}</p>}
         <div className={styles.formActions}><button type="button" disabled={saving} onClick={() => { categoryConfirmRef.current?.close(); setCategoryStatus(null); }}>Отказ</button><button type="button" className={categoryStatus?.isActive ? styles.categoryDeactivate : styles.categoryActivate} disabled={saving} onClick={() => void saveCategoryStatus()}>{saving ? 'Запазване…' : categoryStatus?.isActive ? 'Деактивирай' : 'Активирай'}</button></div>
       </dialog>
-      <aside className={styles.sidebar} hidden={ledgerView === 'analysis'}>{ledgerView === 'history' && <>
+      <aside className={styles.sidebar} hidden={ledgerView === 'analysis'}>{ledgerView !== 'analysis' && <>
         <div className={styles.entryActions}><button type="button" disabled={!data || saving} onClick={() => newEntry(formKind === 'expense' ? 'revenue' : 'expense')}><Plus size={16} />{formKind === 'expense' ? 'Добави приход' : 'Добави разход'}</button></div>
         {entryForm}
 

@@ -106,3 +106,45 @@ it('creates categories inside a separate labeled editor dialog', () => {
  expect(nodes(tree).find(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'finance-category-editor-title')?.props.children).toBeDefined();
  expect(nodes(tree).filter(node => node.type === 'form')).toHaveLength(1); // Only the transaction form remains.
 });
+
+it('hides colors used by other categories when creating or editing', () => {
+ const coloredData={...data,categories:[{id:'one',clubId:'club',name:'First',color:'#E53935',sortOrder:0,isActive:true,isMembership:false},{id:'two',clubId:'club',name:'Second',color:'#1E88E5',sortOrder:1,isActive:true,isMembership:false}]};
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:coloredData,report:coloredData,month:'all',filters:null,onSaved:vi.fn()});};
+ let tree=draw();
+ click(nodes(tree).find(node => node.type === 'button' && text(node).includes('Нова категория'))!);tree=draw();
+ expect(nodes(tree).some(node => node.props['aria-label'] === 'Цвят #E53935')).toBe(false);
+ expect(nodes(tree).some(node => node.props['aria-label'] === 'Цвят #1E88E5')).toBe(false);
+ expect(nodes(tree).some(node => node.props['aria-label'] === 'Цвят #43A047')).toBe(true);
+ click(nodes(tree).find(node => node.props['aria-label'] === 'Преименувай First')!);tree=draw();
+ expect(nodes(tree).some(node => node.props['aria-label'] === 'Цвят #E53935' && node.props['aria-pressed'] === true)).toBe(true);
+ expect(nodes(tree).some(node => node.props['aria-label'] === 'Цвят #1E88E5')).toBe(false);
+});
+
+it('opens the expense chart in the report area and switches back to History', () => {
+ let tree=render();
+ click(action(tree,'-chart'));tree=render();
+ expect(tree.props['data-view']).toBe('chart');
+ expect(nodes(tree).find(node => node.props.id === 'finance-chart')?.props.hidden).toBe(false);
+ expect(nodes(tree).find(node => node.props.id === 'finance-history')?.props.hidden).toBe(true);
+ expect(action(tree,'-chart').props.disabled).toBe(true);
+ click(action(tree,'-history'));tree=render();
+ expect(nodes(tree).find(node => node.props.id === 'finance-chart')?.props.hidden).toBe(true);
+ expect(nodes(tree).find(node => node.props.id === 'finance-history')?.props.hidden).toBe(false);
+});
+
+it('selects chart segments, dims other categories, and clears selection from the legend', () => {
+ const chartData={...data,categories:[{id:'one',clubId:'club',name:'First',color:'#E53935',sortOrder:0,isActive:true,isMembership:false},{id:'two',clubId:'club',name:'Second',color:'#1E88E5',sortOrder:1,isActive:true,isMembership:false}],totals:[{currency:'EUR',revenue:'0',expense:'100',balance:'-100'}],subtotals:[{categoryId:'one',currency:'EUR',kind:'expense' as const,amount:'25'},{categoryId:'two',currency:'EUR',kind:'expense' as const,amount:'75'}]};
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:chartData,report:chartData,month:'all',filters:null,onSaved:vi.fn()});};
+ let tree=draw();
+ const segments=()=>nodes(tree).filter(node=>node.type==='circle' && node.props.role==='button');
+ expect(segments().map(node=>node.props.strokeDasharray)).toEqual(['75 25','25 75']);
+ expect(segments()[0].props['aria-label']).toContain('Second');
+ click(segments()[1]);tree=draw();
+ expect(segments()[1].props['aria-pressed']).toBe(true);
+ expect(segments()[0].props['data-dimmed']).toBe(true);
+ const legend=nodes(tree).find(node=>node.type==='ul' && nodes(node).some(child=>text(child).includes('First')))!;
+ const first=nodes(legend).find(node=>node.type==='button' && text(node).includes('First'))!;
+ expect(first.props['aria-pressed']).toBe(true);
+ click(first);tree=draw();
+ expect(segments().every(node=>node.props['aria-pressed']===false && node.props['data-dimmed']===false)).toBe(true);
+});
