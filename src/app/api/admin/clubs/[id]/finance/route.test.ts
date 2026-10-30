@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-const mocks = vi.hoisted(() => ({ session: vi.fn(), get: vi.fn(), mutate: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), get: vi.fn(), analysis: vi.fn(), mutate: vi.fn() }));
 vi.mock('@/lib/adminAuth', () => ({ verifyAdminToken: mocks.session }));
-vi.mock('@/lib/clubFinance', () => ({ financeId: (id: string) => id, getClubFinance: mocks.get, mutateClubFinance: mocks.mutate }));
+vi.mock('@/lib/clubFinance', () => ({ financeId: (id: string) => id, getClubFinance: mocks.get, getClubFinanceAnalysis: mocks.analysis, mutateClubFinance: mocks.mutate }));
 import { GET, POST } from './route';
 const id = '00000000-0000-0000-0000-000000000001';
 const context = { params: Promise.resolve({ id }) };
@@ -31,4 +31,15 @@ it('allows administrators and rejects malformed payloads and cross-origin writes
  const crossOrigin = request('POST','{}'); crossOrigin.headers.set('origin','https://other.example');
  expect((await POST(crossOrigin,context)).status).toBe(403);
  expect(mocks.mutate).not.toHaveBeenCalled();
+});
+
+it('serves analysis only after the same club authorization as history', async () => {
+ mocks.analysis.mockResolvedValue({year:2026,categories:[],rows:[]});
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:'other'});
+ expect((await GET(request('GET',undefined,'?view=analysis'),context)).status).toBe(403);
+ expect(mocks.analysis).not.toHaveBeenCalled();
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:id});
+ expect((await GET(request('GET',undefined,'?view=analysis'),context)).status).toBe(200);
+ expect(mocks.analysis).toHaveBeenCalledWith(id);
+ expect(mocks.get).not.toHaveBeenCalled();
 });

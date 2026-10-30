@@ -7,9 +7,9 @@ BEGIN
  END IF;
  PERFORM pg_advisory_xact_lock(hashtext(target::text));
  UPDATE clubs SET finance_started_at=LEAST(finance_started_at, '2026-01-01 00:00:00+02'::timestamptz) WHERE id=target;
- INSERT INTO club_finance_categories(club_id,name,kind)
- VALUES(target,'Спонсорство','revenue'),(target,'Дарения','revenue')
- ON CONFLICT (club_id,kind,name) DO NOTHING;
+ INSERT INTO club_finance_categories(club_id,name)
+ VALUES(target,'Спонсорство'),(target,'Дарения')
+ ON CONFLICT (club_id,name) DO NOTHING;
 
  INSERT INTO club_finance_entries(id,club_id,category_id,kind,amount,currency,occurred_at,description)
  SELECT md5(target::text || ':demo2026:' || m || ':' || v.name)::uuid,
@@ -23,7 +23,7 @@ BEGIN
  ('Транспорт и гориво','expense',85,7,12),('Консумативи','expense',25,3,18),
  ('Мачове','expense',65,5,21),('Храна','expense',45,4,23)
  ) v(name,kind,base,step,day)
- JOIN club_finance_categories c ON c.club_id=target AND c.name=v.name AND c.kind=v.kind
+ JOIN club_finance_categories c ON c.club_id=target AND c.name=v.name
  ON CONFLICT(id) DO NOTHING;
 
  -- Give the seven demo players different paid-through months (June–October).

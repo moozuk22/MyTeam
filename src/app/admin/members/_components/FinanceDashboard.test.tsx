@@ -27,8 +27,8 @@ it('renders placeholders without invented amounts before financial data arrives'
 });
 it('retains four summary cards, a compact category filter, and readable debt periods', () => {
  const data: View = {...base,
-  categories:[{id:'category',clubId:'club',name:'Транспорт',kind:'expense',isMembership:false,sortOrder:0,isActive:true}],
-  subtotals:[{categoryId:'category',currency:'EUR',amount:'35.00'}],
+  categories:[{id:'category',clubId:'club',name:'Транспорт',isMembership:false,sortOrder:0,isActive:true}],
+  subtotals:[{kind:'expense',categoryId:'category',currency:'EUR',amount:'35.00'}],
   debts:[{avatarUrl:'https://example.com/player.jpg',id:'player',name:'Иван Петров',periods:['2026-10','Подновяване'],amount:'300.00',fee:'150',conflict:false}],
  };
  const html = renderToStaticMarkup(<FinanceDashboard clubId="club" clubName="Тестов клуб" clubLogoUrl="https://example.com/club.png" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
@@ -58,7 +58,7 @@ it('selects all transactions by default', () => {
 });
 
 it('keeps inactive categories manageable but hides them from new entry options', () => {
- const data: View = {...base,categories:[{id:'inactive',clubId:'club',name:'Стара категория',kind:'expense',isMembership:false,sortOrder:0,isActive:false}]};
+ const data: View = {...base,categories:[{id:'inactive',clubId:'club',name:'Стара категория',isMembership:false,sortOrder:0,isActive:false}]};
  const html = renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
  expect(html).toContain('Стара категория');
  expect(html).toContain('Неактивна');
@@ -78,17 +78,33 @@ it('labels range reports without changing the overall balance', () => {
 });
 
 it('disables the selected category filter while keeping other categories available', () => {
- const data: View = {...base,categories:[{id:'category',clubId:'club',name:'Транспорт',kind:'expense',isMembership:false,sortOrder:0,isActive:true}]};
+ const data: View = {...base,categories:[{id:'category',clubId:'club',name:'Транспорт',isMembership:false,sortOrder:0,isActive:true}]};
  const html = renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
- const chips = html.split('aria-label="Филтрирай разходите по категория">')[1].split('</div>')[0];
+ const chips = html.split('aria-label="Филтрирай записите по категория">')[1].split('</div>')[0];
  expect(chips).toMatch(/<button[^>]*disabled=""[^>]*>Всички<\/button>/);
  expect(chips).toMatch(/<button type="button" aria-pressed="false">Транспорт<\/button>/);
 });
 
-it('opens History by default and provides an empty Analysis view', () => {
+it('opens History by default and defers loading Analysis until selected', () => {
  const html = renderToStaticMarkup(<FinanceDashboard clubId="club" data={base} report={base} month="all" filters={null} onSaved={vi.fn()} />);
  expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*disabled=""[^>]*>.*?История<\/button>/);
  expect(html).toMatch(/<button[^>]*aria-pressed="false"[^>]*>.*?Анализ<\/button>/);
  expect(html).toMatch(/<div[^>]*hidden=""[^>]*role="region" aria-label="Анализ"><\/div>/);
  expect(html).toMatch(/role="region" aria-label="История"><header/);
+});
+
+it('uses one category list and keeps expense charts separate from revenue in the same category', () => {
+ const data: View = {...base,
+  categories:[{id:'shared',clubId:'club',name:'Обща категория',isMembership:false,sortOrder:0,isActive:true}],
+  subtotals:[{kind:'revenue',categoryId:'shared',currency:'EUR',amount:'150.00'},{kind:'expense',categoryId:'shared',currency:'EUR',amount:'35.00'}],
+ };
+ const html = renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
+ const form = html.split('Изберете категория</option>')[1].split('</select>')[0];
+ expect(form).toContain('value="shared">Обща категория</option>');
+ expect(html).not.toContain('Филтрирай категориите по вид"');
+ expect(html).not.toContain('<label>Вид<select');
+ expect(html).toContain('aria-label="Общо разходи: 35,00');
+ expect(html).not.toContain('aria-label="Общо разходи: 150,00');
+ expect(html).toContain('Приходи</small>150,00');
+ expect(html).toContain('Разходи</small>35,00');
 });

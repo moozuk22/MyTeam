@@ -23,3 +23,7 @@ it('locks page scrolling while the mobile categories modal is open', () => {
  expect(css).toContain(':global(body):has(.categoriesDialog[open])');
  expect(css).toMatch(/:global\(body\):has\(\.categoriesDialog\[open\]\)[^{]*\{[^}]*overflow:hidden;/);
 });
+
+it('keeps analysis summary cards at their own height when the action column grows', () => {
+ expect(css).toMatch(/\.dashboard\[data-view="analysis"\] \.cards>\.card\s*\{[^}]*align-self:start;/);
+});

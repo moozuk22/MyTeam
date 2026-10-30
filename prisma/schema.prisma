@@ -890,10 +890,9 @@ model ClubFinanceCategory {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clubId String @map("club_id") @db.Uuid
   name String
-  kind String
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
   entries ClubFinanceEntry[]
-  @@unique([clubId, kind, name])
+  @@unique([clubId, name])
   @@unique([id, clubId])
   @@map("club_finance_categories")
 }

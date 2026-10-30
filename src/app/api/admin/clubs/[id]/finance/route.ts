@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/adminAuth';
-import { financeId, getClubFinance, mutateClubFinance } from '@/lib/clubFinance';
+import { financeId, getClubFinance, getClubFinanceAnalysis, mutateClubFinance } from '@/lib/clubFinance';
 import { FinanceError } from '@/lib/clubFinanceDomain';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +20,7 @@ async function handle(request: NextRequest, context: Context, write: boolean) {
       if (!body || typeof body !== 'object' || Array.isArray(body)) throw new FinanceError('Невалидна заявка.');
       return NextResponse.json(await mutateClubFinance(id, body as Record<string, unknown>));
     }
+    if (request.nextUrl.searchParams.get('view') === 'analysis') return NextResponse.json(await getClubFinanceAnalysis(id));
     return NextResponse.json(await getClubFinance(id,request.nextUrl.searchParams));
   } catch (error) {
     if (error instanceof FinanceError) return NextResponse.json({ error: error.message }, { status: error.status });

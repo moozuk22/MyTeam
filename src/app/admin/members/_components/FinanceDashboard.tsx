@@ -6,6 +6,8 @@ import { financeDateKey, financePeriodLabel } from '@/lib/clubFinanceDomain';
 import styles from './FinanceDashboard.module.css';
 import { lockCategoryPageScroll } from './categoryModalScroll';
 import { categoryDragScrollSpeed } from './categoryDragScroll';
+import FinanceActionDropdown from './FinanceActionDropdown';
+const FinanceAnalysis = lazy(() => import('./FinanceAnalysis'));
 const FinancePlayerDetails = lazy(() => import('./FinancePlayerDetails'));
 type View = Awaited<ReturnType<typeof getClubFinance>>;
 type Draft = { id?: string; categoryId: string; amount: string; date: string; description: string };
@@ -15,6 +17,10 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   const [selectedPlayerId,setSelectedPlayerId] = useState<string | null>(null);
   const [ledgerView,setLedgerView] = useState<'history' | 'analysis'>('history');
   const ledgerId = useId();
+  const [actionDropdown,setActionDropdown] = useState<'revenue' | 'expense' | 'debts' | null>(null);
+  const analysisActionsRef = useRef<HTMLDivElement>(null);
+  const actionTriggerRef = useRef<HTMLButtonElement>(null);
+  const actionPanelRef = useRef<HTMLDivElement>(null);
   const [entryKind,setEntryKind] = useState<'all' | 'expense' | 'revenue'>('all');
   const [formKind,setFormKind] = useState<'expense' | 'revenue'>('expense');
   const [list,setList] = useState<View | null>(null);
@@ -26,16 +32,29 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   }
   const [revision,setRevision] = useState(0);
   const [saving,setSaving] = useState(false);
+  useEffect(() => {
+    if (!actionDropdown || selectedPlayerId) return;
+    const dismiss = (event: globalThis.PointerEvent) => {
+      if (!saving && event.target instanceof Node && !analysisActionsRef.current?.contains(event.target) && !actionPanelRef.current?.contains(event.target)) setActionDropdown(null);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || saving) return;
+      analysisActionsRef.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]')?.focus();
+      setActionDropdown(null);
+    };
+    document.addEventListener('pointerdown',dismiss);
+    document.addEventListener('keydown',escape);
+    return () => { document.removeEventListener('pointerdown',dismiss); document.removeEventListener('keydown',escape); };
+  },[actionDropdown,selectedPlayerId,saving]);
   const [error,setError] = useState('');
   const [listError,setListError] = useState('');
   const [draft,setDraft] = useState<Draft | null>({ categoryId: '', amount: '', date: financeDateKey(), description: '' });
   const [remove,setRemove] = useState<{ id: string; kind: string } | null>(null);
-  const [categoryEdit,setCategoryEdit] = useState<{ id?: string; name: string; kind?: string } | null>(null);
+  const [categoryEdit,setCategoryEdit] = useState<{ id?: string; name: string } | null>(null);
   const [categoryStatus,setCategoryStatus] = useState<{id:string;name:string;isActive:boolean} | null>(null);
   const categoryConfirmRef = useRef<HTMLDialogElement>(null);
   const [ordering,setOrdering] = useState(false);
   const [categoryVisibility,setCategoryVisibility] = useState<'all' | 'active' | 'hidden'>('all');
-  const [categoryKind,setCategoryKind] = useState<'expense' | 'revenue' | null>(null);
   const [allDebts,setAllDebts] = useState(false);
   const [allExpenses,setAllExpenses] = useState(false);
   const [formOpen,setFormOpen] = useState(false);
@@ -58,7 +77,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     syncScrollLock();
     return () => { observer.disconnect(); unlock?.(); };
   }, []);
-  const pointerDrag = useRef<{id:string;kind:string;startX:number;startY:number;left:number;top:number;width:number;row:HTMLLIElement;preview:HTMLLIElement | null;target:string | null} | null>(null);
+  const pointerDrag = useRef<{id:string;startX:number;startY:number;left:number;top:number;width:number;row:HTMLLIElement;preview:HTMLLIElement | null;target:string | null} | null>(null);
   const dragFrame = useRef<number | null>(null);
   const dragPosition = useRef({x:0,y:0});
   const dragScrollTime = useRef<number | null>(null);
@@ -73,13 +92,13 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     pointerDrag.current = null;
   }
   useEffect(() => () => clearDragPreview(), []);
-  function startCategoryDrag(event: PointerEvent<HTMLLIElement>, id: string, kind: string) {
+  function startCategoryDrag(event: PointerEvent<HTMLLIElement>, id: string) {
     if (saving || event.button !== 0 || event.pointerType === 'touch' || window.matchMedia('(max-width:700px), (pointer:coarse)').matches || (event.target as Element).closest('button')) return;
     const row = event.currentTarget;
     const bounds = row.getBoundingClientRect();
     dragPosition.current = {x:event.clientX,y:event.clientY};
     dragScrollTime.current = null;
-    pointerDrag.current = {id,kind,startX:event.clientX,startY:event.clientY,left:bounds.left,top:bounds.top,width:bounds.width,row,preview:null,target:null};
+    pointerDrag.current = {id,startX:event.clientX,startY:event.clientY,left:bounds.left,top:bounds.top,width:bounds.width,row,preview:null,target:null};
     row.setPointerCapture(event.pointerId);
   }
   function moveCategoryDrag(event: PointerEvent<HTMLLIElement>) {
@@ -128,14 +147,14 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     }
     drag.preview.style.transform = `translate3d(${dx}px,${dy}px,0)`;
     const target = document.elementFromPoint(x,y)?.closest<HTMLLIElement>('li[data-category-id]');
-    const targetId = target?.dataset.categoryKind === drag.kind && target.dataset.categoryId !== drag.id ? target.dataset.categoryId ?? null : null;
+    const targetId = target && categoriesDialogRef.current?.contains(target) && target.dataset.categoryId !== drag.id ? target.dataset.categoryId ?? null : null;
     if (drag.target !== targetId) { categoriesDialogRef.current?.querySelector('[data-drop-target]')?.removeAttribute('data-drop-target'); drag.target = targetId; if (targetId) target?.setAttribute('data-drop-target','true'); }
     if (scrolling && dragFrame.current === null) dragFrame.current = requestAnimationFrame(() => { dragFrame.current = null; renderCategoryDrag(); });
   }
   function finishCategoryDrag(cancelled = false) {
     if (!cancelled && pointerDrag.current) renderCategoryDrag();
     const drag = pointerDrag.current;
-    if (!cancelled && drag?.preview && drag.target) void moveCategory(drag.id,drag.kind,0,drag.target);
+    if (!cancelled && drag?.preview && drag.target) void moveCategory(drag.id,0,drag.target);
     clearDragPreview();
   }
   const debtsRef = useRef<HTMLElement>(null);
@@ -183,19 +202,18 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     void load();
     return () => controller.abort();
   }, [base,month,category,page,revision,entryKind]);
-  const expenses = data?.categories.filter(c => c.kind === 'expense') ?? [];
-  const formCategories = data?.categories.filter(c => c.kind === formKind && (c.isActive || (draft?.id && draft.categoryId === c.id))) ?? [];
-  const listCategories = data?.categories.filter(c => entryKind === 'all' || c.kind === entryKind) ?? [];
-  function selectKind(kind: 'all' | 'expense' | 'revenue') { setRemove(null); setEntryKind(kind); setCategory(''); setPage(1); setList(null); }
+  const categories = data?.categories ?? [];
+  const formCategories = data?.categories.filter(c => c.isActive || (draft?.id && draft.categoryId === c.id)) ?? [];
+  const listCategories = categories;
+  function selectKind(kind: 'all' | 'expense' | 'revenue') { setRemove(null); setEntryKind(kind); setPage(1); setList(null); }
   function newEntry(kind: 'expense' | 'revenue') {
     setFormKind(kind);
     setFormOpen(true);
-    setDraft({ categoryId: data?.categories.find(c => c.kind === kind && c.isActive)?.id ?? '', amount: '', date: financeDateKey(), description: '' });
+    setDraft({ categoryId: data?.categories.find(c => c.isActive)?.id ?? '', amount: '', date: financeDateKey(), description: '' });
     setRemove(null);
-    requestAnimationFrame(() => { formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); formRef.current?.querySelector('select')?.focus({ preventScroll: true }); });
+    requestAnimationFrame(() => { if (ledgerView !== 'analysis') formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); formRef.current?.querySelector('select')?.focus({ preventScroll: true }); });
   }
-  async function moveCategory(id: string, kind: string, direction: number, targetId?: string) {
-    const categories = data?.categories.filter(c => c.kind === kind) ?? [];
+  async function moveCategory(id: string, direction: number, targetId?: string) {
     const index = categories.findIndex(c => c.id === id);
     const target = targetId ? categories.findIndex(c => c.id === targetId) : index + direction;
     if (saving || index < 0 || target === index || !categories[target]) return;
@@ -203,7 +221,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     ids.splice(target,0,ids.splice(index,1)[0]);
     setSaving(true); setOrdering(true); setError('');
     try {
-      const response = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reorderCategories', kind, ids }) });
+      const response = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reorderCategories', ids }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       await onSaved();
@@ -229,16 +247,16 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
       const response = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
-      setDraft({ categoryId: '', amount: '', date: financeDateKey(), description: '' }); setFormOpen(false); setRemove(null); setCategoryEdit(null); setList(null); setPage(1); setRevision(v => v+1);
+      setDraft({ categoryId: '', amount: '', date: financeDateKey(), description: '' }); setFormOpen(false); setRemove(null); setCategoryEdit(null); setList(null); setPage(1); setRevision(v => v+1); setActionDropdown(null);
       await onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : 'Грешка при запис.'); }
     finally { setSaving(false); }
   }
   const categoryCharts = (report?.totals ?? []).map(total => {
     const colors = ['#65cf8a','#4b9ce5','#ed706d','#ad79d9','#e1bf66','#66c9be'];
-    const rows = expenses.map((category,index) => ({
+    const rows = categories.map((category,index) => ({
       name: category.name, color: colors[index % colors.length],
-      amount: Number(report?.subtotals.find(row => row.categoryId === category.id && row.currency === total.currency)?.amount ?? 0),
+      amount: Number(report?.subtotals.find(row => row.categoryId === category.id && row.currency === total.currency && row.kind === 'expense')?.amount ?? 0),
     })).filter(row => row.amount > 0);
     const sum = rows.reduce((value,row) => value + row.amount,0);
     let end = 0;
@@ -250,7 +268,24 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     return { currency: total.currency, rows, sum, background: segments.length ? `conic-gradient(${segments.join(',')})` : '#30312c' };
   });
   const periodList = list?.month === month && list.page === page ? list : null;
-  return <div ref={dashboardRef} className={styles.dashboard}>
+  const entryForm = (<form ref={formRef} className={`${styles.box} ${styles.expenseForm} ${formKind === 'revenue' ? styles.revenueForm : ''} ${formOpen ? '' : styles.mobileFormClosed}`} onSubmit={event => { event.preventDefault(); if (draft) void mutate({ ...draft, action: `${draft.id ? 'update' : 'create'}${formKind === 'revenue' ? 'Revenue' : 'Expense'}` }); }}>
+          <h2>{draft?.id ? (formKind === 'revenue' ? 'Редактирай приход' : 'Редактирай разход') : (formKind === 'revenue' ? 'Добави приход' : 'Добави разход')}</h2>
+          {!draft ? <><p className={styles.empty}>Въведете разход за вашия клуб.</p><button type="button" className={styles.primary} disabled={!data} onClick={() => newEntry('expense')}><Plus size={18} />Нов разход</button></> : <>
+            <label>Категория <span>*</span><span className={styles.selectWrap}><select required value={draft.categoryId} onChange={e => setDraft({ ...draft,categoryId:e.target.value })}><option value="" disabled>Изберете категория</option>{formCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><ChevronDown size={15} aria-hidden="true" /></span></label>
+            <label>Сума <span>*</span><span className={styles.amountField}><input required inputMode="decimal" placeholder="0,00" value={draft.amount} onChange={e => setDraft({ ...draft,amount:e.target.value })} /><span aria-hidden="true">€</span></span></label>
+            <label>Дата <span>*</span><span className={styles.dateField}><span aria-hidden="true">{draft.date ? draft.date.split('-').reverse().join('.') : 'дд.мм.гггг'}</span><input required type="date" value={draft.date} onClick={event => { try { event.currentTarget.showPicker(); } catch { /* Keep the native field editable where showPicker is unavailable. */ } }} onChange={e => setDraft({ ...draft,date:e.target.value })} /><CalendarDays size={16} aria-hidden="true" /></span></label>
+            <label>Описание (незадължително)<textarea placeholder={formKind === 'revenue' ? 'Добави описание на прихода…' : 'Добави описание на разхода…'} maxLength={2000} value={draft.description} onChange={e => setDraft({ ...draft,description:e.target.value })} /><small className={styles.counter}>{draft.description.length}/2000</small></label>
+            <div className={styles.formActions}><button type="submit" className={styles.primary} disabled={saving}><Save size={16} />{saving ? 'Записване…' : formKind === 'revenue' ? 'Запази прихода' : 'Запази разхода'}</button></div>
+          </>}
+        </form>);
+  const debtsPanel = (<section ref={debtsRef} tabIndex={-1} className={`${styles.box} ${styles.debts}`}><h2 className={styles.panelHeading}><Users size={22} />Задължения към клуба</h2>
+          <div className={styles.debtTotal}><strong>{data?.incomplete ? '≥ ' : ''}{data ? money(data.outstanding) : '—'}</strong><small>{data?.debts.length ?? '—'} състезатели</small></div>
+          {data?.incomplete && <p className={styles.error}>Има неуточнени такси. Общата сума е непълна.</p>}
+          <ul className={styles.debtList}>{(allDebts ? data?.debts : data?.debts.slice(0,5))?.map(debt => <li key={debt.id}><button type="button" className={styles.debtPlayer} onClick={() => setSelectedPlayerId(debt.id)} aria-label={`Детайли за ${debt.name}`}><span className={styles.avatar}><UserRound size={16} />{debt.avatarUrl && <img key={debt.avatarUrl} src={debt.avatarUrl} alt="" width={28} height={28} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} />}</span><span>{debt.name}<small>{debt.periods.map(period => /^\d{4}-\d{2}$/.test(period) ? new Intl.DateTimeFormat('bg-BG',{ month:'long',year:'numeric' }).format(new Date(`${period}-15T12:00:00`)) : period).join(' · ')}</small></span><strong>{debt.amount === null ? 'Неуточнена такса' : money(debt.amount)}</strong></button></li>)}</ul>
+          {data && !data.debts.length && <p className={styles.empty}>Няма неплатени задължения.</p>}
+          {data && data.debts.length > 5 && <button className={styles.wide} type="button" onClick={() => setAllDebts(v => !v)}>{allDebts ? 'Покажи по-малко' : `Виж всички ${data.debts.length} състезатели →`}</button>}
+        </section>);
+  return <div ref={dashboardRef} className={styles.dashboard} data-view={ledgerView}>
     <header className={styles.topbar}><div className={styles.title}><span className={styles.clubLogo}><House size={25} aria-hidden="true" />{clubLogoUrl && failedClubLogo !== clubLogoUrl && <img src={clubLogoUrl} alt="" width={56} height={56} onError={() => setFailedClubLogo(clubLogoUrl)} />}</span><div className={styles.titleText}><h1>Финанси на клуба</h1>{clubName && <p>{clubName}</p>}</div></div><div className={styles.headerActions}>{filters}</div></header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     <div className={styles.layout}>
@@ -266,6 +301,32 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
             {key === 'outstanding' ? (data ? <strong>{data.incomplete ? '≥ ' : ''}{money(data.outstanding)}</strong> : <span className={styles.skeleton} aria-label="Зареждане" />) : (key === 'balance' ? data : report)?.totals.map(t => <strong key={t.currency}>{money(t[key],t.currency)}</strong>) ?? <span className={styles.skeleton} aria-label="Зареждане" />}
             {key !== 'balance' && <small>{key === 'outstanding' ? `${data?.debts.length ?? '—'} състезатели${data?.incomplete ? ' · неуточнени такси' : ''}` : financePeriodLabel(month)}</small>}
           </section>)}
+          {ledgerView === 'analysis' && <div ref={analysisActionsRef} className={styles.analysisActions}>
+            <div className={styles.analysisAction}>
+              <button type="button" disabled={!data || saving} aria-expanded={actionDropdown === 'revenue'} aria-controls={`${ledgerId}-revenue-dropdown`} onClick={event => {
+                actionTriggerRef.current = event.currentTarget;
+                if (actionDropdown === 'revenue') { setActionDropdown(null); return; }
+                setActionDropdown('revenue'); newEntry('revenue');
+              }}><Plus size={16} aria-hidden="true" />Добави приход<ChevronDown size={15} aria-hidden="true" /></button>
+              {actionDropdown === 'revenue' && <FinanceActionDropdown id={`${ledgerId}-revenue-dropdown`} label="Добави приход" anchor={actionTriggerRef} panelRef={actionPanelRef}>{error && <p className={styles.error} role="alert">{error}</p>}{entryForm}</FinanceActionDropdown>}
+            </div>
+            <div className={styles.analysisAction}>
+              <button type="button" disabled={!data || saving} aria-expanded={actionDropdown === 'expense'} aria-controls={`${ledgerId}-expense-dropdown`} onClick={event => {
+                actionTriggerRef.current = event.currentTarget;
+                if (actionDropdown === 'expense') { setActionDropdown(null); return; }
+                setActionDropdown('expense'); newEntry('expense');
+              }}><Plus size={16} aria-hidden="true" />Добави разход<ChevronDown size={15} aria-hidden="true" /></button>
+              {actionDropdown === 'expense' && <FinanceActionDropdown id={`${ledgerId}-expense-dropdown`} label="Добави разход" anchor={actionTriggerRef} panelRef={actionPanelRef}>{error && <p className={styles.error} role="alert">{error}</p>}{entryForm}</FinanceActionDropdown>}
+            </div>
+            <div className={styles.analysisAction}>
+              <button type="button" className={styles.debtActionButton} disabled={!data || saving} aria-expanded={actionDropdown === 'debts'} aria-controls={`${ledgerId}-debts-dropdown`} onClick={event => {
+                actionTriggerRef.current = event.currentTarget;
+                setActionDropdown(current => current === 'debts' ? null : 'debts');
+                requestAnimationFrame(() => debtsRef.current?.focus({preventScroll:true}));
+              }}><Users size={16} aria-hidden="true" /><span className={styles.debtActionLabel}><span>Задължения</span><small>{data?.incomplete ? '≥ ' : ''}{data ? money(data.outstanding) : '—'} · {data?.debts.length ?? '—'} {data?.debts.length === 1 ? 'състезател' : 'състезатели'}</small></span><ChevronDown size={15} aria-hidden="true" /></button>
+              {actionDropdown === 'debts' && <FinanceActionDropdown id={`${ledgerId}-debts-dropdown`} label="Задължения" anchor={actionTriggerRef} panelRef={actionPanelRef}>{debtsPanel}</FinanceActionDropdown>}
+            </div>
+          </div>}
         </div>
 
         <details ref={breakdownRef} className={`${styles.box} ${styles.breakdown}`} open>
@@ -278,13 +339,13 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
         </details>
         <section ref={expenseDetailsRef} className={`${styles.box} ${styles.ledger}`}>
           <div className={styles.ledgerViews} role="group" aria-label="Изглед на финансите">
-            <button type="button" aria-pressed={ledgerView === 'history'} aria-controls={`${ledgerId}-history`} disabled={ledgerView === 'history'} onClick={() => setLedgerView('history')}><List size={17} aria-hidden="true" />История</button>
+            <button type="button" aria-pressed={ledgerView === 'history'} aria-controls={`${ledgerId}-history`} disabled={ledgerView === 'history'} onClick={() => { setActionDropdown(null); setLedgerView('history'); }}><List size={17} aria-hidden="true" />История</button>
             <button type="button" aria-pressed={ledgerView === 'analysis'} aria-controls={`${ledgerId}-analysis`} disabled={ledgerView === 'analysis'} onClick={() => setLedgerView('analysis')}><ChartPie size={17} aria-hidden="true" />Анализ</button>
           </div>
           <div id={`${ledgerId}-history`} className={styles.ledgerView} hidden={ledgerView !== 'history'} role="region" aria-label="История">
           <header className={styles.panelHeading}><div className={styles.ledgerHeading}><List size={20} />{entryKind === 'all' ? 'Всички записи' : entryKind === 'revenue' ? 'Приходи' : 'Разходи'} <span>Всички записи за избрания период</span></div></header>
           <div className={styles.ledgerToolbar}><div className={styles.entryTabs} role="group" aria-label="Вид записи"><button type="button" aria-pressed={entryKind === 'all'} onClick={() => selectKind('all')}>Всички</button><button type="button" aria-pressed={entryKind === 'expense'} onClick={() => selectKind('expense')}>Разходи</button><button type="button" aria-pressed={entryKind === 'revenue'} onClick={() => selectKind('revenue')}>Приходи</button></div><div className={styles.management}><button type="button" disabled={!data} onClick={() => { setCategoryEdit(null); setError(''); categoriesDialogRef.current?.showModal(); }}><CreditCard size={18} />Управление на категории</button></div></div>
-          <div className={styles.filterChips} role="group" aria-label="Филтрирай разходите по категория">
+          <div className={styles.filterChips} role="group" aria-label="Филтрирай записите по категория">
             {[{ id: '', name: 'Всички' }, ...listCategories].map(item => <button key={item.id} type="button" aria-pressed={category === item.id} disabled={category === item.id} onClick={() => { setCategory(item.id); setPage(1); setList(null); }}>{item.name}</button>)}
           </div>
           <div className={styles.categoryFilter}>
@@ -302,7 +363,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
                 <td data-label="Сума" className={`${styles.amount} ${entry.kind === 'revenue' ? styles.incomeAmount : ''}`}>{money(entry.amount,entry.currency)}</td>
                 <td className={styles.actionCell}>{entry.editable && <details className={styles.rowMenu} onKeyDown={event => { if (event.key === 'Escape') event.currentTarget.open = false; }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
                   <summary aria-label={`Действия за ${entry.description || entry.category}`}><MoreVertical size={19} /></summary>
-                  <div><button type="button" disabled={saving} onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); setFormOpen(true); setFormKind(entry.kind === 'revenue' ? 'revenue' : 'expense'); setDraft({ id: entry.id, categoryId: entry.categoryId, amount: entry.amount, date: entry.date, description: entry.description ?? '' }); requestAnimationFrame(() => { formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); formRef.current?.querySelector('select')?.focus({ preventScroll: true }); }); }}><Pencil size={15} />Редактирай</button><button type="button" disabled={saving} onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); setRemove({ id:entry.id, kind:entry.kind }); }}><Trash2 size={15} />Изтрий</button></div>
+                  <div><button type="button" disabled={saving} onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); setFormOpen(true); setFormKind(entry.kind === 'revenue' ? 'revenue' : 'expense'); setDraft({ id: entry.id, categoryId: entry.categoryId, amount: entry.amount, date: entry.date, description: entry.description ?? '' }); requestAnimationFrame(() => { if (ledgerView !== 'analysis') formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); formRef.current?.querySelector('select')?.focus({ preventScroll: true }); }); }}><Pencil size={15} />Редактирай</button><button type="button" disabled={saving} onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); setRemove({ id:entry.id, kind:entry.kind }); }}><Trash2 size={15} />Изтрий</button></div>
                 </details>}</td>
               </tr>)}
             </tbody></table></div> : <div className={styles.emptyState}><ReceiptText size={32} aria-hidden="true" /><h3>{entryKind === 'all' ? 'Няма записи за този период' : entryKind === 'revenue' ? 'Няма приходи за този период' : 'Няма разходи за този период'}</h3><p>{category ? 'Изберете друга категория или период.' : 'Добавените записи ще се показват тук.'}</p></div>}
@@ -312,21 +373,23 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
           </>}
           </div>
           </div>
-          <div id={`${ledgerId}-analysis`} className={styles.analysisView} hidden={ledgerView !== 'analysis'} role="region" aria-label="Анализ" />
+          <div id={`${ledgerId}-analysis`} className={styles.analysisView} hidden={ledgerView !== 'analysis'} role="region" aria-label="Анализ">
+            {ledgerView === 'analysis' && <Suspense fallback={<p role="status">Зареждане на анализа…</p>}><FinanceAnalysis clubId={clubId} revision={data} /></Suspense>}
+          </div>
         </section>
 
 
         <dialog onClick={closeOnBackdrop} ref={categoriesDialogRef} className={styles.categoriesDialog} aria-labelledby="finance-categories-title" onCancel={event => { if (saving) event.preventDefault(); }}>
           <header className={styles.dialogHeader}><h2 id="finance-categories-title">Управление на категории</h2><button type="button" disabled={saving} aria-label="Затвори" onClick={() => categoriesDialogRef.current?.close()}><X size={18} /></button></header>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <div className={styles.categoryToolbar}><button type="button" disabled={saving} className={styles.primary} onClick={() => setCategoryEdit({ name: '', kind: categoryKind ?? formKind })}><Plus size={16} />Нова категория</button><div className={styles.categoryKindFilters} role="group" aria-label="Филтрирай категориите по вид"><button type="button" aria-pressed={categoryKind === null} onClick={() => setCategoryKind(null)}>Всички</button><button type="button" aria-pressed={categoryKind === 'expense'} onClick={() => setCategoryKind(value => value === 'expense' ? null : 'expense')}>Разходи</button><button type="button" aria-pressed={categoryKind === 'revenue'} onClick={() => setCategoryKind(value => value === 'revenue' ? null : 'revenue')}>Приходи</button></div></div>
+          <div className={styles.categoryToolbar}><button type="button" disabled={saving} className={styles.primary} onClick={() => setCategoryEdit({ name: '' })}><Plus size={16} />Нова категория</button></div>
           <aside className={styles.categoryHelp} aria-label="За скриването на категории">
             <EyeOff size={18} aria-hidden="true" />
             <div><strong>Скриването запазва всички записи</strong><p>„Скрий“ премахва категорията само от избора при добавяне на нов разход или приход. Категорията и записите ѝ се запазват. Можете да я активирате отново по всяко време.</p></div>
           </aside>
           <div className={`${styles.categoryKindFilters} ${styles.categoryVisibilityFilters}`} role="group" aria-label="Филтрирай категориите по видимост"><button type="button" aria-pressed={categoryVisibility === 'all'} onClick={() => setCategoryVisibility('all')}>Всички</button><button type="button" aria-pressed={categoryVisibility === 'active'} onClick={() => setCategoryVisibility('active')}>Активни</button><button type="button" aria-pressed={categoryVisibility === 'hidden'} onClick={() => setCategoryVisibility('hidden')}>Скрити</button></div>
-          {categoryEdit && <form className={styles.categoryForm} onSubmit={event => { event.preventDefault(); void mutate({ ...categoryEdit, action: categoryEdit.id ? 'renameCategory' : 'createCategory' }); }}>{!categoryEdit.id && <label>Вид<select value={categoryEdit.kind} onChange={event => setCategoryEdit({ ...categoryEdit, kind:event.target.value })}><option value="expense">Разход</option><option value="revenue">Приход</option></select></label>}<label>Име<input required maxLength={100} value={categoryEdit.name} onChange={e => setCategoryEdit({ ...categoryEdit,name:e.target.value })} /></label><button type="submit" disabled={saving}>Запази</button><button type="button" onClick={() => setCategoryEdit(null)}>Отказ</button></form>}
-          <div className={styles.categorySaveStatus} role="status" aria-live="polite">{ordering && <><LoaderCircle size={15} aria-hidden="true" />Запазване на подредбата…</>}</div><ul className={styles.categoryList} aria-busy={ordering}>{data?.categories.filter(c => (!categoryKind || c.kind === categoryKind) && (categoryVisibility === 'all' || (categoryVisibility === 'active' ? c.isActive : !c.isActive))).map(c => <li key={c.id} title="Плъзнете за подреждане" data-category-id={c.id} data-category-kind={c.kind} data-active={c.isActive} onPointerDown={event => startCategoryDrag(event,c.id,c.kind)} onPointerMove={moveCategoryDrag} onPointerUp={() => finishCategoryDrag()} onPointerCancel={() => finishCategoryDrag(true)} onLostPointerCapture={() => finishCategoryDrag(true)}><span className={styles.categoryDragHandle} aria-hidden="true"><GripVertical size={17} /></span><span className={styles.categoryNumber} aria-label="Позиция">{(data?.categories.filter(item => item.kind === c.kind).findIndex(item => item.id === c.id) ?? 0) + 1}</span><span className={styles.categoryName}>{c.name}<small>{c.kind === 'revenue' ? 'Приход' : 'Разход'}{!c.isActive && ' · Неактивна'}</small></span><span className={styles.categoryTotals}>{(report?.subtotals.filter(total => total.categoryId === c.id) ?? []).map(total => <strong key={total.currency}>{money(total.amount,total.currency)}</strong>)}</span><span className={styles.categoryOrder}><button type="button" aria-label={`Премести ${c.name} нагоре`} disabled={saving || data?.categories.filter(item => item.kind === c.kind)[0]?.id === c.id} onClick={() => void moveCategory(c.id,c.kind,-1)}><ArrowUp size={15} /></button><button type="button" aria-label={`Премести ${c.name} надолу`} disabled={saving || data?.categories.filter(item => item.kind === c.kind).at(-1)?.id === c.id} onClick={() => void moveCategory(c.id,c.kind,1)}><ArrowDown size={15} /></button></span><button type="button" aria-label={`Преименувай ${c.name}`} disabled={saving} onClick={() => setCategoryEdit({ id: c.id,name: c.name })}><Pencil size={16} /></button><button type="button" className={`${styles.categoryVisibilityButton} ${c.isActive ? styles.categoryDeactivate : styles.categoryActivate}`} title={c.isActive ? 'Скрий категорията' : 'Покажи категорията'} aria-label={`${c.isActive ? 'Скрий' : 'Покажи'} ${c.name}`} disabled={saving} onClick={() => { setError(''); setCategoryStatus({id:c.id,name:c.name,isActive:c.isActive}); categoryConfirmRef.current?.showModal(); }}>{c.isActive ? <EyeOff size={16} /> : <Eye size={16} />}</button></li>)}</ul>
+          {categoryEdit && <form className={styles.categoryForm} onSubmit={event => { event.preventDefault(); void mutate({ ...categoryEdit, action: categoryEdit.id ? 'renameCategory' : 'createCategory' }); }}><label>Име<input required maxLength={100} value={categoryEdit.name} onChange={e => setCategoryEdit({ ...categoryEdit,name:e.target.value })} /></label><button type="submit" disabled={saving}>Запази</button><button type="button" onClick={() => setCategoryEdit(null)}>Отказ</button></form>}
+          <div className={styles.categorySaveStatus} role="status" aria-live="polite">{ordering && <><LoaderCircle size={15} aria-hidden="true" />Запазване на подредбата…</>}</div><ul className={styles.categoryList} aria-busy={ordering}>{data?.categories.filter(c => categoryVisibility === 'all' || (categoryVisibility === 'active' ? c.isActive : !c.isActive)).map(c => <li key={c.id} title="Плъзнете за подреждане" data-category-id={c.id} data-active={c.isActive} onPointerDown={event => startCategoryDrag(event,c.id)} onPointerMove={moveCategoryDrag} onPointerUp={() => finishCategoryDrag()} onPointerCancel={() => finishCategoryDrag(true)} onLostPointerCapture={() => finishCategoryDrag(true)}><span className={styles.categoryDragHandle} aria-hidden="true"><GripVertical size={17} /></span><span className={styles.categoryNumber} aria-label="Позиция">{(data?.categories.findIndex(item => item.id === c.id) ?? 0) + 1}</span><span className={styles.categoryName}>{c.name}{!c.isActive && <small>Неактивна</small>}</span><span className={styles.categoryTotals}>{(report?.subtotals.filter(total => total.categoryId === c.id) ?? []).map(total => <strong key={`${total.kind}-${total.currency}`}><small>{total.kind === 'revenue' ? 'Приходи' : 'Разходи'}</small>{money(total.amount,total.currency)}</strong>)}</span><span className={styles.categoryOrder}><button type="button" aria-label={`Премести ${c.name} нагоре`} disabled={saving || categories[0]?.id === c.id} onClick={() => void moveCategory(c.id,-1)}><ArrowUp size={15} /></button><button type="button" aria-label={`Премести ${c.name} надолу`} disabled={saving || categories.at(-1)?.id === c.id} onClick={() => void moveCategory(c.id,1)}><ArrowDown size={15} /></button></span><button type="button" aria-label={`Преименувай ${c.name}`} disabled={saving} onClick={() => setCategoryEdit({ id: c.id,name: c.name })}><Pencil size={16} /></button><button type="button" className={`${styles.categoryVisibilityButton} ${c.isActive ? styles.categoryDeactivate : styles.categoryActivate}`} title={c.isActive ? 'Скрий категорията' : 'Покажи категорията'} aria-label={`${c.isActive ? 'Скрий' : 'Покажи'} ${c.name}`} disabled={saving} onClick={() => { setError(''); setCategoryStatus({id:c.id,name:c.name,isActive:c.isActive}); categoryConfirmRef.current?.showModal(); }}>{c.isActive ? <EyeOff size={16} /> : <Eye size={16} />}</button></li>)}</ul>
         </dialog>
       </div>
       <dialog onClick={closeOnBackdrop} ref={categoryConfirmRef} className={`${styles.categoriesDialog} ${styles.categoryConfirmation}`} aria-labelledby="category-status-title" onCancel={event => { if (saving) event.preventDefault(); }}>
@@ -335,29 +398,14 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
         {error && <p className={styles.error} role="alert">{error}</p>}
         <div className={styles.formActions}><button type="button" disabled={saving} onClick={() => { categoryConfirmRef.current?.close(); setCategoryStatus(null); }}>Отказ</button><button type="button" className={categoryStatus?.isActive ? styles.categoryDeactivate : styles.categoryActivate} disabled={saving} onClick={() => void saveCategoryStatus()}>{saving ? 'Запазване…' : categoryStatus?.isActive ? 'Деактивирай' : 'Активирай'}</button></div>
       </dialog>
-      <aside className={styles.sidebar}>
+      <aside className={styles.sidebar} hidden={ledgerView === 'analysis'}>{ledgerView === 'history' && <>
         <div className={styles.entryActions}><button type="button" disabled={!data || saving} onClick={() => newEntry(formKind === 'expense' ? 'revenue' : 'expense')}><Plus size={16} />{formKind === 'expense' ? 'Добави приход' : 'Добави разход'}</button></div>
-        <form ref={formRef} className={`${styles.box} ${styles.expenseForm} ${formKind === 'revenue' ? styles.revenueForm : ''} ${formOpen ? '' : styles.mobileFormClosed}`} onSubmit={event => { event.preventDefault(); if (draft) void mutate({ ...draft, action: `${draft.id ? 'update' : 'create'}${formKind === 'revenue' ? 'Revenue' : 'Expense'}` }); }}>
-          <h2>{draft?.id ? (formKind === 'revenue' ? 'Редактирай приход' : 'Редактирай разход') : (formKind === 'revenue' ? 'Добави приход' : 'Добави разход')}</h2>
-          {!draft ? <><p className={styles.empty}>Въведете разход за вашия клуб.</p><button type="button" className={styles.primary} disabled={!data} onClick={() => newEntry('expense')}><Plus size={18} />Нов разход</button></> : <>
-            <label>Категория <span>*</span><span className={styles.selectWrap}><select required value={draft.categoryId} onChange={e => setDraft({ ...draft,categoryId:e.target.value })}><option value="" disabled>Изберете категория</option>{formCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><ChevronDown size={15} aria-hidden="true" /></span></label>
-            <label>Сума <span>*</span><span className={styles.amountField}><input required inputMode="decimal" placeholder="0,00" value={draft.amount} onChange={e => setDraft({ ...draft,amount:e.target.value })} /><span aria-hidden="true">€</span></span></label>
-            <label>Дата <span>*</span><span className={styles.dateField}><span aria-hidden="true">{draft.date ? draft.date.split('-').reverse().join('.') : 'дд.мм.гггг'}</span><input required type="date" value={draft.date} onClick={event => { try { event.currentTarget.showPicker(); } catch { /* Keep the native field editable where showPicker is unavailable. */ } }} onChange={e => setDraft({ ...draft,date:e.target.value })} /><CalendarDays size={16} aria-hidden="true" /></span></label>
-            <label>Описание (незадължително)<textarea placeholder={formKind === 'revenue' ? 'Добави описание на прихода…' : 'Добави описание на разхода…'} maxLength={2000} value={draft.description} onChange={e => setDraft({ ...draft,description:e.target.value })} /><small className={styles.counter}>{draft.description.length}/2000</small></label>
-            <div className={styles.formActions}><button type="submit" className={styles.primary} disabled={saving}><Save size={16} />{saving ? 'Записване…' : formKind === 'revenue' ? 'Запази прихода' : 'Запази разхода'}</button></div>
-          </>}
-        </form>
+        {entryForm}
 
-        <section ref={debtsRef} className={`${styles.box} ${styles.debts}`}><h2 className={styles.panelHeading}><Users size={22} />Задължения към клуба</h2>
-          <div className={styles.debtTotal}><strong>{data?.incomplete ? '≥ ' : ''}{data ? money(data.outstanding) : '—'}</strong><small>{data?.debts.length ?? '—'} състезатели</small></div>
-          {data?.incomplete && <p className={styles.error}>Има неуточнени такси. Общата сума е непълна.</p>}
-          {selectedPlayerId && <Suspense fallback={<p role="status">Зареждане…</p>}><FinancePlayerDetails key={selectedPlayerId} playerId={selectedPlayerId} clubId={clubId} onClose={() => setSelectedPlayerId(null)} /></Suspense>}
-          <ul className={styles.debtList}>{(allDebts ? data?.debts : data?.debts.slice(0,5))?.map(debt => <li key={debt.id}><button type="button" className={styles.debtPlayer} onClick={() => setSelectedPlayerId(debt.id)} aria-label={`Детайли за ${debt.name}`}><span className={styles.avatar}><UserRound size={16} />{debt.avatarUrl && <img key={debt.avatarUrl} src={debt.avatarUrl} alt="" width={28} height={28} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} />}</span><span>{debt.name}<small>{debt.periods.map(period => /^\d{4}-\d{2}$/.test(period) ? new Intl.DateTimeFormat('bg-BG',{ month:'long',year:'numeric' }).format(new Date(`${period}-15T12:00:00`)) : period).join(' · ')}</small></span><strong>{debt.amount === null ? 'Неуточнена такса' : money(debt.amount)}</strong></button></li>)}</ul>
-          {data && !data.debts.length && <p className={styles.empty}>Няма неплатени задължения.</p>}
-          {data && data.debts.length > 5 && <button className={styles.wide} type="button" onClick={() => setAllDebts(v => !v)}>{allDebts ? 'Покажи по-малко' : `Виж всички ${data.debts.length} състезатели →`}</button>}
-        </section>
-      </aside>
+        {debtsPanel}
+      </>}</aside>
     </div>
 
+          {selectedPlayerId && <Suspense fallback={<p role="status">Зареждане…</p>}><FinancePlayerDetails key={selectedPlayerId} playerId={selectedPlayerId} clubId={clubId} onClose={() => setSelectedPlayerId(null)} /></Suspense>}
   </div>;
 }
