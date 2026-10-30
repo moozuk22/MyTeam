@@ -202,13 +202,13 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     return () => controller.abort();
   }, [base,month,category,page,revision,entryKind]);
   const categories = data?.categories ?? [];
-  const formCategories = data?.categories.filter(c => c.isActive || (draft?.id && draft.categoryId === c.id)) ?? [];
+  const formCategories = data?.categories.filter(c => (!c.isMembership && c.isActive) || (draft?.id && draft.categoryId === c.id)) ?? [];
   const listCategories = categories;
   function selectKind(kind: 'all' | 'expense' | 'revenue') { setRemove(null); setEntryKind(kind); setPage(1); setList(null); }
   function newEntry(kind: 'expense' | 'revenue') {
     setFormKind(kind);
     setFormOpen(true);
-    setDraft({ categoryId: data?.categories.find(c => c.isActive)?.id ?? '', amount: '', date: financeDateKey(), description: '' });
+    setDraft({ categoryId: data?.categories.find(c => c.isActive && !c.isMembership)?.id ?? '', amount: '', date: financeDateKey(), description: '' });
     setRemove(null);
     requestAnimationFrame(() => { if (ledgerView !== 'analysis') formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); formRef.current?.querySelector('select')?.focus({ preventScroll: true }); });
   }
@@ -268,6 +268,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     setShowCategoryColors(visible);
     try { localStorage.setItem('finance-category-colors',visible ? 'visible' : 'hidden'); } catch { /* The toggle still works for this visit. */ }
   }
+  const [mobileDebtsOpen,setMobileDebtsOpen] = useState(false);
   const [chartSelection,setChartSelection] = useState<{ currency:string; categoryId:string } | null>(null);
   function selectChartCategory(currency:string, categoryId:string) {
     setChartSelection(current => current?.currency === currency && current.categoryId === categoryId ? null : {currency,categoryId});
@@ -300,7 +301,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
             <div className={styles.formActions}>{draft?.id && <button type="button" disabled={saving} onClick={() => { setError(''); setDraft({categoryId:'',amount:'',date:financeDateKey(),description:''}); setFormOpen(false); }}>Отказ</button>}<button type="submit" className={styles.primary} disabled={saving}><Save size={16} />{saving ? 'Записване…' : formKind === 'revenue' ? 'Запази прихода' : 'Запази разхода'}</button></div>
           </>}
         </form>);
-  const debtsPanel = (<section ref={debtsRef} tabIndex={-1} data-empty={Boolean(data && !data.incomplete && data.debts.length === 0 && Number(data.outstanding) === 0)} className={`${styles.box} ${styles.debts}`}><h2 className={styles.panelHeading}><Users size={22} />Задължения към клуба</h2>
+  const debtsPanel = (<section ref={debtsRef} data-mobile-open={mobileDebtsOpen} tabIndex={-1} data-empty={Boolean(data && !data.incomplete && data.debts.length === 0 && Number(data.outstanding) === 0)} className={`${styles.box} ${styles.debts}`}><h2 className={styles.panelHeading}><Users size={22} />Задължения към клуба</h2>
           <div className={styles.debtTotal}><strong>{data?.incomplete ? '≥ ' : ''}{data ? money(data.outstanding) : '—'}</strong><small>{data?.debts.length ?? '—'} състезатели</small></div>
           {data?.incomplete && <p className={styles.error}>Има неуточнени такси. Общата сума е непълна.</p>}
           {!data && <FinanceSkeleton variant="debts" />}<ul className={styles.debtList}>{(allDebts ? data?.debts : data?.debts.slice(0,5))?.map(debt => <li key={debt.id}><button type="button" className={styles.debtPlayer} onClick={() => setSelectedPlayerId(debt.id)} aria-label={`Детайли за ${debt.name}`}><span className={styles.avatar}><UserRound size={16} />{debt.avatarUrl && <img key={debt.avatarUrl} src={debt.avatarUrl} alt="" width={28} height={28} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} />}</span><span>{debt.name}<small>{debt.periods.map(period => /^\d{4}-\d{2}$/.test(period) ? new Intl.DateTimeFormat('bg-BG',{ month:'long',year:'numeric' }).format(new Date(`${period}-15T12:00:00`)) : period).join(' · ')}</small></span><strong>{debt.amount === null ? 'Неуточнена такса' : money(debt.amount)}</strong></button></li>)}</ul>
@@ -319,8 +320,9 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
             { label: 'Разходи', key: 'expense', tone: styles.gold, Icon: CreditCard },
             { label: 'Баланс', key: 'balance', tone: styles.white, Icon: Wallet },
             { label: 'Задължения към клуба', key: 'outstanding', tone: styles.red, Icon: Users },
-          ] as const).map(({ label,key,tone,Icon }) => <section key={key} className={`${styles.card} ${tone} ${key === 'outstanding' ? styles.mobileDebtCard : ''}`}>
+          ] as const).map(({ label,key,tone,Icon }) => <section key={key} data-metric={key} className={`${styles.card} ${tone} ${key === 'outstanding' ? styles.mobileDebtCard : ''}`}>
             <span className={styles.icon}><Icon size={22} aria-hidden="true" /></span><h2>{label}</h2>
+            {key === 'outstanding' && <button type="button" className={styles.mobileDebtTrigger} aria-label="Покажи задълженията към клуба" aria-expanded={mobileDebtsOpen} onClick={() => { setLedgerView('history'); setMobileDebtsOpen(value => !value); }}><ChevronDown size={18} aria-hidden="true" /></button>}
             {key === 'outstanding' ? (data ? <strong>{data.incomplete ? '≥ ' : ''}{money(data.outstanding)}</strong> : <FinanceMetricSkeleton />) : (key === 'balance' ? data : report)?.totals.map(t => <strong key={t.currency}>{money(t[key],t.currency)}</strong>) ?? <FinanceMetricSkeleton />}
             {key !== 'balance' && <small>{key === 'outstanding' ? `${data?.debts.length ?? '—'} състезатели${data?.incomplete ? ' · неуточнени такси' : ''}` : financePeriodLabel(month)}</small>}
           </section>)}
@@ -352,11 +354,13 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
           </div>}
         </div>
 
+        <div className={styles.mobileEntryActions}><button type="button" disabled={!data || saving} onClick={() => { setLedgerView('history'); newEntry('revenue'); }}><Plus size={18} />Приход</button><button type="button" disabled={!data || saving} onClick={() => { setLedgerView('history'); newEntry('expense'); }}><Plus size={18} />Разход</button></div>
+
         <section ref={expenseDetailsRef} className={`${styles.box} ${styles.ledger}`}>
           <div className={styles.ledgerViews} role="group" aria-label="Изглед на финансите">
             <button type="button" aria-pressed={ledgerView === 'history'} aria-controls={`${ledgerId}-history`} disabled={ledgerView === 'history'} onClick={() => { setActionDropdown(null); setLedgerView('history'); }}><List size={17} aria-hidden="true" />История</button>
             <button type="button" aria-pressed={ledgerView === 'analysis'} aria-controls={`${ledgerId}-analysis`} disabled={ledgerView === 'analysis'} onClick={() => setLedgerView('analysis')}><ChartPie size={17} aria-hidden="true" />Анализ</button>
-            <button type="button" aria-pressed={ledgerView === 'chart'} aria-controls={`${ledgerId}-chart`} disabled={ledgerView === 'chart'} onClick={() => { setActionDropdown(null); setLedgerView('chart'); }}><ChartPie size={17} aria-hidden="true" />Категории разходи</button>
+            <button type="button" aria-pressed={ledgerView === 'chart'} aria-controls={`${ledgerId}-chart`} disabled={ledgerView === 'chart'} onClick={() => { setActionDropdown(null); setLedgerView('chart'); }}><ChartPie size={17} aria-hidden="true" /><span className={styles.desktopCategoryLabel}>Категории разходи</span><span className={styles.mobileCategoryLabel}>Категории</span></button>
           </div>
           <div id={`${ledgerId}-chart`} className={styles.chartView} hidden={ledgerView !== 'chart'} role="region" aria-label="Категории разходи">
           {!report && <FinanceSkeleton variant="chart" />}{categoryCharts.map(chart => <div className={styles.chart} key={chart.currency}>

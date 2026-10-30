@@ -148,3 +148,16 @@ it('selects chart segments, dims other categories, and clears selection from the
  click(first);tree=draw();
  expect(segments().every(node=>node.props['aria-pressed']===false && node.props['data-dimmed']===false)).toBe(true);
 });
+
+it('opens both mobile entry actions and expands debts from its summary card', () => {
+ let tree=render();
+ const mobile=()=>nodes(tree).find(node=>node.type==='div' && String(node.props.className).includes('mobileEntryActions'))!;
+ click(nodes(mobile()).find(node=>node.type==='button' && text(node)==='Приход')!);tree=render();
+ expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Добави приход')).toBe(true);
+ click(nodes(mobile()).find(node=>node.type==='button' && text(node)==='Разход')!);tree=render();
+ expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Добави разход')).toBe(true);
+ const debt=()=>nodes(tree).find(node=>node.props['aria-label']==='Покажи задълженията към клуба')!;
+ click(debt());tree=render();
+ expect(debt().props['aria-expanded']).toBe(true);
+ expect(nodes(tree).find(node=>node.type==='section' && node.props['data-mobile-open']===true)).toBeDefined();
+});

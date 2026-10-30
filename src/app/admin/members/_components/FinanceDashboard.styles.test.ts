@@ -52,3 +52,16 @@ it('contains desktop category scrolling inside the list rather than the outer di
 it('sizes the category editor to its content instead of stretching between mobile inset edges', () => {
  expect(css).toMatch(/\.categoriesDialog\.categoryEditor\s*\{[^}]*height:fit-content;[^}]*min-height:0;/);
 });
+
+it('places expanded mobile debts between the summary cards and entry actions', () => {
+ expect(css).toMatch(/\.debts\[data-mobile-open="true"\]\s*\{[^}]*order:1;/);
+ expect(css).toMatch(/\.mobileEntryActions\s*\{[^}]*order:2;/);
+});
+
+it('uses the category dropdown instead of chips in mobile History', () => {
+ const mobile=css.slice(css.indexOf('/* Compact History category filtering on phones. */'));
+ expect(mobile).toContain('@media(max-width:700px)');
+ expect(mobile).toMatch(/\.dashboard \.ledgerView \.filterChips\s*\{[^}]*display:none;/);
+ expect(mobile).toMatch(/\.dashboard \.ledgerView \.categoryFilter\s*\{[^}]*display:flex!important;/);
+ expect(mobile).toMatch(/\.dashboard \.categoryFilter \.selectWrap\s*\{[^}]*width:100%;/);
+});

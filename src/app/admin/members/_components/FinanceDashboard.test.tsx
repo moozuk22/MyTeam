@@ -116,3 +116,11 @@ it('uses the neutral debts state only after confirming there are no outstanding 
  expect(render(null)).toContain('data-empty="false"');
  expect(render({...base,outstanding:'0.00',debts:[],incomplete:true})).toContain('data-empty="false"');
 });
+
+it('excludes membership fees from categories offered for manual entries', () => {
+ const data: View = {...base,categories:[{id:'membership',clubId:'club',name:'Членски внос',color:null,isMembership:true,sortOrder:0,isActive:true},{id:'other',clubId:'club',name:'Други',color:null,isMembership:false,sortOrder:1,isActive:true}]};
+ const html=renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
+ const form=html.split('Изберете категория</option>')[1].split('</select>')[0];
+ expect(form).not.toContain('value="membership"');
+ expect(form).toContain('value="other"');
+});

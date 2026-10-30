@@ -6,7 +6,7 @@ import { financeDateKey } from '@/lib/clubFinanceDomain';
 import styles from './ClubFinancePanel.module.css';
 import FinanceDashboard from './FinanceDashboard';
 import { FinanceMetricSkeleton, SkeletonLine } from './FinanceSkeleton';
-import { ChevronDown } from 'lucide-react';
+import { CalendarDays, ChevronDown } from 'lucide-react';
 type View = Awaited<ReturnType<typeof getClubFinance>>;
 const money = (amount: string, currency = 'EUR') => new Intl.NumberFormat('bg-BG', { style: 'currency', currency }).format(Number(amount));
 export default function ClubFinancePanel({ clubId, revision, compact = false, clubName, clubLogoUrl }: { clubLogoUrl?: string | null; clubName?: string; clubId: string; revision?: unknown; compact?: boolean }) {
@@ -87,7 +87,7 @@ export default function ClubFinancePanel({ clubId, revision, compact = false, cl
   return <section className={styles.overview} aria-label="Финанси на клуба" aria-busy={loading || (!data && !error)}>
     {error && <p role="alert" className={styles.error}>{error} <button type="button" onClick={() => void refresh()}>Опитай отново</button></p>}
     <FinanceDashboard clubLogoUrl={clubLogoUrl} clubName={clubName} clubId={clubId} data={data} report={period === 'all' ? data : monthlyData?.month === reportPeriod ? monthlyData : null} month={period === 'all' ? 'all' : reportPeriod} onSaved={refresh} filters={<div ref={filtersRef} onBlur={event => { if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setRangeOpen(false); }} className={styles.periodFilters} role="group" aria-label="Период за приходите и разходите">
-      <button ref={rangeButtonRef} type="button" aria-pressed={period === 'range'} aria-expanded={rangeOpen} aria-controls={rangeId} onClick={() => { setPeriod('range'); setRangeOpen(open => !open); }}>Период<ChevronDown size={15} aria-hidden="true" className={rangeOpen ? styles.chevronOpen : undefined} /></button>
+      <button ref={rangeButtonRef} type="button" aria-pressed={period === 'range'} aria-expanded={rangeOpen} aria-controls={rangeId} onClick={() => { setPeriod('range'); setRangeOpen(open => !open); }}><span className={styles.desktopPeriodLabel}>Период</span><span className={styles.mobilePeriodLabel}><CalendarDays size={16} aria-hidden="true" />{rangeStart === rangeEnd ? new Intl.DateTimeFormat('bg-BG',{month:'long',year:'numeric'}).format(new Date(`${rangeStart}-15T12:00:00`)) : 'Период'}</span><ChevronDown size={15} aria-hidden="true" className={rangeOpen ? styles.chevronOpen : undefined} /></button>
       <button type="button" aria-pressed={period === 'all'} onClick={() => { setPeriod('all'); setRangeOpen(false); }}>От началото</button>
       <div id={rangeId} hidden={!rangeOpen} className={styles.rangeControls}>
         <label>От месец<input type="month" aria-label="От месец" min="1900-01" max={financeDateKey().slice(0,7)} value={rangeStart} onChange={event => {

@@ -524,3 +524,82 @@
  .dashboard .chartLegendButton { grid-template-columns:10px minmax(0,1fr) auto 30px; gap:8px; padding:12px 8px; font-size:12px; }
  .chartView .legend strong { font-size:12px; }
 }
+
+.mobileEntryActions,.mobileCategoryLabel,.dashboard .mobileDebtTrigger { display:none; }
+@media(max-width:700px) {
+ .dashboard { min-width:0; }
+ .topbar { gap:16px; margin-bottom:14px; }
+ .title .clubLogo { display:none; }
+ .title h1 { font-size:clamp(23px,7vw,32px); letter-spacing:-.6px; }
+ .title p { font-size:14px; }
+ .layout { gap:14px; }
+ .cards,.dashboard[data-view="analysis"] .cards { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+ .cards>.card { min-height:132px; padding:18px 14px; border-radius:15px; }
+ .card::before { display:none; }
+ .card h2 { margin:0 25px 16px 0; min-height:18px; font-size:13px; }
+ .card strong { font-size:clamp(20px,6vw,29px); letter-spacing:-.6px; }
+ .card small { margin-top:10px; font-size:11px; overflow-wrap:anywhere; }
+ .card .icon { top:17px; right:12px; width:20px; height:20px; padding:0; border:0; background:none; }
+ .card .icon svg { width:18px; height:18px; }
+ .cards>.card[data-metric="balance"],.cards>.mobileDebtCard { grid-column:1 / -1; }
+ .cards>.card[data-metric="balance"] { min-height:120px; }
+ .card[data-metric="balance"] strong { font-size:clamp(29px,8vw,40px); }
+ .dashboard[data-view="analysis"] .cards>.mobileDebtCard,.cards>.mobileDebtCard { display:block!important; min-height:112px; padding-left:16px; }
+ .mobileDebtCard h2 { padding-left:27px; font-weight:600; color:#eee; margin-bottom:18px; }
+ .mobileDebtCard .icon { left:16px; right:auto; }
+ .mobileDebtCard strong { display:inline; font-size:clamp(25px,7vw,32px); }
+ .mobileDebtCard small { display:inline; margin-left:10px; font-size:11px; }
+ .dashboard .mobileDebtTrigger { display:flex; position:absolute; inset:0; width:100%; height:100%; border:0; background:none; justify-content:flex-end; align-items:flex-start; padding:18px 12px; color:var(--finance-red); }
+ .mobileDebtTrigger svg { transform:rotate(-90deg); }
+ .mobileDebtTrigger[aria-expanded="true"] svg { transform:rotate(0); }
+ .mobileEntryActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; width:100%; order:1; }
+ .dashboard .mobileEntryActions button { min-width:0; min-height:54px; border-radius:14px; font-size:15px; color:#81de9d; border-color:#28733b; background:#12371d; }
+ .dashboard .mobileEntryActions button+button { color:#ff9491; border-color:#75413e; background:#342220; }
+ .entryActions,.analysisActions { display:none; }
+ .debts:not([data-mobile-open="true"]) { display:none; }
+ .debts { order:2; }
+ .ledger { padding:20px 0 0; border:0; border-top:1px solid #30322c; border-radius:0; background:none; }
+ .ledgerViews { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; border:0; padding:0; margin:0 0 20px; }
+ .dashboard .ledgerViews button { min-width:0; min-height:40px; padding:8px 4px; border:0; border-radius:24px; background:none; font-size:13px; color:#999; }
+ .ledgerViews button svg,.desktopCategoryLabel { display:none; }
+ .mobileCategoryLabel { display:inline; }
+ .dashboard .ledgerViews button[aria-pressed="true"] { background:#292c29; color:#fff; }
+}
+@media(max-width:360px) {
+ .cards,.mobileEntryActions { gap:8px; }
+ .cards>.card { padding:15px 10px; }
+ .card h2 { font-size:12px; }
+ .mobileDebtCard small { display:block; margin:7px 0 0; }
+ .dashboard .ledgerViews button { font-size:12px; }
+}
+@media(max-width:700px) {
+ .title .titleText h1 { font-size:clamp(23px,7vw,32px); }
+ .title .titleText p { font-size:14px; }
+}
+
+@media(max-width:700px) {
+ .debts[data-mobile-open="true"] { order:1; width:100%; }
+ .mobileEntryActions { order:2; }
+ .expenseForm { order:3; }
+ .ledger { order:4; }
+}
+
+/* Compact History category filtering on phones. */
+@media(max-width:700px) {
+ .dashboard .ledgerView .filterChips { display:none; }
+ .dashboard .ledgerView .categoryFilter { display:flex!important; flex-direction:column; align-items:stretch; gap:8px; margin-bottom:18px; }
+ .dashboard .categoryFilter .selectWrap { width:100%; min-width:0; }
+ .dashboard .categoryFilter select { min-height:44px; padding-right:38px; font-size:16px; }
+}
+
+/* Align mobile History controls to the same edges. */
+@media(max-width:700px) {
+ .ledgerToolbar { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; margin:16px 0; }
+ .ledgerToolbar .entryTabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; width:100%; }
+ .ledgerToolbar .management { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; width:100%; margin:0; }
+ .dashboard .ledgerToolbar :is(.entryTabs,.management)>button { width:100%; min-width:0; min-height:44px; justify-content:center; padding:9px 7px; font-size:12px; text-align:center; }
+ .ledgerToolbar .management>button svg { flex-shrink:0; width:16px; height:16px; }
+}
+@media(max-width:360px) {
+ .dashboard .ledgerToolbar .management>button { font-size:11px; gap:5px; padding-inline:5px; }
+}
