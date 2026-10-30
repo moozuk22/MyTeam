@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { verifyAdminToken } from '@/lib/adminAuth';
 import { prisma } from '@/lib/db';
 import ClubFinancePanel from '@/app/admin/members/_components/ClubFinancePanel';
@@ -26,7 +27,7 @@ export default async function ClubFinancePage({ params }: { params: Promise<{ id
       ? buildCloudinaryUrlFromUploadPath(storedLogo, cloudName, logoTransform)
       : storedLogo;
   return <main className={styles.page}>
-    <Link className={styles.back} href={`/admin/members?clubId=${encodeURIComponent(id)}`}>← Към клуба</Link>
+    <Link className={styles.back} href={`/admin/members?clubId=${encodeURIComponent(id)}`}><ArrowLeft size={16} aria-hidden="true" /><span>Назад</span></Link>
     <ClubFinancePanel clubId={id} clubName={club.name} clubLogoUrl={clubLogoUrl} />
   </main>;
 }
