@@ -15,3 +15,9 @@ it('stacks period fields on phones and constrains iOS native month controls', ()
  expect(css).toContain('.rangeControls input::-webkit-date-and-time-value');
  expect(css).toMatch(/\.rangeControls input\s*\{[^}]*max-width:100%;[^}]*appearance:none;/);
 });
+
+it('keeps compact totals intact beside a fixed-size finance link', () => {
+ const css=readFileSync(new URL('./ClubFinancePanel.module.css',import.meta.url),'utf8');
+ expect(css).toMatch(/\.panel \.link\s*\{[^}]*flex:0 0 52px;/);
+ expect(css).toMatch(/\.panel \.widgetMetrics strong\s*\{[^}]*white-space:nowrap;[^}]*overflow-wrap:normal;/);
+});

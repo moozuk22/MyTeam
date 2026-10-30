@@ -6,7 +6,7 @@ import { financeDateKey } from '@/lib/clubFinanceDomain';
 import styles from './ClubFinancePanel.module.css';
 import FinanceDashboard from './FinanceDashboard';
 import { FinanceMetricSkeleton, SkeletonLine } from './FinanceSkeleton';
-import { CalendarDays, ChevronDown } from 'lucide-react';
+import { CalendarDays, ChevronDown, Wallet, Users, ArrowUpRight } from 'lucide-react';
 type View = Awaited<ReturnType<typeof getClubFinance>>;
 const money = (amount: string, currency = 'EUR') => new Intl.NumberFormat('bg-BG', { style: 'currency', currency }).format(Number(amount));
 export default function ClubFinancePanel({ clubId, revision, compact = false, clubName, clubLogoUrl }: { clubLogoUrl?: string | null; clubName?: string; clubId: string; revision?: unknown; compact?: boolean }) {
@@ -69,20 +69,20 @@ export default function ClubFinancePanel({ clubId, revision, compact = false, cl
     return () => { requestId.current++; clearInterval(timer); window.removeEventListener('focus',update); document.removeEventListener('visibilitychange',update); };
   }, [refresh,revision,compact]);
   if (compact) return <section className={styles.panel} aria-label="Финанси на клуба">
-    <div className={styles.heading}><h2>Финанси</h2><Link className={styles.link} href={`/admin/clubs/${encodeURIComponent(clubId)}/finance`}>Виж финансите →</Link></div>
     <div className={styles.content} aria-busy={loading || (!data && !error)}>
       {error && <p className={styles.error} role="alert">{error} <button type="button" onClick={() => void refresh()}>Опитай отново</button></p>}
       {!data && !error && <div role="status" aria-label="Зареждане на финансите">
         <div className={`${styles.metrics} ${styles.widgetMetrics}`} aria-hidden="true">
-          <div><span>Баланс · от началото</span><FinanceMetricSkeleton /></div>
-          <div><span>Задължения към клуба · общо</span><FinanceMetricSkeleton /><SkeletonLine /></div>
+          <div><span><Wallet size={22} aria-hidden="true" />Баланс</span><FinanceMetricSkeleton /><small>От началото</small></div>
+          <div><span><Users size={22} aria-hidden="true" />Задължения</span><FinanceMetricSkeleton /><SkeletonLine /></div>
         </div>
       </div>}
       {data && <div className={`${styles.metrics} ${styles.widgetMetrics}`}>
-        <div><span>Баланс · от началото</span>{data.totals.map(t => <strong key={t.currency} className={Number(t.balance) < 0 ? styles.negative : styles.positive}>{money(t.balance,t.currency)}</strong>)}</div>
-        <div><span>Задължения към клуба · общо</span><strong className={styles.negative}>{data.incomplete ? '≥ ' : ''}{money(data.outstanding)}</strong><small>{data.debts.length} състезатели{data.incomplete ? ' · неуточнени такси' : ''}</small></div>
+        <div><span><Wallet size={22} aria-hidden="true" />Баланс</span>{data.totals.map(t => <strong key={t.currency} className={Number(t.balance) < 0 ? styles.negative : styles.positive}>{money(t.balance,t.currency)}</strong>)}<small>От началото</small></div>
+        <div><span><Users size={22} aria-hidden="true" />Задължения</span><strong className={styles.negative}>{data.incomplete ? '≥ ' : ''}{money(data.outstanding)}</strong><small>{data.debts.length} състезатели{data.incomplete ? ' · неуточнени такси' : ''}</small></div>
       </div>}
     </div>
+    <Link className={styles.link} aria-label="Виж финансите" href={`/admin/clubs/${encodeURIComponent(clubId)}/finance`}><ArrowUpRight size={21} aria-hidden="true" /></Link>
   </section>;
   return <section className={styles.overview} aria-label="Финанси на клуба" aria-busy={loading || (!data && !error)}>
     {error && <p role="alert" className={styles.error}>{error} <button type="button" onClick={() => void refresh()}>Опитай отново</button></p>}

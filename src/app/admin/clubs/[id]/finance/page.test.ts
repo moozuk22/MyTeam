@@ -23,3 +23,13 @@ it('renders the dedicated page for club management and administrators', async ()
  expect(await Page(context)).toBeTruthy();
  expect(mocks.club).toHaveBeenCalledWith({where:{id},select:{name:true,imageUrl:true,emblemUrl:true}});
 });
+
+it('resolves stored club logo upload paths before passing them to the dashboard', async () => {
+ vi.stubEnv('CLOUDINARY_CLOUD_NAME', 'test-cloud');
+ mocks.session.mockResolvedValue({roles:['admin']});
+ mocks.club.mockResolvedValue({name:'Club',imageUrl:'v123/clubs/logo.png',emblemUrl:null});
+ try {
+  const page = await Page(context);
+  expect(page.props.children[1].props.clubLogoUrl).toBe('https://res.cloudinary.com/test-cloud/image/upload/w_120,h_120,c_limit,f_auto,q_auto:eco/v123/clubs/logo.png');
+ } finally { vi.unstubAllEnvs(); }
+});

@@ -48,3 +48,24 @@
  .rangeControls input::-webkit-date-and-time-value { min-width:0; text-align:left; margin:0; }
  .rangeControls input::-webkit-datetime-edit { display:block; padding:0; }
 }
+
+/* Compact club overview, shared by the loaded and skeleton states. */
+.panel { display:flex; align-items:center; gap:24px; padding:20px 16px; min-width:0; box-sizing:border-box; }
+.panel .content { flex:1; min-width:0; padding:0; }
+.panel .widgetMetrics { gap:0; }
+.panel .widgetMetrics > div { min-width:0; border:0; border-radius:0; background:transparent; padding:0 16px; gap:8px; }
+.panel .widgetMetrics > div:first-child { padding-left:0; }
+.panel .widgetMetrics > div + div { border-left:1px solid #5e6b5a70; }
+.widgetMetrics span { display:flex; align-items:center; gap:6px; font-size:14px; line-height:1.4; }
+.widgetMetrics span svg { width:17px; height:17px; flex-shrink:0; color:#74d99f; }
+.widgetMetrics > div:nth-child(2) span svg { color:#ff8585; }
+.panel .widgetMetrics strong { font-size:clamp(22px,2.4vw,30px); line-height:1.2; white-space:nowrap; overflow-wrap:normal; }
+.panel .widgetMetrics small { font-size:14px; margin:0; }
+.panel .link { display:grid; place-items:center; flex:0 0 52px; width:52px; height:52px; min-height:0; padding:0; box-sizing:border-box; border-radius:10px; background:#74d99f20; }
+@media(max-width:500px) {
+ .panel { padding:16px 12px; gap:10px; }
+ .panel .widgetMetrics > div { padding:0 10px; }
+ .widgetMetrics span,.panel .widgetMetrics small { font-size:12px; }
+ .panel .widgetMetrics strong { font-size:clamp(17px,5vw,24px); }
+ .panel .link { flex-basis:40px; width:40px; height:44px; }
+}
