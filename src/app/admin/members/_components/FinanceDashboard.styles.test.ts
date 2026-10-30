@@ -27,3 +27,8 @@ it('locks page scrolling while the mobile categories modal is open', () => {
 it('keeps analysis summary cards at their own height when the action column grows', () => {
  expect(css).toMatch(/\.dashboard\[data-view="analysis"\] \.cards>\.card\s*\{[^}]*align-self:start;/);
 });
+
+it('blurs the viewport behind the blue editing form and keeps the form above it', () => {
+ expect(css).toMatch(/\.editBackdrop\s*\{[^}]*position:fixed;[^}]*inset:0;[^}]*z-index:1000;[^}]*backdrop-filter:blur\(5px\);/);
+ expect(css).toMatch(/\.dashboard \.expenseForm\.editingForm\s*\{[^}]*z-index:1001;[^}]*border-color:#62aaff;[^}]*background:linear-gradient\(145deg,#172e49,#101c2e\);/);
+});

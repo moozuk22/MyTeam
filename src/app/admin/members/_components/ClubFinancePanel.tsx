@@ -5,6 +5,7 @@ import type { getClubFinance } from '@/lib/clubFinance';
 import { financeDateKey } from '@/lib/clubFinanceDomain';
 import styles from './ClubFinancePanel.module.css';
 import FinanceDashboard from './FinanceDashboard';
+import { FinanceMetricSkeleton, SkeletonLine } from './FinanceSkeleton';
 import { ChevronDown } from 'lucide-react';
 type View = Awaited<ReturnType<typeof getClubFinance>>;
 const money = (amount: string, currency = 'EUR') => new Intl.NumberFormat('bg-BG', { style: 'currency', currency }).format(Number(amount));
@@ -73,8 +74,8 @@ export default function ClubFinancePanel({ clubId, revision, compact = false, cl
       {error && <p className={styles.error} role="alert">{error} <button type="button" onClick={() => void refresh()}>Опитай отново</button></p>}
       {!data && !error && <div role="status" aria-label="Зареждане на финансите">
         <div className={`${styles.metrics} ${styles.widgetMetrics}`} aria-hidden="true">
-          <div><span>Баланс · от началото</span><span className={styles.skeletonAmount} /></div>
-          <div><span>Задължения към клуба · общо</span><span className={styles.skeletonAmount} /><span className={styles.skeletonDetail} /></div>
+          <div><span>Баланс · от началото</span><FinanceMetricSkeleton /></div>
+          <div><span>Задължения към клуба · общо</span><FinanceMetricSkeleton /><SkeletonLine /></div>
         </div>
       </div>}
       {data && <div className={`${styles.metrics} ${styles.widgetMetrics}`}>

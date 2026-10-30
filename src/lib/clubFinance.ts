@@ -60,7 +60,7 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
     const [categories, totals, entries, count, players] = await Promise.all([
       tx.clubFinanceCategory.findMany({ where: { clubId }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }] }),
       tx.clubFinanceEntry.groupBy({ by: ['kind','currency','categoryId'], where, _sum: { amount: true } }),
-      tx.clubFinanceEntry.findMany({ where: listWhere, orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }], skip: (page-1)*20, take: 20, include: { category: { select: { name: true } } } }),
+      tx.clubFinanceEntry.findMany({ where: listWhere, orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }], skip: (page-1)*20, take: 20, include: { category: { select: { name: true, isMembership: true } } } }),
       tx.clubFinanceEntry.count({ where: listWhere }),
       tx.player.findMany({ where: { clubId, isActive: true }, select: { id: true, fullName: true, images: { select: { imageUrl: true, isAdminView: true } }, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
     ]);
@@ -87,7 +87,7 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
       totals: [...currencies].map(([currency,s]) => ({ currency, revenue: s.revenue.toFixed(2), expense: s.expense.toFixed(2), balance: s.revenue.sub(s.expense).toFixed(2) })),
       subtotals: totals.map(r => ({ kind: r.kind, categoryId: r.categoryId, currency: r.currency, amount: r._sum.amount?.toFixed(2) ?? '0.00' })),
       outstanding: outstanding.toFixed(2), debts, incomplete: debt.some(d => d.conflict),
-      entries: entries.map(e => ({ id: e.id, categoryId: e.categoryId, category: e.category.name, kind: e.kind, amount: e.amount.toFixed(2), currency: e.currency, date: financeDateKey(e.occurredAt), description: e.description, playerName: e.playerName, editable: e.paymentReference === null })) };
+      entries: entries.map(e => ({ id: e.id, categoryId: e.categoryId, category: e.category.name, kind: e.kind, amount: e.amount.toFixed(2), currency: e.currency, date: financeDateKey(e.occurredAt), description: e.description, playerName: e.playerName, deletable: e.paymentReference === null && !e.category.isMembership, editable: e.paymentReference === null })) };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 function text(value: unknown, max: number) {
@@ -126,8 +126,8 @@ export async function mutateClubFinance(clubId: string, body: Record<string, unk
     const label = kind === 'revenue' ? 'Приходът' : 'Разходът';
     const id = String(action).startsWith('create') ? undefined : financeId(body.id);
     if (String(action).startsWith('delete')) {
-      const removed = await tx.clubFinanceEntry.deleteMany({ where: { id, clubId, kind, paymentReference: null } });
-      if (!removed.count) throw new FinanceError(`${label} не е намерен или е автоматично отчетен.`,404);
+      const removed = await tx.clubFinanceEntry.deleteMany({ where: { id, clubId, kind, paymentReference: null, category: { isMembership: false } } });
+      if (!removed.count) throw new FinanceError(`${label} не е намерен, е автоматично отчетен или е членски внос и не може да бъде изтрит.`,404);
       return { ok: true };
     }
     const categoryId = financeId(body.categoryId);

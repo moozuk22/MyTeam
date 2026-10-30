@@ -24,11 +24,6 @@
 .rangeControls input { box-sizing:border-box; width:100%; min-width:0; min-height:40px; padding:8px 10px; border:1px solid #3b4937; border-radius:7px; background:#20251e; color:#eee; color-scheme:dark; font:inherit; }
 .rangeControls input:focus-visible { outline:2px solid #32cd32; outline-offset:2px; }
 @media(max-width:600px) { .periodFilters { width:100%; }.periodFilters button { height:40px; font-size:12px; } }
-.skeletonAmount,.skeletonDetail { display: block; border-radius: 6px; background: linear-gradient(90deg,#34342f,#40563c,#34342f); background-size: 200% 100%; filter: blur(4px); animation: financeSkeleton 1.8s ease-in-out infinite; }
-.skeletonAmount { width: 65%; max-width: 160px; height: 29px; }
-.skeletonDetail { width: 45%; max-width: 110px; height: 14px; margin-top: 5px; }
-@keyframes financeSkeleton { 0%,100% { background-position: 100% 0; opacity: .55; } 50% { background-position: 0 0; opacity: .9; } }
-@media(prefers-reduced-motion:reduce) { .skeletonAmount,.skeletonDetail { animation: none; } }
 .link { display: inline-flex; align-items: center; min-height: 40px; padding: 8px 14px; border: 1px solid #35552d; border-radius: 8px; background: #182418; color: #9cff9c; text-decoration: none; font-size: 14px; }
 .link:focus-visible { outline: 2px solid #32cd32; outline-offset: 3px; }
 

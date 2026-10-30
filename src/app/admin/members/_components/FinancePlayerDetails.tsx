@@ -5,6 +5,7 @@ import { MemberDetailModal } from './members-page-components';
 import { normalizeMember } from '../_utils/members-page-utils';
 import type { Member } from '../_types/members-page-types';
 import '../page.css';
+import FinancePlayerSkeleton from './FinancePlayerSkeleton';
 
 export default function FinancePlayerDetails({ playerId, clubId, onClose }: { playerId: string; clubId: string; onClose: () => void }) {
   const [member, setMember] = useState<Member | null>(null);
@@ -48,11 +49,12 @@ export default function FinancePlayerDetails({ playerId, clubId, onClose }: { pl
     void load();
     return () => controller.abort();
   }, [playerId, clubId]);
+  if (!member && !error) return <FinancePlayerSkeleton onClose={onClose} />;
   if (!member) return createPortal(<div className="amp-overlay" onClick={onClose}>
     <div className="amp-modal" role="dialog" aria-modal="true" aria-label="Детайли за състезател" onClick={event => event.stopPropagation()} onKeyDown={event => { if (event.key === 'Escape') onClose(); }}>
-      <p role={error ? 'alert' : 'status'}>{error || 'Зареждане…'}</p>
+      <p role="alert">{error}</p>
       <button type="button" autoFocus onClick={onClose}>Затвори</button>
     </div>
   </div>, document.body);
-  return createPortal(<MemberDetailModal member={member} onClose={onClose} isCoach={isCoach} coachGroups={coachGroups} onCoachGroupAssigned={(_,ids) => setMember(current => current ? {...current,coachGroupIds:ids} : current)} showManagementActions={false} onRequestEdit={() => {}} onRequestDelete={() => {}} />, document.body);
+  return createPortal(<MemberDetailModal member={member} onClose={onClose} isCoach={isCoach} coachGroups={coachGroups} onCoachGroupAssigned={(_,ids) => setMember(current => current ? {...current,coachGroupIds:ids} : current)} showManagementActions={false} showProfileLink onRequestEdit={() => {}} onRequestDelete={() => {}} />, document.body);
 }

@@ -58,3 +58,21 @@ it('opens the income form and player list as mutually exclusive dropdowns withou
  click(action(tree,'-debts-dropdown'));tree=render();
  expect(action(tree,'-debts-dropdown').props['aria-expanded']).toBe(false);
 });
+
+it('highlights the populated edit form and clears the effect when cancelled', () => {
+ render();
+ hooks.values[6] = {...data,count:1,entries:[{id:'entry',categoryId:'category',category:'Други',kind:'expense',amount:'25.00',currency:'EUR',date:'2026-10-30',description:'Описание',playerName:null,editable:true,deletable:true}]};
+ let tree = render();
+ const edit = nodes(tree).find(node => node.type === 'button' && text(node) === 'Редактирай')!;
+ (edit.props.onClick as (event:unknown)=>void)({currentTarget:{closest:()=>({removeAttribute:vi.fn()})}});
+ tree = render();
+ expect(tree.props['data-editing']).toBe(true);
+ expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Редактирай разход')).toBe(true);
+ expect(nodes(tree).some(node=>node.type==='textarea' && node.props.value==='Описание')).toBe(true);
+ const form = nodes(tree).find(node=>node.type==='form' && text(node).includes('Редактирай разход'))!;
+ const cancel = nodes(form).find(node=>node.type==='button' && text(node)==='Отказ')!;
+ click(cancel);
+ tree = render();
+ expect(tree.props['data-editing']).toBe(false);
+ expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Добави разход')).toBe(true);
+});

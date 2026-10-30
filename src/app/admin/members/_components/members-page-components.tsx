@@ -1,3 +1,4 @@
+import FinanceSkeleton, { SkeletonLine } from './FinanceSkeleton';
 import { playerFieldEnabled } from "@/lib/playerFields";
 import { AttendanceFilterSelect } from "@/components/AttendanceFilterSelect";
 import { useEffect, useRef, useState } from "react";
@@ -1614,6 +1615,7 @@ function MemberDetailModal({
   actionMode = "active",
   isCoach = false,
   showManagementActions = true,
+  showProfileLink = false,
   onRequestReactivate,
   onRequestPermanentDelete,
   isReactivating = false,
@@ -1629,6 +1631,7 @@ function MemberDetailModal({
   actionMode?: "active" | "inactive";
   isCoach?: boolean;
   showManagementActions?: boolean;
+  showProfileLink?: boolean;
   onRequestReactivate?: (member: Member) => void;
   onRequestPermanentDelete?: (member: Member) => void;
   isReactivating?: boolean;
@@ -2051,7 +2054,7 @@ function MemberDetailModal({
                   </div>
 
                   {coachNoteLoading ? (
-                    <p className="amp-empty" style={{ margin: 0 }}>Зареждане...</p>
+                    <div role="status" aria-label="Зареждане на бележката" aria-busy="true"><SkeletonLine wide /></div>
                   ) : coachNoteEditing ? (
                     <>
                       <textarea
@@ -2142,6 +2145,12 @@ function MemberDetailModal({
             </div>
           </div>
 
+          {showProfileLink && memberCardCode && (
+            <div className="amp-modal-actions amp-modal-actions--end">
+              <a className="amp-btn amp-btn--ghost" href={`/member/${encodeURIComponent(memberCardCode)}`} style={{textDecoration:'none'}}>Виж профила</a>
+            </div>
+          )}
+
           {showManagementActions && (
             <div className="amp-modal-actions amp-modal-actions--end">
             {actionMode === "active" ? (
@@ -2188,7 +2197,7 @@ function MemberDetailModal({
             </h2>
             <div className="amp-modal-body">
               {notificationsLoading ? (
-                <p className="amp-empty amp-empty--modal">Зареждане...</p>
+                <FinanceSkeleton variant="history" />
               ) : notifications.length === 0 ? (
                 <p className="amp-empty amp-empty--modal">Няма известия</p>
               ) : (

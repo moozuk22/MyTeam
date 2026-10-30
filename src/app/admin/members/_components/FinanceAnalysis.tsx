@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { getClubFinanceAnalysis } from '@/lib/clubFinance';
 import styles from './FinanceDashboard.module.css';
+import FinanceSkeleton from './FinanceSkeleton';
 
 type Analysis = Awaited<ReturnType<typeof getClubFinanceAnalysis>>;
 const money = (amount: string, currency: string) => new Intl.NumberFormat('bg-BG',{style:'currency',currency}).format(Number(amount));
@@ -81,6 +82,6 @@ export default function FinanceAnalysis({ clubId, revision }: { clubId:string; r
   return () => controller.abort();
  },[clubId,revision,retry]);
  if (error) return <p role="alert" className={styles.error}>{error} <button type="button" onClick={() => setRetry(value => value+1)}>Опитай отново</button></p>;
- if (!data) return <p role="status">Зареждане на анализа…</p>;
+ if (!data) return <FinanceSkeleton variant="analysis" />;
  return <FinanceAnalysisTable data={data} />;
 }

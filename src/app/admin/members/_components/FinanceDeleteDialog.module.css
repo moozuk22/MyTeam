@@ -1,0 +1,26 @@
+.dialog { position:fixed; inset:0; margin:auto; box-sizing:border-box; width:min(540px,calc(100% - 32px)); max-height:calc(100dvh - 48px); overflow-y:auto; padding:26px; border:1px solid #55403a; border-radius:20px; background:linear-gradient(145deg,#232821,#171a16); color:#edf0e9; box-shadow:0 24px 100px #0009; color-scheme:dark; }
+.dialog::backdrop { background:#050805b8; backdrop-filter:blur(6px); }
+.header { display:flex; align-items:center; gap:12px; }
+.header h2 { flex:1; margin:0; font-size:21px; line-height:1.3; }
+.icon { display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; border-radius:12px; background:#ff706c18; color:#ff8983; }
+.dialog button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:42px; padding:10px 16px; border:1px solid #ffffff20; border-radius:10px; background:#ffffff07; color:inherit; font:inherit; cursor:pointer; }
+.header button { padding:8px; }
+.dialog button:focus-visible { outline:2px solid #b0d5a2; outline-offset:3px; }
+.dialog button:disabled { opacity:.55; cursor:wait; }
+.prompt { color:#b9c1b3; margin:20px 0; }
+.entry { border:1px solid #ffffff10; border-radius:14px; padding:18px; background:#0002; }
+.amount { display:flex; align-items:center; justify-content:space-between; gap:16px; color:#ff8983; }
+.amount[data-kind=revenue] { color:#77d99a; }
+.amount strong { font-size:26px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.entry dl { margin:20px 0; display:grid; gap:14px; }
+.entry dl>div { display:grid; grid-template-columns:110px minmax(0,1fr); gap:12px; }
+.entry dt,.description h3 { color:#a6b29f; font-size:13px; font-weight:400; }
+.entry dd { margin:0; overflow-wrap:anywhere; }
+.description { padding-top:16px; border-top:1px solid #ffffff10; }
+.description h3 { margin:0 0 8px; }
+.description p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; font-size:14px; }
+.actions { display:flex; justify-content:flex-end; gap:10px; margin-top:24px; }
+.actions .delete { color:#ffaaa5; border-color:#ff706c60; background:#ff706c18; }
+.actions .delete:hover:not(:disabled) { background:#ff706c2b; }
+.error { color:#ffaaa5; }
+@media(max-width:600px) { .dialog { padding:18px; }.header h2 { font-size:18px; }.amount strong { font-size:23px; }.entry dl>div { grid-template-columns:90px minmax(0,1fr); }.actions { flex-wrap:wrap; }.actions button { flex:1; } }

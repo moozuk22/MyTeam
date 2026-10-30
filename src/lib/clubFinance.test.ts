@@ -80,7 +80,7 @@ it('creates manual revenue with exact amounts and protects automatic player paym
  expect(tx.clubFinanceEntry.updateMany).toHaveBeenCalledWith(expect.objectContaining({where:{id:category,clubId:club,kind:'revenue',paymentReference:null}}));
  tx.clubFinanceEntry.deleteMany.mockResolvedValue({count:0});
  await expect(mutateClubFinance(club,{action:'deleteRevenue',id:category})).rejects.toThrow('автоматично');
- expect(tx.clubFinanceEntry.deleteMany).toHaveBeenCalledWith({where:{id:category,clubId:club,kind:'revenue',paymentReference:null}});
+ expect(tx.clubFinanceEntry.deleteMany).toHaveBeenCalledWith({where:{id:category,clubId:club,kind:'revenue',paymentReference:null,category:{isMembership:false}}});
 });
 
 it('updates and deletes manual revenue and rejects categories from another club', async () => {
@@ -133,4 +133,28 @@ it('applies the same inclusive month range to totals, categories and paginated e
  expect(tx.clubFinanceEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,occurredAt,kind:'expense',categoryId:category},skip:20,take:20}));
  expect(tx.clubFinanceEntry.count).toHaveBeenCalledWith({where:{clubId:club,voidedAt:null,occurredAt,kind:'expense',categoryId:category}});
  await expect(getClubFinance(club,new URLSearchParams({month:'2026-10..2026-03'}))).rejects.toThrow();
+});
+
+it.each(['deleteRevenue','deleteExpense'])('excludes membership fee categories when handling %s', async action => {
+ tx.clubFinanceEntry.deleteMany.mockResolvedValue({count:0});
+ await expect(mutateClubFinance(club,{action,id:category})).rejects.toThrow();
+ expect(tx.clubFinanceEntry.deleteMany).toHaveBeenCalledWith({where:{id:category,clubId:club,kind:action === 'deleteRevenue' ? 'revenue' : 'expense',paymentReference:null,category:{isMembership:false}}});
+});
+
+it('marks membership fees as non-deletable even after the category is renamed', async () => {
+ tx.club.findUnique.mockResolvedValue({financeStartedAt:new Date(),paymentWorkflow:'calendar_month',defaultPaymentAmount:'60'});
+ tx.player.findMany.mockResolvedValue([]);
+ tx.clubFinanceCategory.findMany.mockResolvedValue([]);
+ tx.clubFinanceEntry.groupBy.mockResolvedValue([]);
+ tx.clubFinanceEntry.count.mockResolvedValue(3);
+ const entry = {id:category,categoryId:category,kind:'revenue',amount:new Prisma.Decimal('60'),currency:'EUR',occurredAt:new Date(),description:null,playerName:null,paymentReference:null};
+ tx.clubFinanceEntry.findMany.mockResolvedValue([
+  {...entry,category:{name:'Преименуван членски внос',isMembership:true}},
+  {...entry,id:'manual',category:{name:'Дарения',isMembership:false}},
+  {...entry,id:'automatic',paymentReference:'payment',category:{name:'Членски внос',isMembership:true}},
+ ]);
+ const result = await getClubFinance(club,new URLSearchParams({month:'all'}));
+ expect(result.entries.map(({editable,deletable}) => ({editable,deletable}))).toEqual([
+  {editable:true,deletable:false},{editable:true,deletable:true},{editable:false,deletable:false},
+ ]);
 });

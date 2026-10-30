@@ -108,3 +108,11 @@ it('uses one category list and keeps expense charts separate from revenue in the
  expect(html).toContain('Приходи</small>150,00');
  expect(html).toContain('Разходи</small>35,00');
 });
+
+it('uses the neutral debts state only after confirming there are no outstanding debts', () => {
+ const render = (data:View | null) => renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
+ expect(render({...base,outstanding:'0.00',debts:[],incomplete:false})).toContain('data-empty="true"');
+ expect(render(base)).toContain('data-empty="false"');
+ expect(render(null)).toContain('data-empty="false"');
+ expect(render({...base,outstanding:'0.00',debts:[],incomplete:true})).toContain('data-empty="false"');
+});
