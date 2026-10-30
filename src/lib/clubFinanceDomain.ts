@@ -16,12 +16,22 @@ export function financeDayStart(day: string): Date {
   const offset = parts.find(p => p.type === 'timeZoneName')!.value.replace('GMT', '');
   return new Date(`${day}T00:00:00${offset}`);
 }
-export function financePeriod(month: string) {
+export function financePeriod(month: string): { gte: Date; lt: Date } | null {
   if (month === 'all') return null;
+  if (month.includes('..')) {
+    const parts = month.split('..');
+    if (parts.length !== 2 || parts.some(part => !/^\d{4}-(0[1-9]|1[0-2])$/.test(part)) || parts[0] > parts[1]) throw new FinanceError('Невалиден период.');
+    return { gte: financePeriod(parts[0])!.gte, lt: financePeriod(parts[1])!.lt };
+  }
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || Number(month.slice(0,4)) < 1900 || Number(month.slice(0,4)) > 9998) throw new FinanceError('Невалиден месец.');
   const next = new Date(`${month}-01T00:00:00Z`);
   next.setUTCMonth(next.getUTCMonth() + 1);
   return { gte: financeDayStart(`${month}-01`), lt: financeDayStart(next.toISOString().slice(0,10)) };
+}
+export function financePeriodLabel(period: string): string {
+  if (period === 'all') return 'От началото';
+  const formatter = new Intl.DateTimeFormat('bg-BG', { month: 'long', year: 'numeric' });
+  return period.split('..').map(month => formatter.format(new Date(`${month}-15T12:00:00`))).join(' – ');
 }
 export type DebtPlayer = FeePlayer & {
   id: string; fullName: string; firstBillingMonth: Date | null; remainingTrainingCredits: number;

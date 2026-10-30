@@ -21,5 +21,5 @@ it('renders the dedicated page for club management and administrators', async ()
  expect(await Page(context)).toBeTruthy();
  mocks.session.mockResolvedValue({roles:['admin']});
  expect(await Page(context)).toBeTruthy();
- expect(mocks.club).toHaveBeenCalledWith({where:{id},select:{name:true}});
+ expect(mocks.club).toHaveBeenCalledWith({where:{id},select:{name:true,imageUrl:true,emblemUrl:true}});
 });

@@ -1,18 +1,39 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { getClubFinance } from '@/lib/clubFinance';
 import { financeDateKey } from '@/lib/clubFinanceDomain';
 import styles from './ClubFinancePanel.module.css';
 import FinanceDashboard from './FinanceDashboard';
-import { CalendarDays, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 type View = Awaited<ReturnType<typeof getClubFinance>>;
 const money = (amount: string, currency = 'EUR') => new Intl.NumberFormat('bg-BG', { style: 'currency', currency }).format(Number(amount));
-export default function ClubFinancePanel({ clubId, revision, compact = false, clubName }: { clubName?: string; clubId: string; revision?: unknown; compact?: boolean }) {
+export default function ClubFinancePanel({ clubId, revision, compact = false, clubName, clubLogoUrl }: { clubLogoUrl?: string | null; clubName?: string; clubId: string; revision?: unknown; compact?: boolean }) {
   const [data,setData] = useState<View | null>(null);
   const [monthlyData,setMonthlyData] = useState<View | null>(null);
-  const [period,setPeriod] = useState<'month' | 'all'>('month');
-  const [selectedMonth,setSelectedMonth] = useState(financeDateKey().slice(0,7));
+  const [period,setPeriod] = useState<'range' | 'all'>('range');
+  const [rangeOpen,setRangeOpen] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const rangeButtonRef = useRef<HTMLButtonElement>(null);
+  const rangeId = useId();
+  useEffect(() => {
+    if (!rangeOpen) return;
+    const dismiss = (event: PointerEvent) => {
+      if (event.target instanceof Node && !filtersRef.current?.contains(event.target)) setRangeOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setRangeOpen(false);
+        rangeButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown',dismiss);
+    document.addEventListener('keydown',escape);
+    return () => { document.removeEventListener('pointerdown',dismiss); document.removeEventListener('keydown',escape); };
+  }, [rangeOpen]);
+  const [rangeStart,setRangeStart] = useState(financeDateKey().slice(0,7));
+  const [rangeEnd,setRangeEnd] = useState(financeDateKey().slice(0,7));
+  const reportPeriod = `${rangeStart}..${rangeEnd}`;
   const [error,setError] = useState('');
   const [loading,setLoading] = useState(false);
   const requestId = useRef(0);
@@ -27,11 +48,11 @@ export default function ClubFinancePanel({ clubId, revision, compact = false, cl
         if (!response.ok) throw new Error(result.error);
         return result;
       };
-      const [result,monthly] = await Promise.all([load('all'), compact ? Promise.resolve(null) : load(selectedMonth)]);
+      const [result,monthly] = await Promise.all([load('all'), compact ? Promise.resolve(null) : load(reportPeriod)]);
       if (current === requestId.current) { setData(result); setMonthlyData(monthly); setError(''); }
     } catch (err) { if (current === requestId.current) setError(err instanceof Error ? err.message : 'Грешка при зареждане.'); }
     finally { if (current === requestId.current) setLoading(false); }
-  }, [base,compact,selectedMonth]);
+  }, [base,compact,reportPeriod]);
   useEffect(() => {
     void refresh();
     if (!compact) {
@@ -64,21 +85,22 @@ export default function ClubFinancePanel({ clubId, revision, compact = false, cl
   </section>;
   return <section className={styles.overview} aria-label="Финанси на клуба" aria-busy={loading || (!data && !error)}>
     {error && <p role="alert" className={styles.error}>{error} <button type="button" onClick={() => void refresh()}>Опитай отново</button></p>}
-    <FinanceDashboard clubName={clubName} clubId={clubId} data={data} report={period === 'all' ? data : monthlyData} month={period === 'all' ? 'all' : selectedMonth} onSaved={refresh} filters={<div className={styles.periodFilters} role="group" aria-label="Период за приходите и разходите">
-      <label className={styles.monthControl} data-active={period === 'month'}>
-        <CalendarDays size={16} aria-hidden="true" /><span>{new Intl.DateTimeFormat('bg-BG', { month: 'long', year: 'numeric' }).format(new Date(`${selectedMonth}-15T12:00:00`))}</span><ChevronDown size={14} aria-hidden="true" />
-      <input className={styles.monthPicker} data-active={period === 'month'} type="month" aria-label="Месец за приходите и разходите" value={selectedMonth} max={financeDateKey().slice(0,7)} onClick={event => {
-        setPeriod('month');
-        try { event.currentTarget.showPicker(); } catch { /* The native field remains editable when a picker is unavailable. */ }
-      }} onChange={event => {
-        const month = event.target.value;
-        if (/^\d{4}-\d{2}$/.test(month) && month <= financeDateKey().slice(0,7) && month !== selectedMonth) {
-          setPeriod('month');
-          setMonthlyData(null);
-          setSelectedMonth(month);
-        }
-      }} /></label>
-      <button type="button" aria-pressed={period === 'all'} onClick={() => setPeriod('all')}>От началото</button>
+    <FinanceDashboard clubLogoUrl={clubLogoUrl} clubName={clubName} clubId={clubId} data={data} report={period === 'all' ? data : monthlyData?.month === reportPeriod ? monthlyData : null} month={period === 'all' ? 'all' : reportPeriod} onSaved={refresh} filters={<div ref={filtersRef} onBlur={event => { if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setRangeOpen(false); }} className={styles.periodFilters} role="group" aria-label="Период за приходите и разходите">
+      <button ref={rangeButtonRef} type="button" aria-pressed={period === 'range'} aria-expanded={rangeOpen} aria-controls={rangeId} onClick={() => { setPeriod('range'); setRangeOpen(open => !open); }}>Период<ChevronDown size={15} aria-hidden="true" className={rangeOpen ? styles.chevronOpen : undefined} /></button>
+      <button type="button" aria-pressed={period === 'all'} onClick={() => { setPeriod('all'); setRangeOpen(false); }}>От началото</button>
+      <div id={rangeId} hidden={!rangeOpen} className={styles.rangeControls}>
+        <label>От месец<input type="month" aria-label="От месец" min="1900-01" max={financeDateKey().slice(0,7)} value={rangeStart} onChange={event => {
+          const value = event.target.value;
+          if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(value) || value < '1900-01' || value > financeDateKey().slice(0,7)) return;
+          setRangeStart(value);
+          if (value > rangeEnd) setRangeEnd(value);
+        }} /></label>
+        <label>До месец<input type="month" aria-label="До месец" min={rangeStart} max={financeDateKey().slice(0,7)} value={rangeEnd} onChange={event => {
+          const value = event.target.value;
+          if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(value) || value < rangeStart || value > financeDateKey().slice(0,7)) return;
+          setRangeEnd(value);
+        }} /></label>
+      </div>
     </div>
     } />
   </section>;

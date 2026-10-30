@@ -33,7 +33,6 @@
 .categoryFilter>label { color:#aaa; font-size:12px; }
 .selectWrap { display:block; position:relative; min-width:0; }
 .selectWrap>svg { position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:#bcbcb6; }
-.dashboard .selectWrap select { appearance:none; padding-right:34px; }
 .categoryFilter .selectWrap { width:230px; max-width:100%; }
 .dashboard :is(.expenseForm,.categoryForm,.categoryFilter) :is(input,select,textarea) { width:100%; min-width:0; min-height:40px; padding:10px 12px; border:1px solid #373733; border-radius:7px; color:#eee; background:linear-gradient(#232423,#1b1c1b); font:inherit; font-size:13px; line-height:1.4; color-scheme:dark; }
 .tableWrap table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px; }
@@ -64,7 +63,7 @@
 .box.debts { border-color:rgba(255,112,108,.32); background:radial-gradient(ellipse at top left,rgba(255,112,108,.2),transparent 75%),linear-gradient(120deg,#251b19,#191515); box-shadow:inset 0 1px 0 rgba(255,112,108,.08); }
 .debts>.panelHeading { font-size:15px; margin-bottom:10px; color:var(--finance-red); }.debts>.panelHeading svg { color:var(--finance-red); }
 .debtTotal { display:flex; align-items:baseline; flex-wrap:wrap; gap:10px; margin:0 0 15px 31px; }.debtTotal strong { color:var(--finance-red); font-size:23px; font-weight:650; }.debtTotal small { color:#aaa; font-size:11px; }
-.debtList,.categoryList { margin:0; padding:0; list-style:none; }.debtList li { display:flex; align-items:center; gap:9px; padding:11px 0; border-top:1px solid #302624; font-size:12px; }.debtList li>span:nth-child(2) { flex:1; min-width:0; overflow-wrap:anywhere; line-height:1.4; }.debtList small { display:block; color:#a99e98; font-size:10px; margin-top:4px; }.debtList strong { color:var(--finance-red); font-size:12px; text-align:right; font-variant-numeric:tabular-nums; }
+.debtList,.categoryList { margin:0; padding:0; list-style:none; }.debtList li { display:flex; align-items:center; gap:9px; padding:11px 0; border-top:1px solid #302624; font-size:12px; }.debtPlayer>span:nth-child(2) { flex:1; min-width:0; overflow-wrap:anywhere; line-height:1.4; }.debtList small { display:block; color:#a99e98; font-size:10px; margin-top:4px; }.debtList strong { color:var(--finance-red); font-size:12px; text-align:right; font-variant-numeric:tabular-nums; }
 .avatar { display:grid; flex-shrink:0; place-items:center; width:28px; height:28px; border-radius:50%; background:linear-gradient(#484743,#32312e); color:#deded9; }
 .dashboard .wide { width:100%; margin-top:10px; color:var(--finance-accent); border-color:#35552d; }
 .categoryList li { display:flex; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid #292a26; font-size:12px; }.categoryList li>span:first-child { flex:1; min-width:0; overflow-wrap:anywhere; }.categoryList small { display:block; color:#999; font-size:10px; margin-top:4px; }.categoryTotals { text-align:right; color:var(--finance-accent); font-size:12px; }.categoryTotals strong { display:block; }.categoryList+button { margin-top:16px; }.categoryForm button { margin:12px 8px 0 0; }
@@ -101,7 +100,7 @@
 .ledger>.panelHeading::after { display:none; }
 .filterChips { display:flex; flex-wrap:wrap; gap:6px; margin:22px 0 20px; }
 .dashboard .filterChips button { min-height:33px; border-radius:24px; padding:7px 13px; font-size:11px; background:linear-gradient(#20211f,#151614); }
-.dashboard .filterChips button[aria-pressed="true"] { background:rgba(50,205,50,.2); color:#9cff9c; border-color:#32cd32; font-weight:600; }
+.dashboard .filterChips button[aria-pressed="true"] { opacity:1; background:rgba(50,205,50,.2); color:#9cff9c; border-color:#32cd32; font-weight:600; }
 .tableWrap th:first-child { width:20%; }.tableWrap th:nth-child(2) { width:28%; }.tableWrap th:nth-child(3) { width:26%; }
 .tableWrap td { height:64px; }.tableWrap td:first-child { white-space:nowrap; font-size:10px; }
 .entryIcon { display:inline-grid; place-items:center; width:29px; height:30px; margin-right:10px; border-radius:7px; background:linear-gradient(#30312e,#222320); color:#c5c6c1; vertical-align:middle; }
@@ -265,7 +264,11 @@
 .categoriesDialog .categoryList li[data-category-id] { cursor:grab; touch-action:none; user-select:none; }
 .categoriesDialog .categoryList li.categoryDragPreview { will-change:transform; touch-action:none; }
 .categoriesDialog .categoryList li.categoryDragPreview { contain:layout style paint; box-shadow:0 6px 16px #0006; }
-.categoryHelp { color:#9eab9a; font-size:12px; line-height:1.6; margin:14px 0 0; }
+.categoryHelp { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; margin:16px 0 0; border:1px solid #facc1533; border-radius:10px; background:#facc150a; color:#d6cda9; font-size:12px; line-height:1.65; }
+.categoryHelp>svg { flex-shrink:0; margin-top:2px; color:#facc15; }
+.categoryHelp>div { min-width:0; }
+.categoryHelp strong { display:block; color:#fde68a; font-size:13px; font-weight:600; }
+.categoryHelp p { margin:5px 0 0; }
 .categoriesDialog .categoryList li { flex-wrap:wrap; }
 .categoriesDialog .categoryList .categoryDeactivate { min-height:32px; padding:6px 10px; font-size:11px; color:#d8a8a3; border-color:#ff706c26; background:#ff706c08; }
 .categoryConfirmation { width:min(450px,calc(100vw - 32px)); }
@@ -286,3 +289,69 @@
 .categoriesDialog .categoryList li[data-active=false]:hover { background:rgba(255,112,108,.11); border-color:rgba(255,112,108,.35); }
 .categoriesDialog .categoryList li[data-drop-target] { border-color:#32cd3290; box-shadow:inset 0 2px 0 #32cd32; }
 .categoriesDialog .categoryList button.categoryVisibilityButton { width:36px; min-width:36px; min-height:36px; padding:0; margin-left:0; flex-shrink:0; }
+
+/* Keep arrow clearance after the form padding overrides. */
+.dashboard .selectWrap select { appearance:none; padding-right:34px; cursor:pointer; text-overflow:ellipsis; }
+.dashboard .selectWrap option { color:#eee; background:#1b1c1b; }
+.dashboard .selectWrap select:required:invalid { color:var(--muted); }
+
+.avatar { position:relative; overflow:hidden; }
+.avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+
+.dashboard .debtPlayer { display:flex; justify-content:flex-start; width:100%; min-width:0; padding:4px; border:0; border-radius:5px; background:transparent; text-align:left; gap:9px; font:inherit; }
+.dashboard .debtPlayer:hover { background:#ffffff08; }
+
+@media (max-width:700px), (pointer:coarse) {
+ .categoriesDialog .categoryList li[data-category-id] { cursor:default; touch-action:pan-y; user-select:auto; }
+ .categoriesDialog .categoryList li>.categoryDragHandle { display:none; }
+}
+
+/* Keep mobile controls fixed and scroll only the category list. */
+@media (max-width:700px) {
+ .categoriesDialog { inset:0; width:calc(100% - 24px); max-width:600px; height:88dvh; max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); margin:auto; padding:16px; border:1px solid #344333; border-radius:18px; overflow:hidden; overscroll-behavior:contain; }
+ .categoriesDialog[open] { display:flex; flex-direction:column; }
+ .categoriesDialog>* { flex-shrink:0; }
+ .categoriesDialog .categoryForm { flex-shrink:1; min-height:0; overflow-y:auto; }
+ .categoriesDialog .dialogHeader { margin-bottom:12px; padding-bottom:12px; }
+ .categoriesDialog .categoryHelp { gap:9px; margin-top:12px; padding:10px 12px; }
+ .categoriesDialog .categoryList { flex:1; min-height:0; max-height:none; overflow-x:hidden; overflow-y:auto; padding-right:0; scrollbar-gutter:auto; scrollbar-width:none; overscroll-behavior:contain; }
+ .categoriesDialog .categoryList li { padding:8px; margin-bottom:5px; }
+ .categoriesDialog .categorySaveStatus { min-height:0; }
+ .categoriesDialog .categorySaveStatus:empty { display:none; }
+}
+
+@media (max-width:700px) {
+ .categoriesDialog { scrollbar-width:none; }
+ .categoriesDialog::-webkit-scrollbar,
+ .categoriesDialog .categoryList::-webkit-scrollbar { display:none; width:0; height:0; }
+}
+
+@media (max-width:700px) {
+ :global(html):has(.categoriesDialog[open]),
+ :global(body):has(.categoriesDialog[open]) { overflow:hidden; scrollbar-width:none; scrollbar-gutter:auto; }
+ :global(html):has(.categoriesDialog[open])::-webkit-scrollbar,
+ :global(body):has(.categoriesDialog[open])::-webkit-scrollbar { display:none; width:0; height:0; }
+}
+
+/* Club identity in the finance heading. */
+.title { display:flex; align-items:center; gap:14px; }
+.clubLogo { position:relative; display:grid; place-items:center; flex:0 0 56px; width:56px; height:56px; overflow:hidden; border:1px solid #6ed79230; border-radius:14px; background:linear-gradient(145deg,#253023,#171c16); color:#91c7a1; box-shadow:0 4px 14px #0003; }
+.clubLogo img { position:absolute; inset:0; width:100%; height:100%; padding:5px; object-fit:contain; background:#171c16; }
+.titleText { min-width:0; }
+.title .titleText h1 { margin:0; font-size:clamp(22px,2.4vw,30px); line-height:1.2; letter-spacing:-.6px; }
+.title .titleText p { margin:5px 0 0; color:#bbc8b6; font-size:14px; font-weight:500; line-height:1.4; white-space:normal; overflow-wrap:anywhere; }
+@media(max-width:700px) {
+ .title { gap:11px; }
+ .clubLogo { flex-basis:48px; width:48px; height:48px; border-radius:12px; }
+ .title .titleText h1 { font-size:22px; }
+ .title .titleText p { font-size:13px; }
+}
+
+.ledgerViews { display:flex; gap:8px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid #30322c; }
+.ledgerViews button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:9px 18px; }
+.dashboard .ledgerViews button[aria-pressed="true"] { opacity:1; border-color:#32cd3280; background:#32cd321a; color:#9cff9c; }
+.ledgerView[hidden],.analysisView[hidden] { display:none; }
+.analysisView { min-height:240px; }
+.ledgerView>.panelHeading { margin-bottom:10px; font-size:17px; font-weight:600; color:var(--finance-accent); }
+.ledgerView>.panelHeading svg { vertical-align:middle; margin-right:9px; }
+@media(max-width:700px) { .ledgerViews button { flex:1; }.ledgerView>.panelHeading { font-size:14px; } }

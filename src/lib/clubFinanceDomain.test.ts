@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { financeDayStart, financePeriod, playerDebt, type DebtPlayer } from './clubFinanceDomain';
+import { financeDayStart, financePeriod, financePeriodLabel, playerDebt, type DebtPlayer } from './clubFinanceDomain';
 const date = (month: string) => new Date(`${month}-01T00:00:00Z`);
 const player: DebtPlayer = { id: 'p', fullName: 'Player', paymentAmount: '0', firstBillingMonth: date('2026-08'), remainingTrainingCredits: 0, paymentLogs: [], paymentWaivers: [] };
 describe('club finance reporting', () => {
+  it('includes the entire start and end months in a range across Sofia DST changes', () => {
+    const range = financePeriod('2026-03..2026-10')!;
+    expect(range.gte.toISOString()).toBe('2026-02-28T22:00:00.000Z');
+    expect(range.lt.toISOString()).toBe('2026-10-31T22:00:00.000Z');
+    expect(financePeriod('2026-10..2026-10')).toEqual(financePeriod('2026-10'));
+    expect(financePeriod('2026-12..2027-01')!.lt.toISOString()).toBe('2027-01-31T22:00:00.000Z');
+    expect(financePeriodLabel('2026-03..2026-10')).toBe('март 2026 г. – октомври 2026 г.');
+    for (const invalid of ['2026-10..2026-03','2026-00..2026-10','2026-01..all','2026-01..2026-03..2026-05','..2026-10','0000-01..2026-10']) {
+      expect(() => financePeriod(invalid)).toThrow();
+    }
+  });
   it('uses Sofia month boundaries including DST transitions', () => {
     const p = financePeriod('2026-10')!;
     expect(p.gte.toISOString()).toBe('2026-09-30T21:00:00.000Z');

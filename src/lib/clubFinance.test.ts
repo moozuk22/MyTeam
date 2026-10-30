@@ -36,7 +36,7 @@ it('creates categories of either kind and scopes renames by club', async () => {
 
 it('reports exact decimal totals per currency and separates debt from period filters', async () => {
  tx.club.findUnique.mockResolvedValue({ financeStartedAt:new Date('2026-10-29'),paymentWorkflow:'calendar_month',defaultPaymentAmount:'40',billingStatus:'active' });
- tx.player.findMany.mockResolvedValue([{ id:'p',fullName:'Player',paymentAmount:'0',firstBillingMonth:new Date('2026-01-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[] }]);
+ tx.player.findMany.mockResolvedValue([{ id:'p',images:[{imageUrl:'https://example.com/other.jpg',isAdminView:false},{imageUrl:'https://example.com/admin.jpg',isAdminView:true}],fullName:'Player',paymentAmount:'0',firstBillingMonth:new Date('2026-01-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[] }]);
  tx.clubFinanceCategory.findMany.mockResolvedValue([]);
  tx.clubFinanceEntry.findMany.mockResolvedValue([]);
  tx.clubFinanceEntry.count.mockResolvedValue(0);
@@ -48,6 +48,8 @@ it('reports exact decimal totals per currency and separates debt from period fil
  const result=await getClubFinance(club,new URLSearchParams({month:'2026-03',kind:'expense'}));
  expect(result.totals).toEqual([{currency:'EUR',revenue:'0.30',expense:'0.10',balance:'0.20'},{currency:'USD',revenue:'10.00',expense:'0.00',balance:'10.00'}]);
  expect(result.debts[0].periods).toContain('2026-01');
+ expect(result.debts[0].avatarUrl).toBe('https://example.com/admin.jpg');
+ expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({select:expect.objectContaining({images:{select:{imageUrl:true,isAdminView:true}}})}));
  expect(tx.clubFinanceEntry.groupBy).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,occurredAt:expect.any(Object)}}));
  expect(tx.clubFinanceEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({kind:'expense'})}));
 });
@@ -110,4 +112,20 @@ it('deactivates and reactivates categories within the current club without touch
  await expect(mutateClubFinance(club,{action:'setCategoryActive',id:category,isActive:'false'})).rejects.toThrow();
  tx.clubFinanceCategory.updateMany.mockResolvedValue({count:0});
  await expect(mutateClubFinance(club,{action:'setCategoryActive',id:category,isActive:false})).rejects.toThrow('не е намерена');
+});
+
+it('applies the same inclusive month range to totals, categories and paginated entries', async () => {
+ tx.club.findUnique.mockResolvedValue({financeStartedAt:new Date('2026-01-01'),paymentWorkflow:'calendar_month',defaultPaymentAmount:'60'});
+ tx.player.findMany.mockResolvedValue([]);
+ tx.clubFinanceCategory.findMany.mockResolvedValue([]);
+ tx.clubFinanceEntry.groupBy.mockResolvedValue([]);
+ tx.clubFinanceEntry.findMany.mockResolvedValue([]);
+ tx.clubFinanceEntry.count.mockResolvedValue(0);
+ const result = await getClubFinance(club,new URLSearchParams({month:'2026-03..2026-10',page:'2',kind:'expense',category}));
+ const occurredAt = {gte:new Date('2026-02-28T22:00:00Z'),lt:new Date('2026-10-31T22:00:00Z')};
+ expect(result.month).toBe('2026-03..2026-10');
+ expect(tx.clubFinanceEntry.groupBy).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,occurredAt}}));
+ expect(tx.clubFinanceEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,occurredAt,kind:'expense',categoryId:category},skip:20,take:20}));
+ expect(tx.clubFinanceEntry.count).toHaveBeenCalledWith({where:{clubId:club,voidedAt:null,occurredAt,kind:'expense',categoryId:category}});
+ await expect(getClubFinance(club,new URLSearchParams({month:'2026-10..2026-03'}))).rejects.toThrow();
 });

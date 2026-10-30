@@ -14,10 +14,10 @@ export default async function ClubFinancePage({ params }: { params: Promise<{ id
   const session = token ? await verifyAdminToken(token) : null;
   if (!session) redirect('/admin/login');
   if (!session.roles.includes('admin') && session.defaultClubId !== id) notFound();
-  const club = await prisma.club.findUnique({ where: { id }, select: { name: true } });
+  const club = await prisma.club.findUnique({ where: { id }, select: { name: true, imageUrl: true, emblemUrl: true } });
   if (!club) notFound();
   return <main className={styles.page}>
     <Link className={styles.back} href={`/admin/members?clubId=${encodeURIComponent(id)}`}>← Към клуба</Link>
-    <ClubFinancePanel clubId={id} clubName={club.name} />
+    <ClubFinancePanel clubId={id} clubName={club.name} clubLogoUrl={club.imageUrl || club.emblemUrl} />
   </main>;
 }

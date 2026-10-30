@@ -1,3 +1,4 @@
+import { applyCloudinaryTransformToUrl, buildCloudinaryUrlFromUploadPath } from './cloudinaryImagePath';
 import { Prisma } from '@prisma/client';
 import { prisma } from './db';
 import { financeDateKey, financeDayStart, financePeriod, FinanceError, playerDebt } from './clubFinanceDomain';
@@ -26,7 +27,7 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
       tx.clubFinanceEntry.groupBy({ by: ['kind','currency','categoryId'], where, _sum: { amount: true } }),
       tx.clubFinanceEntry.findMany({ where: listWhere, orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }], skip: (page-1)*20, take: 20, include: { category: { select: { name: true } } } }),
       tx.clubFinanceEntry.count({ where: listWhere }),
-      tx.player.findMany({ where: { clubId, isActive: true }, select: { id: true, fullName: true, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
+      tx.player.findMany({ where: { clubId, isActive: true }, select: { id: true, fullName: true, images: { select: { imageUrl: true, isAdminView: true } }, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
     ]);
     const currencies = new Map<string, { revenue: Prisma.Decimal; expense: Prisma.Decimal }>();
     currencies.set('EUR', { revenue: new Prisma.Decimal(0), expense: new Prisma.Decimal(0) });
@@ -36,7 +37,15 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
       else sums.expense = sums.expense.add(row._sum.amount ?? 0);
       currencies.set(row.currency,sums);
     }
-    const debt = players.map(p => playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount)).filter(p => p.periods.length);
+    const debt = players.map(p => {
+      const imagePath = (p.images?.find(image => image.isAdminView) ?? p.images?.[0])?.imageUrl;
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? '';
+      const transform = 'w_80,h_80,c_fill,g_face,f_auto,q_auto';
+      const avatarUrl = !imagePath ? null : imagePath.startsWith('http')
+        ? applyCloudinaryTransformToUrl(imagePath, transform)
+        : cloudName ? buildCloudinaryUrlFromUploadPath(imagePath, cloudName, transform) : null;
+      return { ...playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount), avatarUrl };
+    }).filter(p => p.periods.length);
     let outstanding = new Prisma.Decimal(0);
     const debts = debt.map(p => { const amount = p.fee === null ? null : new Prisma.Decimal(p.fee).mul(p.periods.length); if (amount) outstanding = outstanding.add(amount); return { ...p, amount: amount?.toFixed(2) ?? null }; });
     return { month, page, count, startedAt: club.financeStartedAt.toISOString(), categories,
