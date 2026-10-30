@@ -158,3 +158,13 @@ it('marks membership fees as non-deletable even after the category is renamed', 
   {editable:true,deletable:false},{editable:true,deletable:true},{editable:false,deletable:false},
  ]);
 });
+
+it('stores optional palette colors and supports clearing without overwriting omitted colors', async () => {
+ await mutateClubFinance(club,{action:'createCategory',name:'Colored',color:'#E53935'});
+ expect(tx.clubFinanceCategory.create).toHaveBeenLastCalledWith({data:{clubId:club,name:'Colored',color:'#E53935'}});
+ tx.clubFinanceCategory.updateMany.mockResolvedValue({count:1});
+ await mutateClubFinance(club,{action:'renameCategory',id:category,name:'Clear',color:null});
+ expect(tx.clubFinanceCategory.updateMany).toHaveBeenLastCalledWith({where:{id:category,clubId:club},data:{name:'Clear',color:null}});
+ await expect(mutateClubFinance(club,{action:'createCategory',name:'Invalid',color:'#123456'})).rejects.toThrow('палитрата');
+ await expect(mutateClubFinance(club,{action:'createCategory',name:'Invalid',color:123})).rejects.toThrow('палитрата');
+});

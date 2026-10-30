@@ -4,6 +4,7 @@ import { Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpRight, CreditCard
 import type { getClubFinance } from '@/lib/clubFinance';
 import { financeDateKey, financePeriodLabel } from '@/lib/clubFinanceDomain';
 import styles from './FinanceDashboard.module.css';
+import { CUSTOM_TRAINING_GROUP_COLOR_PALETTE, customTrainingGroupAccentRgba, customTrainingGroupReadableOnAccent } from '@/lib/customTrainingGroupColors';
 import { lockCategoryPageScroll } from './categoryModalScroll';
 import { categoryDragScrollSpeed } from './categoryDragScroll';
 import FinanceActionDropdown from './FinanceActionDropdown';
@@ -53,7 +54,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   const [listError,setListError] = useState('');
   const [draft,setDraft] = useState<Draft | null>({ categoryId: '', amount: '', date: financeDateKey(), description: '' });
   const [remove,setRemove] = useState<View['entries'][number] | null>(null);
-  const [categoryEdit,setCategoryEdit] = useState<{ id?: string; name: string } | null>(null);
+  const [categoryEdit,setCategoryEdit] = useState<{ id?: string; name: string; color?: string | null } | null>(null);
   const [categoryStatus,setCategoryStatus] = useState<{id:string;name:string;isActive:boolean} | null>(null);
   const categoryConfirmRef = useRef<HTMLDialogElement>(null);
   const [ordering,setOrdering] = useState(false);
@@ -255,10 +256,27 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
     } catch (err) { setError(err instanceof Error ? err.message : 'Грешка при запис.'); }
     finally { setSaving(false); }
   }
+  const categoryEditorRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (categoryEdit) categoryEditorRef.current?.showModal();
+    else categoryEditorRef.current?.close();
+  }, [categoryEdit]);
+  const [showCategoryColors,setShowCategoryColors] = useState(true);
+  useEffect(() => {
+    try {
+      // Restore this browser's display preference after hydration.
+      setShowCategoryColors(localStorage.getItem('finance-category-colors') !== 'hidden');
+    } catch { /* Storage may be unavailable; keep colors visible. */ }
+  }, []);
+  function toggleCategoryColors() {
+    const visible = !showCategoryColors;
+    setShowCategoryColors(visible);
+    try { localStorage.setItem('finance-category-colors',visible ? 'visible' : 'hidden'); } catch { /* The toggle still works for this visit. */ }
+  }
   const categoryCharts = (report?.totals ?? []).map(total => {
     const colors = ['#65cf8a','#4b9ce5','#ed706d','#ad79d9','#e1bf66','#66c9be'];
     const rows = categories.map((category,index) => ({
-      name: category.name, color: colors[index % colors.length],
+      name: category.name, color: showCategoryColors ? category.color || colors[index % colors.length] : '#93988f',
       amount: Number(report?.subtotals.find(row => row.categoryId === category.id && row.currency === total.currency && row.kind === 'expense')?.amount ?? 0),
     })).filter(row => row.amount > 0);
     const sum = rows.reduce((value,row) => value + row.amount,0);
@@ -349,9 +367,9 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
           </div>
           <div id={`${ledgerId}-history`} className={styles.ledgerView} hidden={ledgerView !== 'history'} role="region" aria-label="История">
           <header className={styles.panelHeading}><div className={styles.ledgerHeading}><List size={20} />{entryKind === 'all' ? 'Всички записи' : entryKind === 'revenue' ? 'Приходи' : 'Разходи'} <span>Всички записи за избрания период</span></div></header>
-          <div className={styles.ledgerToolbar}><div className={styles.entryTabs} role="group" aria-label="Вид записи"><button type="button" aria-pressed={entryKind === 'all'} onClick={() => selectKind('all')}>Всички</button><button type="button" aria-pressed={entryKind === 'expense'} onClick={() => selectKind('expense')}>Разходи</button><button type="button" aria-pressed={entryKind === 'revenue'} onClick={() => selectKind('revenue')}>Приходи</button></div><div className={styles.management}><button type="button" disabled={!data} onClick={() => { setCategoryEdit(null); setError(''); categoriesDialogRef.current?.showModal(); }}><CreditCard size={18} />Управление на категории</button></div></div>
+          <div className={styles.ledgerToolbar}><div className={styles.entryTabs} role="group" aria-label="Вид записи"><button type="button" aria-pressed={entryKind === 'all'} onClick={() => selectKind('all')}>Всички</button><button type="button" aria-pressed={entryKind === 'expense'} onClick={() => selectKind('expense')}>Разходи</button><button type="button" aria-pressed={entryKind === 'revenue'} onClick={() => selectKind('revenue')}>Приходи</button></div><div className={styles.management}><button type="button" onClick={toggleCategoryColors}>{showCategoryColors ? 'Изключи цветовете' : 'Включи цветовете'}</button><button type="button" disabled={!data} onClick={() => { setCategoryEdit(null); setError(''); categoriesDialogRef.current?.showModal(); }}><CreditCard size={18} />Управление на категории</button></div></div>
           <div className={styles.filterChips} role="group" aria-label="Филтрирай записите по категория">
-            {!data ? <FinanceSkeleton variant="categoryChips" /> : [{ id: '', name: 'Всички' }, ...listCategories].map(item => <button key={item.id} type="button" aria-pressed={category === item.id} disabled={category === item.id} onClick={() => { setCategory(item.id); setPage(1); setList(null); }}>{item.name}</button>)}
+            {!data ? <FinanceSkeleton variant="categoryChips" /> : [{ id: '', name: 'Всички' }, ...listCategories].map(item => <button key={item.id} type="button" aria-pressed={category === item.id} disabled={category === item.id} onClick={() => { setCategory(item.id); setPage(1); setList(null); }}>{showCategoryColors && 'color' in item && typeof item.color === 'string' && item.color && <i className={styles.categorySwatch} style={{background:String(item.color)}} aria-hidden="true" />}{item.name}</button>)}
           </div>
           <div className={styles.categoryFilter}>
             <label htmlFor="finance-expense-category">Категория</label>
@@ -361,10 +379,10 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
           {listError && <p role="alert" className={styles.error}>{listError} <button type="button" onClick={() => setRevision(v => v+1)}>Опитай отново</button></p>}
           {!periodList ? !listError && <FinanceSkeleton /> : <>
             {periodList.count ? <div className={styles.tableWrap}><table><thead><tr><th>Дата</th><th>Описание</th><th>Категория</th><th>Сума</th><th><span className={styles.srOnly}>Действия</span></th></tr></thead><tbody>
-              {(allExpenses ? periodList.entries : periodList.entries.slice(0,5)).map(entry => <tr key={entry.id}>
+              {(allExpenses ? periodList.entries : periodList.entries.slice(0,5)).map(entry => <tr key={entry.id} style={(() => { const color = showCategoryColors ? data?.categories.find(c => c.id === entry.categoryId)?.color : null; return color ? {background:customTrainingGroupAccentRgba(color,0.2),boxShadow:`inset 3px 0 ${color}`} : undefined; })()}>
                 <td data-label="Дата"><span className={styles.entryIcon}>{(() => { const name = entry.category.toLowerCase(); const Icon = /транспорт|гориво/.test(name) ? Bus : /състез|турнир|такс/.test(name) ? Trophy : /екип|топк/.test(name) ? Shirt : /наем|трениров/.test(name) ? House : FileText; return <Icon size={17} aria-hidden="true" />; })()}</span>{entry.date.split('-').reverse().join('.')}</td>
                 <td data-label="Описание" className={styles.description}>{entry.description || entry.playerName || (entry.kind === 'revenue' ? 'Приход без описание' : 'Разход без описание')}</td>
-                <td data-label="Категория"><span className={`${styles.tag} ${(/транспорт|гориво/i.test(entry.category) ? styles.tagBlue : /екип|топк/i.test(entry.category) ? styles.tagPurple : /наем|трениров/i.test(entry.category) ? styles.tagGreen : /състез|турнир/i.test(entry.category) ? styles.tagRed : styles.tagNeutral)}`}>{entry.category}</span></td>
+                <td data-label="Категория"><span className={`${styles.tag} ${(!showCategoryColors ? styles.tagNeutral : /транспорт|гориво/i.test(entry.category) ? styles.tagBlue : /екип|топк/i.test(entry.category) ? styles.tagPurple : /наем|трениров/i.test(entry.category) ? styles.tagGreen : /състез|турнир/i.test(entry.category) ? styles.tagRed : styles.tagNeutral)}`} style={(() => { const color = showCategoryColors ? data?.categories.find(c => c.id === entry.categoryId)?.color : null; return color ? {background:color,color:customTrainingGroupReadableOnAccent(color)} : undefined; })()}>{entry.category}</span></td>
                 <td data-label="Сума" className={`${styles.amount} ${entry.kind === 'revenue' ? styles.incomeAmount : ''}`}>{money(entry.amount,entry.currency)}</td>
                 <td className={styles.actionCell}>{entry.editable && <details className={styles.rowMenu} onKeyDown={event => { if (event.key === 'Escape') event.currentTarget.open = false; }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
                   <summary aria-label={`Действия за ${entry.description || entry.category}`}><MoreVertical size={19} /></summary>
@@ -379,7 +397,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
           </div>
           </div>
           <div id={`${ledgerId}-analysis`} className={styles.analysisView} hidden={ledgerView !== 'analysis'} role="region" aria-label="Анализ">
-            {ledgerView === 'analysis' && <Suspense fallback={<FinanceSkeleton variant="analysis" />}><FinanceAnalysis clubId={clubId} revision={data} /></Suspense>}
+            {ledgerView === 'analysis' && <Suspense fallback={<FinanceSkeleton variant="analysis" />}><FinanceAnalysis showCategoryColors={showCategoryColors} clubId={clubId} revision={data} /></Suspense>}
           </div>
         </section>
 
@@ -387,16 +405,21 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
         <dialog onClick={closeOnBackdrop} ref={categoriesDialogRef} className={styles.categoriesDialog} aria-labelledby="finance-categories-title" onCancel={event => { if (saving) event.preventDefault(); }}>
           <header className={styles.dialogHeader}><h2 id="finance-categories-title">Управление на категории</h2><button type="button" disabled={saving} aria-label="Затвори" onClick={() => categoriesDialogRef.current?.close()}><X size={18} /></button></header>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <div className={styles.categoryToolbar}><button type="button" disabled={saving} className={styles.primary} onClick={() => setCategoryEdit({ name: '' })}><Plus size={16} />Нова категория</button></div>
+          <div className={styles.categoryToolbar}><button type="button" disabled={saving} className={styles.primary} onClick={() => { setError(''); setCategoryEdit({ name: '', color: null }); }}><Plus size={16} />Нова категория</button></div>
           <aside className={styles.categoryHelp} aria-label="За скриването на категории">
             <EyeOff size={18} aria-hidden="true" />
             <div><strong>Скриването запазва всички записи</strong><p>„Скрий“ премахва категорията само от избора при добавяне на нов разход или приход. Категорията и записите ѝ се запазват. Можете да я активирате отново по всяко време.</p></div>
           </aside>
           <div className={`${styles.categoryKindFilters} ${styles.categoryVisibilityFilters}`} role="group" aria-label="Филтрирай категориите по видимост"><button type="button" aria-pressed={categoryVisibility === 'all'} onClick={() => setCategoryVisibility('all')}>Всички</button><button type="button" aria-pressed={categoryVisibility === 'active'} onClick={() => setCategoryVisibility('active')}>Активни</button><button type="button" aria-pressed={categoryVisibility === 'hidden'} onClick={() => setCategoryVisibility('hidden')}>Скрити</button></div>
-          {categoryEdit && <form className={styles.categoryForm} onSubmit={event => { event.preventDefault(); void mutate({ ...categoryEdit, action: categoryEdit.id ? 'renameCategory' : 'createCategory' }); }}><label>Име<input required maxLength={100} value={categoryEdit.name} onChange={e => setCategoryEdit({ ...categoryEdit,name:e.target.value })} /></label><button type="submit" disabled={saving}>Запази</button><button type="button" onClick={() => setCategoryEdit(null)}>Отказ</button></form>}
-          <div className={styles.categorySaveStatus} role="status" aria-live="polite">{ordering && <>Запазване на подредбата…</>}</div>{!data && <FinanceSkeleton variant="categories" />}<ul className={styles.categoryList} aria-busy={ordering || !data}>{data?.categories.filter(c => categoryVisibility === 'all' || (categoryVisibility === 'active' ? c.isActive : !c.isActive)).map(c => <li key={c.id} title="Плъзнете за подреждане" data-category-id={c.id} data-active={c.isActive} onPointerDown={event => startCategoryDrag(event,c.id)} onPointerMove={moveCategoryDrag} onPointerUp={() => finishCategoryDrag()} onPointerCancel={() => finishCategoryDrag(true)} onLostPointerCapture={() => finishCategoryDrag(true)}><span className={styles.categoryDragHandle} aria-hidden="true"><GripVertical size={17} /></span><span className={styles.categoryNumber} aria-label="Позиция">{(data?.categories.findIndex(item => item.id === c.id) ?? 0) + 1}</span><span className={styles.categoryName}>{c.name}{!c.isActive && <small>Неактивна</small>}</span><span className={styles.categoryTotals}>{!report && <SkeletonLine wide />}{(report?.subtotals.filter(total => total.categoryId === c.id) ?? []).map(total => <strong key={`${total.kind}-${total.currency}`}><small>{total.kind === 'revenue' ? 'Приходи' : 'Разходи'}</small>{money(total.amount,total.currency)}</strong>)}</span><span className={styles.categoryOrder}><button type="button" aria-label={`Премести ${c.name} нагоре`} disabled={saving || categories[0]?.id === c.id} onClick={() => void moveCategory(c.id,-1)}><ArrowUp size={15} /></button><button type="button" aria-label={`Премести ${c.name} надолу`} disabled={saving || categories.at(-1)?.id === c.id} onClick={() => void moveCategory(c.id,1)}><ArrowDown size={15} /></button></span><button type="button" aria-label={`Преименувай ${c.name}`} disabled={saving} onClick={() => setCategoryEdit({ id: c.id,name: c.name })}><Pencil size={16} /></button><button type="button" className={`${styles.categoryVisibilityButton} ${c.isActive ? styles.categoryDeactivate : styles.categoryActivate}`} title={c.isActive ? 'Скрий категорията' : 'Покажи категорията'} aria-label={`${c.isActive ? 'Скрий' : 'Покажи'} ${c.name}`} disabled={saving} onClick={() => { setError(''); setCategoryStatus({id:c.id,name:c.name,isActive:c.isActive}); categoryConfirmRef.current?.showModal(); }}>{c.isActive ? <EyeOff size={16} /> : <Eye size={16} />}</button></li>)}</ul>
+
+          <div className={styles.categorySaveStatus} role="status" aria-live="polite">{ordering && <>Запазване на подредбата…</>}</div>{!data && <FinanceSkeleton variant="categories" />}<ul className={styles.categoryList} aria-busy={ordering || !data}>{data?.categories.filter(c => categoryVisibility === 'all' || (categoryVisibility === 'active' ? c.isActive : !c.isActive)).map(c => <li key={c.id} title="Плъзнете за подреждане" data-category-id={c.id} data-active={c.isActive} onPointerDown={event => startCategoryDrag(event,c.id)} onPointerMove={moveCategoryDrag} onPointerUp={() => finishCategoryDrag()} onPointerCancel={() => finishCategoryDrag(true)} onLostPointerCapture={() => finishCategoryDrag(true)}><span className={styles.categoryDragHandle} aria-hidden="true"><GripVertical size={17} /></span><span className={styles.categoryNumber} aria-label="Позиция">{(data?.categories.findIndex(item => item.id === c.id) ?? 0) + 1}</span><span className={styles.categoryName}>{showCategoryColors && c.color && <i className={styles.categorySwatch} style={{background:c.color}} aria-hidden="true" />}{c.name}{!c.isActive && <small>Неактивна</small>}</span><span className={styles.categoryTotals}>{!report && <SkeletonLine wide />}{(report?.subtotals.filter(total => total.categoryId === c.id) ?? []).map(total => <strong key={`${total.kind}-${total.currency}`}><small>{total.kind === 'revenue' ? 'Приходи' : 'Разходи'}</small>{money(total.amount,total.currency)}</strong>)}</span><span className={styles.categoryOrder}><button type="button" aria-label={`Премести ${c.name} нагоре`} disabled={saving || categories[0]?.id === c.id} onClick={() => void moveCategory(c.id,-1)}><ArrowUp size={15} /></button><button type="button" aria-label={`Премести ${c.name} надолу`} disabled={saving || categories.at(-1)?.id === c.id} onClick={() => void moveCategory(c.id,1)}><ArrowDown size={15} /></button></span><button type="button" aria-label={`Преименувай ${c.name}`} disabled={saving} onClick={() => { setError(''); setCategoryEdit({ id: c.id,name: c.name,color:c.color }); }}><Pencil size={16} /></button><button type="button" className={`${styles.categoryVisibilityButton} ${c.isActive ? styles.categoryDeactivate : styles.categoryActivate}`} title={c.isActive ? 'Скрий категорията' : 'Покажи категорията'} aria-label={`${c.isActive ? 'Скрий' : 'Покажи'} ${c.name}`} disabled={saving} onClick={() => { setError(''); setCategoryStatus({id:c.id,name:c.name,isActive:c.isActive}); categoryConfirmRef.current?.showModal(); }}>{c.isActive ? <EyeOff size={16} /> : <Eye size={16} />}</button></li>)}</ul>
         </dialog>
       </div>
+      <dialog ref={categoryEditorRef} className={`${styles.categoriesDialog} ${styles.categoryConfirmation} ${styles.categoryEditor}`} aria-labelledby="finance-category-editor-title" onClose={() => setCategoryEdit(null)} onCancel={event => { if (saving) event.preventDefault(); }} onClick={event => { if (!saving && event.target === event.currentTarget) { const bounds = event.currentTarget.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setCategoryEdit(null); } }}>
+        <header className={styles.dialogHeader}><h2 id="finance-category-editor-title">{categoryEdit?.id ? 'Редактирай категория' : 'Нова категория'}</h2><button type="button" disabled={saving} aria-label="Затвори" onClick={() => setCategoryEdit(null)}><X size={18} /></button></header>
+        {error && <p role="alert" className={styles.error}>{error}</p>}
+        {categoryEdit && <form className={styles.categoryForm} onSubmit={event => { event.preventDefault(); void mutate({ ...categoryEdit, action: categoryEdit.id ? 'renameCategory' : 'createCategory' }); }}><label>Име<input autoFocus required maxLength={100} value={categoryEdit.name} onChange={e => setCategoryEdit({ ...categoryEdit,name:e.target.value })} /></label><fieldset className={styles.categoryColors}><legend>Цвят (незадължително)</legend><button type="button" aria-pressed={!categoryEdit.color} onClick={() => setCategoryEdit({...categoryEdit,color:null})}>Без цвят</button>{CUSTOM_TRAINING_GROUP_COLOR_PALETTE.map(color => <button key={color} type="button" aria-label={`Цвят ${color}`} aria-pressed={categoryEdit.color === color} style={{background:color,color:customTrainingGroupReadableOnAccent(color)}} onClick={() => setCategoryEdit({...categoryEdit,color})}>{categoryEdit.color === color ? '✓' : ''}</button>)}</fieldset><button type="submit" disabled={saving}>Запази</button><button type="button" disabled={saving} onClick={() => setCategoryEdit(null)}>Отказ</button></form>}
+      </dialog>
       <dialog onClick={closeOnBackdrop} ref={categoryConfirmRef} className={`${styles.categoriesDialog} ${styles.categoryConfirmation}`} aria-labelledby="category-status-title" onCancel={event => { if (saving) event.preventDefault(); }}>
         <h2 id="category-status-title">{categoryStatus?.isActive ? 'Деактивиране на категория' : 'Активиране на категория'}</h2>
         <p>{categoryStatus?.isActive ? `Да деактивираме ли „${categoryStatus.name}“? Категорията и съществуващите записи се запазват. Тя няма да се предлага за нови разходи и приходи.` : `Да активираме ли „${categoryStatus?.name}“ отново? Тя ще се предлага при добавяне на нови записи.`}</p>

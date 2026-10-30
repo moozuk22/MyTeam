@@ -32,3 +32,10 @@ it('blurs the viewport behind the blue editing form and keeps the form above it'
  expect(css).toMatch(/\.editBackdrop\s*\{[^}]*position:fixed;[^}]*inset:0;[^}]*z-index:1000;[^}]*backdrop-filter:blur\(5px\);/);
  expect(css).toMatch(/\.dashboard \.expenseForm\.editingForm\s*\{[^}]*z-index:1001;[^}]*border-color:#62aaff;[^}]*background:linear-gradient\(145deg,#172e49,#101c2e\);/);
 });
+
+it('contains desktop category scrolling inside the list rather than the outer dialog', () => {
+ const desktop = css.slice(css.indexOf('/* Desktop category scroll containment. */'));
+ expect(desktop).toMatch(/\.categoriesDialog:not\(\.categoryConfirmation\)\s*\{[^}]*overflow:hidden;/);
+ expect(desktop).toMatch(/\.categoriesDialog:not\(\.categoryConfirmation\)\[open\]\s*\{[^}]*display:flex;[^}]*flex-direction:column;/);
+ expect(desktop).toMatch(/\.categoryList\s*\{[^}]*flex:1;[^}]*min-height:0;[^}]*max-height:none;[^}]*overflow-y:auto;/);
+});

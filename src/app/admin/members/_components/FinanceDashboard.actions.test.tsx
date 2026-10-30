@@ -76,3 +76,33 @@ it('highlights the populated edit form and clears the effect when cancelled', ()
  expect(tree.props['data-editing']).toBe(false);
  expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Добави разход')).toBe(true);
 });
+
+it('toggles category colors and persists the browser display preference without a request', () => {
+ const storage = {getItem:vi.fn(),setItem:vi.fn()};
+ vi.stubGlobal('localStorage',storage);
+ const request=vi.fn();vi.stubGlobal('fetch',request);
+ let tree=render();
+ const toggle = (name:string) => nodes(tree).find(node => node.type === 'button' && text(node) === name)!;
+ click(toggle('Изключи цветовете'));tree=render();
+ expect(toggle('Включи цветовете')).toBeDefined();
+ expect(storage.setItem).toHaveBeenLastCalledWith('finance-category-colors','hidden');
+ click(toggle('Включи цветовете'));tree=render();
+ expect(toggle('Изключи цветовете')).toBeDefined();
+ expect(storage.setItem).toHaveBeenLastCalledWith('finance-category-colors','visible');
+ expect(request).not.toHaveBeenCalled();
+});
+
+it('creates categories inside a separate labeled editor dialog', () => {
+ let tree=render();
+ const create = nodes(tree).find(node => node.type === 'button' && text(node).includes('Нова категория'))!;
+ click(create);tree=render();
+ const editor = nodes(tree).find(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'finance-category-editor-title')!;
+ expect(nodes(editor).some(node => node.type === 'form')).toBe(true);
+ expect(text(editor)).toContain('Цвят (незадължително)');
+ const manager = nodes(tree).find(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'finance-categories-title')!;
+ expect(nodes(manager).some(node => node.type === 'form')).toBe(false);
+ const cancel = nodes(editor).find(node => node.type === 'button' && text(node) === 'Отказ')!;
+ click(cancel);tree=render();
+ expect(nodes(tree).find(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'finance-category-editor-title')?.props.children).toBeDefined();
+ expect(nodes(tree).filter(node => node.type === 'form')).toHaveLength(1); // Only the transaction form remains.
+});

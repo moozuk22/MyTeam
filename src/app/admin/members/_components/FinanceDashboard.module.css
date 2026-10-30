@@ -197,7 +197,7 @@
 
 .ledgerToolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin:16px 0; }
 .ledgerToolbar .entryTabs { margin:0; flex-wrap:wrap; }
-.ledgerToolbar .management { margin-left:auto; }
+.ledgerToolbar .management { display:flex; flex-wrap:wrap; gap:8px; margin-left:auto; }
 .ledgerToolbar .management>button { width:auto; }
 @media(max-width:700px) { .ledgerToolbar .management { width:auto; }.ledgerToolbar .management>button { font-size:11px; } }
 
@@ -439,3 +439,24 @@
 @media(hover:hover) { .dashboard .debts .wide:hover:not(:disabled) { color:#ffaaa5; border-color:var(--finance-red); background:#ff706c20; } }
 .dashboard .box.debts[data-empty=true] { --finance-red:#a8ada6; border-color:#ffffff20; background:linear-gradient(120deg,#232622,#191b18); box-shadow:inset 0 1px 0 #ffffff06; }
 .dashboard .debts[data-empty=true] .empty { color:#a8ada6; }
+
+.categoryColors { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:8px; border:0; padding:0; margin:0; }
+.categoryColors legend { font-size:12px; color:#b6c0b3; margin-bottom:10px; }
+.categoriesDialog .categoryColors button { min-height:30px; min-width:30px; border:2px solid #ffffff40; border-radius:7px; padding:4px; }
+.categoriesDialog .categoryColors button:first-of-type { padding:4px 10px; }
+.categoryColors button[aria-pressed=true] { outline:2px solid #fff; outline-offset:2px; }
+.categorySwatch { display:inline-block; flex-shrink:0; width:10px; height:10px; border-radius:50%; border:1px solid #ffffff55; margin-right:7px; }
+
+/* Desktop category scroll containment. */
+@media (min-width:701px) {
+ .categoriesDialog:not(.categoryConfirmation) { box-sizing:border-box; height:min(800px,90dvh); overflow:hidden; overscroll-behavior:contain; }
+ .categoriesDialog:not(.categoryConfirmation)[open] { display:flex; flex-direction:column; }
+ .categoriesDialog:not(.categoryConfirmation)>* { flex-shrink:0; }
+ .categoriesDialog:not(.categoryConfirmation) .categoryList { flex:1; min-height:0; max-height:none; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; }
+ .categoriesDialog:not(.categoryConfirmation) .categoryForm { flex-shrink:1; min-height:0; overflow-y:auto; }
+ .categoriesDialog:not(.categoryConfirmation) .categorySaveStatus:empty { display:none; }
+}
+
+.categoriesDialog.categoryEditor { box-sizing:border-box; height:auto; max-height:calc(100dvh - 48px); overflow-y:auto; }
+.categoriesDialog.categoryEditor[open] { display:block; }
+.categoryEditor .categoryForm { margin-top:0; }

@@ -884,6 +884,7 @@ model FacebookConnectAttempt {
 }
 
 model ClubFinanceCategory {
+  color String?
   isActive Boolean @default(true) @map("is_active")
   sortOrder Int @default(2147483647) @map("sort_order")
   isMembership Boolean @default(false) @map("is_membership")

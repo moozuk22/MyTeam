@@ -1,4 +1,5 @@
 import { applyCloudinaryTransformToUrl, buildCloudinaryUrlFromUploadPath } from './cloudinaryImagePath';
+import { isCustomTrainingGroupPaletteColor } from './customTrainingGroupColors';
 import { Prisma } from '@prisma/client';
 import { prisma } from './db';
 import { financeDateKey, financeDayStart, financePeriod, financePeriodLabel, FinanceError, playerDebt } from './clubFinanceDomain';
@@ -11,13 +12,12 @@ export function financeId(value: unknown): string {
 export async function getClubFinanceAnalysis(clubId: string, now = new Date()) {
   const currentMonth = financeDateKey(now).slice(0,7);
   const year = Number(currentMonth.slice(0,4));
-  const monthCount = Number(currentMonth.slice(5,7));
-  const period = financePeriod(`${year}-01..${currentMonth}`)!;
+  const period = financePeriod(`${year}-01..${year}-12`)!;
   return prisma.$transaction(async tx => {
     const club = await tx.club.findUnique({ where: { id: clubId }, select: { id: true } });
     if (!club) throw new FinanceError('Клубът не е намерен.',404);
     const [categories, monthly] = await Promise.all([
-      tx.clubFinanceCategory.findMany({ where: { clubId }, orderBy: [{ sortOrder:'asc' }, { name:'asc' }, { id:'asc' }], select: { id:true, name:true } }),
+      tx.clubFinanceCategory.findMany({ where: { clubId }, orderBy: [{ sortOrder:'asc' }, { name:'asc' }, { id:'asc' }], select: { id:true, name:true, color:true } }),
       tx.$queryRaw<{ month:string; categoryId:string; kind:string; currency:string; amount:string }[]>(Prisma.sql`
         SELECT to_char(occurred_at AT TIME ZONE 'Europe/Sofia','YYYY-MM') AS month,
           category_id AS "categoryId",kind,currency,sum(amount)::text AS amount
@@ -27,6 +27,8 @@ export async function getClubFinanceAnalysis(clubId: string, now = new Date()) {
         GROUP BY 1,category_id,kind,currency
       `),
     ]);
+    const latestMonth = monthly.reduce((latest,value) => value.month > latest ? value.month : latest, '') || currentMonth;
+    const monthCount = Number(latestMonth.slice(5,7));
     const annual = new Map<string, { categoryId:string; kind:string; currency:string; amount:Prisma.Decimal }>();
     for (const value of monthly) {
       const key = `${value.categoryId}:${value.kind}:${value.currency}`;
@@ -34,7 +36,7 @@ export async function getClubFinanceAnalysis(clubId: string, now = new Date()) {
       total.amount = total.amount.add(value.amount);
       annual.set(key,total);
     }
-    return { year, currentMonth, categories, rows: [
+    return { year, currentMonth:latestMonth, categories, rows: [
       { key:'year', label:'Текуща година', values:[...annual.values()].map(value => ({...value,amount:value.amount.toFixed(2)})) },
       ...Array.from({length:monthCount},(_,index) => {
         const month = `${year}-${String(monthCount-index).padStart(2,'0')}`;
@@ -114,10 +116,13 @@ export async function mutateClubFinance(clubId: string, body: Record<string, unk
     if (action === 'createCategory' || action === 'renameCategory') {
       const name = text(body.name,100);
       if (!name) throw new FinanceError('Въведете име.');
+      const color = body.color === undefined ? undefined : body.color === null || body.color === '' ? null : body.color;
+      if (color !== undefined && color !== null && (typeof color !== 'string' || !isCustomTrainingGroupPaletteColor(color))) throw new FinanceError('Изберете цвят от палитрата.');
+      const categoryData = { name, ...(color !== undefined ? { color } : {}) };
       if (action === 'createCategory') {
-        return tx.clubFinanceCategory.create({ data: { clubId, name } });
+        return tx.clubFinanceCategory.create({ data: { clubId, ...categoryData } });
       }
-      const changed = await tx.clubFinanceCategory.updateMany({ where: { id: financeId(body.id), clubId }, data: { name } });
+      const changed = await tx.clubFinanceCategory.updateMany({ where: { id: financeId(body.id), clubId }, data: categoryData });
       if (!changed.count) throw new FinanceError('Категорията не е намерена.',404);
       return { ok: true };
     }

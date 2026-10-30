@@ -12,7 +12,7 @@ const cents = (amount: string) => {
  return BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2,'0'));
 };
 
-export function FinanceAnalysisTable({ data }: { data: Analysis }) {
+export function FinanceAnalysisTable({ data, showCategoryColors = true }: { data: Analysis; showCategoryColors?: boolean }) {
  const drag = useRef<{pointerId:number; x:number; scrollLeft:number} | null>(null);
  function startDrag(event: PointerEvent<HTMLDivElement>) {
   const table = event.currentTarget;
@@ -43,7 +43,7 @@ export function FinanceAnalysisTable({ data }: { data: Analysis }) {
  return <div className={styles.analysisTableWrap} role="region" aria-label="Финансов анализ по категории" tabIndex={0} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}>
   <table className={styles.analysisTable}>
    <caption>Приходи и разходи по категории · {data.year} · януари – {new Intl.DateTimeFormat('bg-BG',{month:'long'}).format(new Date(`${data.currentMonth}-15T12:00:00`))}</caption>
-   <thead><tr><th scope="col">Период</th>{data.categories.map(category => <th key={category.id} scope="col">{category.name}</th>)}</tr></thead>
+   <thead><tr><th scope="col">Период</th>{data.categories.map(category => <th key={category.id} scope="col" style={showCategoryColors && category.color ? {borderTop:`4px solid ${category.color}`} : undefined}>{category.name}</th>)}</tr></thead>
    {data.rows.map(row => <tbody key={row.key} aria-label={row.label}>
     {(['net','revenue','expense'] as const).map(kind => <tr key={kind} className={kind === 'net' ? row.key === 'year' ? styles.analysisYear : styles.analysisMonth : styles.analysisDetail}>
      <th scope="row">{kind === 'net' ? `${row.label}${row.key === 'year' ? '' : ' (Общо)'}` : kind === 'revenue' ? 'Приход' : 'Разход'}</th>
@@ -63,7 +63,7 @@ export function FinanceAnalysisTable({ data }: { data: Analysis }) {
  </div>;
 }
 
-export default function FinanceAnalysis({ clubId, revision }: { clubId:string; revision:unknown }) {
+export default function FinanceAnalysis({ clubId, revision, showCategoryColors = true }: { clubId:string; revision:unknown; showCategoryColors?:boolean }) {
  const [data,setData] = useState<Analysis | null>(null);
  const [error,setError] = useState('');
  const [retry,setRetry] = useState(0);
@@ -83,5 +83,5 @@ export default function FinanceAnalysis({ clubId, revision }: { clubId:string; r
  },[clubId,revision,retry]);
  if (error) return <p role="alert" className={styles.error}>{error} <button type="button" onClick={() => setRetry(value => value+1)}>Опитай отново</button></p>;
  if (!data) return <FinanceSkeleton variant="analysis" />;
- return <FinanceAnalysisTable data={data} />;
+ return <FinanceAnalysisTable data={data} showCategoryColors={showCategoryColors} />;
 }

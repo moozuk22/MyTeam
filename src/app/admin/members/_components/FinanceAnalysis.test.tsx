@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 import { FinanceAnalysisTable } from './FinanceAnalysis';
 it('renders every category as a column, annual totals first, and distinct income and expenses', () => {
- const html = renderToStaticMarkup(<FinanceAnalysisTable data={{year:2026,currentMonth:'2026-02',categories:[{id:'a',name:'Обща'},{id:'b',name:'Без записи'}],rows:[
+ const html = renderToStaticMarkup(<FinanceAnalysisTable data={{year:2026,currentMonth:'2026-02',categories:[{id:'a',name:'Обща',color:null},{id:'b',name:'Без записи',color:null}],rows:[
   {key:'year',label:'Текуща година',values:[{categoryId:'a',kind:'revenue',currency:'EUR',amount:'150.00'},{categoryId:'a',kind:'expense',currency:'EUR',amount:'35.00'}]},
   {key:'2026-02',label:'февруари 2026 г.',values:[]},
   {key:'2026-01',label:'януари 2026 г.',values:[]},
@@ -22,7 +22,7 @@ it('renders every category as a column, annual totals first, and distinct income
 });
 
 it('shows net revenue minus expenses followed by income and expense rows, keeping currencies separate', () => {
- const html = renderToStaticMarkup(<FinanceAnalysisTable data={{year:2026,currentMonth:'2026-10',categories:[{id:'a',name:'Обща'}],rows:[
+ const html = renderToStaticMarkup(<FinanceAnalysisTable data={{year:2026,currentMonth:'2026-10',categories:[{id:'a',name:'Обща',color:null}],rows:[
   {key:'2026-10',label:'октомври 2026 г.',values:[{categoryId:'a',kind:'expense',currency:'EUR',amount:'14044.41'},{categoryId:'a',kind:'revenue',currency:'USD',amount:'0.30'},{categoryId:'a',kind:'expense',currency:'USD',amount:'0.10'}]},
  ]}} />);
  const rows = html.split('<tbody')[1].split('<tr').slice(1);
