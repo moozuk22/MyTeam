@@ -11,6 +11,7 @@ vi.mock('react',async original => ({
  useId:()=> 'finance',useRef:()=>({current:null}),useEffect:()=>{},useLayoutEffect:()=>{},
 }));
 import FinanceDashboard from './FinanceDashboard';
+import FinanceDebtsDialog from './FinanceDebtsDialog';
 const data = {month:'all',page:1,count:0,startedAt:'2026-01-01',categories:[],entries:[],subtotals:[],totals:[],outstanding:'60',incomplete:false,debts:[{id:'player',name:'Иван',periods:['2026-10'],amount:'60',fee:'60',conflict:false,avatarUrl:null}]};
 type Node = ReactElement<Record<string,unknown>>;
 function nodes(value:unknown):Node[] {
@@ -185,4 +186,25 @@ it('keeps categories readable but disables editing, hiding and reordering while 
  for(const label of ['Преименувай Транспорт','Скрий Транспорт','Премести Транспорт надолу']) {
   expect(nodes(tree).find(node=>node.type==='button' && node.props['aria-label']===label)?.props.disabled).toBe(true);
  }
+});
+
+it('opens a searchable modal instead of expanding the preview and sorts players alphabetically',()=>{
+ const names=['Яна','Галя','Борис','Даниел','Анна','Вера'];
+ const view={...data,debts:names.map((name,index)=>({...data.debts[0],id:String(index),name}))};
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:view,report:view,month:'all',filters:null,onSaved:vi.fn()});};
+ let tree=draw();
+ const labels=nodes(tree).filter(node=>node.type==='button'&&String(node.props['aria-label']).startsWith('Детайли за ')).map(node=>node.props['aria-label']);
+ expect(labels).toEqual(['Детайли за Анна','Детайли за Борис','Детайли за Вера','Детайли за Галя','Детайли за Даниел']);
+ click(nodes(tree).find(node=>node.type==='button'&&text(node)==='Виж всички 6 състезатели →')!);
+ tree=draw();
+ const modal=nodes(tree).find(node=>node.type===FinanceDebtsDialog)!;
+ expect(modal).toBeDefined();
+ expect((modal.props.debts as typeof view.debts).map(debt=>debt.name)).toEqual(['Анна','Борис','Вера','Галя','Даниел','Яна']);
+ expect(view.debts.map(debt=>debt.name)).toEqual(names);
+ // Selecting a modal row closes it before opening the existing player detail overlay.
+ const row=(modal.props.renderDebt as (debt:typeof view.debts[number])=>Node)(view.debts[0]);
+ click(nodes(row).find(node=>node.type==='button')!);
+ tree=draw();
+ expect(nodes(tree).some(node=>node.type===FinanceDebtsDialog)).toBe(false);
+ expect(nodes(tree).some(node=>node.props.playerId==='0')).toBe(true);
 });
