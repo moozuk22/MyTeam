@@ -51,7 +51,7 @@ export async function getClubDebtSummary(clubId: string) {
   return prisma.$transaction(async tx => {
     const club = await tx.club.findUnique({where:{id:clubId},select:{paymentWorkflow:true,defaultPaymentAmount:true}});
     if (!club) throw new FinanceError('Клубът не е намерен.',404);
-    const players = await tx.player.findMany({where:{clubId,isActive:true},select:{id:true,fullName:true,firstBillingMonth:true,remainingTrainingCredits:true,paymentAmount:true,billingCoachGroupId:true,coachGroups:{select:{id:true,name:true,paymentAmount:true}},paymentLogs:{select:{paidFor:true}},paymentWaivers:{select:{waivedFor:true}}}});
+    const players = await tx.player.findMany({where:{clubId,isActive:true,status:{in:['warning','overdue']}},select:{id:true,status:true,fullName:true,firstBillingMonth:true,remainingTrainingCredits:true,paymentAmount:true,billingCoachGroupId:true,coachGroups:{select:{id:true,name:true,paymentAmount:true}},paymentLogs:{select:{paidFor:true}},paymentWaivers:{select:{waivedFor:true}}}});
     const debts = players.map(p=>playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount)).filter(p=>p.periods.length);
     const outstanding = debts.reduce((sum,p)=>p.fee===null?sum:sum.add(new Prisma.Decimal(p.fee).mul(p.periods.length)),new Prisma.Decimal(0));
     return {outstanding:outstanding.toFixed(2),count:debts.length,incomplete:debts.some(p=>p.conflict)};
@@ -77,7 +77,7 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
       duesOnly ? Promise.resolve([]) : tx.clubFinanceEntry.groupBy({ by: ['kind','currency','categoryId'], where, _sum: { amount: true } }),
       duesOnly ? Promise.resolve([]) : tx.clubFinanceEntry.findMany({ where: listWhere, orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }], skip: (page-1)*20, take: 20, include: { category: { select: { name: true, isMembership: true } } } }),
       duesOnly ? Promise.resolve(0) : tx.clubFinanceEntry.count({ where: listWhere }),
-      tx.player.findMany({ where: { clubId, isActive: true }, select: { id: true, fullName: true, images: { select: { imageUrl: true, isAdminView: true } }, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
+      tx.player.findMany({ where: { clubId, isActive: true, status: { in: ['warning','overdue'] } }, select: { id: true, status: true, fullName: true, images: { select: { imageUrl: true, isAdminView: true } }, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
     ]);
     const currencies = new Map<string, { revenue: Prisma.Decimal; expense: Prisma.Decimal }>();
     currencies.set('EUR', { revenue: new Prisma.Decimal(0), expense: new Prisma.Decimal(0) });

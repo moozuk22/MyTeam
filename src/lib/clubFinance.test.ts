@@ -38,7 +38,7 @@ it('creates shared categories without a type and scopes renames by club', async 
 
 it('reports exact decimal totals per currency and separates debt from period filters', async () => {
  tx.club.findUnique.mockResolvedValue({ financeStartedAt:new Date('2026-10-29'),paymentWorkflow:'calendar_month',defaultPaymentAmount:'40',billingStatus:'active' });
- tx.player.findMany.mockResolvedValue([{ id:'p',images:[{imageUrl:'https://example.com/other.jpg',isAdminView:false},{imageUrl:'https://example.com/admin.jpg',isAdminView:true}],fullName:'Player',paymentAmount:'0',firstBillingMonth:new Date('2026-01-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[] }]);
+ tx.player.findMany.mockResolvedValue([{ id:'p',status:'overdue',images:[{imageUrl:'https://example.com/other.jpg',isAdminView:false},{imageUrl:'https://example.com/admin.jpg',isAdminView:true}],fullName:'Player',paymentAmount:'0',firstBillingMonth:new Date('2026-01-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[] }]);
  tx.clubFinanceCategory.findMany.mockResolvedValue([]);
  tx.clubFinanceEntry.findMany.mockResolvedValue([]);
  tx.clubFinanceEntry.count.mockResolvedValue(0);
@@ -63,7 +63,7 @@ it('reports exact decimal totals per currency and separates debt from period fil
 
 it('includes existing unpaid player months even when platform billing is demo', async () => {
  tx.club.findUnique.mockResolvedValue({financeStartedAt:new Date(),paymentWorkflow:'calendar_month',defaultPaymentAmount:'40',billingStatus:'demo'});
- tx.player.findMany.mockResolvedValue([{id:'p',fullName:'Player',paymentAmount:'0',firstBillingMonth:new Date('2026-01-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[]}]);
+ tx.player.findMany.mockResolvedValue([{id:'p',status:'overdue',fullName:'Player',paymentAmount:'0',firstBillingMonth:new Date('2026-01-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[]}]);
  tx.clubFinanceCategory.findMany.mockResolvedValue([]);
  tx.clubFinanceEntry.findMany.mockResolvedValue([]);
  tx.clubFinanceEntry.count.mockResolvedValue(0);
@@ -181,13 +181,13 @@ it('rejects inactive calculator writes and manual entries dated in gaps',async()
 
 it('returns membership dues without reading calculator records or requiring entitlement',async()=>{
  tx.club.findUnique.mockResolvedValue({paymentWorkflow:'calendar_month',defaultPaymentAmount:'40'});
- tx.player.findMany.mockResolvedValue([{id:'p',fullName:'Player',paymentAmount:'25',firstBillingMonth:new Date('2026-10-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[]}]);
+ tx.player.findMany.mockResolvedValue([{id:'p',status:'overdue',fullName:'Player',paymentAmount:'25',firstBillingMonth:new Date('2026-10-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[]}]);
  const summary=await getClubDebtSummary(club);
  expect(Number(summary.outstanding)).toBeGreaterThanOrEqual(25);
  expect(summary).toMatchObject({count:1,incomplete:false});
  expect(summary).not.toHaveProperty('totals');expect(summary).not.toHaveProperty('debts');
  expect(tx.clubFinanceEntry.groupBy).not.toHaveBeenCalled();expect(tx.clubFinanceEntry.findMany).not.toHaveBeenCalled();expect(access).not.toHaveBeenCalled();
- expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,isActive:true}}));
+ expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,isActive:true,status:{in:['warning','overdue']}}}));
 });
 
 it('loads dues without querying transaction history or chart and analysis totals',async()=>{
@@ -196,4 +196,18 @@ it('loads dues without querying transaction history or chart and analysis totals
  const result=await getClubFinance(club,new URLSearchParams({month:'all',view:'dues'}));
  expect(result.entries).toEqual([]);expect(result.subtotals).toEqual([]);expect(result.outstanding).toBe('0.00');
  expect(tx.clubFinanceEntry.findMany).not.toHaveBeenCalled();expect(tx.clubFinanceEntry.groupBy).not.toHaveBeenCalled();expect(tx.clubFinanceEntry.count).not.toHaveBeenCalled();
+});
+
+it.each(['all','dues'])('excludes paid and paused players from totals, counts and incomplete flags (%s)',async view=>{
+ tx.club.findUnique.mockResolvedValue({financeStartedAt:new Date('2026-01-01'),paymentWorkflow:'calendar_month',defaultPaymentAmount:'40'});
+ tx.clubFinanceCategory.findMany.mockResolvedValue([]);tx.clubFinanceEntry.groupBy.mockResolvedValue([]);
+ tx.clubFinanceEntry.findMany.mockResolvedValue([]);tx.clubFinanceEntry.count.mockResolvedValue(0);
+ const base={fullName:'Player',firstBillingMonth:new Date('2026-01-01'),remainingTrainingCredits:0,paymentAmount:'25',paymentLogs:[],paymentWaivers:[]};
+ tx.player.findMany.mockResolvedValue(['warning','overdue','paid','paused'].map(status=>({...base,id:status,status,paymentAmount:status==='paid'||status==='paused'?null:'25',coachGroups:status==='paid'||status==='paused'?[{id:'a',name:'A',paymentAmount:'30'},{id:'b',name:'B',paymentAmount:'40'}]:[]})));
+ const report=await getClubFinance(club,new URLSearchParams({month:'all',...(view==='dues'?{view:'dues'}:{})}));
+ const summary=await getClubDebtSummary(club);
+ expect(report.debts.map(player=>player.id)).toEqual(['warning','overdue']);
+ expect(summary).toEqual({outstanding:report.outstanding,count:2,incomplete:false});
+ expect(report.incomplete).toBe(false);
+ expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,isActive:true,status:{in:['warning','overdue']}},select:expect.objectContaining({status:true})}));
 });

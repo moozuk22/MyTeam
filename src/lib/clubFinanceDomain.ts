@@ -1,5 +1,4 @@
 import { resolveMemberFee, type FeePlayer } from './memberFee';
-import { resolvePaymentStatus, toYearMonth } from './paymentStatus';
 
 export class FinanceError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -34,13 +33,14 @@ export function financePeriodLabel(period: string): string {
   return period.split('..').map(month => formatter.format(new Date(`${month}-15T12:00:00`))).join(' – ');
 }
 export type DebtPlayer = FeePlayer & {
-  id: string; fullName: string; firstBillingMonth: Date | null; remainingTrainingCredits: number;
+  id: string; status: string; fullName: string; firstBillingMonth: Date | null; remainingTrainingCredits: number;
   paymentLogs: { paidFor: Date }[]; paymentWaivers: { waivedFor: Date }[];
 };
 export function playerDebt(player: DebtPlayer, workflow: string, clubAmount: unknown, now = new Date()) {
   const fee = resolveMemberFee(player, clubAmount);
   const periods: string[] = [];
-  if (workflow === 'calendar_month') {
+  const eligible = player.status === 'warning' || player.status === 'overdue';
+  if (eligible && workflow === 'calendar_month') {
     if (player.firstBillingMonth) {
       const start = player.firstBillingMonth.getUTCFullYear() * 12 + player.firstBillingMonth.getUTCMonth();
       const today = financeDateKey(now);
@@ -48,6 +48,6 @@ export function playerDebt(player: DebtPlayer, workflow: string, clubAmount: unk
       const settled = new Set([...player.paymentLogs.map(p => p.paidFor), ...player.paymentWaivers.map(p => p.waivedFor)].map(d => d.getUTCFullYear() * 12 + d.getUTCMonth()));
       for (let i = start; i <= end; i++) if (!settled.has(i)) periods.push(`${Math.floor(i/12)}-${String(i%12+1).padStart(2,'0')}`);
     }
-  } else if (resolvePaymentStatus({ workflow, paidDates: player.paymentLogs.map(p => p.paidFor), waivedDates: player.paymentWaivers.map(p => p.waivedFor), remainingTrainingCredits: player.remainingTrainingCredits, firstBillingDate: player.firstBillingMonth, firstBillingMonth: player.firstBillingMonth ? toYearMonth(player.firstBillingMonth) : null, now }) !== 'paid') periods.push('Подновяване');
+  } else if (eligible) periods.push('Подновяване');
   return { id: player.id, name: player.fullName, periods, fee: fee.amount, conflict: periods.length > 0 && fee.amount === null };
 }
