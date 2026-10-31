@@ -33,7 +33,7 @@ export function financePeriodLabel(period: string): string {
   return period.split('..').map(month => formatter.format(new Date(`${month}-15T12:00:00`))).join(' – ');
 }
 export type DebtPlayer = FeePlayer & {
-  id: string; status: string; fullName: string; firstBillingMonth: Date | null; remainingTrainingCredits: number;
+  id: string; createdAt: Date; status: string; fullName: string; firstBillingMonth: Date | null; remainingTrainingCredits: number;
   paymentLogs: { paidFor: Date }[]; paymentWaivers: { waivedFor: Date }[];
 };
 export type ClubDebtSchedule = { overdueDay?: number | null; overdueHour?: number | null; overdueMinute?: number | null };
@@ -50,7 +50,9 @@ export function playerDebt(player: DebtPlayer, workflow: string, clubAmount: unk
   const eligible = player.status === 'warning' || player.status === 'overdue';
   if (eligible && workflow === 'calendar_month') {
     if (player.firstBillingMonth) {
-      const start = player.firstBillingMonth.getUTCFullYear() * 12 + player.firstBillingMonth.getUTCMonth();
+      const created = financeDateKey(player.createdAt);
+      const createdMonth = Number(created.slice(0,4)) * 12 + Number(created.slice(5,7)) - 1;
+      const start = Math.max(player.firstBillingMonth.getUTCFullYear() * 12 + player.firstBillingMonth.getUTCMonth(), createdMonth);
       const today = financeDateKey(now);
       const end = Number(today.slice(0,4)) * 12 + Number(today.slice(5,7)) - 1 - (hasReachedStatusUpdate(now,schedule) ? 0 : 1);
       const settled = new Set([...player.paymentLogs.map(p => p.paidFor), ...player.paymentWaivers.map(p => p.waivedFor)].map(d => d.getUTCFullYear() * 12 + d.getUTCMonth()));
