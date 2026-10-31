@@ -3,14 +3,16 @@ import { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { getClubSubscriptionSummary } from "./clubSubscriptionSummary";
 import { GET } from "@/app/api/admin/clubs/[id]/subscription/route";
-const mocks = vi.hoisted(() => ({ findUnique: vi.fn(), auth: vi.fn() }));
+const mocks = vi.hoisted(() => ({ findUnique: vi.fn(), auth: vi.fn(), calculator: vi.fn() }));
 vi.mock("@/lib/db", () => ({ prisma: { club: { findUnique: mocks.findUnique } } }));
+vi.mock("@/lib/calculatorSubscriptions", () => ({ calculatorAccess: mocks.calculator }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.auth }));
 const id = "00000000-0000-0000-0000-000000000001";
 const params = { params: Promise.resolve({ id }) };
 const request = (suffix = "", cookie = true) => new NextRequest(`http://localhost/api/admin/clubs/${id}/subscription${suffix}`, { headers: cookie ? { cookie: "admin_session=test" } : {} });
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.calculator.mockResolvedValue({enabled:false,canView:false,billingMode:"monthly",price:null,periods:[]});
   mocks.auth.mockResolvedValue({ roles: ["coach"], sub: "coach" });
   mocks.findUnique.mockResolvedValue({ billingStatus: "active", platformSubscription: {
     mode: "paid", trialEndDate: null, firstBillingMonth: "2026-10", fees: [{ effectiveMonth: "2026-10", amount: new Prisma.Decimal(10) }],
@@ -26,8 +28,9 @@ it("allows club coach sessions and projects only subscription accounting data", 
   const response = await GET(request(), params);
   expect(response.status).toBe(200);
   const body = await response.json();
+  expect(body.calculator).toEqual({enabled:false,canView:false,billingMode:"monthly",price:null,periods:[]});
   expect(body.paidMonths).toEqual([{ month: "2026-10", amount: "10.00" }]);
-  expect(Object.keys(body).sort()).toEqual(["firstBillingMonth", "mode", "paidMonths", "summary", "trialEndDate"]);
+  expect(Object.keys(body).sort()).toEqual(["calculator", "firstBillingMonth", "mode", "paidMonths", "summary", "trialEndDate"]);
   expect(JSON.stringify(body)).not.toMatch(/createdBy|actorId|note|changes/);
   const selection = mocks.findUnique.mock.calls[0][0].select.platformSubscription.select;
   expect(selection.payments.where).toEqual({ voidedAt: null });

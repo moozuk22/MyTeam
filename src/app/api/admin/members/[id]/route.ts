@@ -74,6 +74,7 @@ export async function GET(
           orderBy: { waivedFor: "desc" },
         },
         images: true,
+        coachGroups: { select: { id: true } },
         club: {
           select: {
             billingStatus: true,

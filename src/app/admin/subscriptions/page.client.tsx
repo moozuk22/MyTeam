@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Building2, Calculator, RefreshCw, Wallet, Search } from "lucide-react";
+import CalculatorSubscription, { SharedCalculatorPrices, type CalculatorClub } from "./CalculatorSubscription";
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import SubscriptionSetupFields, { defaultTrialDraft, setupFromDraft, type SubscriptionDraft } from "@/components/admin/SubscriptionSetupFields";
 import {
@@ -8,6 +10,7 @@ import {
   type ClubSubscriptionView, type SubscriptionStatus,
 } from "@/lib/clubSubscriptionDomain";
 import styles from "./subscriptions.module.css";
+import type { CalculatorPrice } from "@/lib/calculatorSubscriptionDomain";
 import { subscriptionAuditDescription, subscriptionAuditLabels } from "@/lib/clubSubscriptionAudit";
 
 const STATUS: Record<SubscriptionStatus, string> = {
@@ -27,7 +30,9 @@ function endOfMonth(month: string): string {
 }
 
 export default function SubscriptionsPageClient() {
-  const [clubs, setClubs] = useState<ClubSubscriptionView[]>([]);
+  const [calculatorRevision, setCalculatorRevision] = useState(0);
+  const [sharedCalculatorPrices, setSharedCalculatorPrices] = useState<CalculatorPrice[]>();
+  const [clubs, setClubs] = useState<CalculatorClub[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -39,7 +44,7 @@ export default function SubscriptionsPageClient() {
   const load = useCallback(async (signal?: AbortSignal) => {
     const response = await fetch("/api/admin/subscriptions", { cache: "no-store", signal });
     if (!response.ok) throw new Error("Абонаментите не могат да бъдат заредени.");
-    setClubs(await response.json() as ClubSubscriptionView[]);
+    setClubs(await response.json() as CalculatorClub[]);
   }, []);
 
   useEffect(() => {
@@ -82,9 +87,16 @@ export default function SubscriptionsPageClient() {
     <div className={styles.dotGrid} aria-hidden="true" />
     <div className={styles.inner}>
       <Link href="/admin/players" className={styles.back}>← Състезатели и клубове</Link>
-      <header className={styles.header}><div><h1>Абонаменти</h1><p>Месечни такси на клубовете за MyTeam</p><div className={styles.titleLine} /></div><button type="button" onClick={() => void refresh()} disabled={loading || busy}>Обнови</button></header>
+      <header className={styles.header}><div><span className={styles.eyebrow}>УПРАВЛЕНИЕ НА КЛУБОВЕТЕ</span><h1>Абонаменти</h1><p>MyTeam и финансов калкулатор — плащания, достъп и история на едно място.</p></div><button type="button" onClick={() => void refresh()} disabled={loading || busy}><RefreshCw size={16} aria-hidden="true" />Обнови</button></header>
+      <div className={styles.overview} aria-label="Обобщение на абонаментите">
+        <div><Building2 size={20} aria-hidden="true" /><span>Общо клубове<strong>{loading ? '—' : clubs.length}</strong></span></div>
+        <div><Wallet size={20} aria-hidden="true" /><span>Платени абонаменти<strong>{loading ? '—' : clubs.filter(c => c.summary.status === 'active').length}</strong></span></div>
+        <div><Calculator size={20} aria-hidden="true" /><span>Нуждаят се от внимание<strong>{loading ? '—' : clubs.filter(c => ['unpaid', 'trial_expired'].includes(c.summary.status)).length}</strong></span></div>
+      </div>
+      <SharedCalculatorPrices onLoaded={setSharedCalculatorPrices} onSaved={() => setCalculatorRevision(v => v+1)} />
+      <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>АБОНАМЕНТИ</span><h2>Клубове <span>{loading ? "—" : visible.length}</span></h2></div></div>
       <div className={styles.filters}>
-        <label>Търсене на клуб<input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Име на клуб" /></label>
+        <label><span><Search size={14} aria-hidden="true" /> Търсене на клуб</span><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Име на клуб" /></label>
         <label>Статус<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Всички</option>{Object.entries(STATUS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       </div>
       {error && <p role="alert" className={styles.error}>{error}</p>}
@@ -93,7 +105,7 @@ export default function SubscriptionsPageClient() {
       {!loading && !visible.length && <p>Няма намерени клубове.</p>}
       <div className={styles.list} aria-busy={busy || loading}>
         {visible.map((club) => <article key={club.id} className={styles.card}>
-          <div className={styles.cardHeader}><h2>{club.name}</h2><span className={styles.badge} data-status={club.summary.status}>{STATUS[club.summary.status]}</span></div>
+          <div className={styles.cardHeader}><div className={styles.clubIdentity}><span className={styles.clubAvatar} aria-hidden="true">{club.name.slice(0, 2).toLocaleUpperCase("bg")}</span><div><span className={styles.eyebrow}>MYTEAM</span><h2>{club.name}</h2></div></div><span className={styles.badge} data-status={club.summary.status}>{STATUS[club.summary.status]}</span></div>
           {club.subscription?.mode === "contract" ? <p>Таксуването се управлява по договор извън приложението. Известията за абонамент са изключени.</p> : club.subscription?.mode === "trial" ? <p>Безплатен пробен период: <strong>{club.subscription.trialEndDate ? `до ${dateLabel(club.subscription.trialEndDate)} включително` : "без крайна дата"}</strong></p> : club.subscription ? <>
             <dl className={styles.metrics}>
               <div><dt>Месечна такса</dt><dd>{club.summary.currentFee} EUR</dd></div>
@@ -119,9 +131,10 @@ export default function SubscriptionsPageClient() {
             </>}
             {club.billingStatus === "active" && <Link href={`/admin/members?clubId=${club.id}`}>Отвори клуба ↗</Link>}
           </div>
+          {club.billingStatus === "active" && club.subscription && <details className={styles.calculatorSettings}><summary><Calculator size={18} aria-hidden="true" />Финансов калкулатор<span>Настройки и плащания</span></summary><CalculatorSubscription club={club} revision={calculatorRevision} sharedPrices={sharedCalculatorPrices} onSaved={() => { void load().catch(e => setError(e.message)); }} /></details>}
           {editor?.clubId === club.id && club.subscription && <section className={styles.editor}>
             <div className={styles.editorHeader}><h3>{({ trial: "Редакция на пробен период", start_paid: "Платен абонамент", fee: "Промяна на месечната такса", payment: "Запис на плащане", history: "История и такси" })[editor.action]}</h3><button type="button" disabled={busy} onClick={() => setEditor(null)}>Затвори</button></div>
-            <SubscriptionEditor key={`${club.id}-${club.subscription.version}-${editor.action}`} club={club} action={editor.action} busy={busy} save={(body) => save(club, body)} />
+            <SubscriptionEditor key={`${club.id}-${club.subscription.version}-${editor.action}`} club={club} action={editor.action} busy={busy} save={(body) => save(club, body)} onCalculatorSaved={() => { void load().catch(e => setError(e.message)); }} />
           </section>}
         </article>)}
       </div>
@@ -129,7 +142,7 @@ export default function SubscriptionsPageClient() {
   </main>;
 }
 
-function SubscriptionEditor({ club, action, busy, save }: { club: ClubSubscriptionView; action: Action; busy: boolean; save: Save }) {
+function SubscriptionEditor({ club, action, busy, save, onCalculatorSaved }: { club: ClubSubscriptionView; action: Action; busy: boolean; save: Save; onCalculatorSaved: () => void }) {
   const subscription = club.subscription!;
   const [draft, setDraft] = useState<SubscriptionDraft>(() => ({ ...defaultTrialDraft(), mode: action === "start_paid" ? "paid" : "trial",
     trialChoice: subscription.trialEndDate ? "limited" : "unlimited", trialEndDate: subscription.trialEndDate ?? "" }));
@@ -142,7 +155,7 @@ function SubscriptionEditor({ club, action, busy, save }: { club: ClubSubscripti
   const [formError, setFormError] = useState("");
   const id = useId();
   if (action === "history") return <PaymentHistory club={club} busy={busy} save={save} />;
-  if (action === "payment") return <PaymentForm club={club} busy={busy} save={save} />;
+  if (action === "payment") return <SubscriptionPaymentSelector club={club} busy={busy} save={save} onCalculatorSaved={onCalculatorSaved} />;
 
   async function submit(event: FormEvent) {
     event.preventDefault(); setFormError("");
@@ -166,6 +179,12 @@ function SubscriptionEditor({ club, action, busy, save }: { club: ClubSubscripti
     {formError && <p role="alert" className={styles.error}>{formError}</p>}
     <button className={styles.primary} disabled={busy} type="submit">{busy ? "Запазване…" : "Запази"}</button>
   </form>;
+}
+
+function SubscriptionPaymentSelector({club,busy,save,onCalculatorSaved}:{club:ClubSubscriptionView;busy:boolean;save:Save;onCalculatorSaved:()=>void}) {
+  const [target,setTarget]=useState('platform');
+  return <><label>Абонамент<select disabled={busy} value={target} onChange={e=>setTarget(e.target.value)}><option value="platform">MyTeam</option><option value="calculator">Финансов калкулатор</option></select></label>
+    {target==='calculator'?<CalculatorSubscription club={club} paymentOnly onSaved={onCalculatorSaved}/>:<PaymentForm club={club} busy={busy} save={save}/>}</>;
 }
 
 function PaymentForm({ club, busy, save }: { club: ClubSubscriptionView; busy: boolean; save: Save }) {

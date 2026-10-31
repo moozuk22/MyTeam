@@ -104,6 +104,9 @@ export async function middleware(request: NextRequest) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
+        // The finance page and API still perform club ownership and entitlement checks.
+        const financeClubId = /^\/admin\/clubs\/([0-9a-f-]{36})\/finance$/.exec(pathname)?.[1];
+        if (financeClubId && financeClubId === payload.defaultClubId) return NextResponse.next();
         if (COACH_ALLOWED_ADMIN_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
           return NextResponse.next();
         }

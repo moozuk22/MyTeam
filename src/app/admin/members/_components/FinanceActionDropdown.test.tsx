@@ -1,0 +1,28 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { ReactElement } from 'react';
+const hooks = vi.hoisted(()=>({effect:undefined as undefined | (()=>()=>void)}));
+vi.mock('react',async original=>({...await original<typeof import('react')>(),useLayoutEffect:(effect:()=>()=>void)=>{hooks.effect=effect;}}));
+vi.mock('react-dom',()=>({createPortal:vi.fn(node=>node)}));
+import { createPortal } from 'react-dom';
+import FinanceActionDropdown from './FinanceActionDropdown';
+beforeEach(()=>vi.clearAllMocks());
+afterEach(()=>vi.unstubAllGlobals());
+it('mounts outside the dashboard on the body with fixed positioning, anchored below its button',()=>{
+ const events=new EventTarget();
+ const viewport={innerWidth:1200,innerHeight:900,addEventListener:events.addEventListener.bind(events),removeEventListener:events.removeEventListener.bind(events)};
+ const body={};
+ vi.stubGlobal('document',{body});vi.stubGlobal('window',viewport);
+ const style:Record<string,string>={};
+ const anchor={current:{getBoundingClientRect:()=>({right:1100,top:160,bottom:200})} as HTMLButtonElement};
+ const panelRef={current:{style} as unknown as HTMLDivElement};
+ const element=FinanceActionDropdown({id:'dropdown',label:'Добави приход',anchor,panelRef,children:<form />}) as unknown as ReactElement<{style:{position:string}}>;
+ expect(createPortal).toHaveBeenCalledWith(expect.anything(),body);
+ expect(element.props.style.position).toBe('fixed');
+ const cleanup=hooks.effect!();
+ expect(style).toMatchObject({width:'420px',left:'680px',top:'208px',bottom:'auto',maxHeight:'675px'});
+ viewport.innerWidth=360;viewport.innerHeight=300;
+ events.dispatchEvent(new Event('resize'));
+ expect(style.width).toBe('328px');expect(style.left).toBe('16px');
+ expect(style.top).toBe('auto');expect(style.bottom).toBe('148px');
+ cleanup();
+});
