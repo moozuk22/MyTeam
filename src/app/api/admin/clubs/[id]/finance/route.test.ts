@@ -16,8 +16,7 @@ it('requires a session and prevents cross-club coach access', async () => {
  expect((await GET(request(),context)).status).toBe(403);
  expect(mocks.get).not.toHaveBeenCalled();
  mocks.session.mockResolvedValue({ roles: ['coach'], defaultClubId: null });
- expect((await GET(request(),context)).status).toBe(200);
- mocks.get.mockClear();
+ expect((await GET(request(),context)).status).toBe(403);
  expect(mocks.get).not.toHaveBeenCalled();
 });
 it('allows club management and denies group requests', async () => {
@@ -64,4 +63,16 @@ it('allows inactive coaches to load only dues and category names for the locked 
  expect(mocks.get).toHaveBeenCalledWith(id,expect.any(URLSearchParams));
  expect((await GET(request('GET',undefined,'?view=analysis'),context)).status).toBe(403);
  expect((await POST(request('POST','{}','?view=dues'),context)).status).toBe(403);
+});
+
+it.each([null, undefined])('denies unscoped coaches for every finance view and writes (%s)', async defaultClubId => {
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId});
+ for (const query of ['', '?view=analysis', '?view=dues']) {
+  expect((await GET(request('GET',undefined,query),context)).status).toBe(403);
+ }
+ expect((await POST(request('POST','{}'),context)).status).toBe(403);
+ expect(mocks.access).not.toHaveBeenCalled();
+ expect(mocks.get).not.toHaveBeenCalled();
+ expect(mocks.analysis).not.toHaveBeenCalled();
+ expect(mocks.mutate).not.toHaveBeenCalled();
 });

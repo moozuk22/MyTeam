@@ -12,7 +12,7 @@ async function handle(request: NextRequest, context: Context, write: boolean) {
     const session = token ? await verifyAdminToken(token) : null;
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const id = financeId((await context.params).id);
-    if (request.nextUrl.searchParams.has('coachGroupId') || (!session.roles.includes('admin') && session.defaultClubId && session.defaultClubId !== id)) return NextResponse.json({ error: 'Нямате достъп до финансите на този клуб.' }, { status: 403 });
+    if (request.nextUrl.searchParams.has('coachGroupId') || (!session.roles.includes('admin') && session.defaultClubId !== id)) return NextResponse.json({ error: 'Нямате достъп до финансите на този клуб.' }, { status: 403 });
     const access = await calculatorAccess(id, session.roles.includes('admin'));
     const duesPreview = !write && request.nextUrl.searchParams.get('view') === 'dues';
     if ((!access.canView && !duesPreview) || (write && !access.enabled)) return NextResponse.json({ error: 'Финансовият калкулатор не е активиран за този клуб.', code: 'CALCULATOR_LOCKED' }, { status: 403 });

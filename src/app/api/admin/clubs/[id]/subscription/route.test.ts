@@ -38,7 +38,10 @@ it("allows administrators to read a club other than their default", async () => 
 });
 it.each([null, undefined])("preserves access for unscoped sessions (%s)", async (defaultClubId) => {
   mocks.verify.mockResolvedValue({ sub: "coach", roles: ["coach"], defaultClubId });
-  expect((await get(clubB)).status).toBe(200);
+  const response = await get(clubB);
+  expect(response.status).toBe(200);
+  expect(await response.json()).not.toHaveProperty("calculator");
+  expect(mocks.calculator).not.toHaveBeenCalled();
 });
 it("rejects missing or invalid sessions before loading data", async () => {
   expect((await get(clubA, "", false)).status).toBe(401);

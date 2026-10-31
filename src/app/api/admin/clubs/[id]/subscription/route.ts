@@ -17,8 +17,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Профилът ви няма достъп до този клуб." }, { status: 403 });
   }
   try {
-    const [summary, calculator] = await Promise.all([getClubSubscriptionSummary(id), calculatorAccess(id)]);
-    return NextResponse.json(summary ? {...summary, calculator} : null);
+    const canReadCalculator = session.roles.includes("admin") || session.defaultClubId === id;
+    const [summary, calculator] = await Promise.all([
+      getClubSubscriptionSummary(id),
+      canReadCalculator ? calculatorAccess(id) : Promise.resolve(null),
+    ]);
+    return NextResponse.json(summary && calculator ? {...summary, calculator} : summary);
   }
   catch (error) { console.error("Club subscription summary failed:", error); return NextResponse.json({ error: "Абонаментът не може да бъде зареден." }, { status: 500 }); }
 }

@@ -17,8 +17,6 @@ it('redirects signed-out visitors and blocks coaches from other clubs before que
  expect(mocks.club).not.toHaveBeenCalled();
 });
 it('renders the dedicated page for club management and administrators', async () => {
- mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:null});
- expect(await Page(context)).toBeTruthy();
  mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:id});
  expect(await Page(context)).toBeTruthy();
  mocks.session.mockResolvedValue({roles:['admin']});
@@ -34,4 +32,10 @@ it('resolves stored club logo upload paths before passing them to the dashboard'
   const page = await Page(context);
   expect(page.props.children[1].props.clubLogoUrl).toBe('https://res.cloudinary.com/test-cloud/image/upload/w_120,h_120,c_limit,f_auto,q_auto:eco/v123/clubs/logo.png');
  } finally { vi.unstubAllEnvs(); }
+});
+
+it.each([null, undefined])('denies coaches without an assigned club before querying data (%s)', async defaultClubId => {
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId});
+ await expect(Page(context)).rejects.toThrow('not-found');
+ expect(mocks.club).not.toHaveBeenCalled();
 });

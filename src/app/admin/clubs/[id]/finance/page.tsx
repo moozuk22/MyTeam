@@ -15,7 +15,7 @@ export default async function ClubFinancePage({ params }: { params: Promise<{ id
   const token = (await cookies()).get('admin_session')?.value;
   const session = token ? await verifyAdminToken(token) : null;
   if (!session) redirect('/admin/login');
-  if (!session.roles.includes('admin') && session.defaultClubId && session.defaultClubId !== id) notFound();
+  if (!session.roles.includes('admin') && session.defaultClubId !== id) notFound();
   const club = await prisma.club.findUnique({ where: { id }, select: { name: true, imageUrl: true, emblemUrl: true } });
   if (!club) notFound();
   const storedLogo = (club.imageUrl || club.emblemUrl)?.trim();
