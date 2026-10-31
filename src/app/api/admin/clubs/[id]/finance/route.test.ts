@@ -7,7 +7,7 @@ vi.mock('@/lib/clubFinance', () => ({ financeId: (id: string) => id, getClubFina
 import { GET, POST } from './route';
 const id = '00000000-0000-0000-0000-000000000001';
 const context = { params: Promise.resolve({ id }) };
-const request = (method = 'GET', body?: string, query = '') => new NextRequest(`http://localhost/api/admin/clubs/${id}/finance${query}`, { method, headers: { cookie: 'admin_session=test', 'content-type': 'application/json' }, ...(body ? { body } : {}) });
+const request = (method = 'GET', body?: string, query = '') => new NextRequest(`http://localhost/api/admin/clubs/${id}/finance${query}`, { method, headers: { cookie: `admin_session=test; admin_last_club_id=${id}`, 'content-type': 'application/json' }, ...(body ? { body } : {}) });
 beforeEach(() => { vi.resetAllMocks(); mocks.access.mockResolvedValue({enabled:true,canView:true}); mocks.get.mockResolvedValue({ outstanding: '40.00' }); mocks.mutate.mockResolvedValue({ ok: true }); });
 it('requires a session', async () => {
  mocks.session.mockResolvedValue(null);
@@ -67,4 +67,23 @@ it.each([null, undefined, 'other'])('allows coaches across clubs for finance vie
  expect(mocks.get).toHaveBeenCalled();
  expect(mocks.analysis).toHaveBeenCalled();
  expect(mocks.mutate).toHaveBeenCalled();
+});
+
+it.each([undefined, '', 'invalid', '00000000-0000-0000-0000-000000000002'])('denies finance data and writes outside the remembered club (%s)', async remembered => {
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:id});
+ const req = (method='GET', query='') => {
+  const value=request(method,method==='POST'?'{}':undefined,query);
+  value.cookies.delete('admin_last_club_id');
+  if (remembered !== undefined) value.cookies.set('admin_last_club_id',remembered);
+  return value;
+ };
+ for(const query of ['', '?view=analysis', '?view=dues']) expect((await GET(req('GET',query),context)).status).toBe(403);
+ expect((await POST(req('POST'),context)).status).toBe(403);
+ expect(mocks.access).not.toHaveBeenCalled(); expect(mocks.get).not.toHaveBeenCalled();
+ expect(mocks.analysis).not.toHaveBeenCalled(); expect(mocks.mutate).not.toHaveBeenCalled();
+});
+it('allows administrator finance reads without a remembered club', async () => {
+ mocks.session.mockResolvedValue({roles:['admin']});
+ const value=request(); value.cookies.delete('admin_last_club_id');
+ expect((await GET(value,context)).status).toBe(200);
 });

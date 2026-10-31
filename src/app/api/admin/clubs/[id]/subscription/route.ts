@@ -1,3 +1,4 @@
+import { canReadClubCalculator } from '@/lib/clubCalculatorAccess';
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { getClubSubscriptionSummary } from "@/lib/clubSubscriptionSummary";
@@ -16,7 +17,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const [summary, calculator] = await Promise.all([
       getClubSubscriptionSummary(id),
-      calculatorAccess(id),
+      canReadClubCalculator(session.roles, request.cookies.get('admin_last_club_id')?.value, id)
+        ? calculatorAccess(id) : Promise.resolve(null),
     ]);
     return NextResponse.json(summary && calculator ? {...summary, calculator} : summary);
   }

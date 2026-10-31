@@ -1,3 +1,4 @@
+import { canReadClubCalculator } from '@/lib/clubCalculatorAccess';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/adminAuth';
 import { financeId, getClubFinance, getClubFinanceAnalysis, mutateClubFinance } from '@/lib/clubFinance';
@@ -12,7 +13,7 @@ async function handle(request: NextRequest, context: Context, write: boolean) {
     const session = token ? await verifyAdminToken(token) : null;
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const id = financeId((await context.params).id);
-    if (request.nextUrl.searchParams.has('coachGroupId')) return NextResponse.json({ error: 'Нямате достъп до финансите на този клуб.' }, { status: 403 });
+    if (request.nextUrl.searchParams.has('coachGroupId') || !canReadClubCalculator(session.roles, request.cookies.get('admin_last_club_id')?.value, id)) return NextResponse.json({ error: 'Нямате достъп до финансите на този клуб.' }, { status: 403 });
     const access = await calculatorAccess(id, session.roles.includes('admin'));
     const duesPreview = !write && request.nextUrl.searchParams.get('view') === 'dues';
     if ((!access.canView && !duesPreview) || (write && !access.enabled)) return NextResponse.json({ error: 'Финансовият калкулатор не е активиран за този клуб.', code: 'CALCULATOR_LOCKED' }, { status: 403 });
