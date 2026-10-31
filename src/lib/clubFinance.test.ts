@@ -211,3 +211,19 @@ it.each(['all','dues'])('excludes paid and paused players from totals, counts an
  expect(report.incomplete).toBe(false);
  expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,isActive:true,status:{in:['warning','overdue']}},select:expect.objectContaining({status:true})}));
 });
+
+it('uses the club update schedule consistently in the report and widget dues',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-03T08:29:59Z'));
+ try {
+  tx.club.findUnique.mockResolvedValue({financeStartedAt:new Date('2026-01-01'),paymentWorkflow:'calendar_month',defaultPaymentAmount:'75',overdueDay:3,overdueHour:10,overdueMinute:30});
+  tx.player.findMany.mockResolvedValue([{id:'p',status:'warning',fullName:'Player',paymentAmount:'75',firstBillingMonth:new Date('2026-09-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[{waivedFor:new Date('2026-09-01')}]}]);
+  tx.clubFinanceCategory.findMany.mockResolvedValue([]);tx.clubFinanceEntry.groupBy.mockResolvedValue([]);tx.clubFinanceEntry.findMany.mockResolvedValue([]);tx.clubFinanceEntry.count.mockResolvedValue(0);
+  const before=await getClubFinance(club,new URLSearchParams({month:'all'}));
+  expect(before.debts[0].periods).toEqual(['2026-10']);expect(before.outstanding).toBe('75.00');
+  expect((await getClubDebtSummary(club)).outstanding).toBe('75.00');
+  vi.setSystemTime(new Date('2026-11-03T08:30:00Z'));
+  const after=await getClubFinance(club,new URLSearchParams({month:'all'}));
+  expect(after.debts[0].periods).toEqual(['2026-10','2026-11']);expect(after.outstanding).toBe('150.00');
+  expect((await getClubDebtSummary(club)).outstanding).toBe('150.00');
+ } finally {vi.useRealTimers();}
+});

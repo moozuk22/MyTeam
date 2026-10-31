@@ -49,10 +49,11 @@ export async function getClubFinanceAnalysis(clubId: string, now = new Date()) {
 // Membership dues remain available independently of calculator entitlement.
 export async function getClubDebtSummary(clubId: string) {
   return prisma.$transaction(async tx => {
-    const club = await tx.club.findUnique({where:{id:clubId},select:{paymentWorkflow:true,defaultPaymentAmount:true}});
+    const club = await tx.club.findUnique({where:{id:clubId},select:{paymentWorkflow:true,defaultPaymentAmount:true,overdueDay:true,overdueHour:true,overdueMinute:true}});
     if (!club) throw new FinanceError('Клубът не е намерен.',404);
+    const debtAt = new Date();
     const players = await tx.player.findMany({where:{clubId,isActive:true,status:{in:['warning','overdue']}},select:{id:true,status:true,fullName:true,firstBillingMonth:true,remainingTrainingCredits:true,paymentAmount:true,billingCoachGroupId:true,coachGroups:{select:{id:true,name:true,paymentAmount:true}},paymentLogs:{select:{paidFor:true}},paymentWaivers:{select:{waivedFor:true}}}});
-    const debts = players.map(p=>playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount)).filter(p=>p.periods.length);
+    const debts = players.map(p=>playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount,debtAt,club)).filter(p=>p.periods.length);
     const outstanding = debts.reduce((sum,p)=>p.fee===null?sum:sum.add(new Prisma.Decimal(p.fee).mul(p.periods.length)),new Prisma.Decimal(0));
     return {outstanding:outstanding.toFixed(2),count:debts.length,incomplete:debts.some(p=>p.conflict)};
   }, {isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
@@ -68,7 +69,7 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
   const category = params.get('category');
   if (category) financeId(category);
   return prisma.$transaction(async tx => {
-    const club = await tx.club.findUnique({ where: { id: clubId }, select: { financeStartedAt: true, paymentWorkflow: true, defaultPaymentAmount: true } });
+    const club = await tx.club.findUnique({ where: { id: clubId }, select: { financeStartedAt: true, paymentWorkflow: true, defaultPaymentAmount: true, overdueDay: true, overdueHour: true, overdueMinute: true } });
     if (!club) throw new FinanceError('Клубът не е намерен.',404);
     const where = { clubId, voidedAt: null, ...(period ? { occurredAt: period } : {}) };
     const listWhere = { ...where, ...(kind ? { kind } : {}), ...(category ? { categoryId: category } : {}) };
@@ -87,6 +88,7 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
       else sums.expense = sums.expense.add(row._sum.amount ?? 0);
       currencies.set(row.currency,sums);
     }
+    const debtAt = new Date();
     const debt = players.map(p => {
       const imagePath = (p.images?.find(image => image.isAdminView) ?? p.images?.[0])?.imageUrl;
       const cloudName = process.env.CLOUDINARY_CLOUD_NAME ?? '';
@@ -94,7 +96,7 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
       const avatarUrl = !imagePath ? null : imagePath.startsWith('http')
         ? applyCloudinaryTransformToUrl(imagePath, transform)
         : cloudName ? buildCloudinaryUrlFromUploadPath(imagePath, cloudName, transform) : null;
-      return { ...playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount), avatarUrl };
+      return { ...playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount,debtAt,club), avatarUrl };
     }).filter(p => p.periods.length);
     let outstanding = new Prisma.Decimal(0);
     const debts = debt.map(p => { const amount = p.fee === null ? null : new Prisma.Decimal(p.fee).mul(p.periods.length); if (amount) outstanding = outstanding.add(amount); return { ...p, amount: amount?.toFixed(2) ?? null }; });
