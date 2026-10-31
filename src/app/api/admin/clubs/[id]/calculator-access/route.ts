@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, {
     status: 400
   });
   const admin = session.roles.includes('admin');
-  if (request.nextUrl.searchParams.has('coachGroupId') || !admin && session.defaultClubId !== id) return NextResponse.json({
+  if (request.nextUrl.searchParams.has('coachGroupId')) return NextResponse.json({
     error: 'Forbidden'
   }, {
     status: 403

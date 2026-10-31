@@ -9,11 +9,9 @@ import Page from './page';
 const id = '00000000-0000-0000-0000-000000000001';
 const context = { params: Promise.resolve({ id }) };
 beforeEach(() => { vi.resetAllMocks(); mocks.club.mockResolvedValue({ name: 'Club' }); });
-it('redirects signed-out visitors and blocks coaches from other clubs before querying data', async () => {
+it('redirects signed-out visitors before querying data', async () => {
  mocks.session.mockResolvedValue(null);
  await expect(Page(context)).rejects.toThrow('redirect:/admin/login');
- mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:'other'});
- await expect(Page(context)).rejects.toThrow('not-found');
  expect(mocks.club).not.toHaveBeenCalled();
 });
 it('renders the dedicated page for club management and administrators', async () => {
@@ -34,8 +32,8 @@ it('resolves stored club logo upload paths before passing them to the dashboard'
  } finally { vi.unstubAllEnvs(); }
 });
 
-it.each([null, undefined])('denies coaches without an assigned club before querying data (%s)', async defaultClubId => {
+it.each([null, undefined, 'other'])('allows coaches to open a club finance link regardless of default club (%s)', async defaultClubId => {
  mocks.session.mockResolvedValue({roles:['coach'],defaultClubId});
- await expect(Page(context)).rejects.toThrow('not-found');
- expect(mocks.club).not.toHaveBeenCalled();
+ expect(await Page(context)).toBeTruthy();
+ expect(mocks.club).toHaveBeenCalled();
 });

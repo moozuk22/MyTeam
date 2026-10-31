@@ -19,11 +19,11 @@ beforeEach(() => {
   mocks.verify.mockResolvedValue({ sub: "coach", roles: ["coach"], defaultClubId: clubA });
   mocks.summary.mockResolvedValue({ summary: { status: "active", currentFee: "10.00" } });
 });
-it("rejects a club-scoped coach reading another club without querying its financial data", async () => {
+it("allows a coach to read another club's summary", async () => {
   const response = await get(clubB);
-  expect(response.status).toBe(403);
-  expect(mocks.summary).not.toHaveBeenCalled();
-  expect(await response.json()).not.toHaveProperty("summary");
+  expect(response.status).toBe(200);
+  expect(mocks.summary).toHaveBeenCalledWith(clubB);
+  expect(mocks.calculator).toHaveBeenCalledWith(clubB);
 });
 it("allows a coach to read their own club", async () => {
   const response = await get();
@@ -40,8 +40,8 @@ it.each([null, undefined])("preserves access for unscoped sessions (%s)", async 
   mocks.verify.mockResolvedValue({ sub: "coach", roles: ["coach"], defaultClubId });
   const response = await get(clubB);
   expect(response.status).toBe(200);
-  expect(await response.json()).not.toHaveProperty("calculator");
-  expect(mocks.calculator).not.toHaveBeenCalled();
+  expect(await response.json()).toHaveProperty("calculator");
+  expect(mocks.calculator).toHaveBeenCalledWith(clubB);
 });
 it("rejects missing or invalid sessions before loading data", async () => {
   expect((await get(clubA, "", false)).status).toBe(401);

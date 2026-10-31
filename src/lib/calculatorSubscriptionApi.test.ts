@@ -19,9 +19,9 @@ it('requires platform admin for configuration, purchases and shared prices',asyn
  for(const response of [await config(request(),clubContext),await change(request('POST','{}'),clubContext),await prices(request()),await changePrices(request('POST','{}'))])expect(response.status).toBe(403);
  expect(mocks.change).not.toHaveBeenCalled();expect(mocks.changePrices).not.toHaveBeenCalled();
 });
-it('allows club-safe summaries only to assigned management or platform admins',async()=>{
- mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:null});expect((await access(request(),context)).status).toBe(403);
- mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:'other'});expect((await access(request(),context)).status).toBe(403);
+it('allows club-safe summaries to coaches and platform admins',async()=>{
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:null});expect((await access(request(),context)).status).toBe(200);
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:'other'});expect((await access(request(),context)).status).toBe(200);
  mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:id});
  const summary=await access(request(),context);expect(summary.status).toBe(200);
  expect(await summary.json()).toMatchObject({canView:false,debtSummary:{outstanding:'40.00',count:2,incomplete:false}});
@@ -38,9 +38,9 @@ it('rejects malformed bodies and cross-origin mutations and forwards actor IDs',
  expect((await prices(request())).status).toBe(200);
 });
 
-it.each([null, undefined])('denies unscoped calculator access before loading any data (%s)', async defaultClubId => {
+it.each([null, undefined, 'other'])('allows coach calculator summaries regardless of default club (%s)', async defaultClubId => {
  mocks.session.mockResolvedValue({roles:['coach'],defaultClubId});
- expect((await access(request(),context)).status).toBe(403);
- expect(mocks.access).not.toHaveBeenCalled();
- expect(getClubDebtSummary).not.toHaveBeenCalled();
+ expect((await access(request(),context)).status).toBe(200);
+ expect(mocks.access).toHaveBeenCalledWith(id,false);
+ expect(getClubDebtSummary).toHaveBeenCalledWith(id);
 });
