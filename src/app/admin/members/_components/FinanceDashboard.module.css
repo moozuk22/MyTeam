@@ -615,3 +615,14 @@
 
 .dashboard .lockedDebtPlayer:disabled { opacity: 1; }
 .lockedDebtPlayer > span { filter: blur(7px); user-select: none; pointer-events: none; }
+
+.debtsDialog { width:min(720px,calc(100vw - 32px)); }
+.debtSearch { display:grid; gap:8px; color:#b6c0b3; font-size:13px; }
+.debtSearch > span:last-child { display:flex; align-items:center; gap:10px; padding:0 12px; background:#101510; border:1px solid #344032; border-radius:10px; }
+.debtSearch input { width:100%; min-width:0; min-height:44px; border:0; background:transparent; color:#eee; font:inherit; }
+.debtSearch > span:last-child:focus-within { outline:2px solid #32cd32; outline-offset:2px; }
+.debtSearch input:focus-visible { outline:none; }
+.debtResults { color:#9ca898; font-size:12px; margin:14px 0 8px; }
+.debtsDialogList { max-height:55dvh; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.debtsDialogList .debtPlayer > span:nth-child(2) { min-width:0; overflow-wrap:anywhere; }
+.debtsDialogList .debtPlayer > strong { white-space:nowrap; }

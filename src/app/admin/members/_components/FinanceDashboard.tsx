@@ -10,6 +10,7 @@ import { lockCategoryPageScroll } from './categoryModalScroll';
 import { categoryDragScrollSpeed } from './categoryDragScroll';
 import FinanceActionDropdown from './FinanceActionDropdown';
 import FinanceDeleteDialog from './FinanceDeleteDialog';
+import FinanceDebtsDialog from './FinanceDebtsDialog';
 import FinanceSkeleton, { FinanceMetricSkeleton, SkeletonLine } from './FinanceSkeleton';
 import FinancePlayerSkeleton from './FinancePlayerSkeleton';
 const FinanceAnalysis = lazy(() => import('./FinanceAnalysis'));
@@ -60,7 +61,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   const categoryConfirmRef = useRef<HTMLDialogElement>(null);
   const [ordering,setOrdering] = useState(false);
   const [categoryVisibility,setCategoryVisibility] = useState<'all' | 'active' | 'hidden'>('all');
-  const [allDebts,setAllDebts] = useState(false);
+  const [debtsOpen,setDebtsOpen] = useState(false);
   const [allExpenses,setAllExpenses] = useState(false);
   const [formOpen,setFormOpen] = useState(false);
   const categoriesDialogRef = useRef<HTMLDialogElement>(null);
@@ -303,12 +304,14 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
             <div className={styles.formActions}>{draft?.id && <button type="button" disabled={saving} onClick={() => { setError(''); setDraft({categoryId:'',amount:'',date:financeDateKey(),description:''}); setFormOpen(false); }}>Отказ</button>}<button type="submit" className={styles.primary} disabled={saving || !calculatorEnabled}><Save size={16} />{saving ? 'Записване…' : formKind === 'revenue' ? 'Запази прихода' : 'Запази разхода'}</button></div>
           </>}
         </form>);
+  const orderedDebts = [...(data?.debts ?? [])].sort((a,b) => a.name.localeCompare(b.name,'bg',{sensitivity:'base'}) || a.id.localeCompare(b.id));
+  const renderDebt = (debt: View['debts'][number]) => <li key={debt.id}><button type="button" className={`${styles.debtPlayer} ${!calculatorCanView ? styles.lockedDebtPlayer : ''}`} disabled={!calculatorCanView} onClick={() => { if (calculatorCanView) { setDebtsOpen(false); setSelectedPlayerId(debt.id); } }} aria-label={calculatorCanView ? `Детайли за ${debt.name}` : `Задължение: ${debt.amount === null ? 'Неуточнена такса' : money(debt.amount)}`}><span className={styles.avatar}><UserRound size={16} />{debt.avatarUrl && <img key={debt.avatarUrl} src={debt.avatarUrl} alt="" width={28} height={28} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} />}</span><span>{debt.name}<small>{debt.periods.map(period => /^\d{4}-\d{2}$/.test(period) ? new Intl.DateTimeFormat('bg-BG',{ month:'long',year:'numeric' }).format(new Date(`${period}-15T12:00:00`)) : period).join(' · ')}</small></span><strong>{debt.amount === null ? 'Неуточнена такса' : money(debt.amount)}</strong></button></li>;
   const debtsPanel = (<section ref={debtsRef} data-mobile-open={mobileDebtsOpen} tabIndex={-1} data-empty={Boolean(data && !data.incomplete && data.debts.length === 0 && Number(data.outstanding) === 0)} className={`${styles.box} ${styles.debts}`}><h2 className={styles.panelHeading}><Users size={22} />Задължения към клуба</h2>
           <div className={styles.debtTotal}><strong>{data?.incomplete ? '≥ ' : ''}{data ? money(data.outstanding) : '—'}</strong><small>{data?.debts.length ?? '—'} състезатели</small></div>
           {data?.incomplete && <p className={styles.error}>Има неуточнени такси. Общата сума е непълна.</p>}
-          {!data && <FinanceSkeleton variant="debts" />}<ul className={styles.debtList}>{(allDebts ? data?.debts : data?.debts.slice(0,5))?.map(debt => <li key={debt.id}><button type="button" className={`${styles.debtPlayer} ${!calculatorCanView ? styles.lockedDebtPlayer : ''}`} disabled={!calculatorCanView} onClick={() => { if (calculatorCanView) setSelectedPlayerId(debt.id); }} aria-label={calculatorCanView ? `Детайли за ${debt.name}` : `Задължение: ${debt.amount === null ? 'Неуточнена такса' : money(debt.amount)}`}><span className={styles.avatar}><UserRound size={16} />{debt.avatarUrl && <img key={debt.avatarUrl} src={debt.avatarUrl} alt="" width={28} height={28} loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} />}</span><span>{debt.name}<small>{debt.periods.map(period => /^\d{4}-\d{2}$/.test(period) ? new Intl.DateTimeFormat('bg-BG',{ month:'long',year:'numeric' }).format(new Date(`${period}-15T12:00:00`)) : period).join(' · ')}</small></span><strong>{debt.amount === null ? 'Неуточнена такса' : money(debt.amount)}</strong></button></li>)}</ul>
+          {!data && <FinanceSkeleton variant="debts" />}<ul className={styles.debtList}>{orderedDebts.slice(0,5).map(renderDebt)}</ul>
           {data && !data.debts.length && <p className={styles.empty}>Няма неплатени задължения.</p>}
-          {data && data.debts.length > 5 && <button className={styles.wide} type="button" onClick={() => setAllDebts(v => !v)}>{allDebts ? 'Покажи по-малко' : `Виж всички ${data.debts.length} състезатели →`}</button>}
+          {data && data.debts.length > 5 && <button className={styles.wide} type="button" onClick={() => { setActionDropdown(null); setDebtsOpen(true); }}>Виж всички {data.debts.length} състезатели →</button>}
         </section>);
   return <div ref={dashboardRef} className={styles.dashboard} data-view={ledgerView} data-editing={Boolean(draft?.id)}>
     {draft?.id && <div className={styles.editBackdrop} aria-hidden="true" />}
@@ -451,6 +454,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
       </>}</aside>
     </div>
 
+          {debtsOpen && <FinanceDebtsDialog debts={orderedDebts} renderDebt={renderDebt} onClose={() => setDebtsOpen(false)} />}
           {remove && <FinanceDeleteDialog entry={remove} saving={saving} error={error} onClose={() => setRemove(null)} onConfirm={() => void mutate({action:remove.kind === 'revenue' ? 'deleteRevenue' : 'deleteExpense',id:remove.id})} />}
           {selectedPlayerId && <Suspense fallback={<FinancePlayerSkeleton onClose={() => setSelectedPlayerId(null)} />}><FinancePlayerDetails key={selectedPlayerId} playerId={selectedPlayerId} clubId={clubId} onClose={() => setSelectedPlayerId(null)} /></Suspense>}
   </div>;
