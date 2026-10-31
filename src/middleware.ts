@@ -1,3 +1,4 @@
+import { canReadClubCalculator } from './lib/clubCalculatorAccess';
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
@@ -104,11 +105,17 @@ export async function middleware(request: NextRequest) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        // The finance page and API still perform club ownership and entitlement checks.
+        // Calculator scope follows the last club visited in this browser.
         const financeClubId = /^\/admin\/clubs\/([0-9a-f-]{36})\/finance$/.exec(pathname)?.[1];
-        if (financeClubId && financeClubId === payload.defaultClubId) return NextResponse.next();
+        if (financeClubId && canReadClubCalculator(roles, lastClubIdRaw, financeClubId)) return NextResponse.next();
         if (COACH_ALLOWED_ADMIN_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-          return NextResponse.next();
+          const response = NextResponse.next();
+          const clubId = request.nextUrl.searchParams.get("clubId");
+          // Remember the club before hydration starts child calculator API requests.
+          if (pathname === "/admin/members" && clubId && canReadClubCalculator(roles, clubId, clubId)) {
+            response.cookies.set("admin_last_club_id", clubId, { path: "/", maxAge: 31536000, sameSite: "lax" });
+          }
+          return response;
         }
 
         return NextResponse.redirect(new URL(safeRequestedNext || lastClubPath || "/admin/coach-home", request.url));

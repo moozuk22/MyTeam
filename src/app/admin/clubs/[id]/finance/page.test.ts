@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ session: vi.fn(), club: vi.fn() }));
-vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: 'token' }) }) }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), club: vi.fn(), remembered: undefined as string | undefined }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: (name: string) => name === 'admin_session' ? { value: 'token' } : mocks.remembered === undefined ? undefined : { value: mocks.remembered } }) }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); }, notFound: () => { throw new Error('not-found'); } }));
 vi.mock('@/lib/adminAuth', () => ({ verifyAdminToken: mocks.session }));
 vi.mock('@/lib/db', () => ({ prisma: { club: { findUnique: mocks.club } } }));
@@ -8,12 +8,10 @@ vi.mock('@/app/admin/members/_components/ClubFinancePanel', () => ({ default: ()
 import Page from './page';
 const id = '00000000-0000-0000-0000-000000000001';
 const context = { params: Promise.resolve({ id }) };
-beforeEach(() => { vi.resetAllMocks(); mocks.club.mockResolvedValue({ name: 'Club' }); });
-it('redirects signed-out visitors and blocks coaches from other clubs before querying data', async () => {
+beforeEach(() => { vi.resetAllMocks(); mocks.remembered=id; mocks.club.mockResolvedValue({ name: 'Club' }); });
+it('redirects signed-out visitors before querying data', async () => {
  mocks.session.mockResolvedValue(null);
  await expect(Page(context)).rejects.toThrow('redirect:/admin/login');
- mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:'other'});
- await expect(Page(context)).rejects.toThrow('not-found');
  expect(mocks.club).not.toHaveBeenCalled();
 });
 it('renders the dedicated page for club management and administrators', async () => {
@@ -34,8 +32,19 @@ it('resolves stored club logo upload paths before passing them to the dashboard'
  } finally { vi.unstubAllEnvs(); }
 });
 
-it.each([null, undefined])('denies coaches without an assigned club before querying data (%s)', async defaultClubId => {
+it.each([null, undefined, 'other'])('allows coaches to open a club finance link regardless of default club (%s)', async defaultClubId => {
  mocks.session.mockResolvedValue({roles:['coach'],defaultClubId});
+ expect(await Page(context)).toBeTruthy();
+ expect(mocks.club).toHaveBeenCalled();
+});
+
+it.each([undefined, '', 'invalid', '00000000-0000-0000-0000-000000000002'])('denies a coach outside the remembered club (%s)', async remembered => {
+ mocks.remembered=remembered;
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:id});
  await expect(Page(context)).rejects.toThrow('not-found');
  expect(mocks.club).not.toHaveBeenCalled();
+});
+it('allows administrators without a remembered club', async () => {
+ mocks.remembered=undefined; mocks.session.mockResolvedValue({roles:['admin']});
+ expect(await Page(context)).toBeTruthy();
 });

@@ -8,9 +8,9 @@ vi.mock("@/lib/clubSubscriptionSummary", () => ({ getClubSubscriptionSummary: mo
 vi.mock("@/lib/calculatorSubscriptions",()=>({calculatorAccess:mocks.calculator}));
 const clubA = "10000000-0000-4000-8000-000000000001";
 const clubB = "10000000-0000-4000-8000-000000000002";
-function get(clubId = clubA, query = "", cookie = true) {
+function get(clubId = clubA, query = "", cookie = true, remembered: string | undefined = clubA) {
   const request = new NextRequest(`https://myteam.example/api/admin/clubs/${clubId}/subscription${query}`, {
-    headers: cookie ? { cookie: "admin_session=SESSION" } : {},
+    headers: cookie ? { cookie: `admin_session=SESSION${remembered ? `; admin_last_club_id=${remembered}` : ''}` } : {},
   });
   return GET(request, { params: Promise.resolve({ id: clubId }) });
 }
@@ -19,11 +19,11 @@ beforeEach(() => {
   mocks.verify.mockResolvedValue({ sub: "coach", roles: ["coach"], defaultClubId: clubA });
   mocks.summary.mockResolvedValue({ summary: { status: "active", currentFee: "10.00" } });
 });
-it("rejects a club-scoped coach reading another club without querying its financial data", async () => {
+it("allows a coach to read another club's summary", async () => {
   const response = await get(clubB);
-  expect(response.status).toBe(403);
-  expect(mocks.summary).not.toHaveBeenCalled();
-  expect(await response.json()).not.toHaveProperty("summary");
+  expect(response.status).toBe(200);
+  expect(mocks.summary).toHaveBeenCalledWith(clubB);
+  expect(mocks.calculator).not.toHaveBeenCalled();
 });
 it("allows a coach to read their own club", async () => {
   const response = await get();
@@ -53,4 +53,18 @@ it("preserves validation and group-view restrictions", async () => {
   expect((await get("invalid")).status).toBe(400);
   expect((await get(clubA, "?coachGroupId=group")).status).toBe(403);
   expect(mocks.summary).not.toHaveBeenCalled();
+});
+
+it('omits calculator data with no remembered club while keeping the MyTeam summary', async () => {
+ const response=await get(clubA,'',true,'');
+ expect(response.status).toBe(200);
+ expect(await response.json()).not.toHaveProperty('calculator');
+ expect(mocks.calculator).not.toHaveBeenCalled();
+});
+it('includes calculator data for administrators without a remembered club', async () => {
+ mocks.verify.mockResolvedValue({roles:['admin']});
+ const response=await get(clubB,'',true,'');
+ expect(response.status).toBe(200);
+ expect(await response.json()).toHaveProperty('calculator');
+ expect(mocks.calculator).toHaveBeenCalledWith(clubB);
 });

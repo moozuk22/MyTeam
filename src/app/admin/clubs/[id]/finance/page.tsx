@@ -1,3 +1,4 @@
+import { canReadClubCalculator } from '@/lib/clubCalculatorAccess';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -12,10 +13,11 @@ export const metadata = { title: 'Финанси на клуба | My Team' };
 export default async function ClubFinancePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
-  const token = (await cookies()).get('admin_session')?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get('admin_session')?.value;
   const session = token ? await verifyAdminToken(token) : null;
   if (!session) redirect('/admin/login');
-  if (!session.roles.includes('admin') && session.defaultClubId !== id) notFound();
+  if (!canReadClubCalculator(session.roles, cookieStore.get('admin_last_club_id')?.value, id)) notFound();
   const club = await prisma.club.findUnique({ where: { id }, select: { name: true, imageUrl: true, emblemUrl: true } });
   if (!club) notFound();
   const storedLogo = (club.imageUrl || club.emblemUrl)?.trim();

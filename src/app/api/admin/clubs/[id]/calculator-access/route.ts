@@ -1,3 +1,4 @@
+import { canReadClubCalculator } from '@/lib/clubCalculatorAccess';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/adminAuth';
 import { calculatorAccess } from '@/lib/calculatorSubscriptions';
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest, {
     status: 400
   });
   const admin = session.roles.includes('admin');
-  if (request.nextUrl.searchParams.has('coachGroupId') || !admin && session.defaultClubId !== id) return NextResponse.json({
+  if (request.nextUrl.searchParams.has('coachGroupId') || !canReadClubCalculator(session.roles, request.cookies.get('admin_last_club_id')?.value, id)) return NextResponse.json({
     error: 'Forbidden'
   }, {
     status: 403

@@ -1,3 +1,4 @@
+import { canReadClubCalculator } from '@/lib/clubCalculatorAccess';
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { getClubSubscriptionSummary } from "@/lib/clubSubscriptionSummary";
@@ -13,14 +14,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (request.nextUrl.searchParams.has("coachGroupId")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
   if (!UUID_PATTERN.test(id)) return NextResponse.json({ error: "Invalid club" }, { status: 400 });
-  if (!session.roles.includes("admin") && session.defaultClubId && session.defaultClubId !== id) {
-    return NextResponse.json({ error: "Профилът ви няма достъп до този клуб." }, { status: 403 });
-  }
   try {
-    const canReadCalculator = session.roles.includes("admin") || session.defaultClubId === id;
     const [summary, calculator] = await Promise.all([
       getClubSubscriptionSummary(id),
-      canReadCalculator ? calculatorAccess(id) : Promise.resolve(null),
+      canReadClubCalculator(session.roles, request.cookies.get('admin_last_club_id')?.value, id)
+        ? calculatorAccess(id) : Promise.resolve(null),
     ]);
     return NextResponse.json(summary && calculator ? {...summary, calculator} : summary);
   }
