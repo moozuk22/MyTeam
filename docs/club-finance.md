@@ -61,3 +61,9 @@ Buying coverage backfills existing known-amount player payments inside the newly
 An enabled January, disabled February, enabled March retains January revenue/expenses and adds March revenue; February stays empty unless it is explicitly purchased later. Trial and contract grants begin at activation rather than the month's start. Manual entries use calendar dates and require that their date intersects an enabled period. Creation and date changes into inactive periods are rejected both by the service and a database trigger. Existing historical entries can retain their dates when corrected. Voiding calculator payments keeps all previously recorded financial history; player-payment deletion continues to void its matching automatic entry.
 
 The report lists enabled periods and explains excluded gaps. Balances also retain pre-release records and records preserved after a calculator-payment void; neither subscription expiry nor reactivation deletes or resets the ledger.
+
+## Concurrent payment undo and backfill
+
+Apply `20261101003000_finance_backfill_payment_lock` through Prisma Migrate. Backfill holds a key-share lock on each source payment until its transaction commits. If undo deletes first, backfill waits and skips the deleted payment. If backfill locks first, undo waits and then voids the captured revenue. This also applies after a player moves clubs because capture uses the payment’s original club snapshot. Cascading player deletion continues to preserve captured revenue; deleted source payments cannot be recovered by later purchases.
+
+Run `FINANCE_TEST_DATABASE_URL='<disposable PostgreSQL connection URL>' npm run test:finance-concurrency` with `psql` available. The script creates and removes an isolated schema and exercises both transaction orderings for purchase/restoration, with and without player movement, plus cascading player deletion. It does not read the application's `DATABASE_URL`.

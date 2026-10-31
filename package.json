@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:finance-concurrency": "node scripts/verify-finance-backfill-concurrency.mjs",
     "test:training-migration": "node scripts/verify-coach-training-migration.mjs",
     "typecheck": "tsc --noEmit",
     "import:players": "node scripts/import-players-from-csv.js",

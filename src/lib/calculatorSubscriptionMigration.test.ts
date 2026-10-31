@@ -9,6 +9,7 @@ it('gates live capture, backfills paid periods once, leaves gaps empty and prese
   for(const migration of ['20261029160000_club_finance','20261029190000_manual_club_revenue'])await db.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`,'utf8'));
   await db.exec(`UPDATE clubs SET finance_started_at='2020-01-01';INSERT INTO payment_logs(player_id,amount,paid_at)VALUES('${player}',5,'2021-01-01');`);
   await db.exec(readFileSync('prisma/migrations/20261031120000_calculator_subscriptions/migration.sql','utf8'));
+  await db.exec(readFileSync('prisma/migrations/20261101003000_finance_backfill_payment_lock/migration.sql','utf8'));
   // Existing data survives rollout, but disabled capture adds nothing.
   await db.exec(`INSERT INTO payment_logs(player_id,amount,paid_at)VALUES('${player}',10,'2026-01-03'),('${player}',20,'2026-02-03'),('${player}',30,'2026-03-03');`);
   expect((await db.query('SELECT amount::text FROM club_finance_entries')).rows).toEqual([{amount:'5.00'}]);
