@@ -57,3 +57,21 @@ it.each(['warning','overdue'])('uses saved %s status for renewal debts even when
 it.each(['warning','overdue'])('counts unsettled monthly periods for saved %s players',status=>{
  expect(playerDebt({...player,status},'calendar_month','40',new Date('2026-10-29')).periods).toEqual(['2026-08','2026-09','2026-10']);
 });
+
+it('adds the current month only at the club status-update time in Sofia',()=>{
+ const schedule={overdueDay:3,overdueHour:10,overdueMinute:30};
+ const p={...player,status:'warning',firstBillingMonth:date('2026-09'),paymentWaivers:[{waivedFor:date('2026-09')}]};
+ expect(playerDebt(p,'calendar_month','75',new Date('2026-11-03T08:29:59Z'),schedule).periods).toEqual(['2026-10']);
+ expect(playerDebt(p,'calendar_month','75',new Date('2026-11-03T08:30:00Z'),schedule).periods).toEqual(['2026-10','2026-11']);
+});
+it('uses the default 1st at 10:00 Sofia schedule and respects DST',()=>{
+ expect(playerDebt(player,'calendar_month','40',new Date('2026-11-01T07:59:59Z')).periods).not.toContain('2026-11');
+ expect(playerDebt(player,'calendar_month','40',new Date('2026-11-01T08:00:00Z')).periods).toContain('2026-11');
+ expect(playerDebt(player,'calendar_month','40',new Date('2026-09-01T06:59:59Z')).periods).not.toContain('2026-09');
+ expect(playerDebt(player,'calendar_month','40',new Date('2026-09-01T07:00:00Z')).periods).toContain('2026-09');
+});
+it('still skips saved paid/paused statuses and waived current months after the cutoff',()=>{
+ const now=new Date('2026-11-05T12:00:00Z');
+ for(const status of ['paid','paused']) expect(playerDebt({...player,status},'calendar_month','40',now).periods).toEqual([]);
+ expect(playerDebt({...player,paymentWaivers:[{waivedFor:date('2026-11')}]},'calendar_month','40',now).periods).not.toContain('2026-11');
+});

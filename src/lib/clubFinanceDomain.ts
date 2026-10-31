@@ -36,7 +36,15 @@ export type DebtPlayer = FeePlayer & {
   id: string; status: string; fullName: string; firstBillingMonth: Date | null; remainingTrainingCredits: number;
   paymentLogs: { paidFor: Date }[]; paymentWaivers: { waivedFor: Date }[];
 };
-export function playerDebt(player: DebtPlayer, workflow: string, clubAmount: unknown, now = new Date()) {
+export type ClubDebtSchedule = { overdueDay?: number | null; overdueHour?: number | null; overdueMinute?: number | null };
+function hasReachedStatusUpdate(now: Date, schedule: ClubDebtSchedule) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone:'Europe/Sofia', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23' }).formatToParts(now);
+  const value = (type: string) => Number(parts.find(part => part.type === type)?.value);
+  const day = schedule.overdueDay ?? 1;
+  return value('day') > day || value('day') === day
+    && value('hour') * 60 + value('minute') >= (schedule.overdueHour ?? 10) * 60 + (schedule.overdueMinute ?? 0);
+}
+export function playerDebt(player: DebtPlayer, workflow: string, clubAmount: unknown, now = new Date(), schedule: ClubDebtSchedule = {}) {
   const fee = resolveMemberFee(player, clubAmount);
   const periods: string[] = [];
   const eligible = player.status === 'warning' || player.status === 'overdue';
@@ -44,7 +52,7 @@ export function playerDebt(player: DebtPlayer, workflow: string, clubAmount: unk
     if (player.firstBillingMonth) {
       const start = player.firstBillingMonth.getUTCFullYear() * 12 + player.firstBillingMonth.getUTCMonth();
       const today = financeDateKey(now);
-      const end = Number(today.slice(0,4)) * 12 + Number(today.slice(5,7)) - 1;
+      const end = Number(today.slice(0,4)) * 12 + Number(today.slice(5,7)) - 1 - (hasReachedStatusUpdate(now,schedule) ? 0 : 1);
       const settled = new Set([...player.paymentLogs.map(p => p.paidFor), ...player.paymentWaivers.map(p => p.waivedFor)].map(d => d.getUTCFullYear() * 12 + d.getUTCMonth()));
       for (let i = start; i <= end; i++) if (!settled.has(i)) periods.push(`${Math.floor(i/12)}-${String(i%12+1).padStart(2,'0')}`);
     }
