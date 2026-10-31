@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { financeDayStart, financePeriod, financePeriodLabel, playerDebt, type DebtPlayer } from './clubFinanceDomain';
 const date = (month: string) => new Date(`${month}-01T00:00:00Z`);
-const player: DebtPlayer = { id: 'p', status: 'overdue', fullName: 'Player', paymentAmount: '0', firstBillingMonth: date('2026-08'), remainingTrainingCredits: 0, paymentLogs: [], paymentWaivers: [] };
+const player: DebtPlayer = { id: 'p', createdAt: new Date('2020-01-01T00:00:00Z'), status: 'overdue', fullName: 'Player', paymentAmount: '0', firstBillingMonth: date('2026-08'), remainingTrainingCredits: 0, paymentLogs: [], paymentWaivers: [] };
 describe('club finance reporting', () => {
   it('includes the entire start and end months in a range across Sofia DST changes', () => {
     const range = financePeriod('2026-03..2026-10')!;
@@ -74,4 +74,14 @@ it('still skips saved paid/paused statuses and waived current months after the c
  const now=new Date('2026-11-05T12:00:00Z');
  for(const status of ['paid','paused']) expect(playerDebt({...player,status},'calendar_month','40',now).periods).toEqual([]);
  expect(playerDebt({...player,paymentWaivers:[{waivedFor:date('2026-11')}]},'calendar_month','40',now).periods).not.toContain('2026-11');
+});
+
+it('does not charge months before the player was added, even with an earlier billing start',()=>{
+ const added={...player,createdAt:new Date('2026-10-15T12:00:00Z'),firstBillingMonth:date('2026-09')};
+ expect(playerDebt(added,'calendar_month','75',new Date('2026-11-05T12:00:00Z')).periods).toEqual(['2026-10','2026-11']);
+ expect(playerDebt({...added,firstBillingMonth:date('2026-11')},'calendar_month','75',new Date('2026-11-05T12:00:00Z')).periods).toEqual(['2026-11']);
+});
+it('uses the Sofia creation month at a UTC month boundary',()=>{
+ const added={...player,createdAt:new Date('2026-09-30T21:30:00Z'),firstBillingMonth:date('2026-09')};
+ expect(playerDebt(added,'calendar_month','75',new Date('2026-11-05T12:00:00Z')).periods).toEqual(['2026-10','2026-11']);
 });
