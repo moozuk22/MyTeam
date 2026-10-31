@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   $transaction: vi.fn(), $queryRaw: vi.fn(),
   club: { findUniqueOrThrow: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   player: { updateMany: vi.fn() },
+  clubCalculatorSubscription: { findMany: vi.fn() },
   clubSubscription: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
   clubSubscriptionFee: { upsert: vi.fn() },
   clubSubscriptionPayment: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -65,6 +66,7 @@ beforeEach(() => {
   });
   mocks.push.mockResolvedValue({ total: 2, sent: 2, failed: 0, deactivated: 0 });
   mocks.club.findMany.mockResolvedValue([]);
+  mocks.clubCalculatorSubscription.findMany.mockResolvedValue([]);
   mocks.player.updateMany.mockResolvedValue({ count: 3 });
   mocks.club.update.mockResolvedValue({ id: clubId, billingStatus: "active" });
 });

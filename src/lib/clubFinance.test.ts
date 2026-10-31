@@ -1,12 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
-const tx = vi.hoisted(() => ({ club: { findUnique: vi.fn() }, player: { findMany: vi.fn() }, clubFinanceCategory: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() }, clubFinanceEntry: { groupBy: vi.fn(), findMany: vi.fn(), count: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() } }));
+const access=vi.hoisted(()=>vi.fn());
+vi.mock('./calculatorSubscriptions',()=>({calculatorAccess:access}));
+const tx = vi.hoisted(() => ({ $queryRaw:vi.fn(), clubCalculatorGrant:{findFirst:vi.fn()}, club: { findUnique: vi.fn() }, player: { findMany: vi.fn() }, clubFinanceCategory: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() }, clubFinanceEntry: { findFirst:vi.fn(), groupBy: vi.fn(), findMany: vi.fn(), count: vi.fn(), create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() } }));
 vi.mock('./db', () => ({ prisma: { $transaction: (fn: (value: unknown) => unknown) => fn(tx) } }));
-import { getClubFinance, mutateClubFinance } from './clubFinance';
+import { getClubDebtSummary, getClubFinance, mutateClubFinance } from './clubFinance';
 const club = '00000000-0000-0000-0000-000000000001';
 const category = '00000000-0000-0000-0000-000000000002';
 const expense = { action: 'createExpense', categoryId: category, amount: '12,34', date: '2026-10-29', description: '' };
-beforeEach(() => { vi.resetAllMocks(); tx.clubFinanceCategory.findFirst.mockResolvedValue({ id: category }); });
+beforeEach(() => { vi.resetAllMocks(); access.mockResolvedValue({enabled:true}); tx.clubCalculatorGrant.findFirst.mockResolvedValue({id:"grant"}); tx.clubFinanceCategory.findFirst.mockResolvedValue({ id: category }); });
 it('uses a shared category owned by this club and stores exact amounts', async () => {
  await mutateClubFinance(club,expense);
  expect(tx.clubFinanceCategory.findFirst).toHaveBeenCalledWith({ where: { id: category, clubId: club, isActive:true } });
@@ -167,4 +169,31 @@ it('stores optional palette colors and supports clearing without overwriting omi
  expect(tx.clubFinanceCategory.updateMany).toHaveBeenLastCalledWith({where:{id:category,clubId:club},data:{name:'Clear',color:null}});
  await expect(mutateClubFinance(club,{action:'createCategory',name:'Invalid',color:'#123456'})).rejects.toThrow('палитрата');
  await expect(mutateClubFinance(club,{action:'createCategory',name:'Invalid',color:123})).rejects.toThrow('палитрата');
+});
+
+it('rejects inactive calculator writes and manual entries dated in gaps',async()=>{
+ access.mockResolvedValue({enabled:false});
+ await expect(mutateClubFinance(club,expense)).rejects.toMatchObject({status:403});
+ access.mockResolvedValue({enabled:true});tx.clubCalculatorGrant.findFirst.mockResolvedValue(null);
+ await expect(mutateClubFinance(club,expense)).rejects.toThrow('период');
+ expect(tx.clubFinanceEntry.create).not.toHaveBeenCalled();
+});
+
+it('returns membership dues without reading calculator records or requiring entitlement',async()=>{
+ tx.club.findUnique.mockResolvedValue({paymentWorkflow:'calendar_month',defaultPaymentAmount:'40'});
+ tx.player.findMany.mockResolvedValue([{id:'p',fullName:'Player',paymentAmount:'25',firstBillingMonth:new Date('2026-10-01'),remainingTrainingCredits:0,paymentLogs:[],paymentWaivers:[]}]);
+ const summary=await getClubDebtSummary(club);
+ expect(Number(summary.outstanding)).toBeGreaterThanOrEqual(25);
+ expect(summary).toMatchObject({count:1,incomplete:false});
+ expect(summary).not.toHaveProperty('totals');expect(summary).not.toHaveProperty('debts');
+ expect(tx.clubFinanceEntry.groupBy).not.toHaveBeenCalled();expect(tx.clubFinanceEntry.findMany).not.toHaveBeenCalled();expect(access).not.toHaveBeenCalled();
+ expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,isActive:true}}));
+});
+
+it('loads dues without querying transaction history or chart and analysis totals',async()=>{
+ tx.club.findUnique.mockResolvedValue({financeStartedAt:new Date('2026-01-01'),paymentWorkflow:'calendar_month',defaultPaymentAmount:'40'});
+ tx.player.findMany.mockResolvedValue([]);
+ const result=await getClubFinance(club,new URLSearchParams({month:'all',view:'dues'}));
+ expect(result.entries).toEqual([]);expect(result.subtotals).toEqual([]);expect(result.outstanding).toBe('0.00');
+ expect(tx.clubFinanceEntry.findMany).not.toHaveBeenCalled();expect(tx.clubFinanceEntry.groupBy).not.toHaveBeenCalled();expect(tx.clubFinanceEntry.count).not.toHaveBeenCalled();
 });

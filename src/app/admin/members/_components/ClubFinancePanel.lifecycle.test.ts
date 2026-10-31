@@ -8,7 +8,7 @@ vi.mock('react', async original => ({
   useRef: (current: unknown) => ({ current }),
   useState: (initial: unknown) => [initial, vi.fn()],
 }));
-import ClubFinancePanel from './ClubFinancePanel';
+import { FinancePanel as ClubFinancePanel } from './ClubFinancePanel';
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); hooks.effects = []; });
 it('keeps the finance report stable on focus, tab visibility changes, and elapsed time', async () => {
   vi.useFakeTimers();

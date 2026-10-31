@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { ClubSubscriptionSummaryView, SubscriptionStatus } from "@/lib/clubSubscriptionDomain";
+import type { CalculatorAccess } from '@/lib/calculatorSubscriptionDomain';
 import styles from "./ClubSubscriptionSummary.module.css";
 const monthLabel = (month: string) => new Intl.DateTimeFormat("bg-BG", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T00:00:00Z`));
 const dateLabel = (date: string) => date.split("-").reverse().join(".");
@@ -15,7 +16,7 @@ const statusLabels: Record<SubscriptionStatus, string> = {
 };
 
 export default function ClubSubscriptionSummary({ clubId }: { clubId: string }) {
-  const [data, setData] = useState<{ clubId: string; value: ClubSubscriptionSummaryView | null } | null>(null);
+  const [data, setData] = useState<{ clubId: string; value: ClubSubscriptionSummaryView | null; checkedAt: number } | null>(null);
   const [error, setError] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -43,7 +44,7 @@ export default function ClubSubscriptionSummary({ clubId }: { clubId: string }) 
         const response = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/subscription`, { cache: "no-store" });
         if (!response.ok) throw new Error("Абонаментът не може да бъде зареден.");
         const value = await response.json() as ClubSubscriptionSummaryView | null;
-        if (!disposed) { setData({ clubId, value }); setError(""); }
+        if (!disposed) { setData({ clubId, value, checkedAt: Date.now() }); setError(""); }
       } catch (err) { if (!disposed) setError((err as Error).message); }
       finally { loading = false; }
     }
@@ -77,7 +78,29 @@ export default function ClubSubscriptionSummary({ clubId }: { clubId: string }) 
       {summary.outstanding.length > 0 && <details><summary>Неплатени месеци ({summary.outstanding.length})</summary><ul>{summary.outstanding.map((m) => <li key={m.month}><span>{monthLabel(m.month)}</span><strong>{m.amount} EUR</strong></li>)}</ul></details>}
       <p className={styles.hint}>Таксите са за абонамента на клуба към MyTeam. При вече извършено плащане се свържете с администратора за отразяването му.</p>
     </>}
+    {subscription.calculator && <CalculatorSummary calculator={subscription.calculator} asOf={data!.checkedAt} />}
     </section>
     </dialog>
   </div>;
+}
+
+export function CalculatorSummary({calculator,asOf}:{calculator:CalculatorAccess;asOf:number}) {
+  const now = asOf;
+  const periods = calculator.periods.filter(p=>new Date(p.startsAt).getTime()<=now && (!p.endsAt || new Date(p.endsAt).getTime()>now));
+  let expiresAt: number | null = now;
+  for (const period of [...calculator.periods].sort((a,b)=>a.startsAt.localeCompare(b.startsAt))) {
+    if (expiresAt === null) break;
+    const startsAt = new Date(period.startsAt).getTime();
+    const endsAt = period.endsAt ? new Date(period.endsAt).getTime() : null;
+    if (startsAt <= expiresAt && (endsAt === null || endsAt > expiresAt)) expiresAt = endsAt;
+  }
+  const format = (value:string) => new Intl.DateTimeFormat('bg-BG',{day:'numeric',month:'2-digit',year:'numeric',timeZone:'Europe/Sofia'}).format(new Date(value));
+  return <section className={styles.calculator} aria-label="Абонамент за финансовия калкулатор">
+    <h4>Финансов калкулатор</h4>
+    <span className={styles.badge} data-status={calculator.enabled?'active':'not_activated'}>{calculator.enabled?'Активен':'Неактивен'}</span>
+    {calculator.enabled && <dl className={styles.metrics}>
+      <div><dt>Изтича на</dt><dd>{expiresAt === null ? 'Безсрочно' : `${format(new Date(expiresAt-1).toISOString())} включително`}</dd></div>
+      {calculator.enabled && <div><dt>Активно покритие</dt><dd>{periods.map((p,i)=><span className={styles.coveragePeriod} key={i}>{format(p.startsAt)} — {p.endsAt?`${format(new Date(new Date(p.endsAt).getTime()-1).toISOString())} включително`:'безсрочно'}</span>)}</dd></div>}
+    </dl>}
+  </section>;
 }

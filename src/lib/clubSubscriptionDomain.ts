@@ -75,6 +75,7 @@ export type SubscriptionSummary = {
 };
 export type SubscriptionAuditEntry = { id: string; actorId: string; action: string; details: unknown; createdAt: string };
 export type ClubSubscriptionSummaryView = {
+  calculator?: import('./calculatorSubscriptionDomain').CalculatorAccess;
   mode: string; trialEndDate: string | null; firstBillingMonth: string | null;
   summary: SubscriptionSummary; paidMonths: { month: string; amount: string }[];
 };

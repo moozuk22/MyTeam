@@ -59,7 +59,7 @@ it("loads and refreshes the active club and reports real request failures", asyn
   const fetchMock = vi.fn().mockResolvedValueOnce(Response.json(value)).mockRejectedValueOnce(new Error("Network unavailable"));
   vi.stubGlobal("fetch", fetchMock);
   const cleanup = mount();
-  await vi.waitFor(() => expect(hooks.setters[0]).toHaveBeenCalledWith({ clubId: "club-a", value }));
+  await vi.waitFor(() => expect(hooks.setters[0]).toHaveBeenCalledWith({ clubId: "club-a", value, checkedAt: expect.any(Number) }));
   windowEvents.dispatchEvent(new Event("focus"));
   await vi.waitFor(() => expect(hooks.setters[1]).toHaveBeenCalledWith("Network unavailable"));
   cleanup();
@@ -74,7 +74,7 @@ it("ignores a stale request failure after switching clubs and keeps the new effe
   const cleanupOld = mount();
   cleanupOld();
   const cleanupNew = mount("club-b");
-  await vi.waitFor(() => expect(hooks.setters[3]).toHaveBeenCalledWith({ clubId: "club-b", value: { summary: { status: "active" } } }));
+  await vi.waitFor(() => expect(hooks.setters[3]).toHaveBeenCalledWith({ clubId: "club-b", value: { summary: { status: "active" } }, checkedAt: expect.any(Number) }));
   rejectOld(new Error("Old request failed"));
   await vi.waitFor(() => expect(fetchMock).toHaveResolvedTimes(1));
   expect(hooks.setters[0]).not.toHaveBeenCalled();

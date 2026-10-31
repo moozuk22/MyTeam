@@ -603,3 +603,15 @@
 @media(max-width:360px) {
  .dashboard .ledgerToolbar .management>button { font-size:11px; gap:5px; padding-inline:5px; }
 }
+
+.blurredAmount { display: inline-block; filter: blur(7px); user-select: none; pointer-events: none; }
+
+
+
+.lockedSection { padding: 32px 20px; text-align: center; border: 1px dashed #42503a; border-radius: 12px; background: #191e17; color: #bac5b3; }
+.lockedSection h3 { margin: 0 0 12px; color: #e2ebdc; font-size: 16px; }
+.lockedSection p { max-width: 58ch; margin: 0 auto 12px; font-size: 14px; line-height: 1.7; }
+.lockedSection small { color: #92a087; }
+
+.dashboard .lockedDebtPlayer:disabled { opacity: 1; }
+.lockedDebtPlayer > span { filter: blur(7px); user-select: none; pointer-events: none; }

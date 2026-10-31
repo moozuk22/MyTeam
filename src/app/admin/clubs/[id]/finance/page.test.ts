@@ -17,6 +17,8 @@ it('redirects signed-out visitors and blocks coaches from other clubs before que
  expect(mocks.club).not.toHaveBeenCalled();
 });
 it('renders the dedicated page for club management and administrators', async () => {
+ mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:null});
+ expect(await Page(context)).toBeTruthy();
  mocks.session.mockResolvedValue({roles:['coach'],defaultClubId:id});
  expect(await Page(context)).toBeTruthy();
  mocks.session.mockResolvedValue({roles:['admin']});

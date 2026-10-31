@@ -69,3 +69,30 @@
  .panel .widgetMetrics strong { font-size:clamp(17px,5vw,24px); }
  .panel .link { flex-basis:40px; width:40px; height:44px; }
 }
+
+.locked { padding: 1.25rem; color: var(--text-secondary, #cbd5e1); }
+.locked h3 { margin-top: 0; }
+.coverage { margin: 0 0 20px; border: 1px solid #354531; border-radius: 14px; background: linear-gradient(135deg,#1b2119,#151815); color: #c2c9bd; overflow-wrap: anywhere; }
+.coverage summary { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 14px 18px; box-sizing: border-box; color: #e2ebdc; font-size: 14px; font-weight: 600; line-height: 1.5; list-style: none; cursor: pointer; border-radius: 13px; }
+.coverage summary::-webkit-details-marker { display: none; }
+.coverage summary::after { content: ''; flex: 0 0 7px; width: 7px; height: 7px; margin-left: auto; margin-right: 3px; border-right: 2px solid #91b381; border-bottom: 2px solid #91b381; transform: rotate(45deg); }
+.coverage[open] summary::after { transform: rotate(225deg); }
+.coverage summary:hover { background: rgba(140,190,110,.06); }
+.coverage summary:focus-visible { outline: 2px solid #9cff9c; outline-offset: 3px; }
+.coverage[open] summary { border-bottom: 1px solid #303b2c; border-radius: 13px 13px 0 0; }
+.coverage > p { margin: 16px 18px; max-width: 85ch; font-size: 13px; line-height: 1.8; }
+.coverage > p + p { padding: 12px 14px; border-left: 3px solid #b59c62; border-radius: 0 8px 8px 0; background: rgba(181,156,98,.08); color: #d5c7a4; }
+.coverage ul { display: grid; gap: 8px; margin: 16px 18px 18px; padding: 0; list-style: none; }
+.coverage ul:empty { display: none; }
+.coverage li { padding: 10px 12px; border: 1px solid #303b2c; border-radius: 8px; background: #161b14; color: #b9cdb0; font-size: 12px; line-height: 1.6; font-variant-numeric: tabular-nums; }
+@media(max-width:500px) {
+ .coverage summary { padding: 14px; font-size: 13px; }
+ .coverage > p { margin: 14px; }
+ .coverage ul { margin: 14px; }
+}
+
+.blurredBalance { filter: blur(7px); user-select: none; pointer-events: none; }
+
+.periodFilters button:disabled { opacity: .45; cursor: not-allowed; }
+
+.inactiveNotice { margin: 0 0 16px; padding: 14px 16px; border: 1px solid #665535; border-left: 3px solid #b59c62; border-radius: 10px; background: rgba(181,156,98,.08); color: #d5c7a4; font-size: 13px; line-height: 1.7; }

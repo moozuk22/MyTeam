@@ -3,6 +3,7 @@ import { isCustomTrainingGroupPaletteColor } from './customTrainingGroupColors';
 import { Prisma } from '@prisma/client';
 import { prisma } from './db';
 import { financeDateKey, financeDayStart, financePeriod, financePeriodLabel, FinanceError, playerDebt } from './clubFinanceDomain';
+import { calculatorAccess } from './calculatorSubscriptions';
 import { parsePaymentAmount } from './paymentAmount';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function financeId(value: unknown): string {
@@ -45,7 +46,19 @@ export async function getClubFinanceAnalysis(clubId: string, now = new Date()) {
     ] };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
+// Membership dues remain available independently of calculator entitlement.
+export async function getClubDebtSummary(clubId: string) {
+  return prisma.$transaction(async tx => {
+    const club = await tx.club.findUnique({where:{id:clubId},select:{paymentWorkflow:true,defaultPaymentAmount:true}});
+    if (!club) throw new FinanceError('Клубът не е намерен.',404);
+    const players = await tx.player.findMany({where:{clubId,isActive:true},select:{id:true,fullName:true,firstBillingMonth:true,remainingTrainingCredits:true,paymentAmount:true,billingCoachGroupId:true,coachGroups:{select:{id:true,name:true,paymentAmount:true}},paymentLogs:{select:{paidFor:true}},paymentWaivers:{select:{waivedFor:true}}}});
+    const debts = players.map(p=>playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount)).filter(p=>p.periods.length);
+    const outstanding = debts.reduce((sum,p)=>p.fee===null?sum:sum.add(new Prisma.Decimal(p.fee).mul(p.periods.length)),new Prisma.Decimal(0));
+    return {outstanding:outstanding.toFixed(2),count:debts.length,incomplete:debts.some(p=>p.conflict)};
+  }, {isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
+}
 export async function getClubFinance(clubId: string, params: URLSearchParams) {
+  const duesOnly = params.get('view') === 'dues';
   const month = params.get('month') ?? financeDateKey().slice(0,7);
   const period = financePeriod(month);
   const page = Number(params.get('page') ?? '1');
@@ -61,9 +74,9 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
     const listWhere = { ...where, ...(kind ? { kind } : {}), ...(category ? { categoryId: category } : {}) };
     const [categories, totals, entries, count, players] = await Promise.all([
       tx.clubFinanceCategory.findMany({ where: { clubId }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }] }),
-      tx.clubFinanceEntry.groupBy({ by: ['kind','currency','categoryId'], where, _sum: { amount: true } }),
-      tx.clubFinanceEntry.findMany({ where: listWhere, orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }], skip: (page-1)*20, take: 20, include: { category: { select: { name: true, isMembership: true } } } }),
-      tx.clubFinanceEntry.count({ where: listWhere }),
+      duesOnly ? Promise.resolve([]) : tx.clubFinanceEntry.groupBy({ by: ['kind','currency','categoryId'], where, _sum: { amount: true } }),
+      duesOnly ? Promise.resolve([]) : tx.clubFinanceEntry.findMany({ where: listWhere, orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }], skip: (page-1)*20, take: 20, include: { category: { select: { name: true, isMembership: true } } } }),
+      duesOnly ? Promise.resolve(0) : tx.clubFinanceEntry.count({ where: listWhere }),
       tx.player.findMany({ where: { clubId, isActive: true }, select: { id: true, fullName: true, images: { select: { imageUrl: true, isAdminView: true } }, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
     ]);
     const currencies = new Map<string, { revenue: Prisma.Decimal; expense: Prisma.Decimal }>();
@@ -99,6 +112,8 @@ function text(value: unknown, max: number) {
 export async function mutateClubFinance(clubId: string, body: Record<string, unknown>) {
   const action = body.action;
   return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM clubs WHERE id=${clubId}::uuid FOR UPDATE`;
+    if (!(await calculatorAccess(clubId,false,tx)).enabled) throw new FinanceError('Финансовият калкулатор не е активиран.',403);
     if (action === 'setCategoryActive') {
       if (typeof body.isActive !== 'boolean') throw new FinanceError('Невалиден статус.');
       const changed = await tx.clubFinanceCategory.updateMany({ where: { id: financeId(body.id), clubId }, data: { isActive: body.isActive } });
@@ -141,6 +156,12 @@ export async function mutateClubFinance(clubId: string, body: Record<string, unk
     const amount = parsePaymentAmount(body.amount);
     if (amount === null || new Prisma.Decimal(amount).lte(0)) throw new FinanceError('Въведете положителна сума с до 2 десетични знака.');
     const occurredAt = financeDayStart(text(body.date,10));
+    const nextDay = new Date(`${String(body.date)}T12:00:00Z`);
+    nextDay.setUTCDate(nextDay.getUTCDate()+1);
+    const dayEnd = financeDayStart(nextDay.toISOString().slice(0,10));
+    const existing = id ? await tx.clubFinanceEntry.findFirst({where:{id,clubId,kind,paymentReference:null},select:{occurredAt:true}}) : null;
+    const eligible = existing?.occurredAt.getTime() === occurredAt.getTime() || await tx.clubCalculatorGrant.findFirst({where:{clubId,revokedAt:null,startsAt:{lt:dayEnd},OR:[{endsAt:null},{endsAt:{gt:occurredAt}}]}});
+    if (!eligible) throw new FinanceError('Не може да записвате данни за период, в който калкулаторът не е бил активен.');
     const description = body.description == null ? null : text(body.description,2000) || null;
     const data = { categoryId, amount, occurredAt, description };
     if (!id) return tx.clubFinanceEntry.create({ data: { ...data, clubId, kind, currency: 'EUR' } });

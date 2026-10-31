@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { getClubSubscriptionSummary } from "@/lib/clubSubscriptionSummary";
+import { calculatorAccess } from "@/lib/calculatorSubscriptions";
 import { UUID_PATTERN } from "@/lib/clubSubscriptionDomain";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!session.roles.includes("admin") && session.defaultClubId && session.defaultClubId !== id) {
     return NextResponse.json({ error: "Профилът ви няма достъп до този клуб." }, { status: 403 });
   }
-  try { return NextResponse.json(await getClubSubscriptionSummary(id)); }
+  try {
+    const [summary, calculator] = await Promise.all([getClubSubscriptionSummary(id), calculatorAccess(id)]);
+    return NextResponse.json(summary ? {...summary, calculator} : null);
+  }
   catch (error) { console.error("Club subscription summary failed:", error); return NextResponse.json({ error: "Абонаментът не може да бъде зареден." }, { status: 500 }); }
 }

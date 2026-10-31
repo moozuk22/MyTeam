@@ -124,3 +124,37 @@ it('excludes membership fees from categories offered for manual entries', () => 
  expect(form).not.toContain('value="membership"');
  expect(form).toContain('value="other"');
 });
+
+it('blurs revenue, expense and balance cards when calculator access is inactive',()=>{
+ const html=renderToStaticMarkup(<FinanceDashboard clubId="club" calculatorEnabled={false} data={base} report={base} month="all" filters={null} onSaved={vi.fn()} />);
+ for(const metric of ['revenue','expense','balance']) expect(html).toContain(`data-metric="${metric}"`);
+ expect(html.match(/aria-label="Калкулаторът е заключен"/g)).toHaveLength(3);
+ expect(html).not.toContain('900,00');expect(html).not.toContain('200,00');expect(html).not.toContain('700,00');
+ expect(html).toContain('data-metric="outstanding"');
+});
+
+it('shows categories without blur while calculator access is inactive',()=>{
+ const html=renderToStaticMarkup(<FinanceDashboard clubId="club" calculatorEnabled={false} data={base} report={base} month="all" filters={null} onSaved={vi.fn()} />);
+ expect(html).not.toContain('lockedCategories');
+});
+
+it('shows explanations instead of history, analysis and charts while calculator access is inactive',()=>{
+ const html=renderToStaticMarkup(<FinanceDashboard clubId="club" calculatorEnabled={false} data={base} report={base} month="all" filters={null} onSaved={vi.fn()} />);
+ expect(html.match(/Данните в тази секция са достъпни/g)).toHaveLength(3);
+ expect(html).not.toContain('lockedTable');expect(html).not.toContain('analysisTable');expect(html).not.toContain('chartSegment');
+});
+
+it('blurs player details but keeps individual and total dues visible while inactive',()=>{
+ const data:View={...base,debts:[{id:'player',name:'Играч',avatarUrl:null,periods:['2026-10'],fee:'60',amount:'60.00',conflict:false}]};
+ const html=renderToStaticMarkup(<FinanceDashboard clubId="club" calculatorEnabled={false} data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
+ expect(html).toMatch(/<button type="button" class="[^"]*lockedDebtPlayer[^"]*" disabled=""/);
+ expect(html).toContain('60,00');expect(html).toContain('300,00');
+ expect(html).not.toContain('aria-label="Детайли за Играч"');
+});
+
+it('shows all finance data to admin viewers even when calculator recording is inactive',()=>{
+ const data:View={...base,debts:[{id:'player',name:'Играч',avatarUrl:null,periods:['2026-10'],fee:'60',amount:'60.00',conflict:false}]};
+ const html=renderToStaticMarkup(<FinanceDashboard clubId="club" calculatorEnabled={false} calculatorCanView data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
+ expect(html).toContain('900,00');expect(html).toContain('700,00');expect(html).toContain('aria-label="Детайли за Играч"');
+ expect(html).not.toContain('Данните в тази секция са достъпни');expect(html).not.toContain('lockedDebtPlayer');
+});

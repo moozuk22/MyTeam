@@ -2,9 +2,10 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "./route";
 
-const mocks = vi.hoisted(() => ({ verify: vi.fn(), summary: vi.fn() }));
+const mocks = vi.hoisted(() => ({ verify: vi.fn(), summary: vi.fn(), calculator: vi.fn() }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.verify }));
 vi.mock("@/lib/clubSubscriptionSummary", () => ({ getClubSubscriptionSummary: mocks.summary }));
+vi.mock("@/lib/calculatorSubscriptions",()=>({calculatorAccess:mocks.calculator}));
 const clubA = "10000000-0000-4000-8000-000000000001";
 const clubB = "10000000-0000-4000-8000-000000000002";
 function get(clubId = clubA, query = "", cookie = true) {
@@ -14,7 +15,7 @@ function get(clubId = clubA, query = "", cookie = true) {
   return GET(request, { params: Promise.resolve({ id: clubId }) });
 }
 beforeEach(() => {
-  vi.resetAllMocks();
+  vi.resetAllMocks();mocks.calculator.mockResolvedValue({enabled:false,canView:false,periods:[]});
   mocks.verify.mockResolvedValue({ sub: "coach", roles: ["coach"], defaultClubId: clubA });
   mocks.summary.mockResolvedValue({ summary: { status: "active", currentFee: "10.00" } });
 });
@@ -28,7 +29,7 @@ it("allows a coach to read their own club", async () => {
   const response = await get();
   expect(response.status).toBe(200);
   expect(mocks.summary).toHaveBeenCalledWith(clubA);
-  expect(await response.json()).toEqual({ summary: { status: "active", currentFee: "10.00" } });
+  expect(await response.json()).toMatchObject({ calculator:{enabled:false}, summary: { status: "active", currentFee: "10.00" } });
 });
 it("allows administrators to read a club other than their default", async () => {
   mocks.verify.mockResolvedValue({ sub: "admin", roles: ["admin"], defaultClubId: clubA });

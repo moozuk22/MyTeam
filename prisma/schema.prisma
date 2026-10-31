@@ -75,6 +75,7 @@ model Club {
   fields                  Field[]
   coachGroups             CoachGroup[]
   notifyOnCoachVisit      Boolean                     @default(false) @map("notify_on_coach_visit")
+  calculatorSubscription  ClubCalculatorSubscription?
   platformSubscription    ClubSubscription?
   billingStatus           BillingStatus               @default(demo) @map("billing_status")
   paymentWorkflow         PaymentWorkflow             @default(calendar_month) @map("payment_workflow")
@@ -473,6 +474,8 @@ model Image {
 }
 
 model PaymentLog {
+  financeClubId String? @map("finance_club_id") @db.Uuid
+  @@index([financeClubId, paidAt], map: "payment_logs_finance_club_period")
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   playerId   String   @map("player_id") @db.Uuid
   paidAt     DateTime @default(now()) @map("paid_at") @db.Timestamptz(6)
@@ -915,4 +918,83 @@ model ClubFinanceEntry {
   category ClubFinanceCategory @relation(fields: [categoryId, clubId], references: [id, clubId])
   @@index([clubId, occurredAt], map: "club_finance_entries_period")
   @@map("club_finance_entries")
+}
+
+// Calculator billing is independent of the platform subscription.
+model CalculatorPriceRevision {
+  revision Int @unique @default(autoincrement())
+  id String @id @default(uuid()) @db.Uuid
+  billingMode String @map("billing_mode")
+  effectiveMonth String @map("effective_month") @db.VarChar(7)
+  monthly Decimal? @db.Decimal(10, 2)
+  yearly Decimal? @db.Decimal(10, 2)
+  lifetime Decimal? @db.Decimal(10, 2)
+  actorId String @map("actor_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@unique([effectiveMonth, billingMode])
+  @@map("calculator_price_revisions")
+}
+model ClubCalculatorSubscription {
+  freeEnabled Boolean @default(false) @map("free_enabled")
+  clubId String @id @map("club_id") @db.Uuid
+  billingMode String @default("monthly") @map("billing_mode")
+  version Int @default(1)
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  prices ClubCalculatorPrice[]
+  payments ClubCalculatorPayment[]
+  grants ClubCalculatorGrant[]
+  changes ClubCalculatorChange[]
+  @@map("club_calculator_subscriptions")
+}
+model ClubCalculatorPrice {
+  billingMode String @map("billing_mode")
+  id String @id @default(uuid()) @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  effectiveMonth String @map("effective_month") @db.VarChar(7)
+  amount Decimal? @db.Decimal(10, 2) // null restores shared pricing from this month
+  subscription ClubCalculatorSubscription @relation(fields: [clubId], references: [clubId], onDelete: Cascade)
+  @@unique([clubId, billingMode, effectiveMonth])
+  @@map("club_calculator_prices")
+}
+model ClubCalculatorPayment {
+  id String @id @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  billingMode String @map("billing_mode")
+  paidOn String @map("paid_on") @db.VarChar(10)
+  note String?
+  total Decimal @db.Decimal(14, 2)
+  request Json
+  createdBy String @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidedBy String? @map("voided_by")
+  subscription ClubCalculatorSubscription @relation(fields: [clubId], references: [clubId], onDelete: Cascade)
+  grants ClubCalculatorGrant[]
+  @@index([clubId, createdAt])
+  @@map("club_calculator_payments")
+}
+model ClubCalculatorGrant {
+  id String @id @default(uuid()) @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  kind String
+  startsAt DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt DateTime? @map("ends_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  paymentId String? @map("payment_id") @db.Uuid
+  amount Decimal? @db.Decimal(10, 2)
+  subscription ClubCalculatorSubscription @relation(fields: [clubId], references: [clubId], onDelete: Cascade)
+  payment ClubCalculatorPayment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@index([clubId, startsAt])
+  @@map("club_calculator_grants")
+}
+model ClubCalculatorChange {
+  id String @id @default(uuid()) @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  actorId String @map("actor_id")
+  action String
+  details Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  subscription ClubCalculatorSubscription @relation(fields: [clubId], references: [clubId], onDelete: Cascade)
+  @@index([clubId, createdAt])
+  @@map("club_calculator_changes")
 }

@@ -161,3 +161,28 @@ it('opens both mobile entry actions and expands debts from its summary card', ()
  expect(debt().props['aria-expanded']).toBe(true);
  expect(nodes(tree).find(node=>node.type==='section' && node.props['data-mobile-open']===true)).toBeDefined();
 });
+
+it('disables entry submission after calculator access expires',()=>{
+ let tree=render();click(action(tree,'-analysis'));tree=render();click(action(tree,'-revenue-dropdown'));
+ hooks.cursor=0;
+ tree=FinanceDashboard({clubId:'club',calculatorEnabled:false,calculatorCanView:true,data,report:data,month:'all',filters:null,onSaved:vi.fn()});
+ const submit=nodes(tree).find(node=>node.type==='button' && node.props.type==='submit' && text(node).includes('Запази прихода'))!;
+ expect(submit.props.disabled).toBe(true);
+});
+
+it('disables creating a category while calculator access is inactive',()=>{
+ hooks.cursor=0;
+ const tree=FinanceDashboard({clubId:'club',calculatorEnabled:false,data,report:data,month:'all',filters:null,onSaved:vi.fn()});
+ const button=nodes(tree).find(node=>node.type==='button' && text(node)==='Нова категория')!;
+ expect(button.props.disabled).toBe(true);
+});
+
+it('keeps categories readable but disables editing, hiding and reordering while inactive',()=>{
+ hooks.cursor=0;
+ const category={id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,isActive:true,sortOrder:0};
+ const view={...data,categories:[category]};
+ const tree=FinanceDashboard({clubId:'club',calculatorEnabled:false,data:view,report:view,month:'all',filters:null,onSaved:vi.fn()});
+ for(const label of ['Преименувай Транспорт','Скрий Транспорт','Премести Транспорт надолу']) {
+  expect(nodes(tree).find(node=>node.type==='button' && node.props['aria-label']===label)?.props.disabled).toBe(true);
+ }
+});
