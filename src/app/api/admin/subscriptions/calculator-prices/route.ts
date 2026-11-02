@@ -26,7 +26,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await subscriptionAdmin(request);
   if (auth.error) return auth.error;
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return NextResponse.json({
+  const origin = request.headers.get('origin');
+  const baseUrl = process.env.APP_BASE_URL?.trim();
+  let trustedOrigin: string | null = request.nextUrl.origin;
+  if (baseUrl) {
+    try {
+      const configuredUrl = new URL(baseUrl);
+      trustedOrigin = ['http:', 'https:'].includes(configuredUrl.protocol) ? configuredUrl.origin : null;
+    } catch {
+      trustedOrigin = null;
+    }
+  }
+  if (origin && origin !== trustedOrigin) return NextResponse.json({
     error: 'Forbidden'
   }, {
     status: 403

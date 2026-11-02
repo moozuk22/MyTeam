@@ -57,3 +57,39 @@ it('allows administrator calculator summaries without a remembered club',async()
  const value=request(); value.cookies.delete('admin_last_club_id');
  expect((await access(value,context)).status).toBe(200);
 });
+
+it('accepts the configured public origin behind a reverse proxy', async () => {
+ vi.stubEnv('APP_BASE_URL', 'https://myteam7.com/');
+ try {
+  mocks.session.mockResolvedValue({roles:['admin'],sub:'admin-id'});
+  mocks.changePrices.mockResolvedValue({ok:true});
+  const body={billingMode:'lifetime',amount:'20',effectiveMonth:'2026-09',expectedRevision:null};
+  const value=request('POST',JSON.stringify(body));
+  value.headers.set('origin','https://myteam7.com');
+  expect((await changePrices(value)).status).toBe(200);
+  expect(mocks.changePrices).toHaveBeenCalledWith(body,'admin-id');
+ } finally { vi.unstubAllEnvs(); }
+});
+
+it.each(['https://evil.example', 'http://localhost', 'https://myteam7.com.evil.example'])('rejects untrusted origin %s with a configured public URL', async origin => {
+ vi.stubEnv('APP_BASE_URL','https://myteam7.com');
+ try {
+  mocks.session.mockResolvedValue({roles:['admin'],sub:'admin-id'});
+  const value=request('POST','{}');
+  value.headers.set('origin',origin);
+  value.headers.set('x-forwarded-host','evil.example');
+  expect((await changePrices(value)).status).toBe(403);
+  expect(mocks.changePrices).not.toHaveBeenCalled();
+ } finally { vi.unstubAllEnvs(); }
+});
+
+it.each(['', 'not-a-url', 'file:///tmp/site'])('handles missing or invalid public URL %s safely', async baseUrl => {
+ vi.stubEnv('APP_BASE_URL',baseUrl);
+ try {
+  mocks.session.mockResolvedValue({roles:['admin'],sub:'admin-id'});
+  mocks.changePrices.mockResolvedValue({ok:true});
+  const value=request('POST','{}');
+  value.headers.set('origin','http://localhost');
+  expect((await changePrices(value)).status).toBe(baseUrl === '' ? 200 : 403);
+ } finally { vi.unstubAllEnvs(); }
+});
