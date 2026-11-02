@@ -1,6 +1,6 @@
 /**
  * Fixed palette for custom training group colors (club_custom_training_groups).
- * Each coach scope (club + coachGroupId) may use a color at most once.
+ * Each club may use a color at most once.
  */
 export const CUSTOM_TRAINING_GROUP_COLOR_PALETTE = [
   // Keep these original colors unchanged: existing groups store their exact hex values.

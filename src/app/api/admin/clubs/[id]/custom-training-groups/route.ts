@@ -153,6 +153,13 @@ export async function GET(
   }
   const coachGroupId = coachGroupIdRaw || null;
   try {
+    if (request.nextUrl.searchParams.get("colorsOnly") === "true") {
+      const colors = await prisma.clubCustomTrainingGroup.findMany({
+        where: { clubId: id },
+        select: { id: true, color: true },
+      });
+      return NextResponse.json(colors);
+    }
     const groups = await prisma.clubCustomTrainingGroup.findMany({
       where: { clubId: id, coachGroupId },
       orderBy: { createdAt: "desc" },
