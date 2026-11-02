@@ -292,28 +292,25 @@ function CustomTrainingGroupColorPicker({
   value,
   onChange,
   disabled,
-  coachScopeKey,
   groups,
   excludeGroupId,
 }: {
   value: string;
   onChange: (hex: string) => void;
   disabled?: boolean;
-  coachScopeKey: string | null;
-  groups: CustomTrainingGroup[];
+  groups: Pick<CustomTrainingGroup, "id" | "color">[];
   excludeGroupId?: string;
 }) {
   const availableColors = useMemo(() => {
     const usedColors = new Set(
       groups.filter(
         (g) =>
-          (g.coachGroupId ?? null) === coachScopeKey &&
           isCustomTrainingGroupPaletteColor(g.color) &&
           (!excludeGroupId || g.id !== excludeGroupId),
       ).map((g) => g.color),
     );
     return CUSTOM_TRAINING_GROUP_COLOR_PALETTE.filter((hex) => !usedColors.has(hex));
-  }, [groups, coachScopeKey, excludeGroupId]);
+  }, [groups, excludeGroupId]);
 
   useEffect(() => {
     if (!disabled && availableColors.length > 0 && !availableColors.some((hex) => hex === value)) {
@@ -983,6 +980,7 @@ function AdminMembersPageContent() {
   const [trainingScheduleGroupsLoading, setTrainingScheduleGroupsLoading] = useState(false);
   const [trainingScheduleGroups, setTrainingScheduleGroups] = useState<TrainingScheduleGroup[]>([]);
   const [customTrainingGroups, setCustomTrainingGroups] = useState<CustomTrainingGroup[]>([]);
+  const [customTrainingGroupColors, setCustomTrainingGroupColors] = useState<Pick<CustomTrainingGroup, "id" | "color">[]>([]);
   const [trainingFields, setTrainingFields] = useState<TrainingField[]>([]);
   const [trainingFieldsLoading, setTrainingFieldsLoading] = useState(false);
   const [fieldConflictsMap, setFieldConflictsMap] = useState<Record<string, { blockedPieceIds: string[]; wholeFieldBlocked: boolean }>>({});
@@ -2326,13 +2324,12 @@ function AdminMembersPageContent() {
   const noFreeCustomTrainingGroupColor = useMemo(() => {
     if (!isCustomTrainingGroupMode) return false;
     const used = new Set(
-      customTrainingGroups
-        .filter((g) => (g.coachGroupId ?? null) === customTrainingGroupCoachScope)
+      customTrainingGroupColors
         .map((g) => g.color)
         .filter(isCustomTrainingGroupPaletteColor),
     );
     return !CUSTOM_TRAINING_GROUP_COLOR_PALETTE.some((c) => !used.has(c));
-  }, [isCustomTrainingGroupMode, customTrainingGroups, customTrainingGroupCoachScope]);
+  }, [isCustomTrainingGroupMode, customTrainingGroupColors]);
   const trainingAttendanceMatchesByDate = new Map<string, ClubMatch[]>();
   for (const match of clubMatches) {
     const appliesToAll = match.teamGroups.length === 0 && match.customGroupId === null;
@@ -3285,6 +3282,9 @@ function AdminMembersPageContent() {
       if (!response.ok) {
         throw new Error("Failed to load custom training groups.");
       }
+      const colorsResponse = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups?colorsOnly=true`, { cache: "no-store" });
+      if (!colorsResponse.ok) throw new Error("Failed to load custom training group colors.");
+      setCustomTrainingGroupColors(await colorsResponse.json());
       const payload: unknown = await response.json();
       const groups = Array.isArray(payload)
         ? payload.map((item) => {
@@ -3442,8 +3442,7 @@ function AdminMembersPageContent() {
     setTrainingGroupCreatePlayerIds([]);
     setCustomGroupCreateSearch("");
     const used = new Set(
-      customTrainingGroups
-        .filter((g) => (g.coachGroupId ?? null) === customTrainingGroupCoachScope)
+      customTrainingGroupColors
         .map((g) => g.color)
         .filter(isCustomTrainingGroupPaletteColor),
     );
@@ -3470,8 +3469,8 @@ function AdminMembersPageContent() {
       setTrainingGroupEditPlayerIds(group.playerIds.filter((id) => activeIds.has(id)));
       setCustomGroupEditSearch("");
       const usedByOthers = new Set(
-        customTrainingGroups
-          .filter((item) => item.id !== group.id && (item.coachGroupId ?? null) === customTrainingGroupCoachScope)
+        customTrainingGroupColors
+          .filter((item) => item.id !== group.id)
           .map((item) => item.color)
           .filter(isCustomTrainingGroupPaletteColor),
       );
@@ -7827,8 +7826,7 @@ function AdminMembersPageContent() {
                     value={trainingGroupEditColor}
                     onChange={setTrainingGroupEditColor}
                     disabled={trainingGroupEditSaving}
-                    coachScopeKey={customTrainingGroupCoachScope}
-                    groups={customTrainingGroups}
+                    groups={customTrainingGroupColors}
                     excludeGroupId={trainingGroupEditId}
                   />
                   <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
@@ -8121,12 +8119,11 @@ function AdminMembersPageContent() {
                         value={trainingGroupCreateColor}
                         onChange={setTrainingGroupCreateColor}
                         disabled={trainingGroupCreateSaving || noFreeCustomTrainingGroupColor}
-                        coachScopeKey={customTrainingGroupCoachScope}
-                        groups={customTrainingGroups}
+                        groups={customTrainingGroupColors}
                       />
                       {noFreeCustomTrainingGroupColor && (
                         <p className="amp-empty amp-empty--modal" style={{ marginTop: 8 }}>
-                          Всички цветове са заети за тази треньорска група.
+                          Всички цветове са заети за този клуб.
                         </p>
                       )}
                       <div className="amp-training-days-editor-header amp-training-days-editor-header--stack" style={{ marginTop: "10px" }}>
