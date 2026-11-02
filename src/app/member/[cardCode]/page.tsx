@@ -1073,7 +1073,8 @@ export default function MemberCardPage({
   }, [normalizedCardCode, isAdmin, isCoach]);
 
   useEffect(() => {
-    if (!member) {
+    // Foreground/SSE refreshes must not overwrite an open edit draft.
+    if (!member || editModalOpen) {
       return;
     }
 
@@ -1089,7 +1090,7 @@ export default function MemberCardPage({
     });
     setEditImageFile(null);
     setEditImagePreviewUrl("");
-  }, [member]);
+  }, [member, editModalOpen]);
 
   useEffect(() => {
     if (!editImageFile) {
