@@ -1,3 +1,4 @@
+import { hasTrustedOrigin } from "@/lib/requestOrigin";
 import { resolveFacebookPageConfig } from "@/lib/facebook/connection";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest, context: Context) {
 
 export async function POST(request: NextRequest, context: Context) {
   // Cookie-authenticated public publishing must originate from this app.
-  if (request.headers.get("origin") !== request.nextUrl.origin || request.headers.get("sec-fetch-site") === "cross-site") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!hasTrustedOrigin(request, true) || request.headers.get("sec-fetch-site") === "cross-site") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const auth = await authorize(request, context);
     if (auth instanceof NextResponse) return auth;

@@ -93,3 +93,11 @@ it.each(['', 'not-a-url', 'file:///tmp/site'])('handles missing or invalid publi
   expect((await changePrices(value)).status).toBe(baseUrl === '' ? 200 : 403);
  } finally { vi.unstubAllEnvs(); }
 });
+
+it('accepts public proxy origin for club settings', async () => {
+ vi.stubEnv('APP_BASE_URL','https://myteam7.com/');
+ try { mocks.session.mockResolvedValue({roles:['admin'],sub:'admin-id'});
+ const value=request('POST','{"action":"configure"}'); value.headers.set('origin','https://myteam7.com');
+ expect((await change(value,clubContext)).status).toBe(200); expect(mocks.change).toHaveBeenCalled();
+ } finally { vi.unstubAllEnvs(); }
+});
