@@ -101,3 +101,16 @@ it("marks a confirmed Facebook rejection as failed for a later manual retry", as
   expect((await POST(request("POST"), context)).status).toBe(502);
   expect(mocks.update).toHaveBeenCalledWith({ where: { id: "claim" }, data: { status: "failed" } });
 });
+
+it('accepts public proxy origin for birthday publication', async () => {
+ vi.stubEnv('APP_BASE_URL','https://myteam7.com/');
+ expect((await POST(request('POST',payload,{origin:'https://myteam7.com'}),context)).status).toBe(200);
+ expect(mocks.publish).toHaveBeenCalledTimes(1);
+});
+it('still rejects missing origins and cross-site birthday publication', async () => {
+ const missing=request('POST'); missing.headers.delete('origin');
+ expect((await POST(missing,context)).status).toBe(403);
+ const cross=request('POST'); cross.headers.set('sec-fetch-site','cross-site');
+ expect((await POST(cross,context)).status).toBe(403);
+ expect(mocks.publish).not.toHaveBeenCalled();
+});

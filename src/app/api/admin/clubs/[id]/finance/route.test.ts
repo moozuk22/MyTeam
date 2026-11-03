@@ -87,3 +87,11 @@ it('allows administrator finance reads without a remembered club', async () => {
  const value=request(); value.cookies.delete('admin_last_club_id');
  expect((await GET(value,context)).status).toBe(200);
 });
+
+it('accepts public proxy origin for finance writes', async () => {
+ vi.stubEnv('APP_BASE_URL','https://myteam7.com/');
+ try { mocks.session.mockResolvedValue({roles:['admin']});
+ const value=request('POST','{"action":"createExpense"}'); value.headers.set('origin','https://myteam7.com');
+ expect((await POST(value,context)).status).toBe(200); expect(mocks.mutate).toHaveBeenCalled();
+ } finally { vi.unstubAllEnvs(); }
+});

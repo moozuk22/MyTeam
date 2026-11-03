@@ -1,3 +1,4 @@
+import { hasTrustedOrigin } from "@/lib/requestOrigin";
 import { NextRequest, NextResponse } from 'next/server';
 import { calculatorAdminView, changeCalculatorSubscription } from '@/lib/calculatorSubscriptions';
 import { subscriptionAdmin, subscriptionApiError } from '@/lib/clubSubscriptionApi';
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, {
 }: Context) {
   const auth = await subscriptionAdmin(request);
   if (auth.error) return auth.error;
-  if (request.headers.get('origin') && request.headers.get('origin') !== request.nextUrl.origin) return NextResponse.json({
+  if (!hasTrustedOrigin(request)) return NextResponse.json({
     error: 'Forbidden'
   }, {
     status: 403
