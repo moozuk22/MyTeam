@@ -645,3 +645,5 @@
  .tableWrap tr[style] .rowMenu>summary { background:#1116; }
  .tableWrap tr[style]:has(.rowMenu[open]) { position:relative; z-index:6; }
 }
+
+.categoryEditor .categoryForm>label { grid-column:1 / -1; }

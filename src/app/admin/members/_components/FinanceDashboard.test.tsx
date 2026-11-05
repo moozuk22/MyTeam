@@ -27,7 +27,7 @@ it('renders placeholders without invented amounts before financial data arrives'
 });
 it('retains four summary cards, a compact category filter, and readable debt periods', () => {
  const data: View = {...base,
-  categories:[{id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,sortOrder:0,isActive:true}],
+  categories:[{id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0,isActive:true,hiddenForExpense:false,hiddenForRevenue:false}],
   subtotals:[{kind:'expense',categoryId:'category',currency:'EUR',amount:'35.00'}],
   debts:[{avatarUrl:'https://example.com/player.jpg',id:'player',name:'Иван Петров',periods:['2026-10','Подновяване'],amount:'300.00',fee:'150',conflict:false}],
  };
@@ -58,14 +58,14 @@ it('selects all transactions by default', () => {
 });
 
 it('keeps inactive categories manageable but hides them from new entry options', () => {
- const data: View = {...base,categories:[{id:'inactive',clubId:'club',name:'Стара категория',color:null,isMembership:false,sortOrder:0,isActive:false}]};
+ const data: View = {...base,categories:[{id:'inactive',clubId:'club',name:'Стара категория',color:null,isMembership:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0,isActive:false,hiddenForExpense:true,hiddenForRevenue:true}]};
  const html = renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
  expect(html).toContain('Стара категория');
  expect(html).toContain('Неактивна');
  expect(html).toContain('Покажи Стара категория');
  const form = html.split('Изберете категория</option>')[1].split('</select>')[0];
  expect(form).not.toContain('value="inactive"');
- expect(html).toContain('id="category-status-title"');
+ expect(html).toContain('aria-label="Вид категории"');
 });
 
 it('labels range reports without changing the overall balance', () => {
@@ -78,7 +78,7 @@ it('labels range reports without changing the overall balance', () => {
 });
 
 it('disables the selected category filter while keeping other categories available', () => {
- const data: View = {...base,categories:[{id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,sortOrder:0,isActive:true}]};
+ const data: View = {...base,categories:[{id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0,isActive:true,hiddenForExpense:false,hiddenForRevenue:false}]};
  const html = renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
  const chips = html.split('aria-label="Филтрирай записите по категория">')[1].split('</div>')[0];
  expect(chips).toMatch(/<button[^>]*disabled=""[^>]*>Всички<\/button>/);
@@ -95,7 +95,7 @@ it('opens History by default and defers loading Analysis until selected', () => 
 
 it('uses one category list and keeps expense charts separate from revenue in the same category', () => {
  const data: View = {...base,
-  categories:[{id:'shared',clubId:'club',name:'Обща категория',color:null,isMembership:false,sortOrder:0,isActive:true}],
+  categories:[{id:'shared',clubId:'club',name:'Обща категория',color:null,isMembership:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0,isActive:true,hiddenForExpense:false,hiddenForRevenue:false}],
   subtotals:[{kind:'revenue',categoryId:'shared',currency:'EUR',amount:'150.00'},{kind:'expense',categoryId:'shared',currency:'EUR',amount:'35.00'}],
  };
  const html = renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
@@ -105,7 +105,7 @@ it('uses one category list and keeps expense charts separate from revenue in the
  expect(html).not.toContain('<label>Вид<select');
  expect(html).toContain('aria-label="Разходи по категории: 35,00');
  expect(html).not.toContain('aria-label="Разходи по категории: 150,00');
- expect(html).toContain('Приходи</small>150,00');
+ expect(html).not.toContain('Приходи</small>150,00');
  expect(html).toContain('Разходи</small>35,00');
 });
 
@@ -118,7 +118,7 @@ it('uses the neutral debts state only after confirming there are no outstanding 
 });
 
 it('excludes membership fees from categories offered for manual entries', () => {
- const data: View = {...base,categories:[{id:'membership',clubId:'club',name:'Членски внос',color:null,isMembership:true,sortOrder:0,isActive:true},{id:'other',clubId:'club',name:'Други',color:null,isMembership:false,sortOrder:1,isActive:true}]};
+ const data: View = {...base,categories:[{id:'membership',clubId:'club',name:'Членски внос',color:null,isMembership:true,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0,isActive:true,hiddenForExpense:false,hiddenForRevenue:false},{id:'other',clubId:'club',name:'Други',color:null,isMembership:false,sortOrder:1,expenseSortOrder:1,revenueSortOrder:1,isActive:true,hiddenForExpense:false,hiddenForRevenue:false}]};
  const html=renderToStaticMarkup(<FinanceDashboard clubId="club" data={data} report={data} month="all" filters={null} onSaved={vi.fn()} />);
  const form=html.split('Изберете категория</option>')[1].split('</select>')[0];
  expect(form).not.toContain('value="membership"');

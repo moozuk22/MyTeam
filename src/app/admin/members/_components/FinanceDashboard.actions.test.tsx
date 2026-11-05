@@ -148,7 +148,7 @@ it('creates categories inside a separate labeled editor dialog', () => {
 });
 
 it('hides colors used by other categories when creating or editing', () => {
- const coloredData={...data,categories:[{id:'one',clubId:'club',name:'First',color:'#E53935',sortOrder:0,isActive:true,isMembership:false},{id:'two',clubId:'club',name:'Second',color:'#1E88E5',sortOrder:1,isActive:true,isMembership:false}]};
+ const coloredData={...data,categories:[{id:'one',clubId:'club',name:'First',color:'#E53935',sortOrder:0,expenseSortOrder:0,revenueSortOrder:0,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,isMembership:false},{id:'two',clubId:'club',name:'Second',color:'#1E88E5',sortOrder:1,expenseSortOrder:1,revenueSortOrder:1,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,isMembership:false}]};
  const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:coloredData,report:coloredData,month:'all',filters:null,onSaved:vi.fn()});};
  let tree=draw();
  click(nodes(tree).find(node => node.type === 'button' && text(node).includes('Нова категория'))!);tree=draw();
@@ -173,7 +173,7 @@ it('opens the expense chart in the report area and switches back to History', ()
 });
 
 it('selects chart segments, dims other categories, and clears selection from the legend', () => {
- const chartData={...data,categories:[{id:'one',clubId:'club',name:'First',color:'#E53935',sortOrder:0,isActive:true,isMembership:false},{id:'two',clubId:'club',name:'Second',color:'#1E88E5',sortOrder:1,isActive:true,isMembership:false}],totals:[{currency:'EUR',revenue:'0',expense:'100',balance:'-100'}],subtotals:[{categoryId:'one',currency:'EUR',kind:'expense' as const,amount:'25'},{categoryId:'two',currency:'EUR',kind:'expense' as const,amount:'75'}]};
+ const chartData={...data,categories:[{id:'one',clubId:'club',name:'First',color:'#E53935',sortOrder:0,expenseSortOrder:0,revenueSortOrder:0,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,isMembership:false},{id:'two',clubId:'club',name:'Second',color:'#1E88E5',sortOrder:1,expenseSortOrder:1,revenueSortOrder:1,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,isMembership:false}],totals:[{currency:'EUR',revenue:'0',expense:'100',balance:'-100'}],subtotals:[{categoryId:'one',currency:'EUR',kind:'expense' as const,amount:'25'},{categoryId:'two',currency:'EUR',kind:'expense' as const,amount:'75'}]};
  const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:chartData,report:chartData,month:'all',filters:null,onSaved:vi.fn()});};
  let tree=draw();
  const segments=()=>nodes(tree).filter(node=>node.type==='circle' && node.props.role==='button');
@@ -251,7 +251,7 @@ it('disables creating a category while calculator access is inactive',()=>{
 
 it('keeps categories readable but disables editing, hiding and reordering while inactive',()=>{
  hooks.cursor=0;
- const category={id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,isActive:true,sortOrder:0};
+ const category={id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0};
  const view={...data,categories:[category]};
  const tree=FinanceDashboard({clubId:'club',calculatorEnabled:false,data:view,report:view,month:'all',filters:null,onSaved:vi.fn()});
  for(const label of ['Преименувай Транспорт','Скрий Транспорт','Премести Транспорт надолу']) {
@@ -278,4 +278,153 @@ it('opens a searchable modal instead of expanding the preview and sorts players 
  tree=draw();
  expect(nodes(tree).some(node=>node.type===FinanceDebtsDialog)).toBe(false);
  expect(nodes(tree).some(node=>node.props.playerId==='0')).toBe(true);
+});
+
+it.each(['expense','revenue'] as const)('hides and shows directly for the selected category kind: %s', async kind => {
+ const category={id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0};
+ const view={...data,categories:[category]};
+ const request=vi.fn().mockResolvedValue({ok:true,json:async()=>({ok:true})});
+ vi.stubGlobal('fetch',request);
+ const saved=vi.fn(async()=>{
+  const payload=JSON.parse(request.mock.calls.at(-1)![1].body);
+  if (payload.kind==='expense') category.hiddenForExpense=payload.hidden;
+  else category.hiddenForRevenue=payload.hidden;
+  category.isActive=!(category.hiddenForExpense && category.hiddenForRevenue);
+ });
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:view,report:view,month:'all',filters:null,onSaved:saved});};
+ let tree=draw();
+ const kinds=nodes(tree).find(node=>node.props['aria-label']==='Вид категории')!;
+ expect(nodes(kinds).filter(node=>node.type==='button').map(text)).toEqual(['Разходи','Приходи']);
+ click(nodes(kinds).find(node=>node.type==='button' && text(node)===(kind==='expense'?'Разходи':'Приходи'))!);tree=draw();
+ click(nodes(tree).find(node=>node.props['aria-label']==='Скрий Транспорт')!);
+ await vi.waitFor(()=>expect(saved).toHaveBeenCalledOnce());tree=draw();
+ expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({action:'setCategoryKindVisibility',id:'category',kind,hidden:true});
+ expect(nodes(tree).some(node=>node.type==='input' && node.props.type==='radio')).toBe(false);
+ expect(kind==='expense'?category.hiddenForRevenue:category.hiddenForExpense).toBe(false);
+ click(nodes(tree).find(node=>node.props['aria-label']==='Покажи Транспорт')!);
+ await vi.waitFor(()=>expect(saved).toHaveBeenCalledTimes(2));
+ expect(JSON.parse(request.mock.calls[1][1].body)).toEqual({action:'setCategoryKindVisibility',id:'category',kind,hidden:false});
+});
+
+it('offers categories by entry kind and preselects an available category', () => {
+ const view={...data,categories:[
+  {id:'income',clubId:'club',name:'Само приходи',color:null,isMembership:false,isActive:true,hiddenForExpense:true,hiddenForRevenue:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0},
+  {id:'expense',clubId:'club',name:'Само разходи',color:null,isMembership:false,isActive:true,hiddenForExpense:false,hiddenForRevenue:true,sortOrder:1,expenseSortOrder:1,revenueSortOrder:1},
+ ]};
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:view,report:view,month:'all',filters:null,onSaved:vi.fn()});};
+ let tree=draw();
+ const mobile=(label:string)=>nodes(nodes(tree).find(node=>String(node.props.className).includes('mobileEntryActions'))).find(node=>node.type==='button' && text(node)===label)!;
+ click(mobile('Разход'));tree=draw();
+ const select=()=>nodes(tree).find(node=>node.type==='select' && nodes(node).some(option=>option.props.value==='expense' || option.props.value==='income'))!;
+ expect(select().props.value).toBe('expense');
+ expect(nodes(select()).some(node=>node.type==='option' && node.props.value==='income')).toBe(false);
+ click(mobile('Приход'));tree=draw();
+ expect(select().props.value).toBe('income');
+ expect(nodes(select()).some(node=>node.type==='option' && node.props.value==='expense')).toBe(false);
+});
+
+it.each(['expense','revenue'])('only clears the expense draft category when hidden for its kind (%s)', async kind => {
+ const category={id:'category',clubId:'club',name:'Транспорт',color:null,isMembership:false,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0};
+ const view={...data,categories:[category]};
+ const saved=vi.fn().mockResolvedValue(undefined);
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({ok:true})}));
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:view,report:view,month:'all',filters:null,onSaved:saved});};
+ let tree=draw();
+ const select=nodes(tree).find(node=>node.type==='select' && nodes(node).some(option=>option.type==='option' && text(option)==='Изберете категория'))!;
+ (select.props.onChange as (event:unknown)=>void)({target:{value:'category'}});tree=draw();
+ const kinds=nodes(tree).find(node=>node.props['aria-label']==='Вид категории')!;
+ click(nodes(kinds).find(node=>node.type==='button' && text(node)===(kind==='expense'?'Разходи':'Приходи'))!);tree=draw();
+ click(nodes(tree).find(node=>node.props['aria-label']==='Скрий Транспорт')!);
+ await vi.waitFor(()=>expect(saved).toHaveBeenCalledOnce());tree=draw();
+ const updated=nodes(tree).find(node=>node.type==='select' && nodes(node).some(option=>option.type==='option' && text(option)==='Изберете категория'))!;
+ expect(updated.props.value).toBe(kind==='expense'?'':'category');
+});
+
+it('filters active and hidden categories within the selected transaction kind',()=>{
+ const view={...data,categories:[
+  {id:'expense-hidden',clubId:'club',name:'A',color:null,isMembership:false,isActive:true,hiddenForExpense:true,hiddenForRevenue:false,sortOrder:0,expenseSortOrder:0,revenueSortOrder:0},
+  {id:'revenue-hidden',clubId:'club',name:'B',color:null,isMembership:false,isActive:true,hiddenForExpense:false,hiddenForRevenue:true,sortOrder:1,expenseSortOrder:1,revenueSortOrder:1},
+ ]};
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:view,report:view,month:'all',filters:null,onSaved:vi.fn()});};
+ let tree=draw();
+ const press=(group:string,label:string)=>click(nodes(nodes(tree).find(node=>node.props['aria-label']===group)).find(node=>node.type==='button' && text(node)===label)!);
+ const rows=()=>nodes(tree).filter(node=>node.type==='li' && node.props['data-category-id']).map(node=>node.props['data-category-id']);
+ press('Филтрирай категориите по видимост','Активни');tree=draw();
+ expect(rows()).toEqual(['revenue-hidden']);
+ press('Вид категории','Приходи');tree=draw();
+ expect(rows()).toEqual(['expense-hidden']);
+ press('Филтрирай категориите по видимост','Скрити');tree=draw();
+ expect(rows()).toEqual(['revenue-hidden']);
+ expect(nodes(tree).some(node=>node.props['aria-label']==='Покажи B')).toBe(true);
+});
+
+it('shows and reorders independent expense and revenue category lists',async()=>{
+ const view={...data,categories:[
+  {id:'a',clubId:'club',name:'A',color:null,isMembership:false,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,sortOrder:0,expenseSortOrder:1,revenueSortOrder:0},
+  {id:'b',clubId:'club',name:'B',color:null,isMembership:false,isActive:true,hiddenForExpense:false,hiddenForRevenue:false,sortOrder:1,expenseSortOrder:0,revenueSortOrder:1},
+ ]};
+ const request=vi.fn().mockResolvedValue({ok:true,json:async()=>({ok:true})});vi.stubGlobal('fetch',request);
+ const saved=vi.fn(async()=>{
+  const payload=JSON.parse(request.mock.calls.at(-1)![1].body);
+  const field=payload.kind==='expense'?'expenseSortOrder':'revenueSortOrder';
+  for(const [index,id] of payload.ids.entries()) view.categories.find(c=>c.id===id)![field]=index;
+ });
+ const draw=()=>{hooks.cursor=0;return FinanceDashboard({clubId:'club',data:view,report:view,month:'all',filters:null,onSaved:saved});};
+ let tree=draw();
+ const rows=()=>nodes(tree).filter(node=>node.type==='li' && node.props['data-category-id']).map(node=>node.props['data-category-id']);
+ expect(rows()).toEqual(['b','a']);
+ click(nodes(tree).find(node=>node.props['aria-label']==='Премести A нагоре')!);
+ await vi.waitFor(()=>expect(saved).toHaveBeenCalledOnce());tree=draw();
+ expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({action:'reorderCategoryKind',kind:'expense',ids:['a','b']});
+ const kinds=nodes(tree).find(node=>node.props['aria-label']==='Вид категории')!;
+ click(nodes(kinds).find(node=>node.type==='button' && text(node)==='Приходи')!);tree=draw();
+ expect(rows()).toEqual(['a','b']);
+ click(nodes(tree).find(node=>node.props['aria-label']==='Премести B нагоре')!);
+ await vi.waitFor(()=>expect(saved).toHaveBeenCalledTimes(2));tree=draw();
+ expect(rows()).toEqual(['b','a']);
+ expect(JSON.parse(request.mock.calls[1][1].body)).toEqual({action:'reorderCategoryKind',kind:'revenue',ids:['b','a']});
+ const refreshedKinds=nodes(tree).find(node=>node.props['aria-label']==='Вид категории')!;
+ click(nodes(refreshedKinds).find(node=>node.type==='button' && text(node)==='Разходи')!);tree=draw();
+ expect(rows()).toEqual(['a','b']);
+ const mobile=()=>nodes(tree).find(node=>String(node.props.className).includes('mobileEntryActions'))!;
+ click(nodes(mobile()).find(node=>node.type==='button' && text(node)==='Разход')!);tree=draw();
+ const options=()=>nodes(nodes(tree).find(node=>node.type==='form')).filter(node=>node.type==='option' && node.props.value).map(node=>node.props.value);
+ expect(options()).toEqual(['a','b']);
+ click(nodes(mobile()).find(node=>node.type==='button' && text(node)==='Приход')!);tree=draw();
+ expect(options()).toEqual(['b','a']);
+});
+
+it.each(['both','expense','revenue'])('submits a new category with visibility %s',async visibility=>{
+ const request=vi.fn().mockResolvedValue({ok:true,json:async()=>({ok:true})});vi.stubGlobal('fetch',request);
+ let tree=render();
+ click(nodes(tree).find(node=>node.type==='button' && text(node)==='Нова категория')!);tree=render();
+ const editor=()=>nodes(tree).find(node=>node.type==='dialog' && node.props['aria-labelledby']==='finance-category-editor-title')!;
+ const select=()=>nodes(editor()).find(node=>node.type==='select')!;
+ expect(select().props.value).toBe('both');
+ expect(nodes(select()).filter(node=>node.type==='option').map(node=>node.props.value)).toEqual(['both','expense','revenue']);
+ (nodes(editor()).find(node=>node.type==='input')!.props.onChange as (event:unknown)=>void)({target:{value:'New category'}});tree=render();
+ (select().props.onChange as (event:unknown)=>void)({target:{value:visibility}});tree=render();
+ const form=nodes(editor()).find(node=>node.type==='form')!;
+ (form.props.onSubmit as (event:unknown)=>void)({preventDefault:vi.fn()});
+ await vi.waitFor(()=>expect(request).toHaveBeenCalledOnce());
+ expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({action:'createCategory',name:'New category',color:null,visibility});
+});
+
+it('shows duplicate category errors only inside the creation modal and preserves the draft',async()=>{
+ const request=vi.fn().mockResolvedValue({ok:false,json:async()=>({error:'Вече има категория с това име.'})});vi.stubGlobal('fetch',request);
+ let tree=render();
+ click(nodes(tree).find(node=>node.type==='button' && text(node)==='Нова категория')!);tree=render();
+ const editor=()=>nodes(tree).find(node=>node.type==='dialog' && node.props['aria-labelledby']==='finance-category-editor-title')!;
+ (nodes(editor()).find(node=>node.type==='input')!.props.onChange as (event:unknown)=>void)({target:{value:'Храна'}});tree=render();
+ (nodes(editor()).find(node=>node.type==='form')!.props.onSubmit as (event:unknown)=>void)({preventDefault:vi.fn()});
+ await vi.waitFor(()=>{
+  tree=render();
+  expect(nodes(editor()).some(node=>node.props.role==='alert' && text(node)==='Вече има категория с това име.')).toBe(true);
+ });
+ expect(nodes(tree).filter(node=>node.props.role==='alert')).toHaveLength(1);
+ expect(nodes(editor()).find(node=>node.type==='input')?.props.value).toBe('Храна');
+ click(nodes(editor()).find(node=>node.type==='button' && text(node)==='Отказ')!);tree=render();
+ expect(nodes(tree).some(node=>node.props.role==='alert')).toBe(false);
+ click(nodes(tree).find(node=>node.type==='button' && text(node)==='Нова категория')!);tree=render();
+ expect(nodes(editor()).some(node=>node.props.role==='alert')).toBe(false);
 });

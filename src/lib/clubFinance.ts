@@ -116,18 +116,41 @@ export async function mutateClubFinance(clubId: string, body: Record<string, unk
   return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM clubs WHERE id=${clubId}::uuid FOR UPDATE`;
     if (!(await calculatorAccess(clubId,false,tx)).enabled) throw new FinanceError('Финансовият калкулатор не е активиран.',403);
-    if (action === 'setCategoryActive') {
-      if (typeof body.isActive !== 'boolean') throw new FinanceError('Невалиден статус.');
-      const changed = await tx.clubFinanceCategory.updateMany({ where: { id: financeId(body.id), clubId }, data: { isActive: body.isActive } });
+    if (action === 'setCategoryKindVisibility') {
+      if ((body.kind !== 'expense' && body.kind !== 'revenue') || typeof body.hidden !== 'boolean') throw new FinanceError('Изберете вид и видимост на категорията.');
+      const id = financeId(body.id);
+      const category = await tx.clubFinanceCategory.findFirst({where:{id,clubId},select:{hiddenForExpense:true,hiddenForRevenue:true}});
+      if (!category) throw new FinanceError('Категорията не е намерена.',404);
+      const hiddenForExpense = body.kind === 'expense' ? body.hidden : category.hiddenForExpense;
+      const hiddenForRevenue = body.kind === 'revenue' ? body.hidden : category.hiddenForRevenue;
+      await tx.clubFinanceCategory.updateMany({where:{id,clubId},data:{
+        ...(body.kind === 'expense' ? {hiddenForExpense:body.hidden} : {hiddenForRevenue:body.hidden}),
+        isActive: !(hiddenForExpense && hiddenForRevenue),
+      }});
+      return {ok:true};
+    }
+    if (action === 'setCategoryVisibility') {
+      if (typeof body.hiddenForExpense !== 'boolean' || typeof body.hiddenForRevenue !== 'boolean') throw new FinanceError('Изберете видимост за разходи и приходи.');
+      const changed = await tx.clubFinanceCategory.updateMany({
+        where: { id: financeId(body.id), clubId },
+        data: { hiddenForExpense: body.hiddenForExpense, hiddenForRevenue: body.hiddenForRevenue, isActive: !(body.hiddenForExpense && body.hiddenForRevenue) },
+      });
       if (!changed.count) throw new FinanceError('Категорията не е намерена.',404);
       return { ok: true };
     }
-    if (action === 'reorderCategories') {
+    if (action === 'setCategoryActive') {
+      if (typeof body.isActive !== 'boolean') throw new FinanceError('Невалиден статус.');
+      const changed = await tx.clubFinanceCategory.updateMany({ where: { id: financeId(body.id), clubId }, data: { isActive: body.isActive, hiddenForExpense: !body.isActive, hiddenForRevenue: !body.isActive } });
+      if (!changed.count) throw new FinanceError('Категорията не е намерена.',404);
+      return { ok: true };
+    }
+    if (action === 'reorderCategories' || action === 'reorderCategoryKind') {
+      if (action === 'reorderCategoryKind' && body.kind !== 'expense' && body.kind !== 'revenue') throw new FinanceError('Изберете разходи или приходи.');
       if (!Array.isArray(body.ids) || !body.ids.length) throw new FinanceError('Невалидна подредба.');
       const ids = body.ids.map(financeId);
       const categories = await tx.clubFinanceCategory.findMany({ where: { clubId }, select: { id: true } });
       if (new Set(ids).size !== ids.length || categories.length !== ids.length || categories.some(c => !ids.includes(c.id))) throw new FinanceError('Категориите са променени. Обновете страницата.');
-      for (const [sortOrder,id] of ids.entries()) await tx.clubFinanceCategory.updateMany({ where: { id, clubId }, data: { sortOrder } });
+      for (const [sortOrder,id] of ids.entries()) await tx.clubFinanceCategory.updateMany({ where: { id, clubId }, data: action === 'reorderCategoryKind' ? (body.kind === 'expense' ? {expenseSortOrder:sortOrder} : {revenueSortOrder:sortOrder}) : {sortOrder} });
       return { ok: true };
     }
     if (action === 'createCategory' || action === 'renameCategory') {
@@ -137,7 +160,11 @@ export async function mutateClubFinance(clubId: string, body: Record<string, unk
       if (color !== undefined && color !== null && (typeof color !== 'string' || !isCustomTrainingGroupPaletteColor(color))) throw new FinanceError('Изберете цвят от палитрата.');
       const categoryData = { name, ...(color !== undefined ? { color } : {}) };
       if (action === 'createCategory') {
-        return tx.clubFinanceCategory.create({ data: { clubId, ...categoryData } });
+        const visibility = body.visibility;
+        if (visibility !== undefined && visibility !== 'both' && visibility !== 'expense' && visibility !== 'revenue') throw new FinanceError('Изберете видимост за новата категория.');
+        return tx.clubFinanceCategory.create({ data: { clubId, ...categoryData, ...(visibility === undefined ? {} : {
+          hiddenForExpense: visibility === 'revenue', hiddenForRevenue: visibility === 'expense',
+        }) } });
       }
       const changed = await tx.clubFinanceCategory.updateMany({ where: { id: financeId(body.id), clubId }, data: categoryData });
       if (!changed.count) throw new FinanceError('Категорията не е намерена.',404);
@@ -153,7 +180,7 @@ export async function mutateClubFinance(clubId: string, body: Record<string, unk
       return { ok: true };
     }
     const categoryId = financeId(body.categoryId);
-    const category = await tx.clubFinanceCategory.findFirst({ where: { id: categoryId, clubId, ...(!id ? { isActive: true } : {}) } });
+    const category = await tx.clubFinanceCategory.findFirst({ where: { id: categoryId, clubId, ...(!id ? { isActive: true, ...(kind === 'expense' ? {hiddenForExpense:false} : {hiddenForRevenue:false}) } : {}) } });
     if (!category) throw new FinanceError('Изберете подходяща категория от този клуб.');
     const amount = parsePaymentAmount(body.amount);
     if (amount === null || new Prisma.Decimal(amount).lte(0)) throw new FinanceError('Въведете положителна сума с до 2 десетични знака.');
