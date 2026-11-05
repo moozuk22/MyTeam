@@ -202,6 +202,38 @@ it('opens both mobile entry actions and expands debts from its summary card', ()
  expect(nodes(tree).find(node=>node.type==='section' && node.props['data-mobile-open']===true)).toBeDefined();
 });
 
+it('keeps Analysis selected when mobile expense and income actions open their forms', () => {
+ let tree=render();
+ click(action(tree,'-analysis'));tree=render();
+ const mobileButton=(name:string)=>nodes(nodes(tree).find(node=>node.type==='div' && String(node.props.className).includes('mobileEntryActions'))).find(node=>node.type==='button' && text(node)===name)!;
+ click(mobileButton('Разход'));tree=render();
+ expect(tree.props['data-view']).toBe('analysis');
+ expect(nodes(tree).find(node=>node.type==='form')?.props['data-mobile-inline']).toBe(true);
+ expect(mobileButton('Разход').props['aria-expanded']).toBe(true);
+ expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Добави разход')).toBe(true);
+ click(mobileButton('Приход'));tree=render();
+ expect(tree.props['data-view']).toBe('analysis');
+ expect(mobileButton('Приход').props['aria-expanded']).toBe(true);
+ expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Добави приход')).toBe(true);
+ click(mobileButton('Приход'));tree=render();
+ expect(mobileButton('Приход').props['aria-expanded']).toBe(false);
+});
+
+it('preserves the open mobile income draft when switching to Analysis', () => {
+ let tree=render();
+ const mobile=nodes(tree).find(node=>node.type==='div' && String(node.props.className).includes('mobileEntryActions'))!;
+ click(nodes(mobile).find(node=>node.type==='button' && text(node)==='Приход')!);tree=render();
+ const amount=nodes(tree).find(node=>node.type==='input' && node.props.inputMode==='decimal')!;
+ (amount.props.onChange as (event:unknown)=>void)({target:{value:'125'}});tree=render();
+ click(action(tree,'-analysis'));tree=render();
+ expect(tree.props['data-view']).toBe('analysis');
+ expect(nodes(tree).find(node=>node.type==='form')?.props['data-mobile-inline']).toBe(true);
+ const forms=nodes(tree).filter(node=>node.type==='form');
+ expect(forms).toHaveLength(1);
+ expect(text(forms[0])).toContain('Добави приход');
+ expect(nodes(forms[0]).some(node=>node.type==='input' && node.props.value==='125')).toBe(true);
+});
+
 it('disables entry submission after calculator access expires',()=>{
  let tree=render();click(action(tree,'-analysis'));tree=render();click(action(tree,'-revenue-dropdown'));
  hooks.cursor=0;

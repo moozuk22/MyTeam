@@ -25,6 +25,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   const ledgerId = useId();
   const [actionDropdown,setActionDropdown] = useState<'revenue' | 'expense' | 'debts' | null>(null);
   const analysisActionsRef = useRef<HTMLDivElement>(null);
+  const mobileActionsRef = useRef<HTMLDivElement>(null);
   const actionTriggerRef = useRef<HTMLButtonElement>(null);
   const actionPanelRef = useRef<HTMLDivElement>(null);
   const [entryKind,setEntryKind] = useState<'all' | 'expense' | 'revenue'>('all');
@@ -41,11 +42,11 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   useEffect(() => {
     if (!actionDropdown || selectedPlayerId) return;
     const dismiss = (event: globalThis.PointerEvent) => {
-      if (!saving && event.target instanceof Node && !analysisActionsRef.current?.contains(event.target) && !actionPanelRef.current?.contains(event.target)) setActionDropdown(null);
+      if (!saving && event.target instanceof Node && !analysisActionsRef.current?.contains(event.target) && !mobileActionsRef.current?.contains(event.target) && !actionPanelRef.current?.contains(event.target)) setActionDropdown(null);
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || saving) return;
-      analysisActionsRef.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]')?.focus();
+      actionTriggerRef.current?.focus({preventScroll:true});
       setActionDropdown(null);
     };
     document.addEventListener('pointerdown',dismiss);
@@ -169,6 +170,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   const formRef = useRef<HTMLFormElement>(null);
   const editDialogRef = useRef<HTMLDialogElement>(null);
   const [mobileEdit,setMobileEdit] = useState(false);
+  const [mobileInline,setMobileInline] = useState(false);
   const editingId = draft?.id;
   function closeEntryEdit() {
     setError('');
@@ -228,12 +230,19 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   const formCategories = data?.categories.filter(c => (!c.isMembership && c.isActive) || (draft?.id && draft.categoryId === c.id)) ?? [];
   const listCategories = categories;
   function selectKind(kind: 'all' | 'expense' | 'revenue') { setRemove(null); setEntryKind(kind); setPage(1); setList(null); }
-  function newEntry(kind: 'expense' | 'revenue') {
+  function newEntry(kind: 'expense' | 'revenue', inline = false) {
+    setMobileInline(inline);
     setFormKind(kind);
     setFormOpen(true);
     setDraft({ categoryId: data?.categories.find(c => c.isActive && !c.isMembership)?.id ?? '', amount: '', date: financeDateKey(), description: '' });
     setRemove(null);
-    requestAnimationFrame(() => { if (ledgerView !== 'analysis') formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); formRef.current?.querySelector('select')?.focus({ preventScroll: true }); });
+    requestAnimationFrame(() => { if (window.matchMedia('(max-width:700px)').matches) return; if (ledgerView !== 'analysis') formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); formRef.current?.querySelector('select')?.focus({ preventScroll: true }); });
+  }
+  function openMobileEntry(kind: 'expense' | 'revenue') {
+    setActionDropdown(null);
+    setMobileInline(true);
+    if (mobileInline && formOpen && !draft?.id && formKind === kind) { setFormOpen(false); return; }
+    newEntry(kind,true);
   }
   async function moveCategory(id: string, direction: number, targetId?: string) {
     const index = categories.findIndex(c => c.id === id);
@@ -314,7 +323,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
   });
   const lockedSection = <div className={styles.lockedSection}><h3>Калкулаторът не е активиран</h3><p>Данните в тази секция са достъпни с активен абонамент за финансовия калкулатор. Свържете се с администратора за активиране.</p><small>Записаната финансова история се запазва.</small></div>;
   const periodList = list?.month === month && list.page === page ? list : null;
-  const entryForm = (<form ref={formRef} className={`${styles.box} ${styles.expenseForm} ${draft?.id ? styles.editingForm : ''} ${formKind === 'revenue' ? styles.revenueForm : ''} ${formOpen ? '' : styles.mobileFormClosed}`} onSubmit={event => { event.preventDefault(); if (!calculatorEnabled || saving) return; if (draft) void mutate({ ...draft, action: `${draft.id ? 'update' : 'create'}${formKind === 'revenue' ? 'Revenue' : 'Expense'}` }); }}>
+  const entryForm = (<form ref={formRef} id={mobileInline && !draft?.id ? `${ledgerId}-mobile-entry` : undefined} data-mobile-inline={mobileInline && !draft?.id} className={`${styles.box} ${styles.expenseForm} ${draft?.id ? styles.editingForm : ''} ${formKind === 'revenue' ? styles.revenueForm : ''} ${formOpen ? '' : styles.mobileFormClosed}`} onSubmit={event => { event.preventDefault(); if (!calculatorEnabled || saving) return; if (draft) void mutate({ ...draft, action: `${draft.id ? 'update' : 'create'}${formKind === 'revenue' ? 'Revenue' : 'Expense'}` }); }}>
           <h2 id={draft?.id ? `${ledgerId}-entry-edit-title` : undefined}>{draft?.id ? (formKind === 'revenue' ? 'Редактирай приход' : 'Редактирай разход') : (formKind === 'revenue' ? 'Добави приход' : 'Добави разход')}</h2>
           {draft?.id && error && <p className={styles.error} role="alert">{error}</p>}
           {!data ? <FinanceSkeleton variant="form" /> : !draft ? <><p className={styles.empty}>Въведете разход за вашия клуб.</p><button type="button" className={styles.primary} disabled={!data} onClick={() => newEntry('expense')}><Plus size={18} />Нов разход</button></> : <>
@@ -368,7 +377,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
                 if (actionDropdown === 'revenue') { setActionDropdown(null); return; }
                 setActionDropdown('revenue'); newEntry('revenue');
               }}><Plus size={16} aria-hidden="true" />Добави приход<ChevronDown size={15} aria-hidden="true" /></button>
-              {actionDropdown === 'revenue' && <FinanceActionDropdown id={`${ledgerId}-revenue-dropdown`} label="Добави приход" anchor={actionTriggerRef} panelRef={actionPanelRef}>{error && <p className={styles.error} role="alert">{error}</p>}{!(draft?.id && mobileEdit) && entryForm}</FinanceActionDropdown>}
+              {actionDropdown === 'revenue' && <FinanceActionDropdown id={`${ledgerId}-revenue-dropdown`} label="Добави приход" anchor={actionTriggerRef} panelRef={actionPanelRef}>{error && <p className={styles.error} role="alert">{error}</p>}{!(draft?.id && mobileEdit) && !(mobileInline && !draft?.id) && entryForm}</FinanceActionDropdown>}
             </div>
             <div className={styles.analysisAction}>
               <button type="button" disabled={!data || saving} aria-expanded={actionDropdown === 'expense'} aria-controls={`${ledgerId}-expense-dropdown`} onClick={event => {
@@ -376,7 +385,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
                 if (actionDropdown === 'expense') { setActionDropdown(null); return; }
                 setActionDropdown('expense'); newEntry('expense');
               }}><Plus size={16} aria-hidden="true" />Добави разход<ChevronDown size={15} aria-hidden="true" /></button>
-              {actionDropdown === 'expense' && <FinanceActionDropdown id={`${ledgerId}-expense-dropdown`} label="Добави разход" anchor={actionTriggerRef} panelRef={actionPanelRef}>{error && <p className={styles.error} role="alert">{error}</p>}{!(draft?.id && mobileEdit) && entryForm}</FinanceActionDropdown>}
+              {actionDropdown === 'expense' && <FinanceActionDropdown id={`${ledgerId}-expense-dropdown`} label="Добави разход" anchor={actionTriggerRef} panelRef={actionPanelRef}>{error && <p className={styles.error} role="alert">{error}</p>}{!(draft?.id && mobileEdit) && !(mobileInline && !draft?.id) && entryForm}</FinanceActionDropdown>}
             </div>
             <div className={styles.analysisAction}>
               <button type="button" className={styles.debtActionButton} disabled={!data || saving} aria-expanded={actionDropdown === 'debts'} aria-controls={`${ledgerId}-debts-dropdown`} onClick={event => {
@@ -389,12 +398,20 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
           </div>}
         </div>
 
-        <div className={styles.mobileEntryActions}><button type="button" disabled={!data || saving} onClick={() => { setLedgerView('history'); newEntry('revenue'); }}><Plus size={18} />Приход</button><button type="button" disabled={!data || saving} onClick={() => { setLedgerView('history'); newEntry('expense'); }}><Plus size={18} />Разход</button></div>
+        <div ref={mobileActionsRef} className={styles.mobileEntryActions}><button type="button" disabled={!data || saving} data-entry-kind="revenue" aria-expanded={mobileInline && formOpen && !draft?.id && formKind === 'revenue'} aria-controls={`${ledgerId}-mobile-entry`} onClick={() => openMobileEntry('revenue')}><Plus size={18} />Приход</button><button type="button" disabled={!data || saving} data-entry-kind="expense" aria-expanded={mobileInline && formOpen && !draft?.id && formKind === 'expense'} aria-controls={`${ledgerId}-mobile-entry`} onClick={() => openMobileEntry('expense')}><Plus size={18} />Разход</button></div>
+
+        {mobileInline && formOpen && !draft?.id && entryForm}
 
         <section ref={expenseDetailsRef} className={`${styles.box} ${styles.ledger}`}>
           <div className={styles.ledgerViews} role="group" aria-label="Изглед на финансите">
             <button type="button" aria-pressed={ledgerView === 'history'} aria-controls={`${ledgerId}-history`} disabled={ledgerView === 'history'} onClick={() => { setActionDropdown(null); setLedgerView('history'); }}><List size={17} aria-hidden="true" />История</button>
-            <button type="button" aria-pressed={ledgerView === 'analysis'} aria-controls={`${ledgerId}-analysis`} disabled={ledgerView === 'analysis'} onClick={() => setLedgerView('analysis')}><ChartPie size={17} aria-hidden="true" />Анализ</button>
+            <button type="button" aria-pressed={ledgerView === 'analysis'} aria-controls={`${ledgerId}-analysis`} disabled={ledgerView === 'analysis'} onClick={() => {
+              if (window.matchMedia('(max-width:700px)').matches && formOpen && draft && !draft.id) {
+                setMobileInline(true);
+                setActionDropdown(null);
+              }
+              setLedgerView('analysis');
+            }}><ChartPie size={17} aria-hidden="true" />Анализ</button>
             <button type="button" aria-pressed={ledgerView === 'chart'} aria-controls={`${ledgerId}-chart`} disabled={ledgerView === 'chart'} onClick={() => { setActionDropdown(null); setLedgerView('chart'); }}><ChartPie size={17} aria-hidden="true" /><span className={styles.desktopCategoryLabel}>Категории разходи</span><span className={styles.mobileCategoryLabel}>Категории</span></button>
           </div>
           <div id={`${ledgerId}-chart`} className={styles.chartView} hidden={ledgerView !== 'chart'} role="region" aria-label="Категории разходи">
@@ -478,7 +495,7 @@ export default function FinanceDashboard({ clubId, data, report, month, filters,
       </dialog>
       <aside className={styles.sidebar} hidden={ledgerView === 'analysis'}>{ledgerView !== 'analysis' && <>
         <div className={styles.entryActions}><button type="button" disabled={!data || saving} onClick={() => newEntry(formKind === 'expense' ? 'revenue' : 'expense')}><Plus size={16} />{formKind === 'expense' ? 'Добави приход' : 'Добави разход'}</button></div>
-        {!(draft?.id && mobileEdit) && entryForm}
+        {!(draft?.id && mobileEdit) && !(mobileInline && !draft?.id) && entryForm}
 
         {debtsPanel}
       </>}</aside>
