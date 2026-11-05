@@ -634,3 +634,14 @@
 .debtsDialogList .debtPlayer > strong { white-space:nowrap; }
 
 .editBackdrop { position:fixed; inset:0; z-index:1000; background:rgba(3,9,18,.48); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+
+/* Colored History cards on phones. */
+@media(max-width:700px) {
+ .tableWrap tr[style] { margin:10px 0; padding:14px 12px 14px 16px; gap:10px 12px; border:1px solid #ffffff12; border-radius:12px; }
+ .tableWrap tr[style] td:first-child { align-self:center; color:#c7c7c1; }
+ .tableWrap tr[style] .description { min-width:0; }
+ .tableWrap tr[style] .amount { align-self:start; white-space:nowrap; }
+ .tableWrap tr[style] .tag { border-color:#ffffff24; }
+ .tableWrap tr[style] .rowMenu>summary { background:#1116; }
+ .tableWrap tr[style]:has(.rowMenu[open]) { position:relative; z-index:6; }
+}

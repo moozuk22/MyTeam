@@ -66,3 +66,10 @@ it('uses the category dropdown instead of chips in mobile History', () => {
  expect(mobile).toMatch(/\.dashboard \.ledgerView \.categoryFilter\s*\{[^}]*display:flex!important;/);
  expect(mobile).toMatch(/\.dashboard \.categoryFilter \.selectWrap\s*\{[^}]*width:100%;/);
 });
+
+it('gives colored history rows breathing room only on phones', () => {
+ const mobile=css.slice(css.indexOf('/* Colored History cards on phones. */'));
+ expect(mobile).toContain('@media(max-width:700px)');
+ expect(mobile).toMatch(/\.tableWrap tr\[style\]\s*\{[^}]*margin:10px 0;[^}]*padding:14px 12px 14px 16px;[^}]*border-radius:12px;/);
+ expect(mobile).toMatch(/\.tableWrap tr\[style\] \.tag\s*\{[^}]*border-color:#ffffff24;/);
+});
