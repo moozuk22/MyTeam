@@ -30,7 +30,7 @@ function text(value:unknown):string {
 }
 function click(node:Node) { (node.props.onClick as (event:unknown) => void)({currentTarget:null}); }
 function action(tree:unknown,name:string) { return nodes(tree).find(node=>node.type==='button' && String(node.props['aria-controls']).endsWith(name))!; }
-beforeEach(()=>{hooks.values=[];hooks.cursor=0;vi.stubGlobal('requestAnimationFrame',vi.fn());});
+beforeEach(()=>{hooks.values=[];hooks.cursor=0;vi.stubGlobal('requestAnimationFrame',vi.fn());vi.stubGlobal('window',{matchMedia:vi.fn(()=>({matches:true}))});});
 afterEach(()=>vi.unstubAllGlobals());
 it('opens the income form and player list as mutually exclusive dropdowns without leaving Analysis',()=>{
  let tree=render();
@@ -68,6 +68,10 @@ it('highlights the populated edit form and clears the effect when cancelled', ()
  (edit.props.onClick as (event:unknown)=>void)({currentTarget:{closest:()=>({removeAttribute:vi.fn()})}});
  tree = render();
  expect(tree.props['data-editing']).toBe(true);
+ const modal = nodes(tree).find(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'finance-entry-edit-title');
+ expect(modal).toBeDefined();
+ expect(nodes(modal).filter(node => node.type === 'form')).toHaveLength(1);
+ expect(vi.mocked(requestAnimationFrame)).not.toHaveBeenCalled();
  expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Редактирай разход')).toBe(true);
  expect(nodes(tree).some(node=>node.type==='textarea' && node.props.value==='Описание')).toBe(true);
  const form = nodes(tree).find(node=>node.type==='form' && text(node).includes('Редактирай разход'))!;
@@ -76,6 +80,41 @@ it('highlights the populated edit form and clears the effect when cancelled', ()
  tree = render();
  expect(tree.props['data-editing']).toBe(false);
  expect(nodes(tree).some(node=>node.type==='h2' && text(node)==='Добави разход')).toBe(true);
+});
+
+it('keeps desktop editing inline and scrolls to the form', () => {
+ vi.stubGlobal('window',{matchMedia:vi.fn(()=>({matches:false}))});
+ render();
+ hooks.values[6] = {...data,count:1,entries:[{id:'entry',categoryId:'category',category:'Други',kind:'expense',amount:'25.00',currency:'EUR',date:'2026-10-30',description:'Описание',playerName:null,editable:true,deletable:true}]};
+ let tree = render();
+ const edit = nodes(tree).find(node => node.type === 'button' && text(node) === 'Редактирай')!;
+ (edit.props.onClick as (event:unknown)=>void)({currentTarget:{closest:()=>({removeAttribute:vi.fn()})}});
+ tree = render();
+ expect(nodes(tree).some(node => node.type === 'dialog' && node.props['aria-labelledby'] === 'finance-entry-edit-title')).toBe(false);
+ const sidebar = nodes(tree).find(node => node.type === 'aside' && String(node.props.className).includes('sidebar'))!;
+ expect(text(sidebar)).toContain('Редактирай разход');
+ expect(requestAnimationFrame).toHaveBeenCalledOnce();
+});
+
+it('keeps the row menu open during a touch blur so Edit can receive its click', () => {
+ render();
+ hooks.values[6] = {...data,count:1,entries:[{id:'entry',categoryId:'category',category:'Други',kind:'expense',amount:'25.00',currency:'EUR',date:'2026-10-30',description:'Описание',playerName:null,editable:true,deletable:true}]};
+ let tree = render();
+ const menu = nodes(tree).find(node => node.type === 'details' && String(node.props.className).includes('rowMenu'))!;
+ const element = {open:true,contains:vi.fn(() => false)};
+ // Touch browsers may blur the summary with no relatedTarget before dispatching click.
+ (menu.props.onBlur as (event:unknown)=>void)({currentTarget:element,relatedTarget:null});
+ expect(element.open).toBe(true);
+ const edit = nodes(menu).find(node => node.type === 'button' && text(node) === 'Редактирай')!;
+ (edit.props.onClick as (event:unknown)=>void)({currentTarget:{closest:()=>({removeAttribute:vi.fn()})}});
+ tree = render();
+ const form = nodes(tree).find(node => node.type === 'form')!;
+ expect(text(form)).toContain('Редактирай разход');
+ expect(String(form.props.className)).not.toContain('mobileFormClosed');
+ expect(nodes(form).some(node => node.type === 'textarea' && node.props.value === 'Описание')).toBe(true);
+ // Keyboard navigation to a known element outside the menu still dismisses it.
+ (menu.props.onBlur as (event:unknown)=>void)({currentTarget:element,relatedTarget:{}});
+ expect(element.open).toBe(false);
 });
 
 it('toggles category colors and persists the browser display preference without a request', () => {

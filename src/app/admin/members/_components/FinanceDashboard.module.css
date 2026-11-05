@@ -429,7 +429,13 @@
 .analysisTableWrap::-webkit-scrollbar-corner { background:#131a10; }
 @media(forced-colors:active) { .analysisTableWrap { scrollbar-color:auto; } }
 /* A viewport backdrop leaves only the active edit form clear. */
-.editBackdrop { position:fixed; inset:0; z-index:1000; background:rgba(3,9,18,.48); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+.entryEditDialog { position:fixed; inset:0; margin:0; box-sizing:border-box; width:100%; max-width:none; height:100dvh; max-height:none; padding:16px 12px; border:0; background:rgba(3,9,18,.48); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); color:#eee; color-scheme:dark; overflow:hidden; }
+.entryEditDialog[open] { display:grid; place-items:center; }
+.entryEditDialog::backdrop { background:transparent; }
+.entryEditPanel { position:relative; width:min(460px,100%); max-height:100%; overflow-y:auto; overscroll-behavior:contain; border:1px solid #62aaff; border-radius:14px; background:#101c2e; box-shadow:0 18px 48px #0008; }
+.dashboard .entryEditDialog .expenseForm { display:block; margin:0; padding-top:22px; }
+.entryEditDialog .expenseForm h2 { padding-right:36px; }
+.dashboard .entryEditClose { position:absolute; top:8px; right:8px; z-index:1002; padding:6px; }
 .dashboard .expenseForm.editingForm { --finance-accent:#70b8ff; position:relative; z-index:1001; border-color:#62aaff; background:linear-gradient(145deg,#172e49,#101c2e); box-shadow:0 0 0 2px #62aaff55,0 18px 48px #0008; scroll-margin-block:24px; }
 .dashboard .expenseForm.editingForm h2 { color:#a4d1ff; }
 .dashboard .expenseForm.editingForm .primary { color:#c7e3ff; border-color:#62aaff99; background:#3995ef30; }
@@ -626,3 +632,5 @@
 .debtsDialogList { max-height:55dvh; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
 .debtsDialogList .debtPlayer > span:nth-child(2) { min-width:0; overflow-wrap:anywhere; }
 .debtsDialogList .debtPlayer > strong { white-space:nowrap; }
+
+.editBackdrop { position:fixed; inset:0; z-index:1000; background:rgba(3,9,18,.48); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
