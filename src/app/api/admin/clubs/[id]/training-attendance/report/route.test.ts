@@ -119,6 +119,17 @@ describe("individual attendance report", () => {
     expect(mocks.customGroups).not.toHaveBeenCalled();
   });
 
+  it("returns the selected group scope for an unstored group-report training", async () => {
+    const groupId = "10000000-0000-4000-8000-000000000005";
+    mocks.custom.mockResolvedValue({ id: groupId, trainingDates: ["2026-10-02"], trainingWeekdays: [], trainingTime: "18:00", players: [{ playerId: "player-1" }] });
+    mocks.players.mockResolvedValue([{ id: "player-1", fullName: "Player", teamGroup: null }]);
+    const response = await report(`customTrainingGroupId=${groupId}`);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    const target = `2026-10-02T18:00#custom_group:${groupId}`;
+    expect(data.trainingDates).toEqual([target]);
+    expect(data.players[0].attendance[target]).toEqual({ present: true, reasonCode: null });
+  });
   it("rejects a player outside the selected club or coach group", async () => {
     mocks.coach.mockResolvedValue({ id: "coach-1" });
     mocks.player.mockResolvedValue(null);

@@ -421,7 +421,7 @@ export async function GET(
       }
     }
 
-    const missingCustomColumns = playerCustomGroups.flatMap((group) =>
+    const missingCustomColumns = (customTrainingGroup ? [customTrainingGroup] : playerCustomGroups).flatMap((group) =>
       getTrainingDatesInRange({ from, to, trainingDates: group.trainingDates, trainingWeekdays: group.trainingWeekdays })
         .filter((date) => !storedSessions.some((session) => session.scopeKey === `custom_group:${group.id}` && utcDateToIsoDate(session.trainingDate) === date))
         .filter((date) => {
@@ -429,7 +429,7 @@ export async function GET(
           for (const scheduled of playerCustomGroups) {
             if (getTrainingDatesInRange({ from: date, to: date, trainingDates: scheduled.trainingDates, trainingWeekdays: scheduled.trainingWeekdays }).includes(date)) scopes.add(`custom_group:${scheduled.id}`);
           }
-          return scopes.size > 1;
+          return Boolean(customTrainingGroup) || scopes.size > 1;
         })
         .map((date) => {
           const time = (group.trainingDateTimes as Record<string, string> | null)?.[date] ?? group.trainingTime;
