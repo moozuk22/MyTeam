@@ -15,7 +15,8 @@ import {
   normalizeTrainingTime,
   utcDateToIsoDate,
 } from "@/lib/training";
-import { updateTrainingSessionPlayerAttendance } from "@/lib/trainingSessions";
+import { isEligibleForMembership } from "@/lib/attendanceEligibility";
+import { getExpectedPlayersForScope, updateTrainingSessionPlayerAttendance } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -663,7 +664,7 @@ export async function GET(
         scopeType: true,
         scopeId: true,
         note: true,
-        players: { where: { playerId: context.playerId }, select: { present: true, reasonCode: true, reasonText: true } },
+        players: { where: { playerId: context.playerId }, select: { present: true, reasonCode: true, reasonText: true, attendanceRecorded: true } },
         trainingDate: true,
         trainingTime: true,
         trainingDurationMinutes: true,
@@ -805,8 +806,11 @@ export async function GET(
         sessions.push(...matchingGroups.map((g) => ({
           ...buildGroupSession(g, `custom_group:${g.id}`, date, limitedEventsForDate, fieldById, noteByScopeDate),
           ...(() => {
-            const attendance = context.requiresCheckIn ? sessionRows.find((s) => s.scopeKey === `custom_group:${g.id}` && utcDateToIsoDate(s.trainingDate) === date)?.players[0] : undefined;
+            const stored = sessionRows.find((s) => s.scopeKey === `custom_group:${g.id}` && utcDateToIsoDate(s.trainingDate) === date);
+            const row = stored?.players[0];
+            const attendance = context.requiresCheckIn || row?.attendanceRecorded ? row : undefined;
             return {
+              id: stored?.id,
               optedOut: attendance ? !attendance.present : optedOutByDate.has(date),
               optOutReasonCode: attendance ? attendance.reasonCode : optedOutByDate.get(date)?.reasonCode ?? null,
               optOutReasonText: attendance ? attendance.reasonText : optedOutByDate.get(date)?.reasonText ?? null,
@@ -833,10 +837,11 @@ export async function GET(
         const leRow = limitedEventsForDate[0] ?? null;
         sessions = [
           {
+            id: session?.id,
             scopeKey: singleScopeKey === "club" ? "" : singleScopeKey,
-            optedOut: context.requiresCheckIn && session?.players[0] ? !session.players[0].present : optedOutByDate.has(date),
-            optOutReasonCode: context.requiresCheckIn && session?.players[0] ? session.players[0].reasonCode : optedOutByDate.get(date)?.reasonCode ?? null,
-            optOutReasonText: context.requiresCheckIn && session?.players[0] ? session.players[0].reasonText : optedOutByDate.get(date)?.reasonText ?? null,
+            optedOut: (context.requiresCheckIn || session?.players[0]?.attendanceRecorded) && session?.players[0] ? !session.players[0].present : optedOutByDate.has(date),
+            optOutReasonCode: (context.requiresCheckIn || session?.players[0]?.attendanceRecorded) && session?.players[0] ? session.players[0].reasonCode : optedOutByDate.get(date)?.reasonCode ?? null,
+            optOutReasonText: (context.requiresCheckIn || session?.players[0]?.attendanceRecorded) && session?.players[0] ? session.players[0].reasonText : optedOutByDate.get(date)?.reasonText ?? null,
             note: noteByScopeDate.get(`${singleScopeKey}:${date}`) ?? noteByScopeDate.get(`club:${date}`) ?? "",
             trainingTime: session?.trainingTime ?? context.trainingDateTimes[date] ?? context.fallbackTrainingTime ?? "",
             trainingDurationMinutes: session?.trainingDurationMinutes ?? context.trainingDurationMinutes,
@@ -882,24 +887,65 @@ export async function GET(
 }
 
 async function updateMemberSessionAttendance(context: NonNullable<Awaited<ReturnType<typeof getMemberTrainingContext>>>, body: Record<string, unknown>, optedOut: boolean) {
-  const id = String(body.trainingSessionId ?? "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: "Select an individual training" }, { status: 400 });
+  let id = String(body.trainingSessionId ?? "");
+  const scopeKey = String(body.trainingScopeKey ?? "");
+  const selectedDate = String(body.trainingDate ?? "");
+  const validCustomTarget = scopeKey.startsWith("custom_group:") && /^[0-9a-f-]{36}$/i.test(scopeKey.slice(13)) && isIsoDate(selectedDate) && context.upcomingDates.includes(selectedDate);
+  if (id ? !/^[0-9a-f-]{36}$/i.test(id) : !validCustomTarget) return NextResponse.json({ error: "Select an individual training" }, { status: 400 });
   const reason = optedOut ? parseOptOutReason(body.reasonCode, body.reasonText) : { code: null, text: null };
   if ("error" in reason) return NextResponse.json({ error: reason.error }, { status: 400 });
   const attendance = { present: !optedOut, reasonCode: reason.code, reasonText: reason.text, attendanceRecorded: true };
   const result = await prisma.$transaction(async (tx) => {
+    let customSession = null;
+    if (!id) {
+      // Match schedule writers' club lock, then recheck membership and the schedule.
+      await tx.$queryRaw`SELECT id FROM clubs WHERE id = ${context.clubId}::uuid FOR UPDATE`;
+      const group = await tx.clubCustomTrainingGroup.findFirst({ where: { id: scopeKey.slice(13), clubId: context.clubId, players: { some: { playerId: context.playerId } } } });
+      if (!group || !(group.trainingDates.includes(selectedDate) || (!group.trainingDates.length && group.trainingWeekdays.includes(getWeekdayMondayFirst(selectedDate, FIXED_TIME_ZONE)))) || selectedDate < getTodayIsoDateInTimeZone(FIXED_TIME_ZONE)) {
+        return { error: "Training not found", status: 404 } as const;
+      }
+      const field = resolveFieldSelectionsForDate(group.trainingFieldId, group.trainingFieldPieceIds, group.trainingFieldSelections, selectedDate);
+      const times = group.trainingDateTimes as Record<string, string> | null;
+      customSession = await tx.trainingSession.upsert({
+        where: { clubId_scopeKey_trainingDate: { clubId: context.clubId, scopeKey, trainingDate: isoDateToUtcMidnight(selectedDate), occurrenceKey: "" } },
+        update: {},
+        create: { clubId: context.clubId, scopeKey, scopeType: "customGroup", scopeId: group.id, trainingDate: isoDateToUtcMidnight(selectedDate), trainingTime: times?.[selectedDate] ?? group.trainingTime, trainingDurationMinutes: group.trainingDurationMinutes, trainingFieldId: field.fieldId, trainingFieldPieceIds: field.fieldPieceIds },
+        include: { players: { where: { playerId: context.playerId }, select: { playerId: true } } },
+      });
+      if (customSession.status !== "scheduled" || customSession.removedFromSchedule) return { error: "Training not found", status: 404 } as const;
+      id = customSession.id;
+    }
     // Serialize with schedule corrections before deciding whether enrollment is allowed.
     await tx.$queryRaw`SELECT id FROM training_sessions WHERE id = ${id}::uuid FOR UPDATE`;
-    const row = await tx.trainingSession.findFirst({ where: { id, clubId: context.clubId, scopeType: "coachGroup", scopeId: { in: context.playerCoachGroupIds }, status: "scheduled", trainingDate: { gte: isoDateToUtcMidnight(getTodayIsoDateInTimeZone(FIXED_TIME_ZONE)) } }, include: { players: { where: { playerId: context.playerId }, select: { playerId: true } } } });
+    const row = customSession ?? await tx.trainingSession.findFirst({ where: { id, clubId: context.clubId, OR: [{ scopeType: "coachGroup", scopeId: { in: context.playerCoachGroupIds } }, { scopeType: { not: "coachGroup" }, players: { some: { playerId: context.playerId } } }], status: "scheduled", trainingDate: { gte: isoDateToUtcMidnight(getTodayIsoDateInTimeZone(FIXED_TIME_ZONE)) } }, include: { players: { where: { playerId: context.playerId }, select: { playerId: true } } } });
     if (!row) return { error: "Training not found", status: 404 } as const;
     if (row.rosterLockedAt && !row.players.some((player) => player.playerId === context.playerId)) return { error: "Не можете да променяте присъствието си за тази тренировка.", status: 403 } as const;
+    if (customSession && !row.rosterLockedAt) {
+      const members = await getExpectedPlayersForScope(tx, context.clubId, { type: "customGroup", id: row.scopeId! });
+      const date = utcDateToIsoDate(row.trainingDate);
+      const eligible = members.filter((member) => isEligibleForMembership(member, date, row.trainingTime, row.scopeKey));
+      const optOuts = await tx.trainingOptOut.findMany({ where: { playerId: { in: eligible.map((member) => member.id) }, trainingDate: row.trainingDate } });
+      const optOutByPlayer = new Map(optOuts.map((optOut) => [optOut.playerId, optOut]));
+      await tx.trainingSessionPlayer.createMany({
+        data: eligible.map((member) => {
+          const optOut = optOutByPlayer.get(member.id);
+          return { trainingSessionId: row.id, playerId: member.id, playerName: member.fullName, teamGroup: member.teamGroup, present: !context.requiresCheckIn && !optOut, reasonCode: optOut?.reasonCode ?? null, reasonText: optOut?.reasonText ?? null };
+        }),
+        skipDuplicates: true,
+      });
+    }
     await tx.trainingSessionPlayer.upsert({ where: { trainingSessionId_playerId: { trainingSessionId: id, playerId: context.playerId } }, update: attendance, create: { trainingSessionId: id, playerId: context.playerId, playerName: context.playerName, teamGroup: context.playerTeamGroup, ...attendance } });
     return { row };
   });
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
   const { row } = result;
   const date = utcDateToIsoDate(row.trainingDate);
-  const coachGroupId = row.scopeId;
+  const coachGroupId = row.scopeType === "coachGroup" ? row.scopeId : resolveNotificationCoachGroupForDate({
+    customGroups: context.scheduledCustomGroups.filter((group) => row.scopeKey === `custom_group:${group.id}`),
+    coachGroups: context.scheduledCoachGroups,
+    date,
+    weekday: getWeekdayMondayFirst(date, FIXED_TIME_ZONE),
+  });
   const payload = buildCoachAttendancePayload({ clubId: context.clubId, playerName: context.playerName, trainingDate: date, optedOut, optOutReasonCode: reason.code, optOutReasonText: reason.text, coachGroupId });
   payload.body += ` · ${row.trainingTime ?? ""}`;
   payload.tag = `training-attendance-${id}-${context.playerId}`;
@@ -923,8 +969,12 @@ export async function POST(
   }
 
   const body = await request.json().catch(() => ({}));
-  if (body.trainingSessionId || (context.hasCoachGroupSchedule && !context.customUpcomingDates.includes(String(body.trainingDate ?? "")))) return updateMemberSessionAttendance(context, body, true);
+  if (body.trainingSessionId || body.trainingScopeKey || (context.hasCoachGroupSchedule && !context.customUpcomingDates.includes(String(body.trainingDate ?? "")))) return updateMemberSessionAttendance(context, body, true);
   const trainingDate = String((body as { trainingDate?: unknown }).trainingDate ?? "").trim();
+  if (context.scheduledCustomGroups.filter((group) => group.trainingDates.includes(trainingDate) || (isIsoDate(trainingDate) && group.trainingWeekdays.includes(getWeekdayMondayFirst(trainingDate, FIXED_TIME_ZONE)))).length > 1) {
+    return NextResponse.json({ error: "Select an individual training" }, { status: 400 });
+  }
+
   const parsedReason = parseOptOutReason(
     (body as { reasonCode?: unknown }).reasonCode,
     (body as { reasonText?: unknown }).reasonText,
@@ -1033,8 +1083,12 @@ export async function DELETE(
   }
 
   const body = await request.json().catch(() => ({}));
-  if (body.trainingSessionId || (context.hasCoachGroupSchedule && !context.customUpcomingDates.includes(String(body.trainingDate ?? "")))) return updateMemberSessionAttendance(context, body, false);
+  if (body.trainingSessionId || body.trainingScopeKey || (context.hasCoachGroupSchedule && !context.customUpcomingDates.includes(String(body.trainingDate ?? "")))) return updateMemberSessionAttendance(context, body, false);
   const trainingDate = String((body as { trainingDate?: unknown }).trainingDate ?? "").trim();
+  if (context.scheduledCustomGroups.filter((group) => group.trainingDates.includes(trainingDate) || (isIsoDate(trainingDate) && group.trainingWeekdays.includes(getWeekdayMondayFirst(trainingDate, FIXED_TIME_ZONE)))).length > 1) {
+    return NextResponse.json({ error: "Select an individual training" }, { status: 400 });
+  }
+
 
   if (!isIsoDate(trainingDate)) {
     return NextResponse.json({ error: "Invalid trainingDate" }, { status: 400 });

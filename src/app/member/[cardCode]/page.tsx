@@ -1,4 +1,6 @@
 "use client";
+
+import { buildMemberTrainingAttendanceRequest } from "@/lib/memberTrainingAttendance";
 import { playerFieldEnabled, parsePlayerWeight } from "@/lib/playerFields";
 import PlayerExtraFields from "@/components/PlayerExtraFields";
 import MemberMatchExtraDetails from "@/components/MemberMatchExtraDetails";
@@ -460,6 +462,7 @@ export default function MemberCardPage({
   const [trainingDayPopupTab, setTrainingDayPopupTab] = useState<"training" | "match">("training");
   const [matchDetailsPopupOpen, setMatchDetailsPopupOpen] = useState(false);
   const [matchDetailsMatch, setMatchDetailsMatch] = useState<MemberMatch | null>(null);
+  const [trainingConfirmSession, setTrainingConfirmSession] = useState<TrainingSessionItem | null>(null);
   const [trainingConfirmModalOpen, setTrainingConfirmModalOpen] = useState(false);
   const [trainingConfirmAction, setTrainingConfirmAction] = useState<"attend" | "optOut" | null>(null);
   const [trainingOptOutReasonCode, setTrainingOptOutReasonCode] = useState<TrainingOptOutReasonCode | "">("");
@@ -1903,14 +1906,7 @@ export default function MemberCardPage({
     setTrainingSavingDate(item.date);
     setTrainingError(null);
     try {
-      const requestBody =
-        action === "optOut"
-          ? {
-            trainingDate: item.date,
-            reasonCode: reason?.reasonCode ?? "",
-            reasonText: reason?.reasonText ?? "",
-          }
-          : { trainingDate: item.date };
+      const requestBody = buildMemberTrainingAttendanceRequest(item, trainingConfirmSession, action, reason);
       const response = await fetch(`/api/members/${normalizedCardCode}/training`, {
         method: action === "optOut" ? "POST" : "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -1927,18 +1923,7 @@ export default function MemberCardPage({
         );
       }
 
-      setTrainingDays((prev) =>
-        prev.map((entry) =>
-          entry.date === item.date
-            ? {
-              ...entry,
-              optedOut: action === "optOut",
-              optOutReasonCode: action === "optOut" ? reason?.reasonCode ?? null : null,
-              optOutReasonText: action === "optOut" ? reason?.reasonText ?? null : null,
-            }
-            : entry,
-        ),
-      );
+      await fetchTrainingDays();
     } catch (error) {
       console.error("Failed to update training attendance:", error);
       setTrainingError(error instanceof Error ? error.message : "Възникна грешка.");
@@ -3060,7 +3045,7 @@ export default function MemberCardPage({
                             )}
                           </div>
                           {trainingDetailsItem.sessions.length > 1 && trainingDetailsItem.sessions.map((session, sessionIndex) => (
-                            <div key={session.scopeKey || sessionIndex} style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                            <div key={session.id || session.scopeKey || sessionIndex} style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                               <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.75)", marginBottom: session.trainingTime || session.trainingDurationMinutes || session.trainingFieldName ? 8 : 0 }}>
                                 {session.groupName || `Тренировка ${sessionIndex + 1}`}{session.trainingTime ? ` — ${session.trainingTime}` : ""}
                               </div>
@@ -3187,18 +3172,19 @@ export default function MemberCardPage({
                               })() : !isTrainingCreditBasedPayment && (
                                 <div className="training-attendance-buttons" style={{ marginTop: 8 }}>
                                   <button
-                                    className={`pm-btn training-attend-btn${!trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                                    className={`pm-btn training-attend-btn${!session.optedOut ? " training-btn-selected" : ""}`}
                                     type="button"
                                     onClick={() => {
-                                      if (!trainingDetailsItem.optedOut) return;
+                                      if (!session.optedOut) return;
                                       setTrainingOptOutReasonCode("");
                                       setTrainingOptOutReasonText("");
+                                      setTrainingConfirmSession(session);
                                       setTrainingConfirmAction("attend");
                                       setTrainingConfirmModalOpen(true);
                                     }}
-                                    disabled={!trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                                    disabled={!session.optedOut || trainingSavingDate === trainingDetailsItem.date}
                                   >
-                                    {!trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                    {!session.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
                                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                         <polyline points="20 6 9 17 4 12" />
                                       </svg>
@@ -3206,18 +3192,19 @@ export default function MemberCardPage({
                                     {trainingSavingDate === trainingDetailsItem.date ? "Запазване..." : "Присъствам"}
                                   </button>
                                   <button
-                                    className={`pm-btn training-optout-btn${trainingDetailsItem.optedOut ? " training-btn-selected" : ""}`}
+                                    className={`pm-btn training-optout-btn${session.optedOut ? " training-btn-selected" : ""}`}
                                     type="button"
                                     onClick={() => {
-                                      if (trainingDetailsItem.optedOut) return;
+                                      if (session.optedOut) return;
                                       setTrainingOptOutReasonCode("");
                                       setTrainingOptOutReasonText("");
+                                      setTrainingConfirmSession(session);
                                       setTrainingConfirmAction("optOut");
                                       setTrainingConfirmModalOpen(true);
                                     }}
-                                    disabled={trainingDetailsItem.optedOut || trainingSavingDate === trainingDetailsItem.date}
+                                    disabled={session.optedOut || trainingSavingDate === trainingDetailsItem.date}
                                   >
-                                    {trainingDetailsItem.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
+                                    {session.optedOut && trainingSavingDate !== trainingDetailsItem.date && (
                                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                         <polyline points="20 6 9 17 4 12" />
                                       </svg>
@@ -3342,6 +3329,7 @@ export default function MemberCardPage({
                                       if (!trainingDetailsItem.optedOut) return;
                                       setTrainingOptOutReasonCode("");
                                       setTrainingOptOutReasonText("");
+                                      setTrainingConfirmSession(trainingDetailsItem.sessions[0] ?? null);
                                       setTrainingConfirmAction("attend");
                                       setTrainingConfirmModalOpen(true);
                                     }}
@@ -3361,6 +3349,7 @@ export default function MemberCardPage({
                                       if (trainingDetailsItem.optedOut) return;
                                       setTrainingOptOutReasonCode("");
                                       setTrainingOptOutReasonText("");
+                                      setTrainingConfirmSession(trainingDetailsItem.sessions[0] ?? null);
                                       setTrainingConfirmAction("optOut");
                                       setTrainingConfirmModalOpen(true);
                                     }}

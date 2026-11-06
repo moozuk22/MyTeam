@@ -421,21 +421,28 @@ export async function GET(
       }
     }
 
-    if (coachGroupId || storedSessions.some((s) => s.scopeType === "coachGroup")) {
-      const columns = storedSessions.map((s) => ({ key: `${utcDateToIsoDate(s.trainingDate)}T${s.trainingTime ?? "00:00"}#${s.id}`, session: s }));
-      return NextResponse.json({
-        trainingDates: columns.map((c) => c.key),
-        players: players.map((p) => ({ ...p, attendance: Object.fromEntries(columns.filter(({ session }) => eligibleForSession(p, session)).map(({ key, session }) => {
-          const row = session.players.find((r) => r.playerId === p.id);
-          return [key, { present: row?.present ?? !trainingRequiresCheckIn(club.paymentWorkflow), reasonCode: row?.present ? null : row?.reasonCode ?? null }];
-        })) })),
-      });
-    }
+    const missingCustomColumns = (customTrainingGroup ? [customTrainingGroup] : playerCustomGroups).flatMap((group) =>
+      getTrainingDatesInRange({ from, to, trainingDates: group.trainingDates, trainingWeekdays: group.trainingWeekdays })
+        .filter((date) => !storedSessions.some((session) => session.scopeKey === `custom_group:${group.id}` && utcDateToIsoDate(session.trainingDate) === date))
+        .filter((date) => {
+          const scopes = new Set(storedSessions.filter((session) => utcDateToIsoDate(session.trainingDate) === date).map((session) => session.scopeKey));
+          for (const scheduled of playerCustomGroups) {
+            if (getTrainingDatesInRange({ from: date, to: date, trainingDates: scheduled.trainingDates, trainingWeekdays: scheduled.trainingWeekdays }).includes(date)) scopes.add(`custom_group:${scheduled.id}`);
+          }
+          return Boolean(customTrainingGroup) || scopes.size > 1;
+        })
+        .map((date) => {
+          const time = (group.trainingDateTimes as Record<string, string> | null)?.[date] ?? group.trainingTime;
+          return { key: `${date}T${time ?? "00:00"}#custom_group:${group.id}`, date, time, scopeKey: `custom_group:${group.id}` };
+        }),
+    );
+    const useSessionColumns = missingCustomColumns.length > 0 || coachGroupId || storedSessions.some((s) => s.scopeType === "coachGroup") || new Set(storedSessions.map((s) => utcDateToIsoDate(s.trainingDate))).size < storedSessions.length;
     const fallbackSchedules = (playerCustomGroups.length ? playerCustomGroups : [customTrainingGroup ?? trainingGroup ?? trainingGroupOverride ?? groupSchedule ?? club])
       .map((schedule) => ({ schedule, dates: new Set(getTrainingDatesInRange({
         from, to, trainingDates: schedule.trainingDates ?? [], trainingWeekdays: schedule.trainingWeekdays ?? [],
       })) }));
-    return NextResponse.json({
+    const reportData = {
+      trainingSessionIds: Object.fromEntries(storedSessions.map((s) => [utcDateToIsoDate(s.trainingDate), s.id])),
       trainingDates: reportTrainingDates,
       players: players.map((p) => ({
         id: p.id,
@@ -476,7 +483,31 @@ export async function GET(
           }),
         ),
       })),
+    };
+    if (!useSessionColumns) return NextResponse.json(reportData);
+    const storedDates = new Set(storedSessions.map((session) => utcDateToIsoDate(session.trainingDate)));
+    const fallbackDates = coachGroupId ? [] : reportTrainingDates.filter((date) => !storedDates.has(date) && !missingCustomColumns.some((column) => column.date === date));
+    const columns = storedSessions.map((session) => ({ key: `${utcDateToIsoDate(session.trainingDate)}T${session.trainingTime ?? "00:00"}#${session.id}`, session }));
+    return NextResponse.json({
+      trainingDates: [...columns.map((column) => column.key), ...missingCustomColumns.map((column) => column.key), ...fallbackDates].sort(),
+      players: players.map((player, index) => ({ ...player, attendance: {
+        ...Object.fromEntries(Object.entries(reportData.players[index].attendance).filter(([date]) => fallbackDates.includes(date))),
+        ...Object.fromEntries(missingCustomColumns.filter((column) => isEligibleForMembership(player, column.date, column.time, column.scopeKey)).map((column) => {
+          const reason = optOutMap.get(player.id);
+          const absent = reason?.has(column.date) ?? false;
+          return [column.key, { present: !absent && !trainingRequiresCheckIn(club.paymentWorkflow), reasonCode: reason?.get(column.date) ?? null }];
+        })),
+        ...Object.fromEntries(columns.filter(({ session }) => eligibleForSession(player, session)).map(({ key, session }) => {
+          const row = session.players.find((entry) => entry.playerId === player.id);
+          if (row) return [key, { present: row.present, reasonCode: row.present ? null : row.reasonCode ?? null }];
+          const date = utcDateToIsoDate(session.trainingDate);
+          const optOuts = optOutMap.get(player.id);
+          const optedOut = optOuts?.has(date) ?? false;
+          return [key, { present: !optedOut && !trainingRequiresCheckIn(club.paymentWorkflow), reasonCode: optedOut ? optOuts?.get(date) ?? null : null }];
+        })),
+      } })),
     });
+
   } catch (error) {
     console.error("Training attendance report GET error:", error);
     if (isTransientPrismaConnectionError(error)) {

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { buildMemberTrainingAttendanceRequest } from "@/lib/memberTrainingAttendance";
 
 type Session = { id?: string; groupName?: string; scopeKey?: string; trainingTime?: string; trainingDurationMinutes?: number; trainingFieldName?: string | null; trainingFieldPieceNames?: string[]; note?: string; optedOut?: boolean; optOutReasonCode?: string | null; optOutReasonText?: string | null; limitedEvent?: { id: string; isRegistered: boolean; isConfirmed: boolean; waitlistPosition: number | null; spotsRemaining: number } | null };
 export default function MemberTrainingSessions({ sessions, date, cardCode, onUpdated, attendanceEnabled = true }: { sessions: Session[]; date?: string; cardCode: string; onUpdated: () => Promise<unknown>; attendanceEnabled?: boolean }) {
@@ -11,7 +12,7 @@ export default function MemberTrainingSessions({ sessions, date, cardCode, onUpd
   async function update(session: Session, optedOut: boolean) {
     setSaving(session.id ?? session.scopeKey ?? "legacy"); setError("");
     try {
-      const response = await fetch(`/api/members/${encodeURIComponent(cardCode)}/training`, { method: optedOut ? "POST" : "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(session.id ? { trainingSessionId: session.id } : { trainingDate: date }), reasonCode: reason, reasonText: text }) });
+      const response = await fetch(`/api/members/${encodeURIComponent(cardCode)}/training`, { method: optedOut ? "POST" : "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(buildMemberTrainingAttendanceRequest({ date: date ?? "", sessions }, session, optedOut ? "optOut" : "attend", { reasonCode: reason, reasonText: text })) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Неуспешно запазване.");
       await onUpdated(); setSelected(null); setText("");

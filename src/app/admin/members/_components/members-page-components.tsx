@@ -385,7 +385,7 @@ function AttendanceDashboard({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(eventType === "match"
                 ? { playerId, present: !optedOut, reasonCode: "other", reasonText: "Промяна направена от треньор" }
-                : { playerId, trainingDate: trainingDate.slice(0, 10), trainingSessionId: trainingDate.includes("#") ? trainingDate.split("#")[1] : undefined, optedOut }),
+                : { playerId, trainingDate: trainingDate.slice(0, 10), ...(trainingDate.split("#")[1]?.startsWith("custom_group:") ? { trainingScopeKey: trainingDate.split("#")[1] } : { trainingSessionId: trainingDate.includes("#") ? trainingDate.split("#")[1] : data?.trainingSessionIds?.[trainingDate] }), optedOut }),
             },
           );
           if (!res.ok) {

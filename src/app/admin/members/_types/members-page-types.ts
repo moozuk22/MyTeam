@@ -241,6 +241,7 @@ interface AttendanceReportPlayer {
 }
 
 interface AttendanceReportData {
+  trainingSessionIds?: Record<string, string>;
   trainingDates: string[];
   events?: Record<string, { matchId: string; date: string; time: string; opponent: string }>;
   players: AttendanceReportPlayer[];
