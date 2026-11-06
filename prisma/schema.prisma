@@ -887,6 +887,10 @@ model FacebookConnectAttempt {
 }
 
 model ClubFinanceCategory {
+  expenseSortOrder Int @default(2147483647) @map("expense_sort_order")
+  revenueSortOrder Int @default(2147483647) @map("revenue_sort_order")
+  hiddenForExpense Boolean @default(false) @map("hidden_for_expense")
+  hiddenForRevenue Boolean @default(false) @map("hidden_for_revenue")
   color String?
   isActive Boolean @default(true) @map("is_active")
   sortOrder Int @default(2147483647) @map("sort_order")

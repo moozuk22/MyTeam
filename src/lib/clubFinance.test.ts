@@ -11,7 +11,7 @@ const expense = { action: 'createExpense', categoryId: category, amount: '12,34'
 beforeEach(() => { vi.resetAllMocks(); access.mockResolvedValue({enabled:true}); tx.clubCalculatorGrant.findFirst.mockResolvedValue({id:"grant"}); tx.clubFinanceCategory.findFirst.mockResolvedValue({ id: category }); });
 it('uses a shared category owned by this club and stores exact amounts', async () => {
  await mutateClubFinance(club,expense);
- expect(tx.clubFinanceCategory.findFirst).toHaveBeenCalledWith({ where: { id: category, clubId: club, isActive:true } });
+ expect(tx.clubFinanceCategory.findFirst).toHaveBeenCalledWith({ where: { id: category, clubId: club, isActive:true, hiddenForExpense:false } });
  expect(tx.clubFinanceEntry.create).toHaveBeenCalledWith({ data: expect.objectContaining({ amount:'12.34', currency:'EUR', clubId:club, kind:'expense', description:null }) });
  tx.clubFinanceCategory.findFirst.mockResolvedValue(null);
  await expect(mutateClubFinance(club,expense)).rejects.toThrow('категория');
@@ -76,7 +76,7 @@ it('includes existing unpaid player months even when platform billing is demo', 
 it('creates manual revenue with exact amounts and protects automatic player payments', async () => {
  await mutateClubFinance(club,{...expense,action:'createRevenue'});
  expect(tx.clubFinanceEntry.create).toHaveBeenCalledWith({data:expect.objectContaining({kind:'revenue',amount:'12.34',clubId:club})});
- expect(tx.clubFinanceCategory.findFirst).toHaveBeenCalledWith({where:{id:category,clubId:club,isActive:true}});
+ expect(tx.clubFinanceCategory.findFirst).toHaveBeenCalledWith({where:{id:category,clubId:club,isActive:true,hiddenForRevenue:false}});
  tx.clubFinanceEntry.updateMany.mockResolvedValue({count:0});
  await expect(mutateClubFinance(club,{...expense,action:'updateRevenue',id:category})).rejects.toThrow('автоматично');
  expect(tx.clubFinanceEntry.updateMany).toHaveBeenCalledWith(expect.objectContaining({where:{id:category,clubId:club,kind:'revenue',paymentReference:null}}));
@@ -113,7 +113,7 @@ it('deactivates and reactivates categories within the current club without touch
  tx.clubFinanceCategory.updateMany.mockResolvedValue({count:1});
  for (const isActive of [false,true]) {
   await mutateClubFinance(club,{action:'setCategoryActive',id:category,isActive});
-  expect(tx.clubFinanceCategory.updateMany).toHaveBeenLastCalledWith({where:{id:category,clubId:club},data:{isActive}});
+  expect(tx.clubFinanceCategory.updateMany).toHaveBeenLastCalledWith({where:{id:category,clubId:club},data:{isActive,hiddenForExpense:!isActive,hiddenForRevenue:!isActive}});
  }
  expect(tx.clubFinanceEntry.deleteMany).not.toHaveBeenCalled();
  await expect(mutateClubFinance(club,{action:'setCategoryActive',id:category,isActive:'false'})).rejects.toThrow();
@@ -239,4 +239,74 @@ it('limits debt labels and both totals to the player creation month',async()=>{
   expect((await getClubDebtSummary(club)).outstanding).toBe('150.00');
   expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({select:expect.objectContaining({createdAt:true})}));
  } finally {vi.useRealTimers();}
+});
+
+it.each([[true,false],[false,true],[true,true],[false,false]])('saves expense/revenue visibility independently (%s, %s)', async (hiddenForExpense,hiddenForRevenue) => {
+ tx.clubFinanceCategory.updateMany.mockResolvedValue({count:1});
+ await mutateClubFinance(club,{action:'setCategoryVisibility',id:category,hiddenForExpense,hiddenForRevenue});
+ expect(tx.clubFinanceCategory.updateMany).toHaveBeenCalledWith({where:{id:category,clubId:club},data:{hiddenForExpense,hiddenForRevenue,isActive:!(hiddenForExpense && hiddenForRevenue)}});
+ expect(tx.clubFinanceEntry.updateMany).not.toHaveBeenCalled();
+ expect(tx.clubFinanceEntry.deleteMany).not.toHaveBeenCalled();
+});
+it('validates scoped visibility and club ownership', async () => {
+ for (const fields of [{hiddenForExpense:true},{hiddenForExpense:'true',hiddenForRevenue:false},{hiddenForExpense:false,hiddenForRevenue:null}]) {
+  await expect(mutateClubFinance(club,{action:'setCategoryVisibility',id:category,...fields})).rejects.toThrow('видимост');
+ }
+ expect(tx.clubFinanceCategory.updateMany).not.toHaveBeenCalled();
+ tx.clubFinanceCategory.updateMany.mockResolvedValue({count:0});
+ await expect(mutateClubFinance(club,{action:'setCategoryVisibility',id:category,hiddenForExpense:true,hiddenForRevenue:false})).rejects.toThrow('не е намерена');
+});
+it.each(['Expense','Revenue'])('rejects hidden categories for new %s entries but permits historical corrections', async suffix => {
+ tx.clubFinanceCategory.findFirst.mockImplementation(async ({where}) => ('hiddenForExpense' in where || 'hiddenForRevenue' in where) ? null : {id:category});
+ await expect(mutateClubFinance(club,{...expense,action:`create${suffix}`})).rejects.toThrow('категория');
+ expect(tx.clubFinanceEntry.create).not.toHaveBeenCalled();
+ tx.clubFinanceEntry.updateMany.mockResolvedValue({count:1});
+ await expect(mutateClubFinance(club,{...expense,action:`update${suffix}`,id:category})).resolves.toEqual({ok:true});
+});
+
+it.each(['expense','revenue'] as const)('changes only the selected %s visibility while preserving the other kind',async kind=>{
+ for (const otherHidden of [false,true]) {
+  for (const hidden of [false,true]) {
+   tx.clubFinanceCategory.findFirst.mockResolvedValue({hiddenForExpense:otherHidden,hiddenForRevenue:otherHidden});
+   await mutateClubFinance(club,{action:'setCategoryKindVisibility',id:category,kind,hidden});
+   expect(tx.clubFinanceCategory.updateMany).toHaveBeenLastCalledWith({where:{id:category,clubId:club},data:{[kind==='expense'?'hiddenForExpense':'hiddenForRevenue']:hidden,isActive:!(hidden && otherHidden)}});
+  }
+ }
+ expect(tx.clubFinanceEntry.deleteMany).not.toHaveBeenCalled();
+});
+it('validates the selected category kind and restricts the toggle to this club',async()=>{
+ for (const fields of [{kind:'both',hidden:true},{kind:'expense',hidden:'true'},{hidden:true}]) {
+  await expect(mutateClubFinance(club,{action:'setCategoryKindVisibility',id:category,...fields})).rejects.toThrow('видимост');
+ }
+ expect(tx.clubFinanceCategory.updateMany).not.toHaveBeenCalled();
+ tx.clubFinanceCategory.findFirst.mockResolvedValue(null);
+ await expect(mutateClubFinance(club,{action:'setCategoryKindVisibility',id:category,kind:'revenue',hidden:true})).rejects.toThrow('не е намерена');
+ expect(tx.clubFinanceCategory.findFirst).toHaveBeenLastCalledWith({where:{id:category,clubId:club},select:{hiddenForExpense:true,hiddenForRevenue:true}});
+});
+
+it.each(['expense','revenue'] as const)('reorders only %s categories with a complete club-owned list',async kind=>{
+ const second='00000000-0000-0000-0000-000000000003';
+ tx.clubFinanceCategory.findMany.mockResolvedValue([{id:category},{id:second}]);
+ await mutateClubFinance(club,{action:'reorderCategoryKind',kind,ids:[second,category]});
+ const field=kind==='expense'?'expenseSortOrder':'revenueSortOrder';
+ expect(tx.clubFinanceCategory.updateMany).toHaveBeenNthCalledWith(1,{where:{id:second,clubId:club},data:{[field]:0}});
+ expect(tx.clubFinanceCategory.updateMany).toHaveBeenNthCalledWith(2,{where:{id:category,clubId:club},data:{[field]:1}});
+ tx.clubFinanceCategory.updateMany.mockClear();
+ for (const ids of [[category],[category,category],[category,club]]) {
+  await expect(mutateClubFinance(club,{action:'reorderCategoryKind',kind,ids})).rejects.toThrow();
+ }
+ expect(tx.clubFinanceCategory.updateMany).not.toHaveBeenCalled();
+});
+it.each([undefined,'all','both','invalid'])('rejects an invalid reorder kind (%s)',async kind=>{
+ await expect(mutateClubFinance(club,{action:'reorderCategoryKind',kind,ids:[category]})).rejects.toThrow('Изберете');
+ expect(tx.clubFinanceCategory.updateMany).not.toHaveBeenCalled();
+});
+
+it.each(['both','expense','revenue'])('creates a category with the chosen initial visibility: %s',async visibility=>{
+ await mutateClubFinance(club,{action:'createCategory',name:'New',visibility});
+ expect(tx.clubFinanceCategory.create).toHaveBeenCalledWith({data:{clubId:club,name:'New',hiddenForExpense:visibility==='revenue',hiddenForRevenue:visibility==='expense'}});
+});
+it.each(['none','invalid',null,true,{}])('rejects invalid new category visibility (%s)',async visibility=>{
+ await expect(mutateClubFinance(club,{action:'createCategory',name:'New',visibility})).rejects.toThrow('видимост');
+ expect(tx.clubFinanceCategory.create).not.toHaveBeenCalled();
 });

@@ -37,9 +37,10 @@ it('keeps analysis summary cards at their own height when the action column grow
  expect(css).toMatch(/\.dashboard\[data-view="analysis"\] \.cards>\.card\s*\{[^}]*align-self:start;/);
 });
 
-it('blurs the viewport behind the blue editing form and keeps the form above it', () => {
- expect(css).toMatch(/\.editBackdrop\s*\{[^}]*position:fixed;[^}]*inset:0;[^}]*z-index:1000;[^}]*backdrop-filter:blur\(5px\);/);
- expect(css).toMatch(/\.dashboard \.expenseForm\.editingForm\s*\{[^}]*z-index:1001;[^}]*border-color:#62aaff;[^}]*background:linear-gradient\(145deg,#172e49,#101c2e\);/);
+it('centers the phone editor inside a full viewport blurred modal overlay', () => {
+ expect(css).toMatch(/\.entryEditDialog\s*\{[^}]*position:fixed;[^}]*inset:0;[^}]*width:100%;[^}]*height:100dvh;[^}]*max-height:none;[^}]*backdrop-filter:blur\(5px\);[^}]*-webkit-backdrop-filter:blur\(5px\);/);
+ expect(css).toMatch(/\.entryEditDialog\[open\]\s*\{[^}]*display:grid;[^}]*place-items:center;/);
+ expect(css).toMatch(/\.entryEditPanel\s*\{[^}]*position:relative;[^}]*width:min\(460px,100%\);[^}]*max-height:100%;[^}]*overflow-y:auto;/);
 });
 
 it('contains desktop category scrolling inside the list rather than the outer dialog', () => {
@@ -64,4 +65,11 @@ it('uses the category dropdown instead of chips in mobile History', () => {
  expect(mobile).toMatch(/\.dashboard \.ledgerView \.filterChips\s*\{[^}]*display:none;/);
  expect(mobile).toMatch(/\.dashboard \.ledgerView \.categoryFilter\s*\{[^}]*display:flex!important;/);
  expect(mobile).toMatch(/\.dashboard \.categoryFilter \.selectWrap\s*\{[^}]*width:100%;/);
+});
+
+it('gives colored history rows breathing room only on phones', () => {
+ const mobile=css.slice(css.indexOf('/* Colored History cards on phones. */'));
+ expect(mobile).toContain('@media(max-width:700px)');
+ expect(mobile).toMatch(/\.tableWrap tr\[style\]\s*\{[^}]*margin:10px 0;[^}]*padding:14px 12px 14px 16px;[^}]*border-radius:12px;/);
+ expect(mobile).toMatch(/\.tableWrap tr\[style\] \.tag\s*\{[^}]*border-color:#ffffff24;/);
 });
