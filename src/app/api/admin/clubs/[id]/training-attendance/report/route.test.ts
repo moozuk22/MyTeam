@@ -40,6 +40,18 @@ describe("individual attendance report", () => {
     mocks.optOuts.mockResolvedValue([]);
   });
 
+  it.each([false, true])("excludes unrelated club dates from a coach-group report, stored=%s", async (hasSession) => {
+    const groupId = "10000000-0000-4000-8000-000000000002";
+    mocks.club.mockResolvedValue({ id: "club-1", trainingGroupMode: "team_group", trainingDates: ["2026-10-03"], trainingWeekdays: [] });
+    mocks.coach.mockResolvedValue({ id: groupId });
+    mocks.players.mockResolvedValue([{ id: "player-1", fullName: "Player", teamGroup: null }]);
+    mocks.sessions.mockResolvedValue(hasSession ? [{ id: "session", scopeType: "coachGroup", scopeKey: `coach_group:${groupId}`, trainingDate: new Date("2026-10-02"), trainingTime: "18:00", players: [{ playerId: "player-1", present: true, reasonCode: null }] }] : []);
+    const response = await report(`coachGroupId=${groupId}`);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.trainingDates).toEqual(hasSession ? ["2026-10-02T18:00#session"] : []);
+    expect(Object.keys(data.players[0].attendance).sort()).toEqual([...data.trainingDates].sort());
+  });
   it("includes stored sessions from custom and combined groups and preserves attendance", async () => {
     mocks.sessions.mockResolvedValue([
       { trainingDate: new Date("2026-10-02T00:00:00Z"), players: [
@@ -128,20 +140,50 @@ describe("individual attendance report", () => {
     expect(mocks.customGroups).not.toHaveBeenCalled();
   });
 
+  it.each([false, true])("provides separate targets for two scheduled custom trainings, stored=%s", async (stored) => {
+    mocks.customGroups.mockResolvedValue(["a", "b"].map((id) => ({ id, trainingDates: ["2026-10-02"], trainingWeekdays: [], trainingTime: "09:00" })));
+    mocks.sessions.mockResolvedValue(stored ? [{ id: "session-a", scopeKey: "custom_group:a", trainingDate: new Date("2026-10-02"), trainingTime: "09:00", players: [{ playerId: "player-1", present: false, reasonCode: "sick", attendanceRecorded: true }] }] : []);
+    const data = await (await report("playerId=player-1")).json();
+    expect(data.trainingDates).toEqual([`2026-10-02T09:00#${stored ? "session-a" : "custom_group:a"}`, "2026-10-02T09:00#custom_group:b"].sort());
+    expect(Object.keys(data.players[0].attendance).sort()).toEqual([...data.trainingDates].sort());
+  });
+  it.each(["calendar_month", "training_credits"])("preserves legacy absence for missing session rows in %s", async (paymentWorkflow) => {
+    mocks.club.mockResolvedValue({ id: "club-1", trainingGroupMode: "custom_group", trainingDates: [], trainingWeekdays: [], paymentWorkflow });
+    mocks.sessions.mockResolvedValue([
+      { id: "missing", scopeKey: "custom_group:a", trainingDate: new Date("2026-10-02"), trainingTime: "09:00", players: [] },
+      { id: "present", scopeKey: "custom_group:b", trainingDate: new Date("2026-10-02"), trainingTime: "18:00", players: [{ playerId: "player-1", present: true, attendanceRecorded: true, reasonCode: null }] },
+      { id: "absent", scopeKey: "custom_group:c", trainingDate: new Date("2026-10-02"), trainingTime: "19:00", players: [{ playerId: "player-1", present: false, attendanceRecorded: true, reasonCode: "injury" }] },
+    ]);
+    mocks.optOuts.mockResolvedValue([{ playerId: "player-1", trainingDate: new Date("2026-10-02"), reasonCode: "sick" }]);
+    const data = await (await report("playerId=player-1")).json();
+    expect(data.players[0].attendance["2026-10-02T09:00#missing"]).toEqual({ present: false, reasonCode: "sick" });
+    expect(data.players[0].attendance["2026-10-02T18:00#present"]).toEqual({ present: true, reasonCode: null });
+    expect(data.players[0].attendance["2026-10-02T19:00#absent"]).toEqual({ present: false, reasonCode: "injury" });
+  });
+  it("retains unmaterialized schedule dates alongside same-day session columns", async () => {
+    mocks.customGroups.mockResolvedValue([{ id: "custom", trainingDates: ["2026-10-02", "2026-10-03"], trainingWeekdays: [] }]);
+    mocks.sessions.mockResolvedValue(["a", "b"].map((id) => ({ id, trainingDate: new Date("2026-10-02"), trainingTime: "09:00", players: [{ playerId: "player-1", present: true }] })));
+    const data = await (await report("playerId=player-1")).json();
+    expect(data.trainingDates).toContain("2026-10-03");
+    expect(data.players[0].attendance["2026-10-03"]).toEqual({ present: true, reasonCode: null });
+  });
   it.each([
-    { states: [true, false], reasons: [null, "sick"], expected: { present: true, reasonCode: null } },
-    { states: [false, false], reasons: ["sick", "injury"], expected: { present: false, reasonCode: "injury" } },
-    { states: [false, false], reasons: [null, "sick"], expected: { present: false, reasonCode: "sick" } },
-  ])("combines same-day sessions consistently: $states / $reasons", async ({ states, reasons, expected }) => {
+    { states: [true, false], reasons: [null, "sick"] },
+    { states: [false, false], reasons: ["sick", "injury"] },
+    { states: [false, false], reasons: [null, "sick"] },
+  ])("keeps same-day sessions independently editable: $states / $reasons", async ({ states, reasons }) => {
     const sessions = states.map((present, index) => ({
+      id: `session-${index}`, trainingTime: index ? "18:00" : "09:00",
       trainingDate: new Date("2026-10-02T00:00:00Z"),
       players: [{ playerId: "player-1", present, reasonCode: reasons[index] }],
     }));
     for (const rows of [sessions, [...sessions].reverse()]) {
       mocks.sessions.mockResolvedValue(rows);
       const data = await (await report("playerId=player-1")).json();
-      expect(data.trainingDates).toEqual(["2026-10-02"]);
-      expect(data.players[0].attendance["2026-10-02"]).toEqual(expected);
+      expect(data.trainingDates).toHaveLength(2);
+      for (const [index, session] of sessions.entries()) {
+        expect(data.players[0].attendance[`2026-10-02T${session.trainingTime}#${session.id}`]).toEqual({ present: states[index], reasonCode: states[index] ? null : reasons[index] });
+      }
     }
   });
 });

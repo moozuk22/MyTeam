@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { isEligibleForMembership, isEligibleForTraining, type AttendancePlayer } from "@/lib/attendanceEligibility";
 import { getTodayIsoDateInTimeZone, isoDateToUtcMidnight, utcDateToIsoDate } from "@/lib/training";
 
-type TrainingSessionScope =
+export type TrainingSessionScope =
   | { type: "club" }
   | { type: "teamGroup"; teamGroup: number }
   | { type: "trainingGroup"; id: string; teamGroups?: number[] }
@@ -227,7 +227,7 @@ export async function syncFutureTrainingSessions(input: {
   }
 }
 
-async function getExpectedPlayersForScope(
+export async function getExpectedPlayersForScope(
   tx: Pick<TrainingSessionWriter, "player">,
   clubId: string,
   scope: TrainingSessionScope,

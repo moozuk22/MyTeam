@@ -16,7 +16,7 @@ import {
   normalizeTrainingTime,
   utcDateToIsoDate,
 } from "@/lib/training";
-import { getTrainingSessionScopeKey, updateTrainingSessionPlayerAttendance } from "@/lib/trainingSessions";
+import { getExpectedPlayersForScope, getTrainingSessionScopeKey, updateTrainingSessionPlayerAttendance, type TrainingSessionScope } from "@/lib/trainingSessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -520,7 +520,7 @@ export async function GET(
     : [];
   const attendanceSessions = await prisma.trainingSession.findMany({
     where: { clubId: id, scopeKey, trainingDate: { in: upcomingDates.map(isoDateToUtcMidnight) }, status: { not: "cancelled" } },
-    select: { trainingDate: true, trainingTime: true, rosterLockedAt: true, players: { select: { playerId: true, present: true } } },
+    select: { trainingDate: true, trainingTime: true, rosterLockedAt: true, players: { select: { playerId: true, present: true, attendanceRecorded: true } } },
   });
   const lockedPlayerIds = attendanceSessions.filter((entry) => entry.rosterLockedAt).flatMap((entry) => entry.players.flatMap((row) => row.playerId ? [row.playerId] : []));
 
@@ -608,9 +608,9 @@ export async function GET(
   }
   // Check-ins and locked historical rosters override inferred day-wide attendance.
   const selectedAttendance = new Map<string, boolean>();
-  for (const session of attendanceSessions.filter((entry) => trainingRequiresCheckIn(club.paymentWorkflow) || entry.rosterLockedAt)) {
+  for (const session of attendanceSessions.filter((entry) => trainingRequiresCheckIn(club.paymentWorkflow) || entry.rosterLockedAt || entry.players.some((row) => row.attendanceRecorded))) {
     const date = utcDateToIsoDate(session.trainingDate);
-    const attendance = new Map(session.players.filter((row) => row.playerId).map((row) => [row.playerId!, row.present]));
+    const attendance = new Map(session.players.filter((row) => row.playerId && (trainingRequiresCheckIn(club.paymentWorkflow) || session.rosterLockedAt || row.attendanceRecorded)).map((row) => [row.playerId!, row.present]));
     const absentCount = eligiblePlayersOnDate(date).filter((player) => attendance.has(player.id) ? !attendance.get(player.id) : allOptOuts.some((row) => row.playerId === player.id && utcDateToIsoDate(row.trainingDate) === date)).length;
     optedOutCountByDate.set(date, absentCount);
     if (date === trainingDate) for (const [playerId, present] of attendance) selectedAttendance.set(playerId, present);
@@ -838,6 +838,26 @@ export async function PUT(
   }
 }
 
+function resolveFieldSelectionsForDate(
+  fieldId: string | null,
+  fieldPieceIds: string[],
+  fieldSelections: unknown,
+  date: string,
+): { fieldId: string | null; fieldPieceIds: string[] } {
+  if (fieldSelections && typeof fieldSelections === "object" && !Array.isArray(fieldSelections)) {
+    const sel = (fieldSelections as Record<string, unknown>)[date];
+    if (sel && typeof sel === "object" && !Array.isArray(sel)) {
+      const s = sel as Record<string, unknown>;
+      const id = typeof s.trainingFieldId === "string" && s.trainingFieldId.trim() ? s.trainingFieldId.trim() : null;
+      const pieces = Array.isArray(s.trainingFieldPieceIds)
+        ? (s.trainingFieldPieceIds as unknown[]).map((p) => String(p ?? "").trim()).filter(Boolean)
+        : [];
+      return { fieldId: id, fieldPieceIds: pieces };
+    }
+  }
+  return { fieldId, fieldPieceIds };
+}
+
 function formatBgDate(isoDate: string) {
   return new Date(`${isoDate}T00:00:00.000Z`).toLocaleDateString("bg-BG", {
     day: "2-digit",
@@ -861,11 +881,61 @@ export async function PATCH(
   const playerId = String((body as { playerId?: unknown }).playerId ?? "").trim();
   const trainingDate = String((body as { trainingDate?: unknown }).trainingDate ?? "").trim();
   const optedOut = (body as { optedOut?: unknown }).optedOut;
-  if (body.trainingSessionId) {
-    if (typeof optedOut !== "boolean" || !playerId || !/^[0-9a-f-]{36}$/i.test(String(body.trainingSessionId))) return NextResponse.json({ error: "Invalid attendance" }, { status: 400 });
-    const result = await prisma.trainingSessionPlayer.updateMany({ where: { playerId, trainingSessionId: String(body.trainingSessionId), trainingSession: { clubId, status: "scheduled" } }, data: { present: !optedOut, attendanceRecorded: true, reasonCode: optedOut ? "other" : null, reasonText: optedOut ? "Промяна направена от треньор" : null } });
-    if (!result.count) return NextResponse.json({ error: "Training or player not found" }, { status: 404 });
-    publishTrainingAttendanceUpdated(clubId, trainingDate);
+  if (body.trainingSessionId || body.trainingScopeKey) {
+    if (typeof optedOut !== "boolean" || !playerId || (body.trainingSessionId ? !/^[0-9a-f-]{36}$/i.test(String(body.trainingSessionId)) : !/^custom_group:[0-9a-f-]{36}$/i.test(String(body.trainingScopeKey)) || !isIsoDate(trainingDate))) return NextResponse.json({ error: "Invalid attendance" }, { status: 400 });
+    let selectedId = String(body.trainingSessionId ?? "");
+    const result = await prisma.$transaction(async (tx) => {
+      if (!selectedId) {
+        await tx.$queryRaw`SELECT id FROM clubs WHERE id = ${clubId}::uuid FOR UPDATE`;
+        const group = await tx.clubCustomTrainingGroup.findFirst({ where: { id: String(body.trainingScopeKey).slice(13), clubId, players: { some: { playerId } } } });
+        if (!group || !isValidTrainingDateForConfig({ date: trainingDate, trainingDates: group.trainingDates, weekdays: group.trainingWeekdays, timeZone: FIXED_TIME_ZONE })) return null;
+        const field = resolveFieldSelectionsForDate(group.trainingFieldId, group.trainingFieldPieceIds, group.trainingFieldSelections, trainingDate);
+        const training = await tx.trainingSession.upsert({
+          where: { clubId_scopeKey_trainingDate: { clubId, scopeKey: String(body.trainingScopeKey), trainingDate: isoDateToUtcMidnight(trainingDate), occurrenceKey: "" } },
+          update: {},
+          create: { clubId, scopeKey: String(body.trainingScopeKey), scopeType: "customGroup", scopeId: group.id, trainingDate: isoDateToUtcMidnight(trainingDate), trainingTime: (group.trainingDateTimes as Record<string, string> | null)?.[trainingDate] ?? group.trainingTime, trainingDurationMinutes: group.trainingDurationMinutes, trainingFieldId: field.fieldId, trainingFieldPieceIds: field.fieldPieceIds },
+        });
+        if (training.status !== "scheduled" || training.removedFromSchedule) return null;
+        selectedId = training.id;
+      }
+      await tx.$queryRaw`SELECT id FROM training_sessions WHERE id = ${selectedId}::uuid AND club_id = ${clubId}::uuid FOR UPDATE`;
+      const [training, player] = await Promise.all([
+        tx.trainingSession.findFirst({ where: { id: selectedId, clubId, status: "scheduled" } }),
+        tx.player.findFirst({ where: { id: playerId, clubId }, select: { id: true, cards: { where: { isActive: true }, select: { cardCode: true } } } }),
+      ]);
+      if (!training || !player) return null;
+      const data = { present: !optedOut, attendanceRecorded: true, reasonCode: optedOut ? "other" : null, reasonText: optedOut ? "Промяна направена от треньор" : null };
+      const updated = await tx.trainingSessionPlayer.updateMany({ where: { playerId, trainingSessionId: selectedId, trainingSession: { clubId, status: "scheduled" } }, data });
+      if (!updated.count) {
+        if (training.rosterLockedAt) return null;
+        let scope: TrainingSessionScope;
+        switch (training.scopeType) {
+          case "club": scope = { type: "club" }; break;
+          case "teamGroup":
+            if (training.teamGroup === null) return null;
+            scope = { type: "teamGroup", teamGroup: training.teamGroup }; break;
+          case "trainingGroup":
+            if (!training.scopeId) return null;
+            scope = { type: "trainingGroup", id: training.scopeId, teamGroups: training.teamGroups }; break;
+          case "customGroup":
+          case "coachGroup":
+            if (!training.scopeId) return null;
+            scope = { type: training.scopeType, id: training.scopeId }; break;
+          default: return null;
+        }
+        const members = await getExpectedPlayersForScope(tx, clubId, scope);
+        const member = members.find((member) => member.id === playerId && isEligibleForMembership(member, utcDateToIsoDate(training.trainingDate), training.trainingTime, training.scopeKey));
+        if (!member) return null;
+        await tx.trainingSessionPlayer.upsert({
+          where: { trainingSessionId_playerId: { trainingSessionId: selectedId, playerId } },
+          update: data,
+          create: { trainingSessionId: selectedId, playerId, playerName: member.fullName, teamGroup: member.teamGroup, ...data },
+        });
+      }
+      return { training, player };
+    });
+    if (!result) return NextResponse.json({ error: "Training or player not found" }, { status: 404 });
+    await notifyMemberAttendanceChange(result.player, clubId, utcDateToIsoDate(result.training.trainingDate), optedOut);
     return NextResponse.json({ success: true });
   }
 
@@ -885,6 +955,9 @@ export async function PATCH(
       select: {
         id: true,
         fullName: true,
+        customTrainingGroups: {
+          select: { group: { select: { id: true, trainingDates: true, trainingWeekdays: true } } },
+        },
         cards: {
           where: { isActive: true },
           select: { cardCode: true },
@@ -893,6 +966,23 @@ export async function PATCH(
     });
     if (!player) {
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
+    }
+
+    const sameDaySessions = await prisma.trainingSession.findMany({
+      where: { clubId, trainingDate: isoDateToUtcMidnight(trainingDate), status: "scheduled", players: { some: { playerId } } },
+      select: { id: true, scopeKey: true },
+    });
+    const storedScopes = new Set(sameDaySessions.map((training) => training.scopeKey));
+    const unmaterializedGroups = (player.customTrainingGroups ?? []).filter(({ group }) =>
+      !storedScopes.has(`custom_group:${group.id}`) && isValidTrainingDateForConfig({
+        date: trainingDate,
+        trainingDates: group.trainingDates,
+        weekdays: group.trainingWeekdays,
+        timeZone: FIXED_TIME_ZONE,
+      }),
+    );
+    if (sameDaySessions.length + unmaterializedGroups.length > 1) {
+      return NextResponse.json({ error: "Select an individual training" }, { status: 400 });
     }
 
     const trainingDateAsDate = isoDateToUtcMidnight(trainingDate);
@@ -937,30 +1027,7 @@ export async function PATCH(
       });
     });
 
-    const firstCardCode = player.cards[0]?.cardCode ?? null;
-    const formattedDate = formatBgDate(trainingDate);
-    const memberPayload = {
-      title: "Промяна в присъствието",
-      body: optedOut
-        ? `Треньорът е отбелязал отсъствие за тренировка на ${formattedDate}.`
-        : `Треньорът е потвърдил присъствие за тренировка на ${formattedDate}.`,
-      url: firstCardCode ? `/member/${encodeURIComponent(firstCardCode)}` : "/",
-      icon: "/myteam-logo.webp",
-      badge: "/myteam-logo.webp",
-      tag: "training-attendance-updated",
-      data: { type: "training_reminder", trainingDate },
-    };
-
-    try {
-      await sendPushToMember(player.id, memberPayload, "training_reminder");
-    } catch (error) {
-      console.error("Member push send error (coach attendance change):", error);
-    }
-
-    for (const { cardCode } of player.cards) {
-      publishMemberUpdated(cardCode, "training-updated");
-    }
-    publishTrainingAttendanceUpdated(clubId, trainingDate);
+    await notifyMemberAttendanceChange(player, clubId, trainingDate, optedOut);
 
     return NextResponse.json({ success: true, playerId: player.id, trainingDate, optedOut });
   } catch (error) {
@@ -973,4 +1040,37 @@ export async function PATCH(
     }
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
+}
+
+async function notifyMemberAttendanceChange(
+  player: { id: string; cards: { cardCode: string }[] },
+  clubId: string,
+  trainingDate: string,
+  optedOut: boolean,
+) {
+  const firstCardCode = player.cards[0]?.cardCode ?? null;
+  const formattedDate = formatBgDate(trainingDate);
+  const memberPayload = {
+    title: "Промяна в присъствието",
+    body: optedOut
+      ? `Треньорът е отбелязал отсъствие за тренировка на ${formattedDate}.`
+      : `Треньорът е потвърдил присъствие за тренировка на ${formattedDate}.`,
+    url: firstCardCode ? `/member/${encodeURIComponent(firstCardCode)}` : "/",
+    icon: "/myteam-logo.webp",
+    badge: "/myteam-logo.webp",
+    tag: "training-attendance-updated",
+    data: { type: "training_reminder", trainingDate },
+  };
+
+  try {
+    await sendPushToMember(player.id, memberPayload, "training_reminder");
+  } catch (error) {
+    console.error("Member push send error (coach attendance change):", error);
+  }
+
+  for (const { cardCode } of player.cards) {
+    publishMemberUpdated(cardCode, "training-updated");
+  }
+  publishTrainingAttendanceUpdated(clubId, trainingDate);
+
 }
