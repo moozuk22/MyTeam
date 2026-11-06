@@ -7,6 +7,7 @@ import { publishMemberUpdated } from "@/lib/memberEvents";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { publishTrainingAttendanceUpdated } from "@/lib/trainingAttendanceEvents";
 import { sendPushToMember } from "@/lib/push/service";
+import { notifyCoachTrainingChanges } from "@/lib/push/coachTrainingNotifications";
 import {
   getConfiguredTrainingDates,
   getTodayIsoDateInTimeZone,
@@ -684,12 +685,21 @@ export async function PUT(
   const noteRaw = (body as { note?: unknown }).note;
   const note = noteRaw === null || noteRaw === undefined ? "" : String(noteRaw).trim();
   if (body.trainingSessionId) {
-    const row = await prisma.trainingSession.findFirst({ where: { id: String(body.trainingSessionId), clubId: id, scopeType: "coachGroup" }, select: { id: true, scopeId: true, trainingDate: true } });
+    const row = await prisma.trainingSession.findFirst({ where: { id: String(body.trainingSessionId), clubId: id, scopeType: "coachGroup" } });
     if (!row) return NextResponse.json({ error: "Training not found" }, { status: 404 });
     await prisma.$transaction(async (tx) => {
       await tx.trainingSession.update({ where: { id: row.id }, data: { note: note || null } });
       if (row.scopeId) await tx.coachGroup.update({ where: { id: row.scopeId }, data: { updatedAt: new Date() } });
     });
+    if (row.scopeId) {
+      const previous = {
+        id: row.id, date: utcDateToIsoDate(row.trainingDate), trainingTime: row.trainingTime ?? "",
+        trainingDurationMinutes: row.trainingDurationMinutes, trainingFieldId: row.trainingFieldId,
+        trainingFieldPieceIds: row.trainingFieldPieceIds, recurrenceId: row.recurrenceId,
+        status: row.status, note: row.note ?? "",
+      };
+      await notifyCoachTrainingChanges(id, row.scopeId, [previous], [{ ...previous, note }]).catch((error) => console.error("Training description notification failed:", error));
+    }
     publishTrainingAttendanceUpdated(id, utcDateToIsoDate(row.trainingDate));
     return NextResponse.json({ success: true });
   }

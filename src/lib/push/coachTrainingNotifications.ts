@@ -8,7 +8,7 @@ export async function notifyCoachTrainingChanges(clubId: string, groupId: string
   const after = new Map(next.map((t) => [t.id, t]));
   const changed = [...new Set([...before.keys(), ...after.keys()])].filter((id) => {
     const a = before.get(id), b = after.get(id);
-    return !a || !b || a.date !== b.date || a.trainingTime !== b.trainingTime || a.trainingDurationMinutes !== b.trainingDurationMinutes || a.trainingFieldId !== b.trainingFieldId || [...a.trainingFieldPieceIds].sort().join() !== [...b.trainingFieldPieceIds].sort().join() || a.status !== b.status;
+    return !a || !b || a.date !== b.date || a.trainingTime !== b.trainingTime || a.trainingDurationMinutes !== b.trainingDurationMinutes || a.trainingFieldId !== b.trainingFieldId || [...a.trainingFieldPieceIds].sort().join() !== [...b.trainingFieldPieceIds].sort().join() || a.status !== b.status || a.note !== b.note;
   });
   if (!changed.length) return;
   const [members, fields] = await Promise.all([
@@ -22,9 +22,10 @@ export async function notifyCoachTrainingChanges(clubId: string, groupId: string
     const field = fields.find((f) => f.id === item.trainingFieldId);
     const pieces = field?.pieces.filter((p) => item.trainingFieldPieceIds.includes(p.id)).map((p) => p.name).join(", ");
     const title = cancelled ? "Отменена тренировка" : before.has(id) ? "Променена тренировка" : "Нова тренировка";
+    const description = before.has(id) && !cancelled ? item.note.trim() : "";
     for (let i = 0; i < members.length; i += 4) {
       await Promise.allSettled(members.slice(i, i + 4).map(async (member) => {
-        const payload = { title, body: `${item.date} · ${item.trainingTime} · ${item.trainingDurationMinutes} мин.${field ? ` · ${field.name}${pieces ? ` (${pieces})` : ""}` : ""}`, tag: `training-session-${id}`, data: { type: cancelled ? "training_cancelled" : "training_reminder", trainingDate: item.date, trainingSessionId: id }, url: member.cards[0] ? `/member/${member.cards[0].cardCode}` : "/" };
+        const payload = { title, body: `${item.date} · ${item.trainingTime} · ${item.trainingDurationMinutes} мин.${field ? ` · ${field.name}${pieces ? ` (${pieces})` : ""}` : ""}${description ? `\n${description}` : ""}`, tag: `training-session-${id}`, data: { type: cancelled ? "training_cancelled" : "training_reminder", trainingDate: item.date, trainingSessionId: id }, url: member.cards[0] ? `/member/${member.cards[0].cardCode}` : "/" };
         await saveMemberNotificationHistory(member.id, "training_reminder", payload);
         await sendPushToMember(member.id, payload);
       }));
