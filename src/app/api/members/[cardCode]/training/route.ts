@@ -131,6 +131,7 @@ function parseOptOutReason(
 
 type CoachGroupSchedule = {
   id: string;
+  name: string;
   trainingDates: string[];
   trainingDateTimes: unknown;
   trainingTime: string | null;
@@ -239,6 +240,7 @@ async function getMemberTrainingContext(cardCode: string) {
               group: {
                 select: {
                   id: true,
+                  name: true,
                   coachGroupId: true,
                   trainingDates: true,
                   trainingDateTimes: true,
@@ -256,6 +258,7 @@ async function getMemberTrainingContext(cardCode: string) {
           coachGroups: {
             select: {
               id: true,
+              name: true,
               trainingDates: true,
               trainingDateTimes: true,
               trainingTime: true,
@@ -498,6 +501,7 @@ type LimitedEventComputed = {
 
 type SessionItem = {
   id?: string;
+  groupName?: string;
   optedOut?: boolean;
   optOutReasonCode?: string | null;
   optOutReasonText?: string | null;
@@ -540,6 +544,7 @@ function buildGroupSession(
   const note = noteByScopeDate.get(`${scopeKey}:${date}`) ?? noteByScopeDate.get(`club:${date}`) ?? "";
   return {
     scopeKey,
+    groupName: group.name,
     note,
     trainingTime,
     trainingDurationMinutes: group.trainingDurationMinutes,
@@ -786,7 +791,7 @@ export async function GET(
           const attendance = s.players[0];
           const original = sessionRows.filter((row) => row.scopeKey === s.scopeKey && utcDateToIsoDate(row.trainingDate) === date).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
           const limited = limitedEventsForDate.find((e) => e.scopeKey === `${s.scopeKey}:session:${s.id}`) ?? (original?.id === s.id ? limitedEventsForDate.find((e) => e.scopeKey === s.scopeKey) : null);
-          return { id: s.id, scopeKey: s.scopeKey, note: s.note ?? "", trainingTime: s.trainingTime ?? "", trainingDurationMinutes: s.trainingDurationMinutes,
+          return { id: s.id, scopeKey: s.scopeKey, groupName: context.scheduledCoachGroups.find((g) => g.id === s.scopeId)?.name, note: s.note ?? "", trainingTime: s.trainingTime ?? "", trainingDurationMinutes: s.trainingDurationMinutes,
             trainingFieldName: field?.name ?? null, trainingFieldType: field?.fieldType ?? null, trainingFieldPieces: field?.pieces.map((p) => p.name) ?? [], trainingFieldPieceNames: field?.pieces.filter((p) => s.trainingFieldPieceIds.includes(p.id)).map((p) => p.name) ?? [],
             optedOut: attendance ? !attendance.present : context.requiresCheckIn, optOutReasonCode: attendance?.reasonCode ?? null, optOutReasonText: attendance?.reasonText ?? null, limitedEvent: limited ? { id: limited.id, maxSpots: limited.maxSpots, isRegistered: limited.isRegistered, isConfirmed: limited.isConfirmed, waitlistPosition: limited.waitlistPosition, spotsRemaining: limited.spotsRemaining } : null };
         });

@@ -85,6 +85,25 @@ describe("coach training API boundaries", () => {
     mocks.$transaction.mockImplementation(async (callback) => callback(mocks));
   });
   afterEach(() => vi.useRealTimers());
+  it("returns custom training group names for multiple sessions on the same day", async () => {
+    const card = await mocks.card.findFirst();
+    const schedule = card.player.coachGroups[0];
+    card.player.coachGroups = [];
+    card.player.club.trainingGroupMode = "custom_group";
+    card.player.customTrainingGroups = [
+      { group: { ...schedule, id: "custom-a", name: "Beginners", coachGroupId: null, trainingTime: "19:00", trainingDateTimes: {} } },
+      { group: { ...schedule, id: "custom-b", name: "Advanced", coachGroupId: null, trainingTime: "19:30", trainingDateTimes: {} } },
+    ];
+    mocks.trainingSession.findMany.mockResolvedValue([]);
+    const response = await GET(new NextRequest("http://localhost/api/members/CARD/training"), context);
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.dates[0].sessions).toMatchObject([
+      { scopeKey: "custom_group:custom-a", groupName: "Beginners", trainingTime: "19:00" },
+      { scopeKey: "custom_group:custom-b", groupName: "Advanced", trainingTime: "19:30" },
+    ]);
+    expect(mocks.card.findFirst.mock.calls.at(-1)?.[0].select.player.select.customTrainingGroups.select.group.select.name).toBe(true);
+  });
   it("returns separate session IDs, notes, and attendance despite a legacy day absence", async () => {
     const response = await GET(new NextRequest("http://localhost/api/members/CARD/training"), context);
     const data = await response.json();

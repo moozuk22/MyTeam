@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-type Session = { id?: string; scopeKey?: string; trainingTime?: string; trainingDurationMinutes?: number; trainingFieldName?: string | null; trainingFieldPieceNames?: string[]; note?: string; optedOut?: boolean; optOutReasonCode?: string | null; optOutReasonText?: string | null; limitedEvent?: { id: string; isRegistered: boolean; isConfirmed: boolean; waitlistPosition: number | null; spotsRemaining: number } | null };
+type Session = { id?: string; groupName?: string; scopeKey?: string; trainingTime?: string; trainingDurationMinutes?: number; trainingFieldName?: string | null; trainingFieldPieceNames?: string[]; note?: string; optedOut?: boolean; optOutReasonCode?: string | null; optOutReasonText?: string | null; limitedEvent?: { id: string; isRegistered: boolean; isConfirmed: boolean; waitlistPosition: number | null; spotsRemaining: number } | null };
 export default function MemberTrainingSessions({ sessions, date, cardCode, onUpdated, attendanceEnabled = true }: { sessions: Session[]; date?: string; cardCode: string; onUpdated: () => Promise<unknown>; attendanceEnabled?: boolean }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function MemberTrainingSessions({ sessions, date, cardCode, onUpd
   return <div>
     {date && <h3>{new Date(`${date}T12:00:00Z`).toLocaleDateString("bg-BG", { weekday: "long", day: "2-digit", month: "long", timeZone: "Europe/Sofia" })}</h3>}
     {sessions.map((session) => <section key={session.id ?? session.scopeKey} className="training-attendance-info-card">
-      <h3>{session.trainingTime} · {session.trainingDurationMinutes} мин.</h3>
+      <h3>{sessions.length > 1 && session.groupName ? `${session.groupName} — ` : ""}{session.trainingTime} · {session.trainingDurationMinutes} мин.</h3>
       {session.trainingFieldName && <p>{session.trainingFieldName}{session.trainingFieldPieceNames?.length ? ` · ${session.trainingFieldPieceNames.join(", ")}` : " · Цял терен"}</p>}
       {session.note && <p style={{ whiteSpace: "pre-wrap" }}>{session.note}</p>}
       {session.limitedEvent ? <div className="training-attendance-buttons" style={{ flexDirection: "column" }}>

@@ -85,6 +85,7 @@ interface LimitedEventInfo {
 
 interface TrainingSessionItem {
   id?: string;
+  groupName?: string;
   optedOut?: boolean;
   optOutReasonCode?: string | null;
   optOutReasonText?: string | null;
@@ -811,6 +812,7 @@ export default function MemberCardPage({
                     optOutReasonCode: typeof rs.optOutReasonCode === "string" ? rs.optOutReasonCode : null,
                     optOutReasonText: typeof rs.optOutReasonText === "string" ? rs.optOutReasonText : null,
                     scopeKey: String(rs.scopeKey ?? ""),
+                    groupName: String(rs.groupName ?? "").trim() || undefined,
                     note: String(rs.note ?? "").trim(),
                     trainingTime: String(rs.trainingTime ?? "").trim(),
                     trainingDurationMinutes: Number.isInteger(Number(rs.trainingDurationMinutes)) ? Number(rs.trainingDurationMinutes) : undefined,
@@ -3060,7 +3062,7 @@ export default function MemberCardPage({
                           {trainingDetailsItem.sessions.length > 1 && trainingDetailsItem.sessions.map((session, sessionIndex) => (
                             <div key={session.scopeKey || sessionIndex} style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                               <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.75)", marginBottom: session.trainingTime || session.trainingDurationMinutes || session.trainingFieldName ? 8 : 0 }}>
-                                Тренировка {sessionIndex + 1}{session.trainingTime ? ` — ${session.trainingTime}` : ""}
+                                {session.groupName || `Тренировка ${sessionIndex + 1}`}{session.trainingTime ? ` — ${session.trainingTime}` : ""}
                               </div>
                               {formatTrainingDuration(session.trainingDurationMinutes) && (
                                 <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginBottom: 6 }}>
