@@ -276,6 +276,24 @@ describe("coach training API boundaries", () => {
     expect(mocks.trainingOptOut.upsert).not.toHaveBeenCalled();
     expect(mocks.trainingOptOut.deleteMany).not.toHaveBeenCalled();
   });
+  it.each(["calendar_month", "training_credits"])("seeds the whole coach-created roster with legacy absences for %s", async (paymentWorkflow) => {
+    mocks.club.findUnique.mockResolvedValue({ id: clubId, paymentWorkflow });
+    mocks.clubCustomTrainingGroup.findFirst.mockResolvedValue({ id: secondId, trainingDates: [date], trainingWeekdays: [], trainingTime: "18:00", trainingFieldPieceIds: [] });
+    const row = { ...session(secondId, "18:00", true), scopeType: "customGroup", scopeId: secondId, scopeKey: `custom_group:${secondId}`, rosterLockedAt: null };
+    mocks.trainingSession.upsert.mockResolvedValue(row);
+    mocks.trainingSession.findFirst.mockResolvedValue(row);
+    mocks.player.findMany.mockResolvedValue([playerId, "absent-member", "present-member"].map((id) => ({ id, fullName: id, teamGroup: null })));
+    mocks.trainingOptOut.findMany.mockResolvedValue([{ playerId: "absent-member", trainingDate: new Date(date), reasonCode: "sick", reasonText: "Legacy absence" }]);
+    mocks.trainingSessionPlayer.updateMany.mockResolvedValue({ count: 1 });
+    const response = await coachAttendance(new NextRequest("http://localhost/training", { method: "PATCH", headers: { cookie: "admin_session=token" }, body: JSON.stringify({ playerId, trainingDate: date, trainingScopeKey: `custom_group:${secondId}`, optedOut: true }) }), { params: Promise.resolve({ id: clubId }) });
+    expect(response.status).toBe(200);
+    expect(mocks.trainingSessionPlayer.createMany).toHaveBeenCalledWith({ skipDuplicates: true, data: expect.arrayContaining([
+      expect.objectContaining({ trainingSessionId: secondId, playerId: "absent-member", present: false, reasonCode: "sick", reasonText: "Legacy absence" }),
+      expect.objectContaining({ trainingSessionId: secondId, playerId: "present-member", present: paymentWorkflow === "calendar_month", reasonCode: null }),
+      expect.objectContaining({ trainingSessionId: secondId, playerId }),
+    ]) });
+    expect(mocks.trainingSessionPlayer.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ trainingSessionId: secondId, playerId }), data: expect.objectContaining({ present: false, attendanceRecorded: true }) }));
+  });
   it("rejects a coach's ambiguous date-only attendance change", async () => {
     const response = await coachAttendance(new NextRequest("http://localhost/training", { method: "PATCH", headers: { cookie: "admin_session=token" }, body: JSON.stringify({ playerId, trainingDate: date, optedOut: true }) }), { params: Promise.resolve({ id: clubId }) });
     expect(response.status).toBe(400);

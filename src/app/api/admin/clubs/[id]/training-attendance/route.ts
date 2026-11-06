@@ -904,6 +904,24 @@ export async function PATCH(
         tx.player.findFirst({ where: { id: playerId, clubId }, select: { id: true, cards: { where: { isActive: true }, select: { cardCode: true } } } }),
       ]);
       if (!training || !player) return null;
+      if (body.trainingScopeKey && !training.rosterLockedAt && training.scopeType === "customGroup" && training.scopeId) {
+        const members = await getExpectedPlayersForScope(tx, clubId, { type: "customGroup", id: training.scopeId });
+        const date = utcDateToIsoDate(training.trainingDate);
+        const eligible = members.filter((member) => isEligibleForMembership(member, date, training.trainingTime, training.scopeKey));
+        const [club, optOuts] = await Promise.all([
+          tx.club.findUnique({ where: { id: clubId }, select: { paymentWorkflow: true } }),
+          tx.trainingOptOut.findMany({ where: { playerId: { in: eligible.map((member) => member.id) }, trainingDate: training.trainingDate } }),
+        ]);
+        if (!club) return null;
+        const optOutByPlayer = new Map(optOuts.map((optOut) => [optOut.playerId, optOut]));
+        await tx.trainingSessionPlayer.createMany({
+          data: eligible.map((member) => {
+            const optOut = optOutByPlayer.get(member.id);
+            return { trainingSessionId: selectedId, playerId: member.id, playerName: member.fullName, teamGroup: member.teamGroup, present: !trainingRequiresCheckIn(club.paymentWorkflow) && !optOut, reasonCode: optOut?.reasonCode ?? null, reasonText: optOut?.reasonText ?? null };
+          }),
+          skipDuplicates: true,
+        });
+      }
       const data = { present: !optedOut, attendanceRecorded: true, reasonCode: optedOut ? "other" : null, reasonText: optedOut ? "Промяна направена от треньор" : null };
       const updated = await tx.trainingSessionPlayer.updateMany({ where: { playerId, trainingSessionId: selectedId, trainingSession: { clubId, status: "scheduled" } }, data });
       if (!updated.count) {
