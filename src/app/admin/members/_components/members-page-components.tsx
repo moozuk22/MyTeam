@@ -80,7 +80,8 @@ function AttendanceDashboard({
   const [to, setTo] = useState(todayIso);
   const [eventType, setEventType] = useState<"training" | "match">("training");
   const [scopeType, setScopeType] = useState<"group" | "player">("group");
-  const [groupScope, setGroupScope] = useState("");
+  const [selectedGroupScope, setGroupScope] = useState("");
+  const groupScope = coachGroupId ? `cg:${coachGroupId}` : selectedGroupScope;
   const [playerSearch, setPlayerSearch] = useState("");
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [playerMenuOpen, setPlayerMenuOpen] = useState(false);
@@ -122,7 +123,7 @@ function AttendanceDashboard({
         const [membersRes, groupsRes, coachGroupsRes] = await Promise.all([
           fetch(membersUrl, { cache: "no-store" }),
           fetch(groupsUrl, { cache: "no-store" }),
-          fetch(coachGroupsUrl, { cache: "no-store" }),
+          coachGroupId ? Promise.resolve(null) : fetch(coachGroupsUrl, { cache: "no-store" }),
         ]);
 
         if (membersRes.ok) {
@@ -194,7 +195,7 @@ function AttendanceDashboard({
           setScheduleGroups(sortByName(groups));
         }
 
-        if (coachGroupsRes.ok) {
+        if (coachGroupsRes?.ok) {
           const payload: unknown = await coachGroupsRes.json();
           const cgs = Array.isArray(payload)
             ? payload
@@ -601,10 +602,12 @@ function AttendanceDashboard({
           </div>
           {scopeType === "group" ? (
             <>
-              <div className="rd-field">
-                <label className="rd-label">Треньор</label>
-                <AttendanceFilterSelect label="Треньор" value={groupScope} options={coachGroupsList.map((group) => ({ value: `cg:${group.id}`, label: group.name }))} onChange={setGroupScope} />
-              </div>
+              {!coachGroupId && (
+                <div className="rd-field">
+                  <label className="rd-label">Треньор</label>
+                  <AttendanceFilterSelect label="Треньор" value={groupScope} options={coachGroupsList.map((group) => ({ value: `cg:${group.id}`, label: group.name }))} onChange={setGroupScope} />
+                </div>
+              )}
               {groupScope.startsWith("cg:") && customTrainingGroupsList.length > 0 && (
                 <div className="rd-field">
                   <label className="rd-label">Треньорска група</label>
