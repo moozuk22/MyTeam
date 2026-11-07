@@ -31,7 +31,7 @@ import CoachMessageModal from "@/components/admin/CoachMessageModal";
 import ClubFinancePanel from "@/app/admin/members/_components/ClubFinancePanel";
 import ClubSubscriptionSummary from "@/app/admin/members/_components/ClubSubscriptionSummary";
 import ActiveDevicesModal from "@/app/admin/members/_components/ActiveDevicesModal";
-import { buildCoachWizardSchedule, type CoachWizardSelection } from "@/lib/coachTrainingWizard";
+import { buildCoachWizardSchedule, getNewTrainingEditorMode, type CoachWizardSelection } from "@/lib/coachTrainingWizard";
 import type { CoachTraining, CoachTrainingRecurrence } from "@/lib/coachTrainingSchedule";
 import type { CoachTrainingLimit } from "@/lib/coachTrainingLimits";
 import "./page.css";
@@ -4988,16 +4988,14 @@ function AdminMembersPageContent() {
   };
 
   const openTrainingDaysEditorForCurrentScope = async () => {
-    if (trainingAttendanceView === "trainingGroups") {
+    const mode = getNewTrainingEditorMode({ coachGroupId, view: trainingAttendanceView, isCustomGroupMode: isCustomTrainingGroupMode });
+    if (mode === "customGroup" || mode === "trainingGroup") {
       if (!selectedTrainingGroupId) {
         setTrainingAttendanceError("Изберете група.");
         return;
       }
-      await openTrainingDaysEditor(isCustomTrainingGroupMode ? "customGroup" : "trainingGroup");
-      return;
     }
-    if (coachGroupId) { await openTrainingDaysEditor("coachGroup"); return; }
-    await openTrainingDaysEditor("teamGroup");
+    await openTrainingDaysEditor(mode);
   };
 
   const openSingleTrainingDayEditForCurrentScope = async (date: string) => {
