@@ -1,5 +1,17 @@
 import type { CoachTraining, CoachTrainingRecurrence } from "@/lib/coachTrainingSchedule";
 
+export function getNewTrainingEditorMode(input: {
+  coachGroupId: string;
+  view: "teamGroup" | "trainingGroups" | "today";
+  isCustomGroupMode: boolean;
+}): "coachGroup" | "customGroup" | "trainingGroup" | "teamGroup" {
+  // The URL identifies the group receiving new sessions. A selected report view
+  // must not send coaches to the legacy one-session-per-date editor.
+  if (input.coachGroupId) return "coachGroup";
+  if (input.view === "trainingGroups") return input.isCustomGroupMode ? "customGroup" : "trainingGroup";
+  return "teamGroup";
+}
+
 export type CoachWizardSelection = "new" | `session:${string}` | `rule:${string}`;
 export type CoachWizardInput = {
   trainings: CoachTraining[];

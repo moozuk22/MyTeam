@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCoachWizardSchedule, type CoachWizardInput } from "./coachTrainingWizard";
+import { buildCoachWizardSchedule, getNewTrainingEditorMode, type CoachWizardInput } from "./coachTrainingWizard";
 import type { CoachTraining } from "./coachTrainingSchedule";
 const first: CoachTraining = { id: "first", date: "2026-10-12", trainingTime: "09:00", trainingDurationMinutes: 60, trainingFieldId: "field-a", trainingFieldPieceIds: ["north"], recurrenceId: null, status: "scheduled", note: "Morning" };
 const second: CoachTraining = { ...first, id: "second", trainingTime: "18:00", note: "Evening" };
@@ -8,6 +8,20 @@ function input(patch: Partial<CoachWizardInput> = {}): CoachWizardInput {
   return { trainings: [first, second], recurrences: [], selection: "new", dates: [first.date], times: { [first.date]: "20:00" }, duration: 90, fields: { [first.date]: { trainingFieldId: "field-b", trainingFieldPieceIds: [] } }, notes: { [first.date]: "Third training" }, timeMode: "all", today: first.date, createId: () => `new-${++id}`, ...patch };
 }
 describe("original coach scheduling wizard", () => {
+  it.each([true, false])("opens the multi-session coach editor from the groups view (custom mode: %s)", (isCustomGroupMode) => {
+    expect(getNewTrainingEditorMode({ coachGroupId: "coach-group", view: "trainingGroups", isCustomGroupMode })).toBe("coachGroup");
+  });
+  it.each(["today", "teamGroup", "trainingGroups"] as const)("keeps new trainings in the URL coach group from %s", (view) => {
+    expect(getNewTrainingEditorMode({ coachGroupId: "coach-group", view, isCustomGroupMode: true })).toBe("coachGroup");
+  });
+  it.each([
+    { view: "trainingGroups", isCustomGroupMode: true, expected: "customGroup" },
+    { view: "trainingGroups", isCustomGroupMode: false, expected: "trainingGroup" },
+    { view: "teamGroup", isCustomGroupMode: true, expected: "teamGroup" },
+    { view: "today", isCustomGroupMode: false, expected: "teamGroup" },
+  ] as const)("preserves club scheduling for $view ($expected)", ({ view, isCustomGroupMode, expected }) => {
+    expect(getNewTrainingEditorMode({ coachGroupId: "", view, isCustomGroupMode })).toBe(expected);
+  });
   it("adding a training on an occupied date retains both existing sessions", () => {
     const next = buildCoachWizardSchedule(input());
     expect(next.trainings).toHaveLength(3);
