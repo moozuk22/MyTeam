@@ -1,3 +1,5 @@
+import { readNotificationMessage } from "@/lib/notificationMessageRequest";
+import { uploadMessageImage } from "@/lib/uploadMessageImage";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, withPrismaPoolRetry } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
@@ -26,11 +28,13 @@ export async function POST(request: NextRequest) {
   }
 
   let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  let image: File | null;
+  try { ({ body, image } = await readNotificationMessage(request)); }
+  catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Невалидни данни." }, { status: 400 });
   }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
   const raw = body as {
     memberIds?: unknown;
@@ -97,6 +101,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, targeted, sent: 0, skipped: targeted, failed: 0 });
   }
 
+  let attachment: Awaited<ReturnType<typeof uploadMessageImage>> | undefined;
+  if (image) {
+    try { attachment = await uploadMessageImage(image); }
+    catch {
+      return NextResponse.json({ error: "Неуспешно качване на снимката. Проверете файла и опитайте отново." }, { status: 400 });
+    }
+  }
+
   let totalSent = 0;
   let totalFailed = 0;
 
@@ -112,6 +124,8 @@ export async function POST(request: NextRequest) {
         trainerMessage: message,
         url,
       });
+
+      if (attachment) Object.assign(payload, { image: attachment.imageUrl, imagePublicId: attachment.imagePublicId });
 
       try {
         const result = await sendPushToMember(player.id, payload, "trainer_message");

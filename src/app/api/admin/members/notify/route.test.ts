@@ -3,11 +3,13 @@ import { NextRequest } from "next/server";
 import { POST } from "./route";
 
 const mocks = vi.hoisted(() => ({
+  upload: vi.fn(),
   verifyAdminToken: vi.fn(),
   findMany: vi.fn(),
   buildNotificationPayload: vi.fn(),
   sendPushToMember: vi.fn(),
 }));
+vi.mock("@/lib/uploadMessageImage", () => ({ uploadMessageImage: mocks.upload }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.verifyAdminToken }));
 vi.mock("@/lib/db", () => ({
   prisma: { player: { findMany: mocks.findMany } },
@@ -29,7 +31,8 @@ function request(groupId?: string, message = "Hello") {
 
 describe("member message permissions", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mocks.upload.mockResolvedValue({ imageUrl: "https://example.com/photo.webp", imagePublicId: "messages/photo" });
     mocks.verifyAdminToken.mockResolvedValue({ roles: ["coach"] });
     mocks.findMany.mockResolvedValue([{ id: memberId, fullName: "Player", cards: [{ cardCode: "ABC" }] }]);
     mocks.buildNotificationPayload.mockReturnValue({ title: "Message", body: "Hello" });
@@ -85,4 +88,37 @@ describe("member message permissions", () => {
     expect((await POST(request("invalid"))).status).toBe(400);
     expect(mocks.findMany).not.toHaveBeenCalled();
   });
+  function imageRequest(file: File) {
+    const form = new FormData();
+    form.append("payload", JSON.stringify({ clubId, memberIds: [memberId], message: "Photo", coachGroupId }));
+    form.append("image", file);
+    return new NextRequest("http://localhost/api/admin/members/notify", { method: "POST", headers: { cookie: "admin_session=test" }, body: form });
+  }
+  it("uploads a coach's image once and attaches it to the player notification", async () => {
+    const response = await POST(imageRequest(new File(["png"], "photo.png", { type: "image/png" })));
+    expect(response.status).toBe(200);
+    expect(mocks.upload).toHaveBeenCalledOnce();
+    expect(mocks.sendPushToMember).toHaveBeenCalledWith(memberId, expect.objectContaining({ image: "https://example.com/photo.webp", imagePublicId: "messages/photo" }), "trainer_message");
+    expect(mocks.findMany.mock.calls[0][0].where.coachGroups).toEqual({ some: { id: coachGroupId } });
+  });
+  it.each([
+    new File(["svg"], "bad.svg", { type: "image/svg+xml" }),
+    new File([], "empty.png", { type: "image/png" }),
+    new File([new Uint8Array(9 * 1024 * 1024 + 1)], "large.png", { type: "image/png" }),
+  ])("rejects invalid images before uploading or delivering", async file => {
+    expect((await POST(imageRequest(file))).status).toBe(400);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.sendPushToMember).not.toHaveBeenCalled();
+  });
+  it("does not deliver a text-only message when the image upload fails", async () => {
+    mocks.upload.mockRejectedValue(new Error("Invalid image"));
+    expect((await POST(imageRequest(new File(["png"], "photo.png", { type: "image/png" })))).status).toBe(400);
+    expect(mocks.sendPushToMember).not.toHaveBeenCalled();
+  });
+  it("does not upload when no players match the requested scope", async () => {
+    mocks.findMany.mockResolvedValue([]);
+    expect((await POST(imageRequest(new File(["png"], "photo.png", { type: "image/png" })))).status).toBe(200);
+    expect(mocks.upload).not.toHaveBeenCalled();
+  });
+
 });

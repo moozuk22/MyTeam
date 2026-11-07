@@ -1,3 +1,5 @@
+import { readNotificationMessage } from "@/lib/notificationMessageRequest";
+import { uploadMessageImage } from "@/lib/uploadMessageImage";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/db";
@@ -14,8 +16,12 @@ export async function POST(request: NextRequest) {
   if (!session.roles.includes("admin")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body: unknown;
-  try { body = await request.json(); }
-  catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
+  let image: File | null;
+  try { ({ body, image } = await readNotificationMessage(request)); }
+  catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Невалидни данни." }, { status: 400 });
+  }
+
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
@@ -44,6 +50,14 @@ export async function POST(request: NextRequest) {
       select: { id: true, cards: { where: { isActive: true }, orderBy: { createdAt: "desc" }, take: 1, select: { cardCode: true } } },
     });
     if (!players.length) return NextResponse.json({ error: "Няма състезатели в избрания обхват." }, { status: 404 });
+    let attachment: Awaited<ReturnType<typeof uploadMessageImage>> | undefined;
+    if (image) {
+      try { attachment = await uploadMessageImage(image); }
+      catch {
+        return NextResponse.json({ error: "Неуспешно качване на снимката. Проверете файла и опитайте отново." }, { status: 400 });
+      }
+    }
+
     const summary = { total: 0, sent: 0, failed: 0, deactivated: 0 };
     let failedPlayers = 0;
     // Bound concurrency when broadcasting across every club.
@@ -52,6 +66,7 @@ export async function POST(request: NextRequest) {
         try {
           const payload = buildNotificationPayload({ type: "myteam_message", trainerMessage: message.trim(),
             url: player.cards[0] ? `/member/${player.cards[0].cardCode}` : "/" });
+          if (attachment) Object.assign(payload, { image: attachment.imageUrl, imagePublicId: attachment.imagePublicId });
           const result = await sendPushToMember(player.id, payload, "myteam_message");
           summary.total += result.total;
           summary.sent += result.sent;

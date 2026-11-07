@@ -1,5 +1,6 @@
 "use client";
 
+import { NotificationImageAttachment } from "@/components/NotificationImageAttachment";
 import { TimeInput } from "@/components/TimeInput";
 import { playerFieldEnabled, parsePlayerWeight } from "@/lib/playerFields";
 import PlayerExtraFields from "@/components/PlayerExtraFields";
@@ -961,6 +962,7 @@ function AdminMembersPageContent() {
   const guideImgTouchRef = useRef<{ startDist: number; startScale: number; startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const [notifyPanelOpen, setNotifyPanelOpen] = useState(false);
   const [coachMessageOpen, setCoachMessageOpen] = useState(false);
+  const [notifyImage, setNotifyImage] = useState<File | null>(null);
   const [notifyMessage, setNotifyMessage] = useState("");
   const [notifySelectedIds, setNotifySelectedIds] = useState<Set<string>>(new Set());
   const [notifySearchTerm, setNotifySearchTerm] = useState("");
@@ -2898,21 +2900,19 @@ function AdminMembersPageContent() {
     setNotifyError("");
     setNotifySuccess("");
     try {
-      const res = await fetch("/api/admin/members/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          memberIds: Array.from(notifySelectedIds),
-          message: notifyMessage.trim(),
-          clubId,
-          ...(coachGroupId ? { coachGroupId } : {}),
-        }),
-      });
+      const form = new FormData();
+      form.append("payload", JSON.stringify({
+        memberIds: Array.from(notifySelectedIds), message: notifyMessage.trim(), clubId,
+        ...(coachGroupId ? { coachGroupId } : {}),
+      }));
+      if (notifyImage) form.append("image", notifyImage);
+      const res = await fetch("/api/admin/members/notify", { method: "POST", body: form });
       const data = (await res.json()) as { success?: boolean; sent?: number; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Грешка");
       setNotifySuccess(`Изпратено до ${data.sent ?? 0} членове.`);
       setNotifySelectedIds(new Set());
       setNotifyMessage("");
+      setNotifyImage(null);
     } catch (err) {
       setNotifyError(err instanceof Error ? err.message : "Грешка");
     } finally {
@@ -5881,6 +5881,7 @@ function AdminMembersPageContent() {
               onClick={() => {
                 setNotifyPanelOpen(true);
                 setNotifyMessage("");
+                setNotifyImage(null);
                 setNotifySelectedIds(new Set());
                 setNotifySearchTerm(searchTerm);
                 setNotifyGroupFilter(selectedGroup);
@@ -11149,6 +11150,7 @@ function AdminMembersPageContent() {
                   style={{ height: "auto", resize: "vertical", padding: "8px 10px" }}
                 />
               </label>
+              <NotificationImageAttachment file={notifyImage} onChange={setNotifyImage} disabled={notifyBusy} />
               {notifyError && (
                 <p className="amp-confirm-error" style={{ marginTop: "8px" }}>{notifyError}</p>
               )}

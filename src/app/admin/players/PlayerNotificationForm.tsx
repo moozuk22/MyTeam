@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { NotificationImageAttachment } from "@/components/NotificationImageAttachment";
 import { Bell, ChevronDown, Search } from "lucide-react";
 
 export default function PlayerNotificationForm({ clubs, loading }: {
@@ -11,6 +12,7 @@ export default function PlayerNotificationForm({ clubs, loading }: {
   const [clubIds, setClubIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
+  const [image, setImage] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -38,14 +40,14 @@ export default function PlayerNotificationForm({ clubs, loading }: {
       setPickerOpen(false);
       setStatus("");
       try {
-        const response = await fetch("/api/admin/notifications/send-to-players", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ audience, clubIds, message: message.trim() }),
-        });
+        const form = new FormData();
+        form.append("payload", JSON.stringify({ audience, clubIds, message: message.trim() }));
+        if (image) form.append("image", image);
+        const response = await fetch("/api/admin/notifications/send-to-players", { method: "POST", body: form });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Неуспешно изпращане.");
         setStatus(`Обработени състезатели: ${data.targetedPlayers}. Push известия: ${data.summary.sent}/${data.summary.total}. Неуспешни известия: ${data.summary.failed}. Грешки при състезатели: ${data.failedPlayers}.`);
-        if (!data.failedPlayers && !data.summary.failed) setMessage("");
+        if (!data.failedPlayers && !data.summary.failed) { setMessage(""); setImage(null); }
       } catch (error) {
         setStatus(error instanceof Error ? error.message : "Неуспешно изпращане.");
       } finally { setSending(false); }
@@ -92,6 +94,7 @@ export default function PlayerNotificationForm({ clubs, loading }: {
           </div>}
         </div>
         <textarea className="mp-player-message" aria-label="Съобщение до състезателите" placeholder="Въведете съобщение до състезателите..." value={message} onChange={event => setMessage(event.target.value)} required maxLength={1000} rows={3} />
+        <NotificationImageAttachment file={image} onChange={setImage} disabled={sending || loading} />
         <div className="mp-demo-actions">
           <button type="submit" className="mp-demo-btn mp-demo-btn--yellow" disabled={!message.trim() || (audience === "clubs" && !clubIds.length)}>
             <Bell size={16} />
