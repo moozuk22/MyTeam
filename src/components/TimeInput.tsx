@@ -121,8 +121,14 @@ export function TimeInput({ value, onValueChange, ...props }: TimeInputProps) {
   const [open, setOpen] = useState(false);
   const dialogId = useId();
   const input = useRef<HTMLInputElement>(null);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    // Restore focus after the dialog's cleanup has closed and removed it.
+    if (!open && wasOpen.current) input.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
   if (!desktop) return <input {...props} type="time" value={value} onChange={event => onValueChange(event.target.value)} />;
-  const close = () => { setOpen(false); input.current?.focus(); };
+  const close = () => { setOpen(false); };
   return <>
     <input {...props} ref={input} type="text" readOnly value={value} placeholder={props.placeholder ?? "Изберете час"} aria-label={props["aria-label"] ?? "Час (24-часов формат)"}
       className={`${props.className ?? ""} ${styles.trigger}`} role="combobox" aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? dialogId : undefined}
