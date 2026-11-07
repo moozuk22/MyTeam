@@ -54,6 +54,7 @@ self.addEventListener("push", (event) => {
       body,
       icon,
       badge,
+      ...(typeof data.image === "string" ? { image: data.image } : {}),
       tag,
       renotify: true,
       requireInteraction: true,

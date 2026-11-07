@@ -11,6 +11,7 @@ import { getTrainingCountdownCandidates, getTrainingDateTimeMs } from "@/lib/mem
 
 import { use, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { NotificationImage } from "@/components/NotificationImage";
 import { NotificationText } from "@/components/NotificationText";
 import MemberTrainingSessions from "@/components/MemberTrainingSessions";
 import TrainingCheckInPicker from "@/components/TrainingCheckInPicker";
@@ -407,6 +408,7 @@ export default function MemberCardPage({
     type: string;
     title: string;
     body: string;
+    imageUrl?: string | null;
     url?: string | null;
     sentAt: string;
     readAt: string | null;
@@ -4224,6 +4226,7 @@ export default function MemberCardPage({
                         }}>
                           <NotificationText text={notif.body} />
                         </p>
+                        <NotificationImage src={notif.imageUrl} />
                         <p style={{
                           margin: 0,
                           fontSize: "11px",

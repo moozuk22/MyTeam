@@ -17,6 +17,7 @@ export async function saveMemberNotificationHistory(
       title: payload.title,
       body: payload.body,
       url: payload.url,
+      ...(payload.image ? { imageUrl: payload.image, imagePublicId: payload.imagePublicId ?? null } : {}),
     },
   });
 

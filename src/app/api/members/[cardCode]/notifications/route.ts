@@ -36,6 +36,7 @@ export async function GET(
         type: true,
         title: true,
         body: true,
+        imageUrl: true,
         url: true,
         sentAt: true,
         readAt: true,

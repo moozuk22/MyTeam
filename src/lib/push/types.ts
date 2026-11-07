@@ -16,6 +16,8 @@ export type NotificationTemplateType =
   | "birthday";
 
 export interface PushNotificationPayload {
+  image?: string;
+  imagePublicId?: string;
   title: string;
   body: string;
   url?: string;

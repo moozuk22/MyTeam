@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "./route";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), count: vi.fn(), players: vi.fn(), push: vi.fn() }));
+const mocks = vi.hoisted(() => ({ upload: vi.fn(), session: vi.fn(), count: vi.fn(), players: vi.fn(), push: vi.fn() }));
+vi.mock("@/lib/uploadMessageImage", () => ({ uploadMessageImage: mocks.upload }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
 vi.mock("@/lib/db", () => ({ prisma: { club: { count: mocks.count }, player: { findMany: mocks.players } } }));
 vi.mock("@/lib/push/service", () => ({ sendPushToMember: mocks.push }));
@@ -19,6 +20,7 @@ function request(body: unknown, authenticated = true) {
 describe("player notifications", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.upload.mockResolvedValue({ imageUrl: "https://example.com/photo.webp", imagePublicId: "messages/photo" });
     mocks.session.mockResolvedValue({ roles: ["admin"] });
     mocks.count.mockResolvedValue(1);
     mocks.players.mockResolvedValue([{ id: "player-a", cards: [{ cardCode: "card-a" }] }, { id: "player-b", cards: [] }]);
@@ -77,4 +79,30 @@ describe("player notifications", () => {
     expect(mocks.push).toHaveBeenCalledTimes(2);
     expect(await response.json()).toMatchObject({ targetedPlayers: 2, failedPlayers: 1, summary: { total: 2, sent: 1, failed: 1, deactivated: 1 } });
   });
+  function imageRequest(file: File) {
+    const form = new FormData();
+    form.append("payload", JSON.stringify({ audience: "clubs", clubIds: [clubA], message: "Photo" }));
+    form.append("image", file);
+    return new NextRequest("http://localhost/api/admin/notifications/send-to-players", { method: "POST", headers: { cookie: "admin_session=test" }, body: form });
+  }
+  it("uploads a broadcast image once and attaches it for every player", async () => {
+    expect((await POST(imageRequest(new File(["jpg"], "photo.jpg", { type: "image/jpeg" })))).status).toBe(200);
+    expect(mocks.upload).toHaveBeenCalledOnce();
+    for (const [player, payload] of mocks.push.mock.calls) {
+      expect(player).toMatch(/^player-/);
+      expect(payload).toMatchObject({ image: "https://example.com/photo.webp", imagePublicId: "messages/photo" });
+    }
+    expect(mocks.push).toHaveBeenCalledTimes(2);
+  });
+  it("rejects unsupported files without delivering", async () => {
+    expect((await POST(imageRequest(new File(["pdf"], "bad.pdf", { type: "application/pdf" })))).status).toBe(400);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+  it("does not deliver when image processing or upload fails", async () => {
+    mocks.upload.mockRejectedValue(new Error("Upload failed"));
+    expect((await POST(imageRequest(new File(["webp"], "photo.webp", { type: "image/webp" })))).status).toBe(400);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
 });
