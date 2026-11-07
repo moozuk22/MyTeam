@@ -141,9 +141,27 @@ export function buildAbsoluteAppUrl(path: string): string {
   return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-async function parseIrisJson<T>(response: Response): Promise<T> {
+async function parseIrisJson<T>(response: Response, operation: "create" | "status"): Promise<T> {
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : {};
+  let payload: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Invalid IRISPay response shape");
+    }
+    payload = parsed as Record<string, unknown>;
+  } catch {
+    // Provider URLs contain credentials or payment hashes; never log them or the body.
+    console.error("IRISPay invalid JSON response", {
+      operation,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      redirected: response.redirected,
+      server: response.headers.get("server"),
+    });
+    // Do not expose provider HTML, URLs or raw response bodies to members.
+    throw new Error("Платежната услуга IRISPay върна невалиден отговор. Моля, опитайте отново по-късно.");
+  }
   if (!response.ok) {
     throw new Error(
       typeof payload?.message === "string"
@@ -209,7 +227,7 @@ export async function createIrisPayment(input: IrisCreatePaymentInput): Promise<
     cache: "no-store",
   });
 
-  const payload = await parseIrisJson<IrisCreatePaymentResponse>(response);
+  const payload = await parseIrisJson<IrisCreatePaymentResponse>(response, "create");
   if (!payload.paymentHash || !payload.paymentLink) {
     throw new Error("IRISPay did not return a payment link");
   }
@@ -230,7 +248,7 @@ export async function getIrisPaymentStatus(
     headers,
     cache: "no-store",
   });
-  return parseIrisJson<IrisStatusResponse>(response);
+  return parseIrisJson<IrisStatusResponse>(response, "status");
 }
 
 export async function deactivateIrisPayment(paymentHash: string): Promise<unknown> {
