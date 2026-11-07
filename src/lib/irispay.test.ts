@@ -25,6 +25,7 @@ function getJsonBody(fetchMock: ReturnType<typeof vi.fn>) {
 describe("IRISPay configuration", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
     process.env = { ...originalEnv };
     process.env.IRISPAY_BASE_URL = "https://paybyclick.irispay.bg";
     process.env.IRISPAY_MERCHANT_KEY = "merchant/key with spaces";
@@ -33,6 +34,39 @@ describe("IRISPay configuration", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     process.env = { ...originalEnv };
+  });
+
+  it.each([200, 403, 502, 503])("handles an HTML provider response with status %s", async (status) => {
+    mockFetch(new Response("<!doctype html><html>Service unavailable</html>", {
+      status, headers: { "Content-Type": "text/html" },
+    }));
+
+    await expect(createIrisPayment({
+      amount: "20.00", description: "Monthly payment", orderId: "order-1",
+      hookUrl: "https://example.com/hook", redirectUrl: "https://example.com/member",
+    })).rejects.toThrow("Платежната услуга IRISPay върна невалиден отговор. Моля, опитайте отново по-късно.");
+  });
+
+  it("logs safe HTTP diagnostics for an invalid provider response", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch(new Response("<!doctype html><html>private provider error</html>", {
+      status: 502, headers: { "content-type": "text/html", server: "nginx" },
+    }));
+    await expect(getIrisPaymentStatus("private-payment-hash")).rejects.toThrow("невалиден отговор");
+    expect(log).toHaveBeenCalledWith("IRISPay invalid JSON response", {
+      operation: "status", status: 502, contentType: "text/html", redirected: false, server: "nginx",
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/private|merchant/);
+  });
+
+  it("preserves provider JSON error messages", async () => {
+    mockFetch(Response.json({ message: "Payment rejected" }, { status: 400 }));
+    await expect(getIrisPaymentStatus("hash-1")).rejects.toThrow("Payment rejected");
+  });
+
+  it.each(["", "null", "[]", "invalid JSON"])("rejects an invalid provider body: %s", async (body) => {
+    mockFetch(new Response(body));
+    await expect(getIrisPaymentStatus("hash-1")).rejects.toThrow("Платежната услуга IRISPay върна невалиден отговор");
   });
 
   it("defaults repayable links to true", () => {
