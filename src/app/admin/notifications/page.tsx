@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { TimeInput } from "@/components/TimeInput";
+
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -337,9 +339,8 @@ export default function AdminNotificationsPage() {
                 value={trainingDate}
                 onChange={(event) => setTrainingDate(event.target.value)}
               />
-              <input
+              <TimeInput
                 id="trainingTime"
-                type="time"
                 className="input"
                 style={{ 
                   flex: "1 1 60px",
@@ -352,7 +353,7 @@ export default function AdminNotificationsPage() {
                 }}
                 step={60}
                 value={trainingTime}
-                onChange={(event) => setTrainingTime(event.target.value)}
+                onValueChange={setTrainingTime}
               />
             </div>
           </div>

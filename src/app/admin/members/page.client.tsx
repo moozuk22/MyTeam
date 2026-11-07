@@ -1,4 +1,6 @@
 "use client";
+
+import { TimeInput } from "@/components/TimeInput";
 import { playerFieldEnabled, parsePlayerWeight } from "@/lib/playerFields";
 import PlayerExtraFields from "@/components/PlayerExtraFields";
 import { getMatchCalendarDates } from "@/lib/matchScheduleWindow";
@@ -8516,12 +8518,11 @@ function AdminMembersPageContent() {
                               <label className="amp-edit-field">
                                 <span className="amp-lbl">Час</span>
                                 <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                                  <input
+                                  <TimeInput
                                     className="amp-inner-time-input"
-                                    type="time"
                                     step={60}
                                     value={details.time}
-                                    onChange={(e) => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, time: e.target.value } }))}
+                                    onValueChange={(value) => setMatchDetailsPerDay((prev) => ({ ...prev, [date]: { ...details, time: value } }))}
                                     disabled={matchEditorSaving}
                                   />
                                 </div>
@@ -8805,12 +8806,11 @@ function AdminMembersPageContent() {
                     <label className="amp-edit-field" style={{ marginTop: "8px", display: "none", textAlign: "center" }}>
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Час на тренировка (HH:mm)</span>
                       <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                        <input
+                        <TimeInput
                           className="amp-inner-time-input"
-                          type="time"
                           step={60}
                           value={schedulerForm.trainingTime}
-                          onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
+                          onValueChange={(value) => handleTrainingAllTimeChange(value)}
                           required
                           disabled={trainingDaysEditorSaving}
                         />
@@ -8872,12 +8872,11 @@ function AdminMembersPageContent() {
                     <label className="amp-edit-field" style={{ marginTop: "8px", textAlign: "center", order: 2 }}>
                       <span className="amp-lbl" style={{ textAlign: "center" }}>Час на тренировка</span>
                       <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                        <input
+                        <TimeInput
                           className="amp-inner-time-input"
-                          type="time"
                           step={60}
                           value={schedulerForm.trainingTime}
-                          onChange={(e) => handleTrainingAllTimeChange(e.target.value)}
+                          onValueChange={(value) => handleTrainingAllTimeChange(value)}
                           required
                           disabled={trainingDaysEditorSaving}
                         />
@@ -8912,12 +8911,11 @@ function AdminMembersPageContent() {
                           <label key={`per-day-time-${date}`} className="amp-edit-field" style={{ textAlign: "center" }}>
                             <span className="amp-lbl" style={{ textAlign: "center" }}>{formatIsoDateForDisplay(date)}</span>
                             <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                              <input
+                              <TimeInput
                                 className="amp-inner-time-input"
-                                type="time"
                                 step={60}
                                 value={trainingDateTimes[date] ?? ""}
-                                onChange={(e) => handleTrainingDateTimeChange(date, e.target.value)}
+                                onValueChange={(value) => handleTrainingDateTimeChange(date, value)}
                                 required
                                 disabled={trainingDaysEditorSaving}
                               />
@@ -8945,12 +8943,11 @@ function AdminMembersPageContent() {
                             <label key={`weekday-time-${weekdayIndex}`} className="amp-edit-field" style={{ textAlign: "center" }}>
                               <span className="amp-lbl" style={{ textAlign: "center" }}>{TRAINING_WEEKDAY_LONG_BG[weekdayIndex] ?? `#${weekdayIndex + 1}`}</span>
                                 <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                                <input
+                                <TimeInput
                                   className="amp-inner-time-input"
-                                  type="time"
                                   step={60}
                                   value={weekdayTime ?? ""}
-                                  onChange={(e) => handleTrainingWeekdayTimeChange(weekdayIndex, e.target.value)}
+                                  onValueChange={(value) => handleTrainingWeekdayTimeChange(weekdayIndex, value)}
                                   required
                                   disabled={trainingDaysEditorSaving}
                                 />
@@ -9801,7 +9798,7 @@ function AdminMembersPageContent() {
                       </div>
                       <div className="amp-edit-field">
                         <span className="amp-lbl">Час</span>
-                        <input type="time" className="amp-edit-input" value={dayDetailsMatchEditForm.matchTime} onChange={(e) => setDayDetailsMatchEditForm((f) => ({ ...f, matchTime: e.target.value }))} disabled={dayDetailsMatchSaving} />
+                        <TimeInput className="amp-edit-input" value={dayDetailsMatchEditForm.matchTime} onValueChange={(value) => setDayDetailsMatchEditForm((f) => ({ ...f, matchTime: value }))} disabled={dayDetailsMatchSaving} />
                       </div>
                       <div className="amp-edit-field">
                         <span className="amp-lbl">Продължителност (мин.)</span>
@@ -10641,13 +10638,12 @@ function AdminMembersPageContent() {
                   <label className="amp-edit-field amp-scheduler-primary-time" style={{ textAlign: "center" }}>
                     <span className="amp-lbl" style={{ textAlign: "center" }}>Час за месечно напомняне</span>
                     <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                      <input
+                      <TimeInput
                         className="amp-inner-time-input"
-                        type="time"
                         step={60}
                         value={reminderTimeValue}
-                        onChange={(e) => {
-                          const [hour = "0", minute = "0"] = e.target.value.split(":");
+                        onValueChange={(value) => {
+                          const [hour = "0", minute = "0"] = value.split(":");
                           setSchedulerForm((prev) => ({
                             ...prev,
                             reminderHour: hour.replace(/\D/g, ""),
@@ -10695,13 +10691,12 @@ function AdminMembersPageContent() {
                       <label className="amp-edit-field amp-scheduler-second-time" style={{ textAlign: "center" }}>
                         <span className="amp-lbl" style={{ textAlign: "center" }}>Час за второ месечно напомняне</span>
                         <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                          <input
+                          <TimeInput
                             className="amp-inner-time-input"
-                            type="time"
                             step={60}
                             value={secondReminderTimeValue}
-                            onChange={(e) => {
-                              const [hour = "0", minute = "0"] = e.target.value.split(":");
+                            onValueChange={(value) => {
+                              const [hour = "0", minute = "0"] = value.split(":");
                               setSchedulerForm((prev) => ({
                                 ...prev,
                                 secondReminderHour: hour.replace(/\D/g, ""),
@@ -10765,13 +10760,12 @@ function AdminMembersPageContent() {
                           <label className="amp-edit-field amp-scheduler-third-time" style={{ textAlign: "center" }}>
                             <span className="amp-lbl" style={{ textAlign: "center" }}>Час за трето месечно напомняне</span>
                             <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                              <input
+                              <TimeInput
                                 className="amp-inner-time-input"
-                                type="time"
                                 step={60}
                                 value={thirdReminderTimeValue}
-                                onChange={(e) => {
-                                  const [hour = "0", minute = "0"] = e.target.value.split(":");
+                                onValueChange={(value) => {
+                                  const [hour = "0", minute = "0"] = value.split(":");
                                   setSchedulerForm((prev) => ({
                                     ...prev,
                                     thirdReminderHour: hour.replace(/\D/g, ""),
@@ -10804,13 +10798,12 @@ function AdminMembersPageContent() {
                   <label className="amp-edit-field amp-scheduler-overdue-time" style={{ textAlign: "center" }}>
                     <span className="amp-lbl" style={{ textAlign: "center" }}>Час за просрочие</span>
                     <div className="amp-edit-input" style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 0 }}>
-                      <input
+                      <TimeInput
                         className="amp-inner-time-input"
-                        type="time"
                         step={60}
                         value={overdueTimeValue}
-                        onChange={(e) => {
-                          const [hour = "0", minute = "0"] = e.target.value.split(":");
+                        onValueChange={(value) => {
+                          const [hour = "0", minute = "0"] = value.split(":");
                           setSchedulerForm((prev) => ({
                             ...prev,
                             overdueHour: hour.replace(/\D/g, ""),
