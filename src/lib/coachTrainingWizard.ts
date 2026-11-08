@@ -5,10 +5,10 @@ export function getNewTrainingEditorMode(input: {
   view: "teamGroup" | "trainingGroups" | "today";
   isCustomGroupMode: boolean;
 }): "coachGroup" | "customGroup" | "trainingGroup" | "teamGroup" {
-  // The URL identifies the group receiving new sessions. A selected report view
-  // must not send coaches to the legacy one-session-per-date editor.
-  if (input.coachGroupId) return "coachGroup";
+  // A selected training group defines the roster and schedule name. The coach
+  // URL is only the fallback when no training-group view is selected.
   if (input.view === "trainingGroups") return input.isCustomGroupMode ? "customGroup" : "trainingGroup";
+  if (input.coachGroupId) return "coachGroup";
   return "teamGroup";
 }
 
