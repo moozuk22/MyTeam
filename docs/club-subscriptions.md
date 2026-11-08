@@ -55,7 +55,7 @@ The platform admin's **История и такси** displays audit records for
 
 ### Clubs with contracts
 
-Select **С договор** during billing activation, or use **Задай „С договор“** on an existing subscription. Contract billing is managed outside the app. The club sees **С договор**, with no subscription amounts, unpaid months, payment controls, or subscription notifications/reminders. Existing financial records remain in the administrator history. Subscription billing mutations are blocked by the API for contract clubs. Player dues and unrelated notifications are unaffected. Changing to a contract is audited and sends no club message. Returning a contract club to in-app billing is not offered.
+Select **С договор** during billing activation, or use **Задай „С договор“** on an existing subscription. Contract billing is managed outside the app. The club sees **С договор**, with no subscription amounts, unpaid months, payment controls, or subscription notifications/reminders. Existing financial records remain in the administrator history. Subscription payments, voids, trial changes and fee edits are blocked by the API while a club is in contract mode. Player dues and unrelated notifications are unaffected. Changing to a contract is audited and sends no club message. Use **Редактирай абонамента** to return a contract club to paid in-app billing with an explicit first month and fee. The first month must follow all non-voided paid months. Existing receipts and fee revisions are preserved; the selected starting month fee is created or updated. The change is version-checked, audited and notifies the club.
 
 Requires migration `20261024180000_club_subscription_contract` before using the new status.
 

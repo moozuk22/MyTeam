@@ -91,7 +91,7 @@ export async function changeClubSubscription(clubId: string, body: Record<string
     const subscription = await tx.clubSubscription.findUnique({ where: { clubId }, include: subscriptionInclude });
     if (!subscription) throw new SubscriptionError("Абонаментът не е настроен.", 409);
 
-    if (subscription.mode === "contract" && body.action !== "contract") throw new SubscriptionError("Таксуването на клуб с договор се управлява извън приложението.", 409);
+    if (subscription.mode === "contract" && body.action !== "contract" && body.action !== "start_paid") throw new SubscriptionError("Таксуването на клуб с договор се управлява извън приложението.", 409);
 
     const payment = body.action === "payment" ? parsePayment(body) : null;
     if (payment) {
@@ -129,14 +129,18 @@ export async function changeClubSubscription(clubId: string, body: Record<string
         break;
       }
       case "start_paid": {
-        if (subscription.mode !== "trial") throw new SubscriptionError("Клубът вече е с платен абонамент.", 409);
+        if (subscription.mode === "paid") throw new SubscriptionError("Клубът вече е с платен абонамент.", 409);
         const setup = parseSubscriptionSetup({ mode: "paid", firstBillingMonth: body.firstBillingMonth, amount: body.amount });
         if (setup.mode !== "paid") throw new SubscriptionError("Невалиден абонамент.");
-        await tx.clubSubscription.update({ where: { clubId }, data: { mode: "paid", trialEndDate: null, firstBillingMonth: setup.firstBillingMonth,
-          fees: { create: { effectiveMonth: setup.firstBillingMonth, amount: setup.amount } } } });
-        details = { previousTrialEndDate: subscription.trialEndDate, ...setup };
+        if (subscription.mode === "contract" && setup.firstBillingMonth < earliestFeeChangeMonth(setup.firstBillingMonth, subscription.payments)) {
+          throw new SubscriptionError("Началният месец трябва да е след последния платен месец.");
+        }
+        await tx.clubSubscription.update({ where: { clubId }, data: { mode: "paid", trialEndDate: null, firstBillingMonth: setup.firstBillingMonth } });
+        await tx.clubSubscriptionFee.upsert({ where: { clubId_effectiveMonth: { clubId, effectiveMonth: setup.firstBillingMonth } },
+          create: { clubId, effectiveMonth: setup.firstBillingMonth, amount: setup.amount }, update: { amount: setup.amount } });
+        details = { previousMode: subscription.mode, previousTrialEndDate: subscription.trialEndDate, ...setup };
         notice = subscriptionMessage(clubId, "Платен абонамент за MyTeam",
-          `Безплатният пробен период е заменен с платен абонамент. Месечна такса: ${setup.amount} EUR. Първи месец за плащане: ${setup.firstBillingMonth}.`);
+          `Абонаментът е променен на платен. Месечна такса: ${setup.amount} EUR. Първи месец за плащане: ${setup.firstBillingMonth}.`);
         break;
       }
       case "fee": {

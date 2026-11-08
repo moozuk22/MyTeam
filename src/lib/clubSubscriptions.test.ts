@@ -363,7 +363,7 @@ it("switches to contract silently, preserves historical fees, and audits the cha
   expect(mocks.events).not.toHaveBeenCalled();
   expect(mocks.push).not.toHaveBeenCalled();
 });
-it.each(["payment", "void", "fee", "trial", "start_paid"])("blocks %s for contract clubs", async (action) => {
+it.each(["payment", "void", "fee", "trial"])("blocks %s for contract clubs", async (action) => {
   state.mode = "contract";
   await expect(change({ action, expectedVersion: 1 })).rejects.toThrow("извън приложението");
   expect(mocks.clubSubscription.update).not.toHaveBeenCalled();
@@ -377,4 +377,21 @@ it("initializes contract subscriptions with no fee, message, or push", async () 
   expect(mocks.clubSubscription.create.mock.calls[0][0].data).not.toHaveProperty("fees");
   expect(mocks.adminNotification.create).not.toHaveBeenCalled();
   expect(mocks.push).not.toHaveBeenCalled();
+});
+
+it("converts a contract to paid billing and preserves historical receipts", async () => {
+  await change(pay());
+  await change({ action: "contract", expectedVersion: state.version });
+  await change({ action: "start_paid", expectedVersion: state.version, firstBillingMonth: "2026-12", amount: "25.00" });
+  expect(state.mode).toBe("paid");
+  expect(state.firstBillingMonth).toBe("2026-12");
+  expect(state.payments).toHaveLength(1);
+  expect(state.payments[0].total.toFixed(2)).toBe("20.00");
+  expect(state.fees).toContainEqual({ effectiveMonth: "2026-12", amount: decimal("25.00") });
+});
+it("rejects contract conversion overlapping previously paid months", async () => {
+  await change(pay());
+  await change({ action: "contract", expectedVersion: state.version });
+  await expect(change({ action: "start_paid", expectedVersion: state.version, firstBillingMonth: "2026-09", amount: "25.00" })).rejects.toThrow(/платен/);
+  expect(state.mode).toBe("contract");
 });
