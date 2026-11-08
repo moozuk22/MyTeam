@@ -28,7 +28,7 @@ async function runBirthdayDigests(now: Date, daily: boolean) {
   const today = localToday(now);
   const week = daily ? { today, dates: [today], start: today, end: today } : nextBirthdayWeek(now);
   const result = { success: true, skipped: !week, notifiedGroups: 0, notifiedClubs: 0, pushWarnings: 0, failedGroups: [] as string[] };
-  // Local scheduler checks hourly; do not send before 09:00 in Sofia.
+  // Scheduled checks run hourly; do not send before 09:00 in Sofia.
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Sofia", hour: "2-digit", hourCycle: "h23" }).format(now));
   if (!week || hour < 9) return { ...result, skipped: true };
 
