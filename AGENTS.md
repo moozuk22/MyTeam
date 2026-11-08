@@ -22,8 +22,44 @@ MyTeam is a Bulgarian-language sports club management app built with Next.js 16 
 ## Coding Style & Naming Conventions
 Use strict TypeScript and `@/` imports for modules under `src/`. Match surrounding indentation (existing files use two or four spaces), double quotes, and semicolons. Use PascalCase component filenames, camelCase functions, and Next.js filenames such as `page.tsx` and `route.ts`. Keep user-facing text in Bulgarian. Import the shared Prisma client from `@/lib/db`.
 
+## Understand Before Changing
+Inspect the complete affected workflow before editing: trace UI components, API routes, business logic, Prisma models, and tests. Identify dependencies and side effects, especially for payments, memberships, player management, and notifications. Reuse existing abstractions and conventions. Preserve unrelated behavior and avoid unnecessary refactoring.
+
+## Performance & Database Efficiency
+Avoid N+1 queries, excessive database calls, and unbounded parallel operations. Paginate or bound queries for potentially large datasets. Keep transactions short and avoid external network calls inside them where possible without weakening atomicity. Minimize unnecessary polling and client requests. Account for Prisma connection-pool capacity and background-job concurrency (see Background Jobs).
+
+## API Compatibility
+Inspect all relevant callers before modifying an endpoint. Preserve request/response contracts unless breaking changes are explicitly required; update affected clients and contract tests together when contracts change.
+
+## UI/UX & Responsive Design
+These requirements apply to every frontend change:
+
+- **Preserve the design system:** inspect existing pages and shared components first. Reuse established components, colors, typography, spacing, border radii, and styling patterns across admin/member pages, dashboards, forms, and modals. Do not introduce a new design language or significantly change layouts without an explicit request.
+- **Develop mobile first:** over 80% of users access MyTeam on phones. Build for mobile, then adapt to tablet and desktop; never sacrifice mobile usability for desktop. Avoid fixed widths, unnecessary horizontal scrolling, and large-screen dependencies. Make buttons, inputs, menus, tables, and dialogs usable on touchscreens.
+- **Accessibility and usability:** preserve keyboard access, visible focus, semantic controls, readable contrast, and accessible labels. Provide clear loading, empty, success, and error states; apply the existing mobile and touch requirements when testing interactions.
+- **Minimum checks for every UI change:** verify the affected interface at at least one small-phone width of 320–375 px, one large-phone width of 390–430 px, and a desktop width of 1440 px (CSS pixels). Mobile compatibility is mandatory regardless of change size.
+- **Significant layout changes:** test the complete viewport matrix below for new pages, redesigned layouts, dashboards, complex forms, and major component changes. Pay special attention to 320–375 px widths:
+
+  | Viewport | Device class |
+  | --- | --- |
+  | 320 × 568 | Very small phone |
+  | 360 × 800 | Small Android phone |
+  | 375 × 667 | Small iPhone |
+  | 390 × 844 | Typical modern phone |
+  | 430 × 932 | Large phone |
+  | 768 × 1024 | Tablet |
+  | 1440 × 900 | Desktop |
+
+- **High-risk components:** changes involving modals, dropdowns, navigation, tables, or sticky/fixed elements also require the complete matrix and relevant interaction checks, even when the diff is small.
+- **Prevent regressions:** check horizontal overflow, clipping, overlaps, and broken layouts, including modals, dropdowns, navigation, tables, forms, and fixed/sticky elements. Exercise long names, Bulgarian text, validation messages, and empty/loading/error states. Keep controls accessible with the mobile keyboard open, respect safe areas, provide appropriate touch targets, and preserve important functionality on mobile and desktop.
+- **Verify behavior in a browser:** use viewport testing when available and exercise relevant interactions, not only screenshots or code inspection. Include screenshots for significant UI changes when practical. Report viewports/interactions actually tested; if browser testing is unavailable, explicitly state that visual/responsive verification was not performed. Never claim untested responsive behavior is verified.
+
+A frontend task is not fully verified until its affected UI passes the mandatory small-phone, large-phone, and desktop checks, plus the complete matrix for significant layout or high-risk component changes. Report any missing checks as unverified.
+
 ## Testing Guidelines
 Vitest runs in a Node environment configured in `vite.config.mts`; tests use `*.test.ts`, `*.test.tsx`, and `*.test.mjs`. No coverage threshold is configured. For bug fixes, first add a regression test demonstrating the failure. Run affected tests, lint, and type checking; report results and unverified behavior.
+
+For stateful features, trace creation, updates, deletion, reversal, recreation, retries, and concurrent operations where relevant. Verify downstream effects and add regression tests for affected behavior, including the feature-specific safeguards below.
 
 ## Commit & Pull Request Guidelines
 Read `PR_REVIEW.md` before creating or updating pull requests, including handling review feedback.
@@ -109,6 +145,9 @@ Use existing validators and domain errors (for example `FinanceError`, `Subscrip
 
 ## Definition of Done
 Verify requirements and acceptance criteria, add meaningful regression coverage, and run relevant tests, lint, and type checking; build when appropriate. Inspect the final diff for correctness, unrelated changes, and secrets. Report exactly which checks passed, failed, or were not run, plus unverified behavior. Follow `PR_REVIEW.md` for PR creation and the manual review cycle.
+
+## Documentation Maintenance
+Update existing documentation when architecture, business behavior, configuration, deployment, or integrations change. Avoid unnecessary documentation files; keep `AGENTS.md` concise and focused on actionable instructions for coding agents.
 
 ## Production Boundaries
 Without explicit authorization, do not manually deploy, restart production services, change production environment variables, alter VPS infrastructure, or directly modify production data. Documenting operational commands does not authorize executing them.
