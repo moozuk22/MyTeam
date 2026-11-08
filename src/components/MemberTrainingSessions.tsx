@@ -33,7 +33,7 @@ export default function MemberTrainingSessions({ sessions, date, cardCode, onUpd
   return <div>
     {date && <h3>{new Date(`${date}T12:00:00Z`).toLocaleDateString("bg-BG", { weekday: "long", day: "2-digit", month: "long", timeZone: "Europe/Sofia" })}</h3>}
     {sessions.map((session) => <section key={session.id ?? session.scopeKey} className="training-attendance-info-card">
-      <h3>{sessions.length > 1 && session.groupName ? `${session.groupName} — ` : ""}{session.trainingTime} · {session.trainingDurationMinutes} мин.</h3>
+      <h3 style={{ overflowWrap: "anywhere" }}>{session.groupName ? `${session.groupName} — ` : ""}{session.trainingTime} · {session.trainingDurationMinutes} мин.</h3>
       {session.trainingFieldName && <p>{session.trainingFieldName}{session.trainingFieldPieceNames?.length ? ` · ${session.trainingFieldPieceNames.join(", ")}` : " · Цял терен"}</p>}
       {session.note && <p style={{ whiteSpace: "pre-wrap" }}>{session.note}</p>}
       {session.limitedEvent ? <div className="training-attendance-buttons" style={{ flexDirection: "column" }}>
