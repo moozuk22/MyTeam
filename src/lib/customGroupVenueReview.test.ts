@@ -211,7 +211,7 @@ describe("custom group edits with legacy schedules without venues", () => {
     mocks.field.findFirst.mockResolvedValueOnce(null);
     const response = await edit({ trainingFieldId: fieldId });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Selected field was not found." });
+    expect(await response.json()).toEqual({ error: "Избраният терен не е намерен. Изберете терен отново." });
     expect(mocks.$transaction).not.toHaveBeenCalled();
   });
 
