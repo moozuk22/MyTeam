@@ -395,3 +395,21 @@ it("rejects contract conversion overlapping previously paid months", async () =>
   await expect(change({ action: "start_paid", expectedVersion: state.version, firstBillingMonth: "2026-09", amount: "25.00" })).rejects.toThrow(/платен/);
   expect(state.mode).toBe("contract");
 });
+
+it("lets a contract club choose a free trial", async () => {
+  state.mode = "contract";
+  await change({ action: "configure", mode: "trial", trialEndDate: "2026-12-31", expectedVersion: 1 });
+  expect(state.mode).toBe("trial");
+  expect(state.trialEndDate).toBe("2026-12-31");
+});
+it("lets a paid club change its subscription type without deleting receipts", async () => {
+  await change(pay());
+  await change({ action: "configure", mode: "trial", trialEndDate: null, expectedVersion: state.version });
+  expect(state.mode).toBe("trial");
+  expect(state.payments).toHaveLength(1);
+});
+it("sets up a missing subscription with an explicit version of zero", async () => {
+  mocks.clubSubscription.findUnique.mockResolvedValueOnce(null);
+  await change({ action: "configure", mode: "trial", trialEndDate: null, expectedVersion: 0 });
+  expect(mocks.clubSubscription.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ mode: "trial" }) }));
+});
