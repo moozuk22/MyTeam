@@ -8,10 +8,10 @@ function input(patch: Partial<CoachWizardInput> = {}): CoachWizardInput {
   return { trainings: [first, second], recurrences: [], selection: "new", dates: [first.date], times: { [first.date]: "20:00" }, duration: 90, fields: { [first.date]: { trainingFieldId: "field-b", trainingFieldPieceIds: [] } }, notes: { [first.date]: "Third training" }, timeMode: "all", today: first.date, createId: () => `new-${++id}`, ...patch };
 }
 describe("original coach scheduling wizard", () => {
-  it.each([true, false])("opens the multi-session coach editor from the groups view (custom mode: %s)", (isCustomGroupMode) => {
-    expect(getNewTrainingEditorMode({ coachGroupId: "coach-group", view: "trainingGroups", isCustomGroupMode })).toBe("coachGroup");
+  it.each([true, false])("keeps the selected training group as the target even in a coach URL (custom mode: %s)", (isCustomGroupMode) => {
+    expect(getNewTrainingEditorMode({ coachGroupId: "coach-group", view: "trainingGroups", isCustomGroupMode })).toBe(isCustomGroupMode ? "customGroup" : "trainingGroup");
   });
-  it.each(["today", "teamGroup", "trainingGroups"] as const)("keeps new trainings in the URL coach group from %s", (view) => {
+  it.each(["today", "teamGroup"] as const)("keeps new trainings in the URL coach group from %s", (view) => {
     expect(getNewTrainingEditorMode({ coachGroupId: "coach-group", view, isCustomGroupMode: true })).toBe("coachGroup");
   });
   it.each([
