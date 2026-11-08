@@ -118,7 +118,9 @@ export default function SubscriptionsPageClient() {
           </> : <p>Активирайте таксуването от страницата „Такси“ на клуба, за да настроите абонамент.</p>}
           <div className={styles.actions}>
             {club.subscription && club.subscription.mode !== "contract" && <button type="button" disabled={busy || loading} onClick={() => { if (window.confirm("Задаване на статус „С договор“? Таксуването ще се управлява извън приложението и известията за абонамент ще бъдат изключени.")) void save(club, { action: "contract" }).catch(() => {}); }}>Задай „С договор“</button>}
-            {club.subscription?.mode === "contract" && <button type="button" disabled={busy || loading} onClick={() => setEditor({ clubId: club.id, action: "history" })}>История</button>}
+            {club.subscription?.mode === "contract" && <>
+              <button type="button" disabled={busy || loading} onClick={() => { setError(""); setEditor({ clubId: club.id, action: "start_paid" }); }}>Редактирай абонамента</button>
+              <button type="button" disabled={busy || loading} onClick={() => setEditor({ clubId: club.id, action: "history" })}>История</button></>}
             {club.subscription?.mode === "trial" && <>
               <button type="button" disabled={busy || loading} onClick={() => { setError(""); setEditor({ clubId: club.id, action: "trial" }); }}>Редактирай пробния период</button>
               <button type="button" disabled={busy || loading} onClick={() => { setError(""); setEditor({ clubId: club.id, action: "start_paid" }); }}>Задай платен абонамент</button>
@@ -168,6 +170,7 @@ function SubscriptionEditor({ club, action, busy, save, onCalculatorSaved }: { c
     } catch (error) { setFormError((error as Error).message); }
   }
   return <form onSubmit={(e) => void submit(e)}>
+    {subscription.mode === "contract" && <p className={styles.hint}>Запазването заменя статуса „С договор“ с платен абонамент в приложението. Началният месец трябва да е след последния платен месец. Предишните плащания и планираните промени на таксата се запазват.</p>}
     {action === "fee" ? <fieldset disabled={busy} className={styles.formFields}>
       <label htmlFor={`${id}-amount`}>Нова месечна такса (EUR)<input id={`${id}-amount`} type="text" inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
       <label htmlFor={`${id}-month`}>В сила от месец<input id={`${id}-month`} type="month" min={minimumFeeMonth} max="2199-12" required value={effectiveMonth} onChange={(e) => setEffectiveMonth(e.target.value)} /></label>
