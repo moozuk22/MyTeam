@@ -115,7 +115,7 @@ export async function verifyTrainingFieldSelection(
     },
   });
   if (!field) {
-    throw new Error("Selected field was not found.");
+    throw new Error("Избраният терен не е намерен. Изберете терен отново.");
   }
 
   const fieldPieceIds = new Set(field.pieces.map((p) => p.id));
