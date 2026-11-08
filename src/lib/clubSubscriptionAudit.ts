@@ -1,5 +1,6 @@
 import type { SubscriptionAuditEntry } from "./clubSubscriptionDomain";
 export const subscriptionAuditLabels: Record<string, string> = {
+  configure: "Променен вид абонамент",
   contract: "Сключен договор — таксуване извън приложението",
   setup: "Настроен абонамент", initial_trial: "Начален пробен период", trial: "Променен пробен период",
   start_paid: "Активиран платен абонамент", fee: "Променена месечна такса", payment: "Записано плащане", void: "Анулирано плащане",
@@ -14,6 +15,7 @@ export function subscriptionAuditDescription(entry: SubscriptionAuditEntry): str
     case "trial": return `${trial(d.before)} → ${trial(d.after)}`;
     case "fee": return `${text("oldAmount")} → ${text("newAmount")} EUR / месец · В сила от ${text("effectiveMonth")}`;
     case "start_paid": return `${text("amount")} EUR / месец · Първи месец: ${text("firstBillingMonth")}`;
+    case "configure":
     case "setup": return d.mode === "contract" ? "С договор · Таксуване извън приложението" : d.mode === "paid" ? `${text("amount")} EUR / месец · От ${text("firstBillingMonth")}` : `Пробен период ${trial(d.trialEndDate)}`;
     case "initial_trial": return "Безплатен пробен период без крайна дата (миграция)";
     case "payment": return `${text("total")} EUR · Месеци: ${months} · Дата на плащане: ${text("paidOn")}`;

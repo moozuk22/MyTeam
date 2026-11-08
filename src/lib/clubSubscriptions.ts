@@ -89,9 +89,13 @@ export async function changeClubSubscription(clubId: string, body: Record<string
     const club = await tx.club.findUniqueOrThrow({ where: { id: clubId }, select: { billingStatus: true } });
     if (club.billingStatus !== "active") throw new SubscriptionError("Първо активирайте таксуването на клуба.", 409);
     const subscription = await tx.clubSubscription.findUnique({ where: { clubId }, include: subscriptionInclude });
-    if (!subscription) throw new SubscriptionError("Абонаментът не е настроен.", 409);
+    if (!subscription) {
+      if (body.action !== "configure") throw new SubscriptionError("Абонаментът не е настроен.", 409);
+      if (body.expectedVersion !== 0) throw new SubscriptionError("Данните са променени. Обновете страницата.", 409);
+      return initializeClubSubscription(tx, clubId, parseSubscriptionSetup(body), actorId);
+    }
 
-    if (subscription.mode === "contract" && body.action !== "contract" && body.action !== "start_paid") throw new SubscriptionError("Таксуването на клуб с договор се управлява извън приложението.", 409);
+    if (subscription.mode === "contract" && body.action !== "contract" && body.action !== "start_paid" && body.action !== "configure") throw new SubscriptionError("Таксуването на клуб с договор се управлява извън приложението.", 409);
 
     const payment = body.action === "payment" ? parsePayment(body) : null;
     if (payment) {
@@ -110,6 +114,26 @@ export async function changeClubSubscription(clubId: string, body: Record<string
     let notice: PushNotificationPayload | null = null;
     let details: Prisma.InputJsonValue;
     switch (body.action) {
+      case "configure": {
+        const setup = parseSubscriptionSetup(body);
+        if (setup.mode === "paid") {
+          if (setup.firstBillingMonth < earliestFeeChangeMonth(setup.firstBillingMonth, subscription.payments)) {
+            throw new SubscriptionError("Началният месец трябва да е след последния платен месец. За промяна на текущата такса използвайте „Редактирай таксата“.");
+          }
+          await tx.clubSubscriptionFee.upsert({ where: { clubId_effectiveMonth: { clubId, effectiveMonth: setup.firstBillingMonth } },
+            create: { clubId, effectiveMonth: setup.firstBillingMonth, amount: setup.amount }, update: { amount: setup.amount } });
+        }
+        await tx.clubSubscription.update({ where: { clubId }, data: {
+          mode: setup.mode, trialEndDate: setup.mode === "trial" ? setup.trialEndDate : null,
+          firstBillingMonth: setup.mode === "paid" ? setup.firstBillingMonth : null,
+        } });
+        details = { previousMode: subscription.mode, previousTrialEndDate: subscription.trialEndDate,
+          previousFirstBillingMonth: subscription.firstBillingMonth, ...setup };
+        if (setup.mode !== "contract") notice = subscriptionMessage(clubId, "Промяна на абонамента за MyTeam",
+          setup.mode === "trial" ? `Безплатен пробен период ${trialDescription(setup.trialEndDate)}.`
+            : `Платен абонамент. Месечна такса: ${setup.amount} EUR. Първи месец за плащане: ${setup.firstBillingMonth}.`);
+        break;
+      }
       case "contract": {
         if (subscription.mode === "contract") return null;
         details = { previousMode: subscription.mode, previousTrialEndDate: subscription.trialEndDate, previousFirstBillingMonth: subscription.firstBillingMonth };
