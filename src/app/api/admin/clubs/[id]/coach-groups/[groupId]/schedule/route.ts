@@ -78,10 +78,20 @@ export async function PUT(request: NextRequest, context: Context) {
     }
     const upper = isoDateToUtcMidnight(today).getTime() + (TRAINING_SELECTION_WINDOW_DAYS - 1) * 86400000;
     const hasFields = await clubHasTrainingFields(group.clubId);
+    const previousById = new Map(previous.map((item) => [item.id, item]));
     for (let i = 0; i < trainings.length; i++) {
       const item = trainings[i];
       if (item.date < today || isoDateToUtcMidnight(item.date).getTime() > upper) throw new Error(`Training dates must be within the next ${TRAINING_SELECTION_WINDOW_DAYS} days`);
-      if (hasFields && !item.trainingFieldId) throw new Error("Изберете терен за всяка тренировка.");
+      // The wizard submits the whole schedule, including sessions created before
+      // the club added fields. Require a field when booking or moving a session,
+      // without making unrelated legacy sessions block the save.
+      const stored = previousById.get(item.id);
+      const preservesLegacyBooking = stored && !stored.trainingFieldId &&
+        stored.date === item.date && stored.trainingTime === item.trainingTime &&
+        stored.trainingDurationMinutes === item.trainingDurationMinutes &&
+        stored.recurrenceId === item.recurrenceId &&
+        (stored.recurrenceDate ?? null) === (item.recurrenceDate ?? null);
+      if (hasFields && !item.trainingFieldId && !preservesLegacyBooking) throw new Error("Изберете терен за всяка тренировка.");
       await verifyTrainingFieldSelection(group.clubId, item);
       for (let j = 0; j < i; j++) if (coachTrainingsConflict(item, trainings[j])) throw new Error(`Теренът е зает на ${item.date} от ${trainings[j].trainingTime}.`);
       if (item.status !== "cancelled") await assertNoTrainingFieldConflict({ clubId: group.clubId, trainingDates: [item.date], trainingDateTimes: { [item.date]: item.trainingTime }, ...item, exclude: { type: "coachGroup", id: group.id } });
