@@ -19,7 +19,7 @@ const STATUS: Record<SubscriptionStatus, string> = {
   active: "Платен", unpaid: "Неплатени месеци", scheduled: "Предстоящ",
 };
 const MONTH_NAMES = ["Януари", "Февруари", "Март", "Април", "Май", "Юни", "Юли", "Август", "Септември", "Октомври", "Ноември", "Декември"];
-type Action = "trial" | "start_paid" | "fee" | "payment" | "history";
+type Action = "configure" | "trial" | "start_paid" | "fee" | "payment" | "history";
 type Save = (body: Record<string, unknown>) => Promise<void>;
 
 function monthLabel(month: string): string { return `${MONTH_NAMES[Number(month.slice(5)) - 1]} ${month.slice(0, 4)}`; }
@@ -66,7 +66,7 @@ export default function SubscriptionsPageClient() {
     try {
       const response = await fetch(`/api/admin/subscriptions/${club.id}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, expectedVersion: club.subscription!.version }),
+        body: JSON.stringify({ ...body, expectedVersion: club.subscription?.version ?? 0 }),
       });
       const result = await response.json() as { error?: string; warning?: string };
       if (!response.ok) {
@@ -115,11 +115,11 @@ export default function SubscriptionsPageClient() {
             </dl>
             {club.summary.outstanding.length > 0 && <details><summary>Неплатени месеци ({club.summary.outstanding.length})</summary><ul className={styles.monthList}>{club.summary.outstanding.map((m) => <li key={m.month}>{monthLabel(m.month)} — {m.amount} EUR</li>)}</ul></details>}
             {club.summary.laterPaidMonths.length > 0 && <p>Отделно платени месеци след пропуск: {club.summary.laterPaidMonths.map(monthLabel).join(", ")}</p>}
-          </> : <p>Активирайте таксуването от страницата „Такси“ на клуба, за да настроите абонамент.</p>}
+          </> : <p>{club.billingStatus === "active" ? "Абонаментът още не е настроен. Изберете „Настрой абонамента“." : "Активирайте таксуването от страницата „Такси“ на клуба, за да настроите абонамент."}</p>}
           <div className={styles.actions}>
+            {club.billingStatus === "active" && <button type="button" disabled={busy || loading} onClick={() => { setError(""); setEditor({ clubId: club.id, action: "configure" }); }}>{club.subscription ? "Редактирай абонамента" : "Настрой абонамента"}</button>}
             {club.subscription && club.subscription.mode !== "contract" && <button type="button" disabled={busy || loading} onClick={() => { if (window.confirm("Задаване на статус „С договор“? Таксуването ще се управлява извън приложението и известията за абонамент ще бъдат изключени.")) void save(club, { action: "contract" }).catch(() => {}); }}>Задай „С договор“</button>}
             {club.subscription?.mode === "contract" && <>
-              <button type="button" disabled={busy || loading} onClick={() => { setError(""); setEditor({ clubId: club.id, action: "start_paid" }); }}>Редактирай абонамента</button>
               <button type="button" disabled={busy || loading} onClick={() => setEditor({ clubId: club.id, action: "history" })}>История</button></>}
             {club.subscription?.mode === "trial" && <>
               <button type="button" disabled={busy || loading} onClick={() => { setError(""); setEditor({ clubId: club.id, action: "trial" }); }}>Редактирай пробния период</button>
@@ -134,9 +134,9 @@ export default function SubscriptionsPageClient() {
             {club.billingStatus === "active" && <Link href={`/admin/members?clubId=${club.id}`}>Отвори клуба ↗</Link>}
           </div>
           {club.billingStatus === "active" && club.subscription && <details className={styles.calculatorSettings}><summary><Calculator size={18} aria-hidden="true" />Финансов калкулатор<span>Настройки и плащания</span></summary><CalculatorSubscription club={club} revision={calculatorRevision} sharedPrices={sharedCalculatorPrices} onSaved={() => { void load().catch(e => setError(e.message)); }} /></details>}
-          {editor?.clubId === club.id && club.subscription && <section className={styles.editor}>
-            <div className={styles.editorHeader}><h3>{({ trial: "Редакция на пробен период", start_paid: "Платен абонамент", fee: "Промяна на месечната такса", payment: "Запис на плащане", history: "История и такси" })[editor.action]}</h3><button type="button" disabled={busy} onClick={() => setEditor(null)}>Затвори</button></div>
-            <SubscriptionEditor key={`${club.id}-${club.subscription.version}-${editor.action}`} club={club} action={editor.action} busy={busy} save={(body) => save(club, body)} onCalculatorSaved={() => { void load().catch(e => setError(e.message)); }} />
+          {editor?.clubId === club.id && (club.subscription || editor.action === "configure") && <section className={styles.editor}>
+            <div className={styles.editorHeader}><h3>{({ configure: "Вид и настройки на абонамента", trial: "Редакция на пробен период", start_paid: "Платен абонамент", fee: "Промяна на месечната такса", payment: "Запис на плащане", history: "История и такси" })[editor.action]}</h3><button type="button" disabled={busy} onClick={() => setEditor(null)}>Затвори</button></div>
+            <SubscriptionEditor key={`${club.id}-${club.subscription?.version ?? 0}-${editor.action}`} club={club} action={editor.action} busy={busy} save={(body) => save(club, body)} onCalculatorSaved={() => { void load().catch(e => setError(e.message)); }} />
           </section>}
         </article>)}
       </div>
@@ -145,8 +145,9 @@ export default function SubscriptionsPageClient() {
 }
 
 function SubscriptionEditor({ club, action, busy, save, onCalculatorSaved }: { club: ClubSubscriptionView; action: Action; busy: boolean; save: Save; onCalculatorSaved: () => void }) {
-  const subscription = club.subscription!;
-  const [draft, setDraft] = useState<SubscriptionDraft>(() => ({ ...defaultTrialDraft(), mode: action === "start_paid" ? "paid" : "trial",
+  const subscription = club.subscription ?? { mode: "trial" as const, trialEndDate: null, firstBillingMonth: null, fees: [], payments: [] };
+  const [draft, setDraft] = useState<SubscriptionDraft>(() => ({ ...defaultTrialDraft(), mode: action === "configure" ? subscription.mode as SubscriptionDraft["mode"] : action === "start_paid" ? "paid" : "trial",
+    firstBillingMonth: subscription.firstBillingMonth ?? localToday().slice(0, 7), amount: club.summary.currentFee ?? "",
     trialChoice: subscription.trialEndDate ? "limited" : "unlimited", trialEndDate: subscription.trialEndDate ?? "" }));
   const minimumFeeMonth = earliestFeeChangeMonth(subscription.firstBillingMonth ?? localToday().slice(0, 7), subscription.payments);
   const [effectiveMonth, setEffectiveMonth] = useState(() => {
@@ -170,15 +171,15 @@ function SubscriptionEditor({ club, action, busy, save, onCalculatorSaved }: { c
     } catch (error) { setFormError((error as Error).message); }
   }
   return <form onSubmit={(e) => void submit(e)}>
-    {subscription.mode === "contract" && <p className={styles.hint}>Запазването заменя статуса „С договор“ с платен абонамент в приложението. Началният месец трябва да е след последния платен месец. Предишните плащания и планираните промени на таксата се запазват.</p>}
+    {action === "configure" && <p className={styles.hint}>Изберете безплатен пробен период, платен абонамент или договор. Историята и предишните плащания се запазват. При платен абонамент началният месец трябва да е след последния платен месец; за текущата такса използвайте „Редактирай таксата“.</p>}
     {action === "fee" ? <fieldset disabled={busy} className={styles.formFields}>
       <label htmlFor={`${id}-amount`}>Нова месечна такса (EUR)<input id={`${id}-amount`} type="text" inputMode="decimal" required value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
       <label htmlFor={`${id}-month`}>В сила от месец<input id={`${id}-month`} type="month" min={minimumFeeMonth} max="2199-12" required value={effectiveMonth} onChange={(e) => setEffectiveMonth(e.target.value)} /></label>
       <p>Най-ранен месец за промяна: {monthLabel(minimumFeeMonth)}. Новата такса може да влиза в сила само след последния платен месец.</p>
       <p>Сегашна такса за избрания месец: {feeForMonth(subscription.fees, effectiveMonth) ?? "—"} EUR. Новата такса важи до следващата зададена промяна. Платените суми се запазват.</p>
       <p>Промяната се запазва в „Известия за треньори“ за клуба. Push известието се изпраща само до устройствата на клуба, без треньорските групи.</p>
-    </fieldset> : <SubscriptionSetupFields value={draft} onChange={setDraft} disabled={busy} fixedMode={action === "trial" ? "trial" : "paid"} />}
-    {action !== "fee" && <p className={styles.hint}>При промяна клубът ще получи съобщение в „Известия за треньори“ и push известие на активираните устройства на клуба.</p>}
+    </fieldset> : <SubscriptionSetupFields value={draft} onChange={setDraft} disabled={busy} fixedMode={action === "configure" ? undefined : action === "trial" ? "trial" : "paid"} />}
+    {action !== "fee" && draft.mode !== "contract" && <p className={styles.hint}>При промяна клубът ще получи съобщение в „Известия за треньори“ и push известие на активираните устройства на клуба.</p>}
     {formError && <p role="alert" className={styles.error}>{formError}</p>}
     <button className={styles.primary} disabled={busy} type="submit">{busy ? "Запазване…" : "Запази"}</button>
   </form>;
