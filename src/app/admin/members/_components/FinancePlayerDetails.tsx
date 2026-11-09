@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MemberDetailModal } from './members-page-components';
+import { MemberDetailModal } from './MemberDetailModal';
 import { normalizeMember } from '../_utils/members-page-utils';
 import type { Member } from '../_types/members-page-types';
 import '../page.css';

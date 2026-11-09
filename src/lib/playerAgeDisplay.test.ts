@@ -7,7 +7,7 @@ import { playerFieldEnabled } from "./playerFields";
 
 it.each([
   ["src/app/member/[cardCode]/page.tsx", "info-row", 1],
-  ["src/app/admin/members/_components/members-page-components.tsx", "amp-info-cell", 2],
+  ["src/app/admin/members/_components/MemberDetailModal.tsx", "amp-info-cell", 1],
 ] as const)("displays saved age in %s even when optional fields are disabled", (path, className, count) => {
   const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const rows: ts.Expression[] = [];
