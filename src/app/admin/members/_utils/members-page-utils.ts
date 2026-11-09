@@ -391,3 +391,7 @@ export {
   buildCalendarMonths,
   getStatusMeta,
 };
+
+export function sortByName<T extends { name: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.name.localeCompare(b.name, "bg", { sensitivity: "base", numeric: true }));
+}

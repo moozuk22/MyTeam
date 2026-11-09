@@ -367,3 +367,6 @@ export type {
   LimitedEventRegistration,
   LimitedEventDetail,
 };
+
+export type PaymentWorkflow =
+  "calendar_month" | "rolling_30_days" | "training_credits" | "training_credits_30_days";

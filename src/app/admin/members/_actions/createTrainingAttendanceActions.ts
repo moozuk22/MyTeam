@@ -1,0 +1,956 @@
+import { getScopeKeyFromSessionId } from "../_utils/training-session-scope";
+import type * as React from "react";
+import { mergeTrainingCalendarDates } from "@/lib/trainingCalendarDates";
+import { getNewTrainingEditorMode } from "@/lib/coachTrainingWizard";
+import { type CoachTraining } from "@/lib/coachTrainingSchedule";
+import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
+import {
+  DEFAULT_TRAINING_DURATION_MINUTES,
+  TRAINING_TIME_REGEX,
+  getTodayIsoDate,
+  parseSelectedTeamGroup,
+} from "../_utils/members-page-utils";
+import {
+  type TrainingAttendancePlayer,
+  type TrainingUpcomingDateItem,
+  type TrainingWeekSessionItem,
+  type LimitedEventDetail,
+} from "../_types/members-page-types";
+import { getMonthKeyFromIsoDate, addMonthsToMonthKey } from "../_utils/members-calendar";
+import { type TrainingDaysForm } from "../_hooks/useTrainingDaysForm";
+import { type TrainingGroups } from "../_hooks/useTrainingGroups";
+import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceState";
+import { type MatchEditorState } from "../_hooks/useMatchEditorState";
+
+type Options = {
+  trainingAttendanceState: Pick<
+    TrainingAttendanceState,
+    | "trainingAttendanceView"
+    | "setTrainingAttendanceLoading"
+    | "setTrainingAttendanceError"
+    | "trainingAttendanceMonth"
+    | "setTrainingAttendanceSessionId"
+    | "setTrainingAttendanceDate"
+    | "setTrainingAttendancePlayers"
+    | "setTrainingAttendanceStats"
+    | "setTrainingUpcomingDates"
+    | "setTrainingWeekSessions"
+    | "setTrainingDayDurationMinutes"
+    | "setTrainingDayTime"
+    | "setTrainingPlayersExpanded"
+    | "setTrainingDayField"
+    | "setTrainingDayFieldPieceIds"
+    | "setTrainingDaySessionCancelled"
+    | "setTrainingDayCancelConfirmOpen"
+    | "setTrainingWeekLoading"
+    | "setTrainingWeekDates"
+    | "setTrainingAttendanceHideTeamsTab"
+    | "setTrainingAttendanceOpen"
+    | "setTrainingAttendanceMonth"
+    | "setTrainingAttendanceView"
+    | "setTrainingDayDetailsOpen"
+    | "setWeekColorFilter"
+    | "trainingAttendanceOpen"
+    | "trainingAttendanceHideTeamsTab"
+    | "trainingDayDetailsTab"
+    | "setLimitedEvent"
+    | "setLimitedEventLoading"
+    | "setTrainingDayDetailsOpening"
+    | "setTrainingDayDetailsViewSnapshot"
+    | "trainingWeekSessions"
+    | "setTrainingDayDetailsTab"
+    | "setShowLimitedForm"
+    | "setLimitedEventError"
+    | "setLimitedSpotsInput"
+    | "setTrainingDayDetailsTabLoading"
+    | "trainingAttendanceDate"
+    | "trainingDayCancelLoading"
+    | "setTrainingDayCancelLoading"
+    | "trainingAttendanceSessionId"
+  >;
+  trainingGroups: Pick<
+    TrainingGroups,
+    | "selectedTrainingGroupId"
+    | "isCustomTrainingGroupMode"
+    | "customTrainingGroups"
+    | "loadCustomTrainingGroups"
+    | "trainingScheduleGroups"
+    | "loadTrainingScheduleGroups"
+    | "setSelectedTrainingGroupId"
+  >;
+  trainingDaysForm: Pick<TrainingDaysForm, "setTrainingDaysEditorOpen" | "setTrainingDaysEditorError">;
+  matchEditorState: Pick<MatchEditorState, "setMatchCalendarVisibleMonthIdx" | "setMatchEditTarget">;
+  clubId: string;
+  trainingGroupScope: string;
+  coachGroupId: string;
+  currentCoachGroupName: string;
+  setTrainingNote: React.Dispatch<React.SetStateAction<string>>;
+  setTrainingNotesByDate: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setTrainingNoteTargetDates: React.Dispatch<React.SetStateAction<string[]>>;
+  setPostTeamGroupSavePromptOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setTrainingBulkNoteOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setSchedulerCalendarVisibleMonthIdx: React.Dispatch<React.SetStateAction<number>>;
+  fetchClubMatches: () => Promise<void>;
+  standaloneTeamGroups: number[];
+  setTrainingGroupScope: React.Dispatch<React.SetStateAction<string>>;
+  resolvedTrainingGroupScope: string;
+  openTrainingDaysEditor: (
+    mode?: "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup",
+    editDate?: string,
+    coachTarget?: { groupId: string; sessionId?: string },
+  ) => Promise<void>;
+  trainingUpcomingByDate: Map<string, TrainingUpcomingDateItem>;
+};
+
+export function createTrainingAttendanceActions({
+  trainingAttendanceState,
+  trainingGroups,
+  trainingDaysForm,
+  matchEditorState,
+  clubId,
+  trainingGroupScope,
+  coachGroupId,
+  currentCoachGroupName,
+  setTrainingNote,
+  setTrainingNotesByDate,
+  setTrainingNoteTargetDates,
+  setPostTeamGroupSavePromptOpen,
+  setTrainingBulkNoteOpen,
+  setSchedulerCalendarVisibleMonthIdx,
+  fetchClubMatches,
+  standaloneTeamGroups,
+  setTrainingGroupScope,
+  resolvedTrainingGroupScope,
+  openTrainingDaysEditor,
+  trainingUpcomingByDate,
+}: Options) {
+  const {
+    trainingAttendanceView,
+    setTrainingAttendanceLoading,
+    setTrainingAttendanceError,
+    trainingAttendanceMonth,
+    setTrainingAttendanceSessionId,
+    setTrainingAttendanceDate,
+    setTrainingAttendancePlayers,
+    setTrainingAttendanceStats,
+    setTrainingUpcomingDates,
+    setTrainingWeekSessions,
+    setTrainingDayDurationMinutes,
+    setTrainingDayTime,
+    setTrainingPlayersExpanded,
+    setTrainingDayField,
+    setTrainingDayFieldPieceIds,
+    setTrainingDaySessionCancelled,
+    setTrainingDayCancelConfirmOpen,
+    setTrainingWeekLoading,
+    setTrainingWeekDates,
+    setTrainingAttendanceHideTeamsTab,
+    setTrainingAttendanceOpen,
+    setTrainingAttendanceMonth,
+    setTrainingAttendanceView,
+    setTrainingDayDetailsOpen,
+    setWeekColorFilter,
+    trainingAttendanceOpen,
+    trainingAttendanceHideTeamsTab,
+    trainingDayDetailsTab,
+    setLimitedEvent,
+    setLimitedEventLoading,
+    setTrainingDayDetailsOpening,
+    setTrainingDayDetailsViewSnapshot,
+    trainingWeekSessions,
+    setTrainingDayDetailsTab,
+    setShowLimitedForm,
+    setLimitedEventError,
+    setLimitedSpotsInput,
+    setTrainingDayDetailsTabLoading,
+    trainingAttendanceDate,
+    trainingDayCancelLoading,
+    setTrainingDayCancelLoading,
+    trainingAttendanceSessionId,
+  } = trainingAttendanceState;
+  const {
+    selectedTrainingGroupId,
+    isCustomTrainingGroupMode,
+    customTrainingGroups,
+    loadCustomTrainingGroups,
+    trainingScheduleGroups,
+    loadTrainingScheduleGroups,
+    setSelectedTrainingGroupId,
+  } = trainingGroups;
+  const { setTrainingDaysEditorOpen, setTrainingDaysEditorError } = trainingDaysForm;
+  const { setMatchCalendarVisibleMonthIdx, setMatchEditTarget } = matchEditorState;
+  const fetchTrainingAttendance = async (
+    date?: string,
+    groupScopeOverride?: string,
+    trainingGroupIdOverride?: string,
+    viewOverride?: "teamGroup" | "trainingGroups",
+    monthOverride?: string,
+    trainingSessionIdOverride?: string,
+    legacyScopeOverride = false,
+  ) => {
+    if (!clubId) return;
+    const resolvedView = viewOverride ?? trainingAttendanceView;
+    const teamGroupFilter =
+      resolvedView === "teamGroup" ? parseSelectedTeamGroup(groupScopeOverride ?? trainingGroupScope) : null;
+    const trainingGroupFilter =
+      resolvedView === "trainingGroups" ? (trainingGroupIdOverride ?? selectedTrainingGroupId).trim() : "";
+    setTrainingAttendanceLoading(true);
+    setTrainingAttendanceError("");
+    try {
+      const search = new URLSearchParams();
+      if (coachGroupId && !legacyScopeOverride) search.set("coachGroupId", coachGroupId);
+      if (trainingSessionIdOverride) search.set("trainingSessionId", trainingSessionIdOverride);
+      if (date) {
+        search.set("date", date);
+      }
+      const requestedMonth = monthOverride ?? (date ? getMonthKeyFromIsoDate(date) : trainingAttendanceMonth);
+      search.set("month", requestedMonth);
+      if (teamGroupFilter !== null) {
+        search.set("teamGroup", String(teamGroupFilter));
+      }
+      if (trainingGroupFilter) {
+        search.set(
+          isCustomTrainingGroupMode ? "customTrainingGroupId" : "trainingGroupId",
+          trainingGroupFilter,
+        );
+      }
+      const query = search.size ? `?${search.toString()}` : "";
+      const response = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance${query}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно зареждане на присъствие.",
+        );
+      }
+
+      const payload = await response.json();
+      setTrainingAttendanceSessionId(
+        typeof payload.trainingSessionId === "string" ? payload.trainingSessionId : null,
+      );
+      const players = Array.isArray(payload?.players)
+        ? payload.players.map((item: unknown) => {
+            const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+            return {
+              id: String(raw.id ?? ""),
+              fullName: String(raw.fullName ?? ""),
+              teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
+              cardCode: raw.cardCode ? String(raw.cardCode) : null,
+              optedOut: Boolean(raw.optedOut),
+            } satisfies TrainingAttendancePlayer;
+          })
+        : [];
+      const parseUpcomingDates = (items: unknown): TrainingUpcomingDateItem[] =>
+        Array.isArray(items)
+          ? items
+              .map((item: unknown) => {
+                const raw =
+                  typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+                const rawStats =
+                  typeof raw.stats === "object" && raw.stats !== null
+                    ? (raw.stats as Record<string, unknown>)
+                    : {};
+                return {
+                  date: String(raw.date ?? ""),
+                  sessions: Array.isArray(raw.sessions)
+                    ? raw.sessions
+                        .map((entry: unknown) => {
+                          const session =
+                            entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+                          return {
+                            id: String(session.id ?? ""),
+                            trainingTime:
+                              typeof session.trainingTime === "string" ? session.trainingTime : null,
+                            trainingDurationMinutes: Number(session.trainingDurationMinutes ?? 60),
+                          };
+                        })
+                        .filter((session: { id: string }) => session.id)
+                    : undefined,
+                  weekday: Number(raw.weekday ?? 0),
+                  trainingTime:
+                    typeof raw.trainingTime === "string" && TRAINING_TIME_REGEX.test(raw.trainingTime.trim())
+                      ? raw.trainingTime.trim()
+                      : null,
+                  stats: {
+                    total: Number(rawStats.total ?? 0),
+                    attending: Number(rawStats.attending ?? 0),
+                    optedOut: Number(rawStats.optedOut ?? 0),
+                  },
+                };
+              })
+              .filter((item: TrainingUpcomingDateItem) => /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+          : [];
+
+      let upcomingDates = parseUpcomingDates(payload.upcomingDates);
+      if (coachGroupId) {
+        const companionSearch = new URLSearchParams(search);
+        companionSearch.delete("trainingSessionId");
+        companionSearch.delete("date");
+        if (legacyScopeOverride) companionSearch.set("coachGroupId", coachGroupId);
+        else companionSearch.delete("coachGroupId");
+        const companionResponse = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance?${companionSearch}`,
+          { cache: "no-store" },
+        );
+        if (!companionResponse.ok) throw new Error("Неуспешно зареждане на всички тренировки.");
+        const companion = parseUpcomingDates((await companionResponse.json()).upcomingDates);
+        upcomingDates = legacyScopeOverride
+          ? mergeTrainingCalendarDates(upcomingDates, companion)
+          : mergeTrainingCalendarDates(companion, upcomingDates);
+      }
+
+      const resolvedDate = payload?.trainingDate || date || "";
+      const resolvedScopeKey = payload.trainingSessionId
+        ? `session:${payload.trainingSessionId}`
+        : resolvedView === "trainingGroups"
+          ? `trainingGroup:${trainingGroupFilter || "-"}`
+          : `teamGroup:${teamGroupFilter === null ? "all" : String(teamGroupFilter)}`;
+      setTrainingAttendanceDate(resolvedDate);
+      setTrainingAttendancePlayers(players);
+      setTrainingAttendanceStats({
+        total: Number(payload?.stats?.total ?? players.length),
+        attending: Number(
+          payload?.stats?.attending ??
+            players.filter((player: TrainingAttendancePlayer) => !player.optedOut).length,
+        ),
+        optedOut: Number(
+          payload?.stats?.optedOut ??
+            players.filter((player: TrainingAttendancePlayer) => player.optedOut).length,
+        ),
+      });
+      setTrainingUpcomingDates(upcomingDates);
+      const calendarCoachGroupId = coachGroupId || payload.coachGroupId;
+      if (typeof calendarCoachGroupId === "string" && calendarCoachGroupId) {
+        const prefix = `coach-${calendarCoachGroupId}-`;
+        const calendarSessions: TrainingWeekSessionItem[] = upcomingDates.flatMap(
+          (day: TrainingUpcomingDateItem) =>
+            (day.sessions ?? []).map((session) => ({
+              id: `${prefix}${session.id}`,
+              date: day.date,
+              trainingTime: session.trainingTime,
+              scopeType: "trainingGroup" as const,
+              eventType: "training" as const,
+              teamGroups: [],
+              label: currentCoachGroupName || "Тренировка",
+              durationMinutes: session.trainingDurationMinutes,
+            })),
+        );
+        setTrainingWeekSessions((previous) => [
+          ...previous.filter(
+            (session) => !(session.id.startsWith(prefix) && session.date.startsWith(requestedMonth)),
+          ),
+          ...calendarSessions.map((session) => ({
+            ...previous.find((existing) => existing.id === session.id),
+            ...session,
+            limitedSpots: previous.find((existing) => existing.id === session.id)?.limitedSpots,
+          })),
+        ]);
+      }
+      setTrainingNote(typeof payload?.note === "string" ? payload.note : "");
+      if (resolvedDate) {
+        setTrainingNotesByDate((prev) => ({
+          ...prev,
+          [`${resolvedScopeKey}|${resolvedDate}`]: typeof payload?.note === "string" ? payload.note : "",
+        }));
+      }
+      setTrainingNoteTargetDates((prev) => {
+        const allowedSet = new Set(upcomingDates.map((item: TrainingUpcomingDateItem) => item.date));
+        const filtered = prev.filter((item) => allowedSet.has(item));
+        if (filtered.length > 0) {
+          return filtered;
+        }
+        return resolvedDate ? [resolvedDate] : [];
+      });
+      setTrainingDayDurationMinutes(
+        typeof payload?.trainingDurationMinutes === "number" && payload.trainingDurationMinutes > 0
+          ? payload.trainingDurationMinutes
+          : DEFAULT_TRAINING_DURATION_MINUTES,
+      );
+      setTrainingDayTime(
+        typeof payload?.trainingTime === "string" && TRAINING_TIME_REGEX.test(payload.trainingTime.trim())
+          ? payload.trainingTime.trim()
+          : null,
+      );
+      setTrainingPlayersExpanded(false);
+      const rawField = payload?.trainingField;
+      setTrainingDayField(
+        rawField && typeof rawField === "object" && rawField !== null
+          ? {
+              id: String((rawField as Record<string, unknown>).id ?? ""),
+              name: String((rawField as Record<string, unknown>).name ?? ""),
+              fieldType:
+                typeof (rawField as Record<string, unknown>).fieldType === "string"
+                  ? String((rawField as Record<string, unknown>).fieldType)
+                  : "football",
+              pieces: Array.isArray((rawField as Record<string, unknown>).pieces)
+                ? ((rawField as Record<string, unknown>).pieces as unknown[]).map((p) => {
+                    const rp = typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {};
+                    return { id: String(rp.id ?? ""), name: String(rp.name ?? "") };
+                  })
+                : [],
+            }
+          : null,
+      );
+      setTrainingDayFieldPieceIds(
+        Array.isArray(payload?.trainingFieldPieceIds)
+          ? (payload.trainingFieldPieceIds as unknown[]).map(String)
+          : [],
+      );
+      setTrainingDaySessionCancelled(
+        typeof payload?.sessionStatus === "string" ? payload.sessionStatus === "cancelled" : false,
+      );
+      setTrainingDayCancelConfirmOpen(false);
+    } catch (error) {
+      setTrainingAttendanceSessionId(null);
+      setTrainingAttendancePlayers([]);
+      setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
+      setTrainingUpcomingDates([]);
+      setTrainingNote("");
+      setTrainingNoteTargetDates([]);
+      setTrainingDayDurationMinutes(DEFAULT_TRAINING_DURATION_MINUTES);
+      setTrainingDayTime(null);
+      setTrainingDayField(null);
+      setTrainingDayFieldPieceIds([]);
+      setTrainingDaySessionCancelled(false);
+      setTrainingDayCancelConfirmOpen(false);
+      setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
+    } finally {
+      setTrainingAttendanceLoading(false);
+    }
+  };
+
+  const fetchTrainingWeekSessions = async (options?: { silent?: boolean }) => {
+    if (!clubId) return;
+    const showLoading = !options?.silent;
+    if (showLoading) {
+      setTrainingWeekLoading(true);
+    }
+    setTrainingAttendanceError("");
+    try {
+      const response = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/week`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Неуспешно зареждане на седмичния график.",
+        );
+      }
+      const payload = await response.json();
+      const dates: string[] = Array.isArray(payload?.dates)
+        ? payload.dates.filter((d: unknown) => typeof d === "string")
+        : [];
+      const sessions: TrainingWeekSessionItem[] = Array.isArray(payload?.sessions)
+        ? payload.sessions.map((item: unknown) => {
+            const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
+            return {
+              id: String(raw.id ?? ""),
+              date: String(raw.date ?? ""),
+              trainingTime: typeof raw.trainingTime === "string" ? raw.trainingTime : null,
+              scopeType: raw.scopeType === "trainingGroup" ? "trainingGroup" : "teamGroup",
+              eventType: raw.eventType === "match" ? "match" : "training",
+              label: String(raw.label ?? ""),
+              teamGroups: Array.isArray(raw.teamGroups)
+                ? (raw.teamGroups as unknown[]).map(Number).filter(Number.isInteger)
+                : [],
+              location: typeof raw.location === "string" ? raw.location : undefined,
+              scopeLabel: typeof raw.scopeLabel === "string" ? raw.scopeLabel : undefined,
+              isHome: typeof raw.isHome === "boolean" ? raw.isHome : undefined,
+              durationMinutes: typeof raw.durationMinutes === "number" ? raw.durationMinutes : undefined,
+              customGroupId: typeof raw.customGroupId === "string" ? raw.customGroupId : null,
+              color: (() => {
+                const c = typeof raw.color === "string" ? raw.color.trim() : "";
+                return isCustomTrainingGroupPaletteColor(c) ? c : undefined;
+              })(),
+              limitedSpots: (() => {
+                const ls = raw.limitedSpots;
+                if (!ls || typeof ls !== "object") return null;
+                const o = ls as Record<string, unknown>;
+                if (
+                  typeof o.id !== "string" ||
+                  typeof o.maxSpots !== "number" ||
+                  typeof o.registeredCount !== "number"
+                )
+                  return null;
+                return { id: o.id, maxSpots: o.maxSpots, registeredCount: o.registeredCount };
+              })(),
+            } satisfies TrainingWeekSessionItem;
+          })
+        : [];
+      setTrainingWeekDates(dates);
+      setTrainingWeekSessions(sessions);
+      console.log("[WeekSchedule] sessions", sessions);
+      return sessions;
+    } catch (error) {
+      if (showLoading) {
+        setTrainingWeekDates([]);
+        setTrainingWeekSessions([]);
+      }
+      setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
+      return [];
+    } finally {
+      if (showLoading) {
+        setTrainingWeekLoading(false);
+      }
+    }
+  };
+
+  const openTrainingAttendance = async (options?: { hideTeamsTab?: boolean }) => {
+    if (!clubId) return;
+    const currentMonth = getTodayIsoDate().slice(0, 7);
+    setTrainingAttendanceHideTeamsTab(Boolean(options?.hideTeamsTab));
+    setTrainingAttendanceOpen(true);
+    setTrainingAttendanceMonth(currentMonth);
+    setPostTeamGroupSavePromptOpen(false);
+    setTrainingAttendanceView("today");
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingNoteTargetDates([]);
+    setWeekColorFilter(null);
+    setSchedulerCalendarVisibleMonthIdx(0);
+    setMatchCalendarVisibleMonthIdx(0);
+    const [sessions = []] = await Promise.all([fetchTrainingWeekSessions(), fetchClubMatches()]);
+    if (!options?.hideTeamsTab && sessions.length === 0) {
+      setTrainingAttendanceView("trainingGroups");
+      const groups = isCustomTrainingGroupMode
+        ? customTrainingGroups.length > 0
+          ? customTrainingGroups
+          : await loadCustomTrainingGroups()
+        : trainingScheduleGroups.length > 0
+          ? trainingScheduleGroups
+          : await loadTrainingScheduleGroups();
+      const resolvedGroupId =
+        selectedTrainingGroupId && groups.some((g) => g.id === selectedTrainingGroupId)
+          ? selectedTrainingGroupId
+          : (groups[0]?.id ?? "");
+      setSelectedTrainingGroupId(resolvedGroupId);
+      if (!resolvedGroupId) {
+        if (!isCustomTrainingGroupMode && standaloneTeamGroups.length > 0) {
+          const firstYear = String(standaloneTeamGroups[0]);
+          setTrainingAttendanceView("teamGroup");
+          setTrainingGroupScope(firstYear);
+          await fetchTrainingAttendance(undefined, firstYear, undefined, "teamGroup");
+          return;
+        }
+        return;
+      }
+      await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
+    }
+  };
+
+  const handleTrainingGroupScopeChange = async (nextScope: string) => {
+    setTrainingGroupScope(nextScope);
+    if (!trainingAttendanceOpen) {
+      return;
+    }
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingAttendanceError("");
+    setTrainingNoteTargetDates([]);
+    await fetchTrainingAttendance(undefined, nextScope);
+  };
+
+  const handleTrainingAttendanceViewChange = async (nextView: "teamGroup" | "trainingGroups" | "today") => {
+    if (trainingAttendanceHideTeamsTab && nextView !== "today") {
+      return;
+    }
+    setTrainingAttendanceView(nextView);
+    if (!trainingAttendanceOpen) {
+      return;
+    }
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingAttendanceError("");
+    setTrainingNoteTargetDates([]);
+
+    if (nextView === "today") {
+      await fetchTrainingWeekSessions();
+      return;
+    }
+
+    if (nextView === "teamGroup") {
+      // Internally kept for standalone team group selections
+      await fetchTrainingAttendance(undefined, resolvedTrainingGroupScope, undefined, "teamGroup");
+      return;
+    }
+
+    const groups = isCustomTrainingGroupMode
+      ? customTrainingGroups.length > 0
+        ? customTrainingGroups
+        : await loadCustomTrainingGroups()
+      : trainingScheduleGroups.length > 0
+        ? trainingScheduleGroups
+        : await loadTrainingScheduleGroups();
+    const resolvedGroupId =
+      selectedTrainingGroupId && groups.some((group) => group.id === selectedTrainingGroupId)
+        ? selectedTrainingGroupId
+        : (groups[0]?.id ?? "");
+    setSelectedTrainingGroupId(resolvedGroupId);
+    if (!resolvedGroupId) {
+      if (!isCustomTrainingGroupMode && standaloneTeamGroups.length > 0) {
+        const firstYear = String(standaloneTeamGroups[0]);
+        setTrainingAttendanceView("teamGroup");
+        setTrainingGroupScope(firstYear);
+        await fetchTrainingAttendance(undefined, firstYear, undefined, "teamGroup");
+        return;
+      }
+      setTrainingAttendancePlayers([]);
+      setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
+      setTrainingUpcomingDates([]);
+      setTrainingAttendanceDate("");
+      return;
+    }
+    await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
+  };
+
+  const handleTrainingAttendanceMonthChange = async (delta: number) => {
+    const nextMonth = addMonthsToMonthKey(trainingAttendanceMonth, delta);
+    setTrainingAttendanceMonth(nextMonth);
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingAttendanceError("");
+    setTrainingNoteTargetDates([]);
+    await fetchTrainingAttendance(undefined, undefined, undefined, undefined, nextMonth);
+  };
+
+  const handleSelectedTrainingGroupChange = async (nextGroupId: string) => {
+    setSelectedTrainingGroupId(nextGroupId);
+    if (!trainingAttendanceOpen || trainingAttendanceView !== "trainingGroups") {
+      return;
+    }
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingAttendanceError("");
+    setTrainingNoteTargetDates([]);
+    await fetchTrainingAttendance(undefined, undefined, nextGroupId, "trainingGroups");
+  };
+
+  const handleUnifiedGroupChange = async (value: string) => {
+    setTrainingDayDetailsOpen(false);
+    setTrainingBulkNoteOpen(false);
+    setTrainingDaysEditorOpen(false);
+    setTrainingDaysEditorError("");
+    setTrainingAttendanceError("");
+    setTrainingNoteTargetDates([]);
+    setTrainingAttendanceHideTeamsTab(false);
+    if (value.startsWith("year:")) {
+      const yearStr = value.slice(5);
+      setTrainingAttendanceView("teamGroup");
+      setTrainingGroupScope(yearStr);
+      if (trainingAttendanceOpen) {
+        await fetchTrainingAttendance(undefined, yearStr, undefined, "teamGroup");
+      }
+    } else {
+      setTrainingAttendanceView("trainingGroups");
+      setSelectedTrainingGroupId(value);
+      if (trainingAttendanceOpen && value) {
+        await fetchTrainingAttendance(undefined, undefined, value, "trainingGroups");
+      }
+    }
+  };
+
+  const openTrainingDaysEditorForCurrentScope = async () => {
+    const mode = getNewTrainingEditorMode({
+      coachGroupId,
+      view: trainingAttendanceView,
+      isCustomGroupMode: isCustomTrainingGroupMode,
+    });
+    if (mode === "customGroup" || mode === "trainingGroup") {
+      if (!selectedTrainingGroupId) {
+        setTrainingAttendanceError("Изберете група.");
+        return;
+      }
+    }
+    await openTrainingDaysEditor(mode);
+  };
+
+  const openSingleTrainingDayEditForCurrentScope = async (date: string) => {
+    if (trainingDayDetailsTab.startsWith("coach-")) {
+      await openTrainingDaysEditor("coachGroup", date, {
+        groupId: trainingDayDetailsTab.slice(6, 42),
+        sessionId: trainingDayDetailsTab.slice(43),
+      });
+      return;
+    }
+    if (trainingAttendanceView === "trainingGroups") {
+      if (!selectedTrainingGroupId) return;
+      await openTrainingDaysEditor(isCustomTrainingGroupMode ? "customGroup" : "trainingGroup", date);
+      return;
+    }
+    if (coachGroupId) {
+      await openTrainingDaysEditor("coachGroup", date);
+      return;
+    }
+    await openTrainingDaysEditor("teamGroup", date);
+  };
+
+  const fetchLimitedEventForSession = async (date: string, sessionId: string) => {
+    if (!clubId) return;
+    const scopeKey = getScopeKeyFromSessionId(sessionId);
+    if (!scopeKey) {
+      setLimitedEvent(null);
+      return;
+    }
+    setLimitedEventLoading(true);
+    try {
+      const url = `/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events?date=${encodeURIComponent(date)}&scopeKey=${encodeURIComponent(scopeKey)}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        setLimitedEvent(null);
+        return;
+      }
+      const data: unknown = await res.json();
+      let arr = Array.isArray(data) ? data : [];
+      if (!arr.length && sessionId.startsWith("coach-")) {
+        const groupId = sessionId.slice(6, 42);
+        const [legacyResponse, scheduleResponse] = await Promise.all([
+          fetch(
+            `/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events?date=${encodeURIComponent(date)}&scopeKey=${encodeURIComponent(`coach_group:${groupId}`)}`,
+            { cache: "no-store" },
+          ),
+          fetch(
+            `/api/admin/clubs/${encodeURIComponent(clubId)}/coach-groups/${encodeURIComponent(groupId)}/schedule`,
+            { cache: "no-store" },
+          ),
+        ]);
+        if (legacyResponse.ok && scheduleResponse.ok) {
+          const legacy = await legacyResponse.json();
+          const schedule = await scheduleResponse.json();
+          const original = (schedule.trainings as Array<CoachTraining & { createdAt: string }>)
+            .filter((t) => t.date === date)
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+          if (original?.id === sessionId.slice(43) && Array.isArray(legacy)) arr = legacy;
+        }
+      }
+      if (arr.length === 0) {
+        setLimitedEvent(null);
+        return;
+      }
+      const ev = arr[0] as {
+        id: string;
+        scopeKey: string;
+        scopeId: string | null;
+        teamGroup: number | null;
+        trainingDate: string;
+        maxSpots: number;
+        registeredCount: number;
+      };
+      // Fetch full event details with registrations
+      const detailRes = await fetch(
+        `/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events/${encodeURIComponent(ev.id)}`,
+        { cache: "no-store" },
+      );
+      if (!detailRes.ok) {
+        setLimitedEvent(null);
+        return;
+      }
+      const detail = (await detailRes.json()) as {
+        event: LimitedEventDetail;
+        registrations: LimitedEventDetail["registrations"];
+        spotsRemaining: number;
+      };
+      setLimitedEvent({
+        ...detail.event,
+        registrations: detail.registrations,
+        spotsRemaining: detail.spotsRemaining,
+      });
+    } catch {
+      setLimitedEvent(null);
+    } finally {
+      setLimitedEventLoading(false);
+    }
+  };
+
+  const openTrainingDayDetails = async (date: string, sessionId?: string) => {
+    setMatchEditTarget(null);
+    const month = getMonthKeyFromIsoDate(date);
+    setTrainingDayDetailsOpening(true);
+    setTrainingDayDetailsViewSnapshot(trainingAttendanceView);
+    setTrainingAttendanceDate(date);
+    setTrainingAttendanceMonth(month);
+    const dateSessions = trainingWeekSessions.filter(
+      (session) => session.date === date && session.eventType !== "match",
+    );
+    const firstSession =
+      dateSessions.find(
+        (session) =>
+          selectedTrainingGroupId &&
+          (session.id === `${date}-custom-${selectedTrainingGroupId}` ||
+            session.id === `${date}-group-${selectedTrainingGroupId}`),
+      ) ??
+      dateSessions.find(
+        (session) =>
+          !coachGroupId ||
+          session.id.startsWith(`coach-${coachGroupId}-`) ||
+          !session.id.startsWith("coach-"),
+      );
+    const calendarSession = trainingUpcomingByDate.get(date)?.sessions?.[0];
+    const firstSessionId =
+      sessionId ??
+      (calendarSession && coachGroupId
+        ? `coach-${coachGroupId}-${calendarSession.id}`
+        : (firstSession?.id ?? "training"));
+    setTrainingDayDetailsTab(firstSessionId);
+    setLimitedEvent(null);
+    setShowLimitedForm(false);
+    setLimitedEventError("");
+    setLimitedSpotsInput("10");
+    // Resolve scope from session ID so the right group data is fetched
+    let _viewOverride: "teamGroup" | "trainingGroups" | undefined;
+    let _groupScopeOverride: string | undefined;
+    let _trainingGroupIdOverride: string | undefined;
+    if (sessionId && !sessionId.startsWith("match-")) {
+      const customM = sessionId.match(/^\d{4}-\d{2}-\d{2}-custom-(.+)$/);
+      const groupM = sessionId.match(/^\d{4}-\d{2}-\d{2}-group-(.+)$/);
+      const teamM = sessionId.match(/^\d{4}-\d{2}-\d{2}-team-(\d+)$/);
+      if (customM) {
+        _viewOverride = "trainingGroups";
+        _trainingGroupIdOverride = customM[1];
+        setTrainingAttendanceView("trainingGroups");
+        setSelectedTrainingGroupId(customM[1]);
+      } else if (groupM) {
+        _viewOverride = "trainingGroups";
+        _trainingGroupIdOverride = groupM[1];
+        setTrainingAttendanceView("trainingGroups");
+        setSelectedTrainingGroupId(groupM[1]);
+      } else if (teamM) {
+        _viewOverride = "teamGroup";
+        _groupScopeOverride = teamM[1];
+        setTrainingAttendanceView("teamGroup");
+        setTrainingGroupScope(teamM[1]);
+      }
+    }
+    try {
+      await Promise.all([
+        fetchTrainingAttendance(
+          date,
+          _groupScopeOverride,
+          _trainingGroupIdOverride,
+          _viewOverride,
+          month,
+          firstSessionId.startsWith("coach-") ? firstSessionId.slice(43) : undefined,
+          !firstSessionId.startsWith("coach-"),
+        ),
+        fetchClubMatches(),
+        fetchLimitedEventForSession(date, firstSessionId),
+      ]);
+      setTrainingDayDetailsOpen(true);
+    } finally {
+      setTrainingDayDetailsOpening(false);
+    }
+  };
+
+  const loadDayDetailsSessionAttendance = async (session: TrainingWeekSessionItem, date: string) => {
+    if (session.id.startsWith("coach-")) {
+      setTrainingDayDetailsTabLoading(true);
+      try {
+        await fetchTrainingAttendance(
+          date,
+          undefined,
+          undefined,
+          undefined,
+          getMonthKeyFromIsoDate(date),
+          session.id.slice(43),
+        );
+      } finally {
+        setTrainingDayDetailsTabLoading(false);
+      }
+      return;
+    }
+    const month = getMonthKeyFromIsoDate(date);
+    setTrainingDayDetailsTabLoading(true);
+    try {
+      if (session.scopeType === "teamGroup") {
+        const tg = session.teamGroups[0];
+        const groupScope = tg !== undefined && Number.isInteger(tg) ? String(tg) : "all";
+        setTrainingAttendanceView("teamGroup");
+        setTrainingGroupScope(groupScope);
+        await fetchTrainingAttendance(date, groupScope, undefined, "teamGroup", month, undefined, true);
+      } else {
+        const groupPrefix = `${date}-group-`;
+        const customPrefix = `${date}-custom-`;
+        let groupId: string | null = null;
+        if (session.id.startsWith(groupPrefix)) {
+          groupId = session.id.slice(groupPrefix.length);
+        } else if (session.id.startsWith(customPrefix)) {
+          groupId = session.id.slice(customPrefix.length);
+        }
+        if (groupId) {
+          setTrainingAttendanceView("trainingGroups");
+          setSelectedTrainingGroupId(groupId);
+          await fetchTrainingAttendance(date, undefined, groupId, "trainingGroups", month, undefined, true);
+        }
+      }
+    } finally {
+      setTrainingDayDetailsTabLoading(false);
+    }
+  };
+
+  const handleDeleteTrainingDay = async () => {
+    if (!clubId || !trainingAttendanceDate || trainingDayCancelLoading) return;
+    setTrainingDayCancelConfirmOpen(false);
+    setTrainingDayCancelLoading(true);
+    try {
+      const body: Record<string, unknown> = { date: trainingAttendanceDate };
+      if (trainingAttendanceSessionId) body.trainingSessionId = trainingAttendanceSessionId;
+      if (trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId) {
+        body[isCustomTrainingGroupMode ? "customTrainingGroupId" : "trainingGroupId"] =
+          selectedTrainingGroupId;
+      } else if (trainingAttendanceView === "teamGroup") {
+        const tg = parseSelectedTeamGroup(trainingGroupScope);
+        if (tg !== null) body.teamGroup = tg;
+      }
+      const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/session`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error ?? "Грешка при изтриване на тренировката.");
+      }
+      setTrainingDayDetailsOpen(false);
+      await Promise.all([fetchTrainingWeekSessions(), fetchTrainingAttendance()]);
+    } catch (error) {
+      setTrainingAttendanceError(
+        error instanceof Error ? error.message : "Грешка при изтриване на тренировката.",
+      );
+    } finally {
+      setTrainingDayCancelLoading(false);
+    }
+  };
+
+  return {
+    fetchTrainingAttendance,
+    fetchTrainingWeekSessions,
+    openTrainingAttendance,
+    handleTrainingGroupScopeChange,
+    handleTrainingAttendanceViewChange,
+    handleTrainingAttendanceMonthChange,
+    handleSelectedTrainingGroupChange,
+    handleUnifiedGroupChange,
+    openTrainingDaysEditorForCurrentScope,
+    openSingleTrainingDayEditForCurrentScope,
+    fetchLimitedEventForSession,
+    openTrainingDayDetails,
+    loadDayDetailsSessionAttendance,
+    handleDeleteTrainingDay,
+  };
+}

@@ -6,7 +6,7 @@ vi.mock("react", async original => ({
   ...await original<typeof import("react")>(),
   useEffect: (effect: () => unknown) => { hooks.effects.push(effect); },
 }));
-import { AttendanceDashboard } from "./members-page-components";
+import { AttendanceDashboard } from "./AttendanceDashboard";
 
 afterEach(() => {
   hooks.effects = [];
