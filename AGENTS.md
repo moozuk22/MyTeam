@@ -56,6 +56,16 @@ These requirements apply to every frontend change:
 
 A frontend task is not fully verified until its affected UI passes the mandatory small-phone, large-phone, and desktop checks, plus the complete matrix for significant layout or high-risk component changes. Report any missing checks as unverified.
 
+### Loading States
+Use the club calculator's loading experience as the design reference for new features. Inspect `src/app/admin/members/_components/FinanceSkeleton.tsx`, `FinanceSkeleton.module.css`, and their usage in `FinanceDashboard.tsx`, `FinanceAnalysis.tsx`, and `FinancePlayerSkeleton.tsx` before implementing loaders.
+
+- **Match the content:** use skeleton placeholders shaped like the pending content: lines for text, larger lines for totals, circles for avatars, a ring for a chart, and rows, chips, or fields for lists and forms. Reuse `FinanceSkeleton`, `FinanceMetricSkeleton`, and `SkeletonLine` where appropriate; for other layouts, follow their styling without importing the calculator's business logic.
+- **Keep the page structure visible:** preserve headings, cards, filters, and surrounding content; place skeletons only inside sections awaiting data. Load independent sections independently. For lazy-loaded components, use the same skeleton for the `Suspense` fallback and subsequent data fetch so the loading appearance stays consistent. Loading dialogs should retain their dialog shell and usable close control, as in `FinancePlayerSkeleton`.
+- **Keep the visual style subtle:** follow the existing muted translucent green background, faint border, rounded shapes, and soft left-to-right shimmer (`1.8s ease-in-out infinite`). Match placeholder dimensions and spacing to the final content to minimize layout shifts. Adapt skeleton layouts for phones and contain wide table placeholders within their section. Disable shimmer under `prefers-reduced-motion: reduce`.
+- **Show placeholders rather than invented content:** do not display fake amounts, zero totals, sample records, a generic spinner, or visible “Зареждане…” text in place of pending content. Keep loading distinct from a genuine empty result, a locked feature, and an error. Replace failed loading with a Bulgarian error and a retry action where appropriate.
+- **Expose loading accessibly:** mark the skeleton container with `role="status"`, `aria-label="Зареждане"`, and `aria-busy="true"`; hide decorative placeholder shapes with `aria-hidden="true"`. Clear the busy state when loading completes.
+- **Separate fetching from saving:** on filter or page changes, show the affected section's skeleton while its new data is pending; prevent obsolete responses from replacing current results (follow the calculator's `AbortController` cleanup). For saves, keep the form/content visible, disable duplicate or conflicting actions, and use Bulgarian action feedback such as “Записване…” or “Запазване на подредбата…”. Restore controls after success or failure and surface errors clearly.
+
 ## Testing Guidelines
 Vitest runs in a Node environment configured in `vite.config.mts`; tests use `*.test.ts`, `*.test.tsx`, and `*.test.mjs`. No coverage threshold is configured. For bug fixes, first add a regression test demonstrating the failure. Run affected tests, lint, and type checking; report results and unverified behavior.
 
