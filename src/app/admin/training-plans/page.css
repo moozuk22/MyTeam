@@ -19,7 +19,11 @@
   inset: 0;
   pointer-events: none;
   opacity: 0.025;
-  background-image: radial-gradient(circle at 2px 2px, #ffffff 1px, transparent 0);
+  background-image: radial-gradient(
+    circle at 2px 2px,
+    #ffffff 1px,
+    transparent 0
+  );
   background-size: 40px 40px;
 }
 
@@ -73,7 +77,10 @@
   background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
   cursor: pointer;
-  transition: border-color 0.18s, background 0.18s, transform 0.18s;
+  transition:
+    border-color 0.18s,
+    background 0.18s,
+    transform 0.18s;
 }
 
 .tp-back-btn {
@@ -374,4 +381,30 @@
   .tp-card-actions span {
     display: none;
   }
+}
+
+.tp-actions {
+  flex-wrap: wrap;
+}
+.tp-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+.tp-card-actions button {
+  flex: 1 1 100px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  overflow-wrap: anywhere;
+}
+.tp-modal {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+body:has(.tp-overlay) {
+  overflow: hidden;
+}
+.tp-page :focus-visible {
+  outline: 2px solid #c4fa82;
+  outline-offset: 2px;
 }

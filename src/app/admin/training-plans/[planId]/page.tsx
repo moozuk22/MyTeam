@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import { DEFAULT_LAYOUT, PlanLayout, validateLayout } from "@/lib/trainingPlans";
+import { PlanLayout, validateLayout } from "@/lib/trainingPlans";
+import { canAccessTrainingClub, UUID_RE } from "@/lib/exercise/access";
+import { isV2 } from "@/lib/exercise/model";
 import TrainingPlanEditorClient from "./page.client";
 
 type TrainingPlanEditorSearchParams = {
@@ -10,7 +12,7 @@ type TrainingPlanEditorSearchParams = {
 };
 
 function firstParam(value: string | string[] | undefined) {
-  return (Array.isArray(value) ? value[0] : value ?? "").trim();
+  return (Array.isArray(value) ? value[0] : (value ?? "")).trim();
 }
 
 export default async function TrainingPlanEditorPage({
@@ -30,7 +32,13 @@ export default async function TrainingPlanEditorPage({
   const { planId } = await params;
   const resolvedSearchParams = await searchParams;
   const clubId = firstParam(resolvedSearchParams.clubId);
-  if (!clubId) notFound();
+  if (
+    !clubId ||
+    !UUID_RE.test(clubId) ||
+    !UUID_RE.test(planId) ||
+    !canAccessTrainingClub(session, clubId)
+  )
+    notFound();
 
   const plan = await prisma.trainingPlan.findFirst({
     where: { id: planId, clubId },
@@ -47,7 +55,17 @@ export default async function TrainingPlanEditorPage({
 
   if (!plan) notFound();
 
-  const layout: PlanLayout = validateLayout(plan.layout) ? DEFAULT_LAYOUT : (plan.layout as unknown as PlanLayout);
+  if (isV2(plan.layout))
+    redirect(`/admin/training-plans/${planId}/konva?clubId=${clubId}`);
+  if (validateLayout(plan.layout))
+    return (
+      <main>
+        <h1>Невалидно упражнение</h1>
+        <p>Запазеното съдържание не може да се отвори.</p>
+        <a href={`/admin/training-plans?clubId=${clubId}`}>Назад</a>
+      </main>
+    );
+  const layout = plan.layout as unknown as PlanLayout;
 
   return (
     <TrainingPlanEditorClient

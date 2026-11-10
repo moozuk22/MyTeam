@@ -22,3 +22,20 @@ it('allows absent origins only when the endpoint permits them', () => {
   expect(hasTrustedOrigin(request())).toBe(true);
   expect(hasTrustedOrigin(request(), true)).toBe(false);
 });
+it('accepts a matching development origin when the configured URL points to production', () => {
+  vi.stubEnv('NODE_ENV', 'development');
+  vi.stubEnv('APP_BASE_URL', 'https://myteam7.com');
+  expect(hasTrustedOrigin(request('http://localhost'))).toBe(true);
+  expect(hasTrustedOrigin(request('https://evil.example'))).toBe(false);
+});
+it('keeps the configured public origin authoritative in production', () => {
+  vi.stubEnv('NODE_ENV', 'production');
+  vi.stubEnv('APP_BASE_URL', 'https://myteam7.com');
+  expect(hasTrustedOrigin(request('http://localhost'))).toBe(false);
+  expect(hasTrustedOrigin(request('https://myteam7.com'))).toBe(true);
+});
+it('still fails closed for invalid configuration in development', () => {
+  vi.stubEnv('NODE_ENV', 'development');
+  vi.stubEnv('APP_BASE_URL', 'not-a-url');
+  expect(hasTrustedOrigin(request('http://localhost'))).toBe(false);
+});

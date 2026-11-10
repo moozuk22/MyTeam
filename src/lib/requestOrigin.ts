@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-// Use the configured public address rather than the proxy's internal URL.
+// In production, use the configured public address rather than the proxy's internal URL.
 export function hasTrustedOrigin(request: NextRequest, requireOrigin = false): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return !requireOrigin;
@@ -8,7 +8,11 @@ export function hasTrustedOrigin(request: NextRequest, requireOrigin = false): b
   if (!baseUrl) return origin === request.nextUrl.origin;
   try {
     const configured = new URL(baseUrl);
-    return ["http:", "https:"].includes(configured.protocol) && origin === configured.origin;
+    if (!["http:", "https:"].includes(configured.protocol)) return false;
+    if (origin === configured.origin) return true;
+    // Local development may keep the production URL for existing integrations.
+    // Match the actual request URL; never add forwarded headers to the allowlist.
+    return process.env.NODE_ENV === "development" && origin === request.nextUrl.origin;
   } catch {
     return false;
   }
