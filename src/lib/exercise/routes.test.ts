@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { DEFAULT_LAYOUT } from "@/lib/trainingPlans";
-import { EMPTY_EXERCISE } from "./model";
+import { createObject, EMPTY_EXERCISE } from "./model";
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   findMany: vi.fn(),
@@ -223,17 +223,18 @@ describe("training plan access and persistence", () => {
     });
     // Successful response is read inside the same transaction, before another writer can update it.
     mocks.updateMany.mockResolvedValue({ count: 1 });
-    expect(
-      (
-        await PUT(
-          request("PUT", {
-            layout: EMPTY_EXERCISE,
-            expectedUpdatedAt: revision,
-          }),
-          params,
-        )
-      ).status,
-    ).toBe(200);
+    const layout = {
+      ...EMPTY_EXERCISE,
+      objects: [createObject("wall", { x: 200, y: 150 }, "wall")],
+    };
+    mocks.findUnique.mockResolvedValue({ ...row, layout });
+    const response = await PUT(
+      request("PUT", { layout, expectedUpdatedAt: revision }),
+      params,
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.updateMany.mock.calls[1][0].data.layout).toEqual(layout);
+    expect((await response.json()).plan.layout).toEqual(layout);
     expect(mocks.transaction).toHaveBeenCalledTimes(2);
   });
   it("allows only one of two saves from the same revision", async () => {

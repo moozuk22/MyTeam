@@ -19,6 +19,7 @@ export const ACTIONS = [
   "dashed-line",
 ] as const;
 export type Action = (typeof ACTIONS)[number];
+export type ExerciseTool = EquipmentType | "wall";
 export const SHAPES = ["circle", "rectangle", "triangle"] as const;
 export type ExerciseObject = {
   id: string;
@@ -29,7 +30,7 @@ export type ExerciseObject = {
   width: number;
   height: number;
   color: string;
-  equipment?: EquipmentType;
+  equipment?: ExerciseTool;
   team?: 1 | 2;
   role?: "player" | "coach" | "goalkeeper";
   label?: string;
@@ -64,11 +65,12 @@ export const isMovementType = (type: string) =>
 export const isZoneType = (type: string) =>
   SHAPES.some((s) => type === s || type === `hatched-${s}`);
 export const isEquipmentType = (type: string) =>
-  ALLOWED_EQUIPMENT_TYPES.includes(type as EquipmentType) &&
-  !isMovementType(type) &&
-  !isZoneType(type) &&
-  !type.startsWith("team") &&
-  type !== "text";
+  type === "wall" ||
+  (ALLOWED_EQUIPMENT_TYPES.includes(type as EquipmentType) &&
+    !isMovementType(type) &&
+    !isZoneType(type) &&
+    !type.startsWith("team") &&
+    type !== "text");
 
 export function validateExercise(raw: unknown): string | null {
   if (
@@ -210,7 +212,7 @@ export function layoutVersion(raw: unknown) {
 }
 
 export function createObject(
-  type: EquipmentType,
+  type: ExerciseTool,
   point: Point,
   id: string,
 ): ExerciseObject {
@@ -296,10 +298,11 @@ export function createObject(
       color: "#ffffff",
     };
   if (type === "ladder") return { ...base, width: 32, height: 88 };
-  if (type === "pole" || type === "flag")
-    return { ...base, width: 15, height: 55 };
+  if (type === "pole") return { ...base, width: 15, height: 55 };
+  if (type === "flag") return { ...base, width: 35, height: 55 };
   if (type === "hurdle") return { ...base, width: 50, height: 28 };
   if (type === "mannequin") return { ...base, width: 30, height: 58 };
+  if (type === "wall") return { ...base, width: 98, height: 58 };
   if (type.startsWith("marker"))
     return {
       ...base,

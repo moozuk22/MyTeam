@@ -21,6 +21,7 @@ import {
   movementPoints,
   moveMovementHandle,
   redo,
+  selectionToolbarPosition,
   simplify,
   undo,
   worldPoint,
@@ -31,6 +32,39 @@ const point = { x: 200, y: 200 };
 const cone = createObject("cone", point, "cone");
 const exercise = { ...EMPTY_EXERCISE, objects: [cone] };
 describe("exercise model and geometry", () => {
+  it("offers one recolorable marker and round trips a wall alongside older markers", () => {
+    const tools = FOOTBALL.tools.flatMap(({ types }) => types);
+    expect(tools.filter((type) => type.startsWith("marker"))).toEqual(["marker"]);
+    expect(FOOTBALL.labels.marker).toBe("Шапка");
+    expect(tools).toContain("wall");
+
+    const objects = [
+      createObject("wall", point, "wall"),
+      { ...createObject("marker", point, "marker"), color: "#aa00ff" },
+      createObject("marker-blue", point, "old-marker"),
+    ];
+    const saved = JSON.parse(JSON.stringify({ ...EMPTY_EXERCISE, objects }));
+    expect(validateSavedLayout(saved)).toBeNull();
+    expect(saved.objects).toEqual(objects);
+    expect(objects[0].width).toBeGreaterThan(objects[0].height);
+    expect(objects[2].color).toBe("#3b82f6");
+  });
+
+  it("centers the selection toolbar above the object and keeps it inside the pitch at corners", () => {
+    const toolbar = { width: 246, height: 54 };
+    const pitch = { width: 304, height: 202 };
+    const bounds = { x: 142, y: 100, width: 20, height: 20 };
+    expect(selectionToolbarPosition(bounds, toolbar, pitch)).toEqual({
+      x: 29,
+      y: 38,
+    });
+    expect(
+      selectionToolbarPosition({ ...bounds, x: -5, y: -5 }, toolbar, pitch),
+    ).toEqual({ x: 8, y: 23 });
+    expect(
+      selectionToolbarPosition({ ...bounds, x: 294, y: 192 }, toolbar, pitch),
+    ).toEqual({ x: 50, y: 130 });
+  });
   it("round trips every legacy tool through a copy, retaining originals and order", () => {
     const items = ALLOWED_EQUIPMENT_TYPES.map((type, i): PlanItem => ({
       id: String(i),
@@ -57,11 +91,15 @@ describe("exercise model and geometry", () => {
     );
   });
   it("exposes standard movement tools and keeps legacy variants out of the toolbar", () => {
-    const legacyVariants = ["run-free", "dribble-free", "long-pass"];
+    const legacyVariants = [
+      "run-free", "dribble-free", "long-pass",
+      "marker-blue", "marker-orange", "marker-yellow",
+    ];
     expect(new Set(FOOTBALL.tools.flatMap((g) => g.types))).toEqual(
-      new Set(
-        ALLOWED_EQUIPMENT_TYPES.filter((type) => !legacyVariants.includes(type)),
-      ),
+      new Set([
+        ...ALLOWED_EQUIPMENT_TYPES.filter((type) => !legacyVariants.includes(type)),
+        "wall",
+      ]),
     );
   });
   it("rejects unexpected payloads hidden in non-movement objects", () => {
@@ -296,6 +334,23 @@ describe("exercise model and geometry", () => {
   });
 });
 describe("history and recovery", () => {
+  it("undoes a live color adjustment in one step and starts a new step for another picker session", () => {
+    const history = { past: [], present: exercise, future: [] };
+    const colored = (color: string) => ({
+      ...exercise,
+      objects: [{ ...cone, color }],
+    });
+    const adjustment = Symbol();
+    const first = commit(history, colored("#123456"), adjustment);
+    const second = commit(first, colored("#654321"), adjustment);
+    expect(second.present).toEqual(colored("#654321"));
+    expect(undo(second).present).toEqual(exercise);
+    expect(redo(undo(second)).present).toEqual(second.present);
+    expect(commit(second, exercise, adjustment).past).toHaveLength(0);
+    expect(undo(commit(second, colored("#abcdef"), Symbol())).present).toEqual(
+      second.present,
+    );
+  });
   it("undoes edits and surface changes, clears redo after editing, bounds history", () => {
     let h = {
       past: [],

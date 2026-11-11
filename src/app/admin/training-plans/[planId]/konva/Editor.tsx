@@ -1,15 +1,37 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Copy, Redo2, Save, Trash2, Undo2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Check,
+  Copy,
+  Pencil,
+  Redo2,
+  Save,
+  Trash2,
+  Undo2,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FOOTBALL } from "@/lib/exercise/football";
 import {
   HEIGHT,
   WIDTH,
   createObject,
+  isMovementType,
+  isZoneType,
   validateExercise,
   type Exercise,
   type ExerciseObject,
+  type ExerciseTool,
 } from "@/lib/exercise/model";
 import {
   commit,
@@ -26,8 +48,9 @@ import {
   sameExercise,
   type RecoveryDraft,
 } from "@/lib/exercise/drafts";
-import type { EquipmentType } from "@/lib/trainingPlans";
+import { MAX_ITEMS } from "@/lib/trainingPlans";
 import Canvas from "./Canvas";
+import { EquipmentPreview } from "./Visuals";
 
 const EQUIPMENT_LABELS = FOOTBALL.labels;
 const TOOLBAR_GROUPS = FOOTBALL.tools;
@@ -36,6 +59,190 @@ const DRAWING_MODES = [
   { value: "curve", label: "Крива с ръкохватка" },
   { value: "freehand", label: "Свободна ръка" },
 ] as const;
+
+function ObjectColorInput({
+  color,
+  onCommit,
+}: {
+  color: string;
+  onCommit: (color: string, group: symbol, preview: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const group = useRef<symbol | undefined>(undefined);
+  const frame = useRef(0);
+  const commitColor = useEffectEvent(onCommit);
+  useEffect(() => {
+    const input = ref.current;
+    if (!input) return;
+    const onInput = () => {
+      group.current ??= Symbol();
+      if (frame.current) return;
+      frame.current = requestAnimationFrame(() => {
+        frame.current = 0;
+        if (group.current) commitColor(input.value, group.current, true);
+      });
+    };
+    const finish = () => {
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
+      commitColor(input.value, group.current ?? Symbol(), false);
+      group.current = undefined;
+    };
+    const finishIfAdjusting = () => {
+      if (group.current) finish();
+    };
+    input.addEventListener("input", onInput);
+    input.addEventListener("change", finish);
+    input.addEventListener("blur", finishIfAdjusting);
+    input.addEventListener("click", finishIfAdjusting);
+    return () => {
+      cancelAnimationFrame(frame.current);
+      input.removeEventListener("input", onInput);
+      input.removeEventListener("change", finish);
+      input.removeEventListener("blur", finishIfAdjusting);
+      input.removeEventListener("click", finishIfAdjusting);
+    };
+  }, []);
+  useEffect(() => {
+    const input = ref.current;
+    if (input && !frame.current && input.value !== color) input.value = color;
+  }, [color]);
+
+  return (
+    <input
+      ref={ref}
+      type="color"
+      aria-label="Цвят"
+      title="Цвят"
+      defaultValue={color}
+    />
+  );
+}
+
+function ObjectActions({
+  object,
+  onColorChange,
+  onLabelChange,
+  onDuplicate,
+  onRemove,
+  onReorder,
+  canDuplicate,
+  canMoveBack,
+  canMoveForward,
+}: {
+  object: ExerciseObject;
+  onColorChange: (color: string, group: symbol, preview: boolean) => void;
+  onLabelChange: (label: string) => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+  onReorder: (delta: number) => void;
+  canDuplicate: boolean;
+  canMoveBack: boolean;
+  canMoveForward: boolean;
+}) {
+  const [editingLabel, setEditingLabel] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const editTitle =
+    object.kind === "player" ? "Редактирай номер" : "Редактирай текст";
+
+  function closeLabelEditor() {
+    setEditingLabel(false);
+    requestAnimationFrame(() => editButton.current?.focus());
+  }
+
+  if (editingLabel) {
+    return (
+      <form
+        className="ke-object-label"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const label = new FormData(e.currentTarget).get("label");
+          if (typeof label === "string" && label !== object.label) {
+            onLabelChange(label);
+          }
+          closeLabelEditor();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            closeLabelEditor();
+          }
+        }}
+      >
+        <input
+          autoFocus
+          name="label"
+          defaultValue={object.label ?? ""}
+          maxLength={40}
+          aria-label={object.kind === "player" ? "Номер" : "Текст"}
+        />
+        <button type="submit" aria-label="Потвърди" title="Потвърди">
+          <Check size={18} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          aria-label="Откажи редакцията"
+          title="Откажи редакцията"
+          onClick={closeLabelEditor}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <>
+      <ObjectColorInput color={object.color} onCommit={onColorChange} />
+      <button
+        type="button"
+        aria-label="Дублирай"
+        title="Дублирай"
+        onClick={onDuplicate}
+        disabled={!canDuplicate}
+      >
+        <Copy size={18} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="Изтрий"
+        title="Изтрий"
+        onClick={onRemove}
+      >
+        <Trash2 size={18} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="Назад в слоевете"
+        title="Назад в слоевете"
+        onClick={() => onReorder(-1)}
+        disabled={!canMoveBack}
+      >
+        <ArrowDown size={18} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="Напред в слоевете"
+        title="Напред в слоевете"
+        onClick={() => onReorder(1)}
+        disabled={!canMoveForward}
+      >
+        <ArrowUp size={18} aria-hidden="true" />
+      </button>
+      {(object.kind === "player" || object.kind === "text") && (
+        <button
+          ref={editButton}
+          type="button"
+          aria-label={editTitle}
+          title={editTitle}
+          onClick={() => setEditingLabel(true)}
+        >
+          <Pencil size={18} aria-hidden="true" />
+        </button>
+      )}
+    </>
+  );
+}
 
 export type EditorProps = {
   plan: {
@@ -52,7 +259,7 @@ function objectLabel(o: ExerciseObject) {
   return o.kind === "player"
     ? `Отбор ${o.team} · ${o.role === "coach" ? "Треньор" : o.role === "goalkeeper" ? "Вратар" : "Състезател"} ${o.label}`
     : o.kind === "text"
-      ? o.label
+      ? o.label || "Текст"
       : o.kind === "equipment"
         ? EQUIPMENT_LABELS[o.equipment!]
         : o.kind === "movement"
@@ -63,7 +270,7 @@ function objectLabel(o: ExerciseObject) {
               ? "Триъгълник"
               : "Правоъгълник";
 }
-function MovementPreview({ type }: { type: EquipmentType }) {
+function MovementPreview({ type }: { type: ExerciseTool }) {
   const o = createObject(type, { x: 0, y: 0 }, "preview");
   if (o.kind !== "movement") return null;
   o.points =
@@ -111,42 +318,6 @@ function MovementPreview({ type }: { type: EquipmentType }) {
     </svg>
   );
 }
-function NumberField({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (n: number) => void;
-}) {
-  return (
-    <label>
-      {label}
-      <input
-        key={value}
-        type="number"
-        defaultValue={Math.round(value * 10) / 10}
-        min={min}
-        max={max}
-        step="0.1"
-        onBlur={(e) => {
-          const n = Number(e.target.value);
-          if (e.target.value && Number.isFinite(n) && n >= min && n <= max)
-            onChange(n);
-          e.target.value = String(Math.round(value * 10) / 10);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-      />
-    </label>
-  );
-}
 export default function Editor({ plan, clubId, userId }: EditorProps) {
   const router = useRouter();
   const [history, setHistory] = useState<History>({
@@ -155,7 +326,9 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     future: [],
   });
   const [selected, setSelected] = useState<string | null>(null),
-    [tool, setTool] = useState<EquipmentType | "select">("select");
+    [tool, setTool] = useState<ExerciseTool | "select">("select");
+  const [placementCount, setPlacementCount] = useState("1");
+  const toolsRef = useRef<HTMLDivElement>(null);
   const [pathMode, setPathMode] = useState<"straight" | "curve" | "freehand">(
     "straight",
   );
@@ -169,9 +342,23 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const [recovery, setRecovery] = useState<RecoveryDraft | null>(null),
     [draftReady, setDraftReady] = useState(false);
   const [storageError, setStorageError] = useState(false);
+  const [colorPreview, setColorPreview] = useState<{
+    id: string;
+    group: symbol;
+  } | null>(null);
   const layout = history.present;
   const dirty = useMemo(() => !sameExercise(layout, saved), [layout, saved]);
   const object = layout.objects.find((o) => o.id === selected);
+  const drawingMovement = isMovementType(tool);
+  const drawingArrow =
+    drawingMovement && tool !== "line" && tool !== "dashed-line";
+  const placing =
+    tool !== "select" && !drawingMovement && !isZoneType(tool);
+  const usesQuantity = placing || drawingArrow;
+  const placementCapacity = MAX_ITEMS - layout.objects.length;
+  const quantity = Number(placementCount);
+  const validQuantity =
+    Number.isInteger(quantity) && quantity >= 1 && quantity <= placementCapacity;
   const key = draftKey(userId, clubId, plan.id),
     endpoint = `/api/admin/clubs/${clubId}/training-plans/${plan.id}`;
   const state = useRef({ layout, dirty, revision, saved });
@@ -195,6 +382,31 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         ),
       });
   }
+  function updateObjectColor(
+    id: string,
+    color: string,
+    group: symbol,
+    preview: boolean,
+  ) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+    setColorPreview((current) => {
+      if (!preview) return null;
+      return current?.group === group ? current : { id, group };
+    });
+    setHistory((h) =>
+      commit(
+        h,
+        {
+          ...h.present,
+          objects: h.present.objects.map((o) =>
+            o.id === id && o.color !== color ? { ...o, color } : o,
+          ),
+        },
+        group,
+      ),
+    );
+    setStatus("");
+  }
   function remove() {
     change({
       ...layout,
@@ -202,11 +414,42 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     });
     setSelected(null);
   }
+  function cancelPlacement() {
+    setSelected(null);
+    setTool("select");
+    setPlacementCount("1");
+  }
+  function cancelPlacementFromControls() {
+    const tools = toolsRef.current;
+    const button =
+      tools?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]') ??
+      tools?.querySelector("button");
+    button?.focus();
+    cancelPlacement();
+  }
+  function clearPitch() {
+    change({ ...layout, objects: [] });
+    cancelPlacement();
+  }
   function duplicate() {
     if (!object) return;
     const copy = duplicateObject(object, crypto.randomUUID());
     change({ ...layout, objects: [...layout.objects, copy] });
-    if (layout.objects.length < 200) setSelected(copy.id);
+    if (layout.objects.length < MAX_ITEMS) setSelected(copy.id);
+  }
+  function onPlaced(placed: ExerciseObject) {
+    if (!usesQuantity) {
+      setSelected(placed.id);
+      return;
+    }
+
+    setSelected(null);
+    if (quantity <= 1) {
+      setTool("select");
+      setPlacementCount("1");
+    } else {
+      setPlacementCount(String(quantity - 1));
+    }
   }
   useEffect(() => {
     try {
@@ -307,8 +550,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
       )
         return;
       if (e.key === "Escape") {
-        setTool("select");
-        setSelected(null);
+        if (!e.defaultPrevented) cancelPlacement();
         return;
       }
       if (recovery) return;
@@ -478,25 +720,6 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     next.splice(to, 0, object);
     change({ ...layout, objects: next });
   }
-  function changePath(mode: "straight" | "curve" | "freehand") {
-    if (!object?.points) return;
-    const first = object.points[0],
-      end = object.points.at(-1)!;
-    patch({
-      path: mode,
-      points:
-        mode === "curve"
-          ? [
-              first,
-              {
-                x: (first.x + end.x) / 2 + (end.y - first.y) * 0.2,
-                y: (first.y + end.y) / 2 - (end.x - first.x) * 0.2,
-              },
-              end,
-            ]
-          : [first, end],
-    });
-  }
   return (
     <main className="ke-page">
       <div className="ke-inner">
@@ -532,7 +755,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         <div className="ke-feedback" aria-live="polite">
           <span>
             {dirty ? "Незапазени промени" : "Всички промени са запазени"} ·{" "}
-            {layout.objects.length}/200
+            {layout.objects.length}/{MAX_ITEMS}
           </span>
           {status && <p>{status}</p>}
           {copyId && (
@@ -594,13 +817,6 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
               <div className="ke-toolbar">
                 <button
                   type="button"
-                  aria-pressed={tool === "select"}
-                  onClick={() => setTool("select")}
-                >
-                  Избор
-                </button>
-                <button
-                  type="button"
                   aria-label="Отмени"
                   disabled={!history.past.length}
                   onClick={() => setHistory(undo)}
@@ -616,6 +832,14 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 >
                   <Redo2 size={18} />
                   Повтори
+                </button>
+                <button
+                  type="button"
+                  disabled={layout.objects.length === 0}
+                  onClick={clearPitch}
+                >
+                  <Trash2 size={18} aria-hidden="true" />
+                  Изчисти игрището
                 </button>
                 <label>
                   Игрище
@@ -654,6 +878,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
               </div>
               <div
                 className="ke-tools"
+                ref={toolsRef}
                 role="group"
                 aria-label={TOOLBAR_GROUPS[category].title}
               >
@@ -663,19 +888,68 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                     type="button"
                     aria-pressed={tool === t}
                     onClick={() => {
+                      if (tool === t) {
+                        cancelPlacement();
+                        return;
+                      }
+                      setSelected(null);
+                      setPlacementCount("1");
                       setTool(t);
                       const defaultPath = FOOTBALL.defaultPaths[t];
                       if (defaultPath) setPathMode(defaultPath);
-                      setSelected(null);
                     }}
                   >
-                    <MovementPreview type={t} />
+                    {isMovementType(t) ? (
+                      <MovementPreview type={t} />
+                    ) : (
+                      <EquipmentPreview type={t} />
+                    )}
                     <span>{EQUIPMENT_LABELS[t]}</span>
                   </button>
                 ))}
               </div>
               <div className="ke-mode">
-                {category === 0 && (
+                {usesQuantity && (
+                  <div
+                    className="ke-placement-count"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelPlacementFromControls();
+                      }
+                    }}
+                  >
+                    <label>
+                      Брой обекти за поставяне
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={Math.max(1, placementCapacity)}
+                        step={1}
+                        value={placementCount}
+                        disabled={placementCapacity === 0}
+                        aria-invalid={placementCapacity > 0 && !validQuantity}
+                        aria-describedby={
+                          !validQuantity ? "ke-placement-limit" : undefined
+                        }
+                        onChange={(e) => setPlacementCount(e.target.value)}
+                      />
+                    </label>
+                    {!validQuantity && (
+                      <p id="ke-placement-limit" className="ke-error">
+                        {placementCapacity === 0
+                          ? "Достигнахте максималния брой обекти."
+                          : `Въведете цяло число от 1 до ${placementCapacity}.`}
+                      </p>
+                    )}
+                    <button type="button" onClick={cancelPlacementFromControls}>
+                      Откажи поставянето
+                    </button>
+                    <p>Или натиснете <kbd>Esc</kbd>.</p>
+                  </div>
+                )}
+                {category === 0 && !placing && (
                   <fieldset className="ke-path-modes">
                     <legend>Начин на рисуване</legend>
                     {DRAWING_MODES.map(({ value, label }) => (
@@ -692,189 +966,50 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 )}
                 <p>
                   {tool === "select"
-                    ? "Плъзнете обект за преместване или редактирайте свойствата му."
-                    : "Поставете обект на празно място. Плъзнете за движение или зона. Escape отменя."}
+                    ? "Изберете обект за редакция или го плъзнете за преместване."
+                    : placing
+                      ? "Изберете място за всеки обект."
+                      : drawingArrow
+                        ? "Плъзнете по игрището, за да нарисувате стрелка."
+                        : "Плъзнете за движение или зона. Escape отменя."}
                 </p>
               </div>
-              <section className="ke-properties" aria-label="Свойства на обекта">
-                <label>
-                  Избран обект
-                  <select
-                    value={selected ?? ""}
-                    onChange={(e) => {
-                      setSelected(e.target.value || null);
-                      setTool("select");
-                    }}
-                  >
-                    <option value="">Няма избран обект</option>
-                    {layout.objects.map((o, i) => (
-                      <option key={o.id} value={o.id}>
-                        {i + 1}. {objectLabel(o)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {object && (
-                  <>
-                    <h2>{objectLabel(object)}</h2>
-                    <div className="ke-property-grid">
-                      <label>
-                        Цвят
-                        <input
-                          key={`${object.id}-${object.color}`}
-                          type="color"
-                          defaultValue={object.color}
-                          onBlur={(e) => {
-                            if (e.target.value !== object.color)
-                              patch({ color: e.target.value });
-                          }}
-                        />
-                      </label>
-                      {(object.kind === "player" || object.kind === "text") && (
-                        <label>
-                          Текст / номер
-                          <input
-                            key={`${object.id}-${object.label}`}
-                            defaultValue={object.label ?? ""}
-                            maxLength={40}
-                            onBlur={(e) => {
-                              if (e.target.value !== object.label)
-                                patch({ label: e.target.value });
-                            }}
-                          />
-                        </label>
-                      )}
-                      <NumberField
-                        label="X"
-                        value={object.x}
-                        min={0}
-                        max={WIDTH}
-                        onChange={(x) => patch({ x })}
-                      />
-                      <NumberField
-                        label="Y"
-                        value={object.y}
-                        min={0}
-                        max={HEIGHT}
-                        onChange={(y) => patch({ y })}
-                      />
-                      <NumberField
-                        label="Завъртане °"
-                        value={object.rotation}
-                        min={-360}
-                        max={360}
-                        onChange={(rotation) => patch({ rotation })}
-                      />
-                      {object.kind !== "movement" && (
-                        <>
-                          <NumberField
-                            label="Ширина"
-                            value={object.width}
-                            min={2}
-                            max={WIDTH * 3}
-                            onChange={(width) =>
-                              patch({
-                                width,
-                                ...(object.kind !== "zone"
-                                  ? {
-                                      height:
-                                        (object.height * width) / object.width,
-                                    }
-                                  : {}),
-                              })
-                            }
-                          />
-                          <NumberField
-                            label="Височина"
-                            value={object.height}
-                            min={2}
-                            max={HEIGHT * 3}
-                            onChange={(height) =>
-                              patch({
-                                height,
-                                ...(object.kind !== "zone"
-                                  ? {
-                                      width:
-                                        (object.width * height) / object.height,
-                                    }
-                                  : {}),
-                              })
-                            }
-                          />
-                        </>
-                      )}
-                      {object.kind === "movement" && (
-                        <>
-                          <label>
-                            Път
-                            <select
-                              value={object.path}
-                              onChange={(e) =>
-                                changePath(e.target.value as typeof pathMode)
-                              }
-                            >
-                              <option value="straight">Прав</option>
-                              <option value="curve">Крива</option>
-                              <option value="freehand">Свободна ръка</option>
-                            </select>
-                          </label>
-                          <NumberField
-                            label="Мащаб на пътя %"
-                            value={100}
-                            min={10}
-                            max={300}
-                            onChange={(n) =>
-                              patch({
-                                points: object.points!.map((p) => ({
-                                  x: (p.x * n) / 100,
-                                  y: (p.y * n) / 100,
-                                })),
-                              })
-                            }
-                          />
-                        </>
-                      )}
-                    </div>
-                    <div className="ke-toolbar">
-                      <button
-                        type="button"
-                        onClick={duplicate}
-                        disabled={layout.objects.length >= 200}
-                      >
-                        <Copy size={16} />
-                        Дублирай
-                      </button>
-                      <button type="button" onClick={remove}>
-                        <Trash2 size={16} />
-                        Изтрий
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => reorder(-1)}
-                        disabled={layout.objects[0].id === object.id}
-                      >
-                        Назад в слоевете
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => reorder(1)}
-                        disabled={layout.objects.at(-1)!.id === object.id}
-                      >
-                        Напред в слоевете
-                      </button>
-                    </div>
-                  </>
-                )}
-              </section>
             </div>
             <div className="ke-pitch-area">
               <Canvas
                 exercise={layout}
                 selected={selected}
-                tool={recovery ? "select" : tool}
+                tool={
+                  recovery || (usesQuantity && !validQuantity) ? "select" : tool
+                }
+                placementOnly={usesQuantity}
                 pathMode={pathMode}
+                colorPreviewId={
+                  colorPreview?.group === history.group &&
+                  colorPreview?.id === selected
+                    ? colorPreview.id
+                    : undefined
+                }
+                selectedLabel={object ? objectLabel(object) : undefined}
+                objectActions={object && (
+                  <ObjectActions
+                    key={object.id}
+                    object={object}
+                    onColorChange={(color, group, preview) =>
+                      updateObjectColor(object.id, color, group, preview)
+                    }
+                    onLabelChange={(label) => patch({ label })}
+                    onDuplicate={duplicate}
+                    onRemove={remove}
+                    onReorder={reorder}
+                    canDuplicate={layout.objects.length < MAX_ITEMS}
+                    canMoveBack={layout.objects[0].id !== object.id}
+                    canMoveForward={layout.objects.at(-1)!.id !== object.id}
+                  />
+                )}
                 onSelect={setSelected}
                 onCommit={change}
+                onPlaced={onPlaced}
                 onError={setError}
               />
             </div>

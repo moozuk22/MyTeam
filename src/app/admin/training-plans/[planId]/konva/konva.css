@@ -147,6 +147,30 @@
   min-height: 52px;
   flex-direction: column;
 }
+.ke-equipment-preview {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 24px;
+}
+.ke-equipment-preview > span {
+  grid-area: 1 / 1;
+}
+.ke-ball-previews {
+  display: flex;
+  gap: 2px;
+}
+.ke-ball-previews > span {
+  border-radius: 50%;
+}
+.ke-equipment-preview--pole::before {
+  content: "";
+  width: 3px;
+  height: 20px;
+  border-radius: 2px;
+  background: #f59e0b;
+}
 .ke-mode {
   padding: 12px 0;
   font-size: 13px;
@@ -169,6 +193,22 @@
   color: #b6c1b9;
   line-height: 1.5;
 }
+.ke-placement-count {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.ke-placement-count button {
+  justify-self: center;
+}
+.ke-placement-count input {
+  font-size: 16px;
+}
+.ke-placement-count .ke-error {
+  margin-top: 5px;
+  color: #ffaaaa;
+}
 .ke-canvas,
 .ke-skeleton-pitch {
   width: 100%;
@@ -177,6 +217,7 @@
   border-radius: 8px;
 }
 .ke-canvas {
+  position: relative;
   touch-action: none;
   outline: 1px solid #ffffff30;
   outline-offset: -1px;
@@ -185,26 +226,35 @@
 .ke-canvas canvas {
   display: block;
 }
-.ke-properties {
-  order: 1;
-  margin-top: 14px;
-  padding: 14px;
-  background: #ffffff05;
-  border: 1px solid #ffffff1a;
+.ke-object-actions {
+  --ke-action-size: 44px;
+  --ke-action-gap: 3px;
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  gap: var(--ke-action-gap);
+  padding: 3px;
+  border: 1px solid #ffffff29;
   border-radius: 10px;
+  background: #151c17;
 }
-.ke-properties > label {
-  max-width: 500px;
+.ke-object-actions[hidden] {
+  display: none;
 }
-.ke-properties h2 {
-  overflow-wrap: anywhere;
+.ke-page .ke-object-actions button,
+.ke-page .ke-object-actions input[type="color"] {
+  flex: 0 0 var(--ke-action-size);
+  width: var(--ke-action-size);
+  height: var(--ke-action-size);
+  padding: 6px;
+}
+.ke-object-label {
+  display: flex;
+  width: calc(6 * var(--ke-action-size) + 5 * var(--ke-action-gap));
+  gap: var(--ke-action-gap);
+}
+.ke-page .ke-object-label input {
   font-size: 16px;
-  margin: 16px 0;
-}
-.ke-property-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
 }
 .ke-notice {
   padding: 14px;
@@ -266,9 +316,6 @@
 @media (min-width: 768px) {
   .ke-page {
     padding: 20px;
-  }
-  .ke-property-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .ke-tools button {
     flex: 0 1 140px;
@@ -351,9 +398,6 @@
   }
   .ke-tools svg {
     height: 18px;
-  }
-  .ke-property-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .ke-pitch-area {
     display: grid;

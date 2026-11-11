@@ -8,6 +8,29 @@ import {
 } from "./model";
 import { FOOTBALL } from "./football";
 export const clamp = (n: number, max: number) => Math.max(0, Math.min(max, n));
+export function selectionToolbarPosition(
+  bounds: Point & { width: number; height: number },
+  toolbar: { width: number; height: number },
+  pitch: { width: number; height: number },
+): Point {
+  const gap = 8;
+  const above = bounds.y - toolbar.height - gap;
+  const below = bounds.y + bounds.height + gap;
+  const fitsBelow = below + toolbar.height <= pitch.height - gap;
+  const y =
+    above >= gap || (!fitsBelow && bounds.y > pitch.height - below)
+      ? above
+      : below;
+  return {
+    x:
+      gap +
+      clamp(
+        bounds.x + (bounds.width - toolbar.width) / 2 - gap,
+        pitch.width - toolbar.width - 2 * gap,
+      ),
+    y: gap + clamp(y - gap, pitch.height - toolbar.height - 2 * gap),
+  };
+}
 export function localPoint(p: Point, object: ExerciseObject): Point {
   const angle = (-object.rotation * Math.PI) / 180,
     x = p.x - object.x,
@@ -112,11 +135,23 @@ export type History = {
   past: Exercise[];
   present: Exercise;
   future: Exercise[];
+  group?: symbol;
 };
-export function commit(h: History, next: Exercise): History {
-  return sameExercise(h.present, next)
-    ? h
-    : { past: [...h.past, h.present].slice(-100), present: next, future: [] };
+export function commit(h: History, next: Exercise, group?: symbol): History {
+  if (sameExercise(h.present, next)) return h;
+  if (group && h.group === group) {
+    const start = h.past.at(-1)!;
+    if (sameExercise(start, next)) {
+      return { past: h.past.slice(0, -1), present: start, future: [] };
+    }
+    return { ...h, present: next };
+  }
+  return {
+    past: [...h.past, h.present].slice(-100),
+    present: next,
+    future: [],
+    group,
+  };
 }
 export function undo(h: History): History {
   return h.past.length

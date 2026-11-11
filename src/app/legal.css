@@ -64,6 +64,11 @@
     font-size: 1.05rem;
 }
 
+.legal-content a {
+    color: #b4dfb1;
+    text-decoration: underline;
+}
+
 .legal-content ul {
     list-style: none;
     padding: 0;

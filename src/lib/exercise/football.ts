@@ -1,8 +1,7 @@
-import {
-  ALLOWED_EQUIPMENT_TYPES,
-  type EquipmentType,
-} from "@/lib/trainingPlans";
-export const FOOTBALL_LABELS: Record<EquipmentType, string> = {
+import { ALLOWED_EQUIPMENT_TYPES } from "@/lib/trainingPlans";
+import type { Exercise, ExerciseObject, ExerciseTool } from "./model";
+
+export const FOOTBALL_LABELS: Record<ExerciseTool, string> = {
   cone: "Конус",
   ball: "Топка",
   balls: "Топки",
@@ -13,10 +12,11 @@ export const FOOTBALL_LABELS: Record<EquipmentType, string> = {
   "goal-3m": "Врата 3м",
   "goal-1m": "Врата 1м",
   mannequin: "Манекен",
-  marker: "Шапка червена",
-  "marker-orange": "Шапка оранжева",
-  "marker-blue": "Шапка синя",
-  "marker-yellow": "Шапка жълта",
+  wall: "Стена",
+  marker: "Шапка",
+  "marker-orange": "Шапка",
+  "marker-blue": "Шапка",
+  "marker-yellow": "Шапка",
   pole: "Пилон",
   ladder: "Стълба",
   flag: "Колче",
@@ -49,7 +49,7 @@ export const FOOTBALL_LABELS: Record<EquipmentType, string> = {
   "team2-player-2": "състезател 2",
   "team2-player-more": "състезател 3-11",
 };
-export const FOOTBALL_TOOLS: { title: string; types: EquipmentType[] }[] = [
+export const FOOTBALL_TOOLS: { title: string; types: ExerciseTool[] }[] = [
   {
     title: "Движения",
     types: ["run", "dribble", "pass", "shot"],
@@ -77,10 +77,8 @@ export const FOOTBALL_TOOLS: { title: string; types: EquipmentType[] }[] = [
       "hurdle",
       "ring",
       "mannequin",
+      "wall",
       "marker",
-      "marker-orange",
-      "marker-blue",
-      "marker-yellow",
     ],
   },
   {
@@ -106,10 +104,8 @@ export const FOOTBALL_TOOLS: { title: string; types: EquipmentType[] }[] = [
     types: ALLOWED_EQUIPMENT_TYPES.filter((t) => t.startsWith("team2")),
   },
 ];
-import type { Exercise, ExerciseObject } from "./model";
-
 const defaultPaths: Partial<
-  Record<EquipmentType, NonNullable<ExerciseObject["path"]>>
+  Record<ExerciseTool, NonNullable<ExerciseObject["path"]>>
 > = {
   run: "straight",
   dribble: "freehand",

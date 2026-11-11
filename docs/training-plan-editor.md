@@ -4,7 +4,23 @@ The original HTML/CSS editor remains at `/admin/training-plans/[planId]`. The se
 
 Use **Нов план — Konva** to create a version-2 exercise or **Копирай в Konva** to convert a legacy exercise into a new record. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error instead of dropping objects. The original editor and its drawing code remain available.
 
-Existing objects and arrows can be selected and dragged directly, even while a placement/drawing tool is active. Tapping empty pitch continues using that active tool. The explicit Select tool remains available for manipulating objects without placing new ones. Resize/rotation and path handles work without changing tools.
+For equipment, players, text and arrows, **Брой обекти за поставяне** defaults to one and counts down after each successful placement or completed arrow. While one of these tools is active, you can place items or start drawing arrows directly over existing items. Once the requested number is reached, the editor returns to selection mode with no object selected. Choose **Откажи поставянето**, tap the active tool again, or press Esc to cancel early and reset the count to one. In selection mode, click or drag existing items directly and use their handles to resize, rotate or reshape them.
+
+Selecting an object opens a toolbar on the pitch to change its color, duplicate it, delete it, or move it one layer forward or back. For players and text objects, the pencil button edits the number or text. To select objects with the keyboard, focus the pitch and use Page Up or Page Down. Color updates as the picker moves, and one undo restores the color before that adjustment. The toolbar moves below the object when there is insufficient room above it.
+
+The Konva football uses [“Ball” by Icuk Yulianti from Noun Project](https://thenounproject.com/icon/ball-5681732/) under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The editor serves the PNG locally and draws it over the selected ball color. The app displays the attribution at `/terms#credits`.
+
+The six placeable Konva goals use [“Football goal” by Mark Caron from Noun Project](https://thenounproject.com/icon/football-goal-2451562/) under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The editor serves the PNG locally and tints it with each goal’s selected color. The attribution is at `/terms#credits`.
+
+The editor uses local copies of [“Flag” by NAPISAH](https://thenounproject.com/icon/flag-6452452/) and [“Hula Hoop” by omeneko](https://thenounproject.com/icon/hula-hoop-3437627/) from Noun Project under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). They use the object color and are credited at `/terms#credits`.
+
+In Konva, **Стена** uses the full [“Barrier” icon by Magnific from Flaticon](https://www.flaticon.com/free-icon/barrier_1540543), and **Манекен** displays a crop of one figure from the same local PNG. The attribution is at `/terms#credits`.
+
+**Шапка** uses a local PNG of [“Sport” by ICs Icons from Flaticon](https://www.flaticon.com/free-icon/sport_17228453). The editor tints the icon with the selected object color, including for existing marker variants. The attribution is at `/terms#credits`.
+
+**Конус**, **Стълба**, and **Препятствие** use local PNGs of [“Cone” by Smashicons](https://www.flaticon.com/free-icon/cone_1505455), [“Stairs” by Magnific](https://www.flaticon.com/free-icon/stairs_4212592), and [“Hurdle” by Rudy_wae](https://www.flaticon.com/free-icon/hurdle_11798797) from Flaticon. Each obstacle shows only the top hurdle. The credits are at `/terms#credits`.
+
+**Изчисти игрището** removes every object and arrow while keeping the current pitch surface. **Отмени** restores the entire drawing in one step.
 
 Use **Начин на рисуване** to draw **Бягане**, **Дрибъл**, **Пас** or **Удар** as a straight line, a curve with a handle, or a freehand stroke. Drag the yellow handle on the curve to reshape it. Existing long passes and converted freehand movements retain their saved geometry.
 
@@ -12,7 +28,7 @@ Selecting **Дрибъл** defaults to **Свободна ръка**. Selecting 
 
 While drawing a freehand movement, the preview shows the stroke. After release, its arrowhead points along the short, straight finish at the tip. The dribbling wave fades into the centerline under the arrowhead.
 
-On desktop, drawing tools and object properties share a scrollable side panel. The pitch scales to fit the available viewport height and keeps its aspect ratio. On narrower screens, the tools, pitch and properties are stacked.
+On desktop, drawing tools sit in a scrollable side panel. The pitch scales to fit the available viewport height and keeps its aspect ratio. On narrower screens, the pitch sits below the tools.
 
 ## Data and rendering
 
@@ -20,7 +36,7 @@ The existing `TrainingPlan.layout` JSON column stores both versions; no schema m
 
 The football registry owns toolbar labels, equipment choices, surfaces and movement styles. Football is the only registered sport. Selection, transformations, history, geometry, recovery and saves are shared editor operations. Future sports can add definitions and rendering; future 3D previews can consume semantic data without interpreting canvas pixels. Neither additional sports nor 3D rendering is implemented here.
 
-The client-only canvas scales a 1050 × 700 board uniformly. Surface, objects and transient controls use three layers. Active dragging/transformation temporarily moves the object to the controls layer, restoring its original stacking order afterward. Drawing previews update at most once per animation frame. Completed gestures create one history entry; cancelled gestures restore the original object. History retains 100 entries. Exercises are limited to 200 objects and 300 persisted points per freehand path; rendering also bounds sampled dribbling geometry.
+The client-only canvas scales a 1050 × 700 board uniformly. Surface, objects and transient controls normally use three layers. Active dragging/transformation temporarily moves the object to the controls layer, restoring its original stacking order afterward. During live color adjustments, the selected object renders on its own temporary layer, with surrounding objects retaining their stacking order. Drawing and color previews update at most once per animation frame. Completed gestures create one history entry; cancelled gestures restore the original object. History retains 100 entries. Exercises are limited to 200 objects and 300 persisted points per freehand path; rendering also bounds sampled dribbling geometry.
 
 ## Saving and recovery
 
