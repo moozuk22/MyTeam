@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -14,6 +15,7 @@ import {
   Check,
   Copy,
   Pencil,
+  Plus,
   Redo2,
   Save,
   Trash2,
@@ -24,10 +26,15 @@ import { useRouter } from "next/navigation";
 import { FOOTBALL } from "@/lib/exercise/football";
 import {
   HEIGHT,
+  CUSTOM_TEAM_COLOR_ERROR,
   WIDTH,
+  addCustomTeam,
   createObject,
+  getCustomTeamColors,
+  isCustomTeamColor,
   isMovementType,
   isZoneType,
+  removeCustomTeam,
   validateExercise,
   type Exercise,
   type ExerciseObject,
@@ -54,6 +61,7 @@ import { EquipmentPreview } from "./Visuals";
 
 const EQUIPMENT_LABELS = FOOTBALL.labels;
 const TOOLBAR_GROUPS = FOOTBALL.tools;
+const TEAM_COLOR_SUGGESTIONS = ["#facc15", "#a855f7", "#fb923c", "#22d3ee", "#f472b6", "#a3e635"];
 const DRAWING_MODES = [
   { value: "straight", label: "Право" },
   { value: "curve", label: "Крива с ръкохватка" },
@@ -270,6 +278,41 @@ function objectLabel(o: ExerciseObject) {
               ? "Триъгълник"
               : "Правоъгълник";
 }
+function ZonePreview({ type }: { type: ExerciseTool }) {
+  const hatchId = useId();
+  const hatched = type.startsWith("hatched-");
+  return (
+    <svg viewBox="0 0 70 24" width="70" height="24" aria-hidden="true">
+      {hatched && (
+        <defs>
+          <pattern
+            id={hatchId}
+            width="4"
+            height="4"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
+            <path d="M0 0V4" stroke="currentColor" strokeWidth="1.5" />
+          </pattern>
+        </defs>
+      )}
+      <g
+        fill={hatched ? `url(#${hatchId})` : "none"}
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      >
+        {type.endsWith("circle") ? (
+          <circle cx="35" cy="12" r="9" />
+        ) : type.endsWith("triangle") ? (
+          <path d="M35 3L47 21H23Z" />
+        ) : (
+          <rect x="21" y="4" width="28" height="16" />
+        )}
+      </g>
+    </svg>
+  );
+}
 function MovementPreview({ type }: { type: ExerciseTool }) {
   const o = createObject(type, { x: 0, y: 0 }, "preview");
   if (o.kind !== "movement") return null;
@@ -326,9 +369,12 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     future: [],
   });
   const [selected, setSelected] = useState<string | null>(null),
-    [tool, setTool] = useState<ExerciseTool | "select">("select");
+    [selectedTool, setTool] = useState<ExerciseTool | "select">("select");
   const [placementCount, setPlacementCount] = useState("1");
   const toolsRef = useRef<HTMLDivElement>(null);
+  const addTeamButtonRef = useRef<HTMLButtonElement>(null);
+  const [addingTeam, setAddingTeam] = useState(false);
+  const [teamColor, setTeamColor] = useState(TEAM_COLOR_SUGGESTIONS[0]);
   const [pathMode, setPathMode] = useState<"straight" | "curve" | "freehand">(
     "straight",
   );
@@ -347,6 +393,24 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     group: symbol;
   } | null>(null);
   const layout = history.present;
+  const customTeamColors = getCustomTeamColors(layout);
+  const toolGroups = [
+    ...TOOLBAR_GROUPS,
+    ...customTeamColors.map((color, index) =>
+      color ? { title: `Отбор ${index + 3}`, types: FOOTBALL.customTeamTools, color } : null,
+    ),
+  ];
+  const firstCustomCategory = TOOLBAR_GROUPS.length;
+  const customTeamIndex = category - firstCustomCategory;
+  const customTeamNumber = customTeamColors[customTeamIndex] ? customTeamIndex + 3 : undefined;
+  const activeCategory =
+    category < firstCustomCategory || customTeamNumber !== undefined ? category : 0;
+  const toolGroup = toolGroups[activeCategory] ?? TOOLBAR_GROUPS[0];
+  const tool =
+    customTeamNumber === undefined && selectedTool.startsWith("custom-team-")
+      ? "select"
+      : selectedTool;
+  const validTeamColor = isCustomTeamColor(teamColor);
   const dirty = useMemo(() => !sameExercise(layout, saved), [layout, saved]);
   const object = layout.objects.find((o) => o.id === selected);
   const drawingMovement = isMovementType(tool);
@@ -418,6 +482,26 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     setSelected(null);
     setTool("select");
     setPlacementCount("1");
+  }
+  function createTeam() {
+    if (!validTeamColor) return;
+    change(addCustomTeam(layout, teamColor));
+    cancelPlacement();
+    setAddingTeam(false);
+    setCategory(firstCustomCategory + customTeamColors.length);
+    addTeamButtonRef.current?.focus();
+  }
+  function deleteTeam() {
+    if (customTeamNumber === undefined) return;
+    change(removeCustomTeam(layout, customTeamNumber));
+    cancelPlacement();
+    addTeamButtonRef.current?.focus();
+  }
+  function selectCategory(index: number) {
+    if (index !== activeCategory && (index >= firstCustomCategory || customTeamNumber !== undefined)) {
+      cancelPlacement();
+    }
+    setCategory(index);
   }
   function cancelPlacementFromControls() {
     const tools = toolsRef.current;
@@ -865,24 +949,86 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 role="group"
                 aria-label="Категории инструменти"
               >
-                {TOOLBAR_GROUPS.map((g, i) => (
+                {toolGroups.map((g, i) => g && (
                   <button
                     type="button"
                     key={g.title}
-                    aria-pressed={category === i}
-                    onClick={() => setCategory(i)}
+                    aria-pressed={activeCategory === i}
+                    onClick={() => selectCategory(i)}
                   >
+                    {g.color && (
+                      <span
+                        className="ke-team-swatch"
+                        style={{ backgroundColor: g.color }}
+                        aria-hidden="true"
+                      />
+                    )}
                     {g.title}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  ref={addTeamButtonRef}
+                  aria-expanded={addingTeam}
+                  onClick={() => {
+                    if (!addingTeam) {
+                      cancelPlacement();
+                      const suggestion = TEAM_COLOR_SUGGESTIONS.find(
+                        (color) => !customTeamColors.includes(color),
+                      );
+                      setTeamColor(suggestion ?? TEAM_COLOR_SUGGESTIONS[0]);
+                    }
+                    setAddingTeam(!addingTeam);
+                  }}
+                >
+                  <Plus size={16} aria-hidden="true" /> Добави отбор
+                </button>
               </div>
+              {addingTeam && (
+                <div className="ke-team-setup">
+                  <label>
+                    Цвят на отбор {customTeamColors.length + 3}
+                    <input
+                      type="color"
+                      value={teamColor}
+                      onChange={(e) => setTeamColor(e.currentTarget.value)}
+                      aria-invalid={!validTeamColor}
+                      aria-describedby={validTeamColor ? undefined : "ke-team-color-error"}
+                    />
+                  </label>
+                  {!validTeamColor && (
+                    <p id="ke-team-color-error" className="ke-error" role="alert">
+                      {CUSTOM_TEAM_COLOR_ERROR}
+                    </p>
+                  )}
+                  <div className="ke-toolbar">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingTeam(false);
+                        addTeamButtonRef.current?.focus();
+                      }}
+                    >
+                      Отказ
+                    </button>
+                    <button
+                      type="button"
+                      className="ke-primary"
+                      disabled={!validTeamColor}
+                      onClick={createTeam}
+                    >
+                      Създай отбор
+                    </button>
+                  </div>
+                </div>
+              )}
               <div
                 className="ke-tools"
                 ref={toolsRef}
                 role="group"
-                aria-label={TOOLBAR_GROUPS[category].title}
+                aria-label={toolGroup.title}
               >
-                {TOOLBAR_GROUPS[category].types.map((t) => (
+                {toolGroup.types.map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -901,6 +1047,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   >
                     {isMovementType(t) ? (
                       <MovementPreview type={t} />
+                    ) : isZoneType(t) ? (
+                      <ZonePreview type={t} />
                     ) : (
                       <EquipmentPreview type={t} />
                     )}
@@ -909,6 +1057,12 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 ))}
               </div>
               <div className="ke-mode">
+                {customTeamNumber !== undefined && (
+                  <button type="button" onClick={deleteTeam}>
+                    <Trash2 size={16} aria-hidden="true" />
+                    Изтрий отбор
+                  </button>
+                )}
                 {usesQuantity && (
                   <div
                     className="ke-placement-count"
@@ -949,7 +1103,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                     <p>Или натиснете <kbd>Esc</kbd>.</p>
                   </div>
                 )}
-                {category === 0 && !placing && (
+                {activeCategory === 0 && !placing && (
                   <fieldset className="ke-path-modes">
                     <legend>Начин на рисуване</legend>
                     {DRAWING_MODES.map(({ value, label }) => (
@@ -983,6 +1137,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   recovery || (usesQuantity && !validQuantity) ? "select" : tool
                 }
                 placementOnly={usesQuantity}
+                customTeamNumber={customTeamNumber}
                 pathMode={pathMode}
                 colorPreviewId={
                   colorPreview?.group === history.group &&

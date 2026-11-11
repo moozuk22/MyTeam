@@ -19,7 +19,23 @@ export const ACTIONS = [
   "dashed-line",
 ] as const;
 export type Action = (typeof ACTIONS)[number];
-export type ExerciseTool = EquipmentType | "wall";
+export type ExerciseTool =
+  | EquipmentType
+  | "wall"
+  | "custom-team-coach"
+  | "custom-team-goalkeeper"
+  | "custom-team-player";
+export const TEAM_COLORS = { 1: "#3b82f6", 2: "#ef4444" };
+export const CUSTOM_TEAM_COLOR_ERROR =
+  "Изберете цвят, различен от цветовете на отбори 1 и 2.";
+
+export function isCustomTeamColor(color: unknown): color is string {
+  return (
+    typeof color === "string" &&
+    /^#[0-9a-f]{6}$/i.test(color) &&
+    !Object.values(TEAM_COLORS).includes(color.toLowerCase())
+  );
+}
 export const SHAPES = ["circle", "rectangle", "triangle"] as const;
 export type ExerciseObject = {
   id: string;
@@ -31,7 +47,7 @@ export type ExerciseObject = {
   height: number;
   color: string;
   equipment?: ExerciseTool;
-  team?: 1 | 2;
+  team?: number;
   role?: "player" | "coach" | "goalkeeper";
   label?: string;
   action?: Action;
@@ -44,8 +60,37 @@ export type Exercise = {
   version: 2;
   sport: "football";
   surface: "full" | "half" | "blank";
+  customTeamColors?: (string | null)[];
+  thirdTeamColor?: string;
   objects: ExerciseObject[];
 };
+const EMPTY_TEAM_COLORS: readonly (string | null)[] = [];
+
+export function getCustomTeamColors(layout: Exercise): readonly (string | null)[] {
+  return layout.customTeamColors ??
+    (layout.thirdTeamColor ? [layout.thirdTeamColor] : EMPTY_TEAM_COLORS);
+}
+
+export function addCustomTeam(layout: Exercise, color: string): Exercise {
+  const { thirdTeamColor, ...current } = layout;
+  const colors = current.customTeamColors ?? (thirdTeamColor ? [thirdTeamColor] : []);
+  return { ...current, customTeamColors: [...colors, color] };
+}
+
+export function removeCustomTeam(layout: Exercise, team: number): Exercise {
+  const colors = getCustomTeamColors(layout);
+  const index = team - 3;
+  if (!colors[index]) return layout;
+
+  const next = {
+    ...layout,
+    // Keep other team numbers stable by reserving the deleted team's slot.
+    customTeamColors: colors.map((color, i) => i === index ? null : color),
+    objects: layout.objects.filter((object) => object.team !== team),
+  };
+  delete next.thirdTeamColor;
+  return next;
+}
 export const EMPTY_EXERCISE: Exercise = {
   version: 2,
   sport: "football",
@@ -84,10 +129,23 @@ export function validateExercise(raw: unknown): string | null {
     return "Позволени са до 200 обекта.";
   if (
     Object.keys(raw).some(
-      (key) => !["version", "sport", "surface", "objects"].includes(key),
+      (key) =>
+        !["version", "sport", "surface", "objects", "customTeamColors", "thirdTeamColor"].includes(key),
     )
   )
     return "Непознато поле във формата на упражнението.";
+  let customTeamColors = EMPTY_TEAM_COLORS;
+  if (raw.customTeamColors !== undefined) {
+    if (
+      raw.thirdTeamColor !== undefined ||
+      !Array.isArray(raw.customTeamColors) ||
+      !raw.customTeamColors.every((color) => color === null || isCustomTeamColor(color))
+    ) return CUSTOM_TEAM_COLOR_ERROR;
+    customTeamColors = raw.customTeamColors;
+  } else if (raw.thirdTeamColor !== undefined) {
+    if (!isCustomTeamColor(raw.thirdTeamColor)) return CUSTOM_TEAM_COLOR_ERROR;
+    customTeamColors = [raw.thirdTeamColor];
+  }
   const kindFields: Record<string, string[]> = {
     equipment: ["equipment"],
     player: ["team", "role"],
@@ -149,8 +207,9 @@ export function validateExercise(raw: unknown): string | null {
         break;
       case "player":
         if (
-          typeof o.team !== "number" ||
-          ![1, 2].includes(o.team) ||
+          !finite(o.team, 1, customTeamColors.length + 2) ||
+          !Number.isInteger(o.team) ||
+          (o.team > 2 && !customTeamColors[o.team - 3]) ||
           !["player", "coach", "goalkeeper"].includes(String(o.role))
         )
           return "Невалиден състезател.";
@@ -215,6 +274,7 @@ export function createObject(
   type: ExerciseTool,
   point: Point,
   id: string,
+  customTeam?: { number: number; color: string },
 ): ExerciseObject {
   const base: ExerciseObject = {
     id,
@@ -226,12 +286,13 @@ export function createObject(
     color: "#f59e0b",
     equipment: type,
   };
-  if (type.startsWith("team"))
+  if (type.startsWith("team") || type.startsWith("custom-team-")) {
+    const team = type.startsWith("team2") ? 2 : 1;
     return {
       ...base,
       equipment: undefined,
       kind: "player",
-      team: type.startsWith("team2") ? 2 : 1,
+      team: customTeam?.number ?? team,
       role: type.endsWith("coach")
         ? "coach"
         : type.endsWith("goalkeeper")
@@ -244,8 +305,9 @@ export function createObject(
           : type.endsWith("-2")
             ? "2"
             : "1",
-      color: type.startsWith("team2") ? "#3b82f6" : "#ef4444",
+      color: customTeam?.color ?? TEAM_COLORS[team],
     };
+  }
   if (type === "text")
     return {
       ...base,
@@ -321,6 +383,22 @@ export function createObject(
   return base;
 }
 
+export function nextPlayerLabel(
+  objects: readonly ExerciseObject[],
+  team: ExerciseObject["team"],
+): string {
+  const teammates = objects.filter(
+    (object) =>
+      object.kind === "player" &&
+      object.role === "player" &&
+      object.team === team,
+  );
+  const usedLabels = new Set(teammates.map((object) => object.label?.trim()));
+  let number = 1;
+  while (usedLabels.has(String(number))) number++;
+  return String(number);
+}
+
 const LEGACY_DIMENSIONS: Partial<Record<EquipmentType, [number, number]>> = {
   cone: [28, 28],
   ball: [28, 28],
@@ -369,6 +447,9 @@ export function convertLegacy(layout: PlanLayout): Exercise {
             : o.color;
         if (!/^#[a-f0-9]{3}([a-f0-9]{3})?$/i.test(c))
           throw new Error("Цветът на обект не може да се преобразува.");
+      } else if (o.kind === "player") {
+        // Legacy plans without an explicit fill use the original team colors.
+        o.color = o.team === 2 ? "#3b82f6" : "#ef4444";
       }
       if (i.text !== undefined) o.label = i.text;
       if (o.kind === "movement") {
@@ -411,10 +492,14 @@ export function convertLegacy(layout: PlanLayout): Exercise {
 
 export function sameExercise(a: Exercise, b: Exercise): boolean {
   if (a === b) return true;
+  const teamsA = getCustomTeamColors(a);
+  const teamsB = getCustomTeamColors(b);
   return (
     a.version === b.version &&
     a.sport === b.sport &&
     a.surface === b.surface &&
+    (teamsA === teamsB ||
+      (teamsA.length === teamsB.length && teamsA.every((color, i) => color === teamsB[i]))) &&
     a.objects.length === b.objects.length &&
     a.objects.every(
       (o, i) =>

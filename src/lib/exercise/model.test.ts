@@ -6,8 +6,12 @@ import {
 } from "@/lib/trainingPlans";
 import {
   convertLegacy,
+  addCustomTeam,
   createObject,
   EMPTY_EXERCISE,
+  getCustomTeamColors,
+  nextPlayerLabel,
+  removeCustomTeam,
   validateExercise,
   validateSavedLayout,
 } from "./model";
@@ -32,6 +36,80 @@ const point = { x: 200, y: 200 };
 const cone = createObject("cone", point, "cone");
 const exercise = { ...EMPTY_EXERCISE, objects: [cone] };
 describe("exercise model and geometry", () => {
+  it("adds more teams to an existing third-team exercise and keeps their colors and numbers", () => {
+    const thirdTeam = { number: 3, color: "#a855f7" };
+    const fourthTeam = { number: 4, color: "#22d3ee" };
+    const fifthTeam = { number: 5, color: "#f472b6" };
+    const existing = { ...EMPTY_EXERCISE, thirdTeamColor: thirdTeam.color };
+    expect(validateSavedLayout(existing)).toBeNull();
+    expect(getCustomTeamColors(existing)).toEqual([thirdTeam.color]);
+    const layout = addCustomTeam(existing, fourthTeam.color);
+    expect(layout).not.toHaveProperty("thirdTeamColor");
+    const history = commit({ past: [], present: existing, future: [] }, layout);
+    expect(undo(history).present).toEqual(existing);
+    expect(redo(undo(history)).present).toEqual(layout);
+    expect(validateSavedLayout(JSON.parse(JSON.stringify(layout)))).toBeNull();
+    const extended = addCustomTeam(layout, fifthTeam.color);
+    expect(getCustomTeamColors(extended)).toEqual(
+      [thirdTeam, fourthTeam, fifthTeam].map((team) => team.color),
+    );
+
+    const figures = FOOTBALL.customTeamTools.map((type) =>
+      createObject(type, point, type, fourthTeam),
+    );
+    expect(figures.map(({ team, color, role }) => [team, color, role])).toEqual([
+      [4, fourthTeam.color, "coach"],
+      [4, fourthTeam.color, "goalkeeper"],
+      [4, fourthTeam.color, "player"],
+    ]);
+    expect(nextPlayerLabel(figures, 4)).toBe("2");
+    expect(nextPlayerLabel(figures, 5)).toBe("1");
+    expect(validateSavedLayout({ ...extended, objects: figures })).toBeNull();
+    expect(validateSavedLayout({ ...existing, objects: figures })).toBeTruthy();
+    for (const color of ["#3B82F6", "#ef4444", "#invalid", 42]) {
+      expect(validateSavedLayout({ ...layout, customTeamColors: [color] })).toBeTruthy();
+    }
+  });
+
+  it("removes one custom team and its figures while retaining the other team numbers", () => {
+    const thirdTeam = { number: 3, color: "#a855f7" };
+    const fourthTeam = { number: 4, color: "#22d3ee" };
+    const figures = FOOTBALL.customTeamTools.map((tool) =>
+      createObject(tool, point, tool, thirdTeam),
+    );
+    const remaining = createObject("custom-team-player", point, "remaining", fourthTeam);
+    const layout = {
+      ...exercise,
+      customTeamColors: [thirdTeam.color, fourthTeam.color],
+      objects: [cone, ...figures, remaining],
+    };
+    const deleted = removeCustomTeam(layout, 3);
+    expect(deleted.customTeamColors).toEqual([null, fourthTeam.color]);
+    expect(deleted.objects).toEqual([cone, remaining]);
+    expect(validateSavedLayout(JSON.parse(JSON.stringify(deleted)))).toBeNull();
+    expect(validateSavedLayout({ ...deleted, objects: layout.objects })).toBeTruthy();
+    expect(removeCustomTeam(layout, 2)).toBe(layout);
+    expect(removeCustomTeam(deleted, 3)).toBe(deleted);
+    expect(addCustomTeam(deleted, "#f472b6").customTeamColors)
+      .toEqual([null, fourthTeam.color, "#f472b6"]);
+    expect(removeCustomTeam({ ...exercise, thirdTeamColor: thirdTeam.color }, 3))
+      .toEqual({ ...exercise, customTeamColors: [null] });
+    const history = commit({ past: [], present: layout, future: [] }, deleted);
+    expect(undo(history).present).toEqual(layout);
+    expect(redo(undo(history)).present).toEqual(deleted);
+  });
+
+  it("defaults newly placed Team 1 figures to blue and Team 2 figures to red", () => {
+    const teamTools = ALLOWED_EQUIPMENT_TYPES.filter((type) =>
+      type.startsWith("team"),
+    );
+
+    for (const type of teamTools) {
+      const object = createObject(type, point, type);
+      expect(object.color).toBe(type.startsWith("team1") ? "#3b82f6" : "#ef4444");
+    }
+  });
+
   it("offers one recolorable marker and round trips a wall alongside older markers", () => {
     const tools = FOOTBALL.tools.flatMap(({ types }) => types);
     expect(tools.filter((type) => type.startsWith("marker"))).toEqual(["marker"]);
@@ -82,6 +160,10 @@ describe("exercise model and geometry", () => {
     const converted = convertLegacy(source);
     expect(converted.objects).toHaveLength(items.length);
     expect(converted.objects.map((o) => o.id)).toEqual(items.map((o) => o.id));
+    expect(converted.objects.filter((o) => o.team === 1).map((o) => o.color))
+      .toEqual(Array(5).fill("#ef4444"));
+    expect(converted.objects.filter((o) => o.team === 2).map((o) => o.color))
+      .toEqual(Array(5).fill("#3b82f6"));
     expect(source).toEqual(original);
     expect(
       validateSavedLayout(JSON.parse(JSON.stringify(converted))),
@@ -90,10 +172,11 @@ describe("exercise model and geometry", () => {
       15,
     );
   });
-  it("exposes standard movement tools and keeps legacy variants out of the toolbar", () => {
+  it("keeps legacy tool variants out of the toolbar", () => {
     const legacyVariants = [
       "run-free", "dribble-free", "long-pass",
       "marker-blue", "marker-orange", "marker-yellow",
+      "team1-player-2", "team1-player-more", "team2-player-2", "team2-player-more",
     ];
     expect(new Set(FOOTBALL.tools.flatMap((g) => g.types))).toEqual(
       new Set([
@@ -101,6 +184,19 @@ describe("exercise model and geometry", () => {
         "wall",
       ]),
     );
+  });
+  it("numbers newly placed players per team and skips occupied labels", () => {
+    const first = createObject("team1-player-1", point, "first");
+    const edited = { ...createObject("team1-player-1", point, "edited"), label: "3" };
+    const coach = createObject("team1-coach", point, "coach");
+    const keeper = createObject("team1-goalkeeper", point, "keeper");
+    const objects = [cone, first, coach, keeper];
+
+    expect(nextPlayerLabel(objects, 1)).toBe("2");
+    expect(nextPlayerLabel(objects, 2)).toBe("1");
+    const fourth = { ...createObject("team1-player-1", point, "fourth"), label: "4" };
+    expect(nextPlayerLabel([...objects, edited, fourth], 1)).toBe("2");
+    expect(nextPlayerLabel([coach, keeper], 1)).toBe("1");
   });
   it("rejects unexpected payloads hidden in non-movement objects", () => {
     expect(

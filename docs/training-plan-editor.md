@@ -8,6 +8,10 @@ For equipment, players, text and arrows, **Брой обекти за поста
 
 Selecting an object opens a toolbar on the pitch to change its color, duplicate it, delete it, or move it one layer forward or back. For players and text objects, the pencil button edits the number or text. To select objects with the keyboard, focus the pitch and use Page Up or Page Down. Color updates as the picker moves, and one undo restores the color before that adjustment. The toolbar moves below the object when there is insufficient room above it.
 
+Use **Добави отбор** to choose a default color and add another team to the exercise. Each team offers a coach, goalkeeper and player tool. Placed players receive the lowest available number for their team. The exercise stores added teams' default colors in order in `customTeamColors`, including teams with no figures on the pitch. Earlier exercises with `thirdTeamColor` retain that team's color and number.
+
+Select a custom team and choose **Изтрий отбор** to remove the team and its figures. **Отмени** restores them in one step. Deleted teams reserve a slot in `customTeamColors` so the other teams keep their numbers.
+
 The Konva football uses [“Ball” by Icuk Yulianti from Noun Project](https://thenounproject.com/icon/ball-5681732/) under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The editor serves the PNG locally and draws it over the selected ball color. The app displays the attribution at `/terms#credits`.
 
 The six placeable Konva goals use [“Football goal” by Mark Caron from Noun Project](https://thenounproject.com/icon/football-goal-2451562/) under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The editor serves the PNG locally and tints it with each goal’s selected color. The attribution is at `/terms#credits`.

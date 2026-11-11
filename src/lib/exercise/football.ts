@@ -1,5 +1,9 @@
-import { ALLOWED_EQUIPMENT_TYPES } from "@/lib/trainingPlans";
-import type { Exercise, ExerciseObject, ExerciseTool } from "./model";
+import {
+  TEAM_COLORS,
+  type Exercise,
+  type ExerciseObject,
+  type ExerciseTool,
+} from "./model";
 
 export const FOOTBALL_LABELS: Record<ExerciseTool, string> = {
   cone: "Конус",
@@ -40,16 +44,23 @@ export const FOOTBALL_LABELS: Record<ExerciseTool, string> = {
   text: "Добави текст",
   "team1-coach": "Треньор",
   "team1-goalkeeper": "Вратар",
-  "team1-player-1": "състезател 1",
-  "team1-player-2": "състезател 2",
-  "team1-player-more": "състезател 3-11",
+  "team1-player-1": "Състезател",
+  "team1-player-2": "Състезател",
+  "team1-player-more": "Състезател",
   "team2-coach": "Треньор",
   "team2-goalkeeper": "Вратар",
-  "team2-player-1": "състезател 1",
-  "team2-player-2": "състезател 2",
-  "team2-player-more": "състезател 3-11",
+  "team2-player-1": "Състезател",
+  "team2-player-2": "Състезател",
+  "team2-player-more": "Състезател",
+  "custom-team-coach": "Треньор",
+  "custom-team-goalkeeper": "Вратар",
+  "custom-team-player": "Състезател",
 };
-export const FOOTBALL_TOOLS: { title: string; types: ExerciseTool[] }[] = [
+export const FOOTBALL_TOOLS: {
+  title: string;
+  types: ExerciseTool[];
+  color?: string;
+}[] = [
   {
     title: "Движения",
     types: ["run", "dribble", "pass", "shot"],
@@ -97,11 +108,13 @@ export const FOOTBALL_TOOLS: { title: string; types: ExerciseTool[] }[] = [
   { title: "Текст", types: ["text"] },
   {
     title: "Отбор 1",
-    types: ALLOWED_EQUIPMENT_TYPES.filter((t) => t.startsWith("team1")),
+    color: TEAM_COLORS[1],
+    types: ["team1-coach", "team1-goalkeeper", "team1-player-1"],
   },
   {
     title: "Отбор 2",
-    types: ALLOWED_EQUIPMENT_TYPES.filter((t) => t.startsWith("team2")),
+    color: TEAM_COLORS[2],
+    types: ["team2-coach", "team2-goalkeeper", "team2-player-1"],
   },
 ];
 const defaultPaths: Partial<
@@ -117,6 +130,9 @@ const defaultPaths: Partial<
 export const FOOTBALL = {
   id: "football",
   tools: FOOTBALL_TOOLS,
+  customTeamTools: [
+    "custom-team-coach", "custom-team-goalkeeper", "custom-team-player",
+  ] satisfies ExerciseTool[],
   labels: FOOTBALL_LABELS,
   defaultPaths,
   surfaces: [

@@ -14,6 +14,8 @@ import {
   HEIGHT,
   WIDTH,
   createObject,
+  getCustomTeamColors,
+  nextPlayerLabel,
   validateExercise,
   type Exercise,
   type ExerciseObject,
@@ -61,6 +63,7 @@ export type CanvasProps = {
   exercise: Exercise;
   selected: string | null;
   tool: ExerciseTool | "select";
+  customTeamNumber?: number;
   placementOnly: boolean;
   pathMode: "straight" | "curve" | "freehand";
   objectActions: ReactNode;
@@ -75,6 +78,7 @@ export default function Canvas({
   exercise,
   selected,
   tool,
+  customTeamNumber,
   placementOnly,
   pathMode,
   objectActions,
@@ -303,9 +307,19 @@ export default function Canvas({
       onError(`Позволени са до ${MAX_ITEMS} обекта.`);
       return;
     }
-    const object = createObject(tool, p, crypto.randomUUID());
+    let customTeam;
+    if (tool.startsWith("custom-team-")) {
+      if (customTeamNumber === undefined) return;
+      const color = getCustomTeamColors(exercise)[customTeamNumber - 3];
+      if (!color) return;
+      customTeam = { number: customTeamNumber, color };
+    }
+    const object = createObject(tool, p, crypto.randomUUID(), customTeam);
     if (object.kind === "movement") {
       object.path = pathMode;
+    }
+    if (object.role === "player") {
+      object.label = nextPlayerLabel(exercise.objects, object.team);
     }
     gesture.current = {
       tool,
@@ -338,7 +352,10 @@ export default function Canvas({
     const g = gesture.current,
       p = position();
     if (!g || !p || g.pointerId !== e.evt.pointerId) return;
-    if (g.tool !== tool) {
+    if (
+      g.tool !== tool ||
+      (g.tool.startsWith("custom-team-") && g.object.team !== customTeamNumber)
+    ) {
       clear();
       return;
     }
@@ -348,6 +365,9 @@ export default function Canvas({
         : { ...g.object, ...p };
     clear();
     const current = latest.current.exercise;
+    if (object.role === "player") {
+      object.label = nextPlayerLabel(current.objects, object.team);
+    }
     const next = { ...current, objects: [...current.objects, object] };
     if (!validateExercise(next)) {
       onCommit(next);
@@ -523,6 +543,7 @@ export default function Canvas({
               flipEnabled={false}
               padding={12}
               keepRatio={selectedObject?.kind !== "zone"}
+              ignoreStroke={selectedObject?.kind === "zone"}
               enabledAnchors={
                 selectedObject?.kind === "zone"
                   ? [

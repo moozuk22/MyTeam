@@ -223,9 +223,14 @@ describe("training plan access and persistence", () => {
     });
     // Successful response is read inside the same transaction, before another writer can update it.
     mocks.updateMany.mockResolvedValue({ count: 1 });
+    const fourthTeam = { number: 4, color: "#22d3ee" };
     const layout = {
       ...EMPTY_EXERCISE,
-      objects: [createObject("wall", { x: 200, y: 150 }, "wall")],
+      customTeamColors: ["#a855f7", fourthTeam.color],
+      objects: [
+        createObject("wall", { x: 200, y: 150 }, "wall"),
+        createObject("custom-team-player", { x: 260, y: 150 }, "player", fourthTeam),
+      ],
     };
     mocks.findUnique.mockResolvedValue({ ...row, layout });
     const response = await PUT(

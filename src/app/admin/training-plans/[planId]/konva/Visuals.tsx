@@ -541,24 +541,28 @@ export const ObjectVisual = memo(function ObjectVisual({
   if (o.kind === "zone")
     return (
       <Shape
+        x={-w / 2}
+        y={-h / 2}
+        width={w}
+        height={h}
         sceneFunc={(ctx, shape) => {
           ctx.beginPath();
           if (o.shape === "circle")
-            ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+            ctx.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
           else if (o.shape === "triangle") {
-            ctx.moveTo(0, -h / 2);
-            ctx.lineTo(w / 2, h / 2);
-            ctx.lineTo(-w / 2, h / 2);
+            ctx.moveTo(w / 2, 0);
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
             ctx.closePath();
-          } else ctx.rect(-w / 2, -h / 2, w, h);
+          } else ctx.rect(0, 0, w, h);
           ctx.fillStrokeShape(shape);
           if (o.hatched) {
             ctx.save();
             ctx.clip();
             ctx.beginPath();
-            for (let x = -w / 2 - h; x <= w / 2; x += 12) {
-              ctx.moveTo(x, h / 2);
-              ctx.lineTo(x + h, -h / 2);
+            for (let x = -h; x <= w; x += 12) {
+              ctx.moveTo(x, h);
+              ctx.lineTo(x + h, 0);
             }
             ctx.strokeStyle = c;
             ctx.lineWidth = 1;
