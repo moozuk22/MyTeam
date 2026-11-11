@@ -171,6 +171,11 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const schedule2 = request.nextUrl.searchParams.get("view") === "schedule2";
+  if (schedule2 && !session.roles.includes("admin")) {
+    return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
+  }
+
   const { id } = await params;
   const trainingSessionId = request.nextUrl.searchParams.get("trainingSessionId");
   const coachGroupId = request.nextUrl.searchParams.get("coachGroupId");
@@ -227,7 +232,10 @@ export async function GET(
     return NextResponse.json({ coachGroupId: scopeId, trainingSessionId: row.id, trainingDate: utcDateToIsoDate(row.trainingDate), trainingTime: row.trainingTime, trainingDurationMinutes: row.trainingDurationMinutes, trainingField: field, trainingFieldPieceIds: row.trainingFieldPieceIds, sessionStatus: row.status, note: row.note ?? "", players, stats: attendanceStats(row.players), upcomingDates });
   }
   const requestedDate = request.nextUrl.searchParams.get("date")?.trim() ?? "";
-  const requestedMonth = request.nextUrl.searchParams.get("month");
+  if (schedule2 && !isIsoDate(requestedDate)) {
+    return NextResponse.json({ error: "Невалидна дата на тренировка." }, { status: 400 });
+  }
+  const requestedMonth = schedule2 ? requestedDate.slice(0, 7) : request.nextUrl.searchParams.get("month");
   const monthKey = parseMonthKey(requestedMonth, requestedDate || getTodayIsoDateInTimeZone(FIXED_TIME_ZONE));
   let teamGroup: number | null = null;
   let trainingGroupId: string | null = null;
@@ -432,7 +440,7 @@ export async function GET(
         where: {
           clubId: id,
           scopeKey,
-          trainingDate: {
+          trainingDate: schedule2 ? isoDateToUtcMidnight(requestedDate) : {
             gte: isoDateToUtcMidnight(monthDates[0]),
             lte: isoDateToUtcMidnight(monthDates[monthDates.length - 1]),
           },
@@ -453,15 +461,18 @@ export async function GET(
   const storedSessionByDate = new Map(storedSessions.map((session) => [utcDateToIsoDate(session.trainingDate), session]));
   const storedSessionDates = storedSessions.map((session) => utcDateToIsoDate(session.trainingDate));
 
-  const upcomingDates = storedSessionDates.length > 0
+  const configuredMonthDates = () => getConfiguredTrainingDatesForMonth({
+    trainingDates: resolvedTrainingDates,
+    weekdays: resolvedTrainingWeekdays,
+    monthKey,
+    timeZone: FIXED_TIME_ZONE,
+  });
+  const upcomingDates = schedule2
+    ? (storedSessionByDate.has(requestedDate) || configuredMonthDates().includes(requestedDate) ? [requestedDate] : [])
+    : storedSessionDates.length > 0
     ? storedSessionDates
     : requestedMonth
-      ? getConfiguredTrainingDatesForMonth({
-          trainingDates: resolvedTrainingDates,
-          weekdays: resolvedTrainingWeekdays,
-          monthKey,
-          timeZone: FIXED_TIME_ZONE,
-        })
+      ? configuredMonthDates()
       : getConfiguredTrainingDates({
           trainingDates: resolvedTrainingDates,
           weekdays: resolvedTrainingWeekdays,
