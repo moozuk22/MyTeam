@@ -106,12 +106,23 @@ export const FOOTBALL_TOOLS: { title: string; types: EquipmentType[] }[] = [
     types: ALLOWED_EQUIPMENT_TYPES.filter((t) => t.startsWith("team2")),
   },
 ];
-import type { Exercise } from "./model";
+import type { Exercise, ExerciseObject } from "./model";
+
+const defaultPaths: Partial<
+  Record<EquipmentType, NonNullable<ExerciseObject["path"]>>
+> = {
+  run: "straight",
+  dribble: "freehand",
+  pass: "straight",
+  shot: "straight",
+};
+
 // Sport-specific surface geometry; the editor always uses the shared logical board.
 export const FOOTBALL = {
   id: "football",
   tools: FOOTBALL_TOOLS,
   labels: FOOTBALL_LABELS,
+  defaultPaths,
   surfaces: [
     { id: "full", label: "Цяло игрище" },
     { id: "half", label: "Половин игрище" },

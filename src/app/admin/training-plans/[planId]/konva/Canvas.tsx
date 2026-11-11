@@ -22,6 +22,8 @@ import {
   clamp,
   drawnObject,
   localPoint,
+  movementHandlePoint,
+  moveMovementHandle,
   worldPoint,
 } from "@/lib/exercise/geometry";
 import { ObjectVisual, Pitch } from "./Visuals";
@@ -111,11 +113,11 @@ export default function Canvas({
         node.rotation(o.rotation);
         node.scale({ x: 1, y: 1 });
       }
-      o.points?.forEach((p, i) => {
+      o.points?.forEach((_, i) => {
         const handle = handles.current.get(`${o.id}:${i}`);
         if (handle) {
           handle.stopDrag();
-          handle.position(worldPoint(p, o));
+          handle.position(worldPoint(movementHandlePoint(o, i), o));
         }
       });
     }
@@ -392,16 +394,19 @@ export default function Canvas({
             />
             {selectedObject?.kind === "movement" &&
               (preview?.id === selected ? preview : selectedObject).points?.map(
-                (p, i) => {
+                (_, i) => {
                   const object =
-                      preview?.id === selected ? preview : selectedObject,
-                    world = worldPoint(p, object);
+                    preview?.id === selected ? preview : selectedObject;
                   if (
                     object.path === "freehand" &&
                     i !== 0 &&
                     i !== object.points!.length - 1
                   )
                     return null;
+                  const world = worldPoint(
+                    movementHandlePoint(object, i),
+                    object,
+                  );
                   return (
                     <Circle
                       name="path-handle"
@@ -436,12 +441,9 @@ export default function Canvas({
                           { x: e.target.x(), y: e.target.y() },
                           selectedObject,
                         );
-                        previewAtFrame({
-                          ...selectedObject,
-                          points: selectedObject.points!.map((q, j) =>
-                            i === j ? point : q,
-                          ),
-                        });
+                        previewAtFrame(
+                          moveMovementHandle(selectedObject, i, point),
+                        );
                       }}
                       onDragEnd={(e) => {
                         e.cancelBubble = true;
@@ -450,14 +452,18 @@ export default function Canvas({
                           { x: e.target.x(), y: e.target.y() },
                           selectedObject,
                         );
-                        const next = {
-                          ...selectedObject,
-                          points: selectedObject.points!.map((q, j) =>
-                            i === j ? point : q,
-                          ),
-                        };
+                        const next = moveMovementHandle(
+                          selectedObject,
+                          i,
+                          point,
+                        );
                         clear();
-                        applyObject(next);
+                        if (applyObject(next)) {
+                          // The committed handle can have the same props as the preview.
+                          e.target.position(
+                            worldPoint(movementHandlePoint(next, i), next),
+                          );
+                        }
                       }}
                     />
                   );

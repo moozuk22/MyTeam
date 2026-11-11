@@ -664,6 +664,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                     aria-pressed={tool === t}
                     onClick={() => {
                       setTool(t);
+                      const defaultPath = FOOTBALL.defaultPaths[t];
+                      if (defaultPath) setPathMode(defaultPath);
                       setSelected(null);
                     }}
                   >

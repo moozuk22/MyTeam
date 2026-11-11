@@ -24,6 +24,34 @@ export function worldPoint(p: Point, object: ExerciseObject): Point {
     y: object.y + p.x * Math.sin(a) + p.y * Math.cos(a),
   };
 }
+export function movementHandlePoint(object: ExerciseObject, index: number): Point {
+  const points = object.points!;
+  if (object.path !== "curve" || index !== 1) return points[index];
+
+  const [start, control, end] = points;
+  return {
+    x: (start.x + 2 * control.x + end.x) / 4,
+    y: (start.y + 2 * control.y + end.y) / 4,
+  };
+}
+export function moveMovementHandle(
+  object: ExerciseObject,
+  index: number,
+  position: Point,
+): ExerciseObject {
+  const points = object.points!.slice();
+  if (object.path === "curve" && index === 1) {
+    const [start, , end] = points;
+    // Solve the quadratic midpoint for its control point.
+    points[index] = {
+      x: 2 * position.x - (start.x + end.x) / 2,
+      y: 2 * position.y - (start.y + end.y) / 2,
+    };
+  } else {
+    points[index] = position;
+  }
+  return { ...object, points };
+}
 export function simplify(points: Point[], cap = 300): Point[] {
   const filtered: Point[] = [];
   for (const [i, p] of points.entries()) {

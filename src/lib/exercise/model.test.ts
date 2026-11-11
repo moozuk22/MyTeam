@@ -17,7 +17,9 @@ import {
   drawnObject,
   duplicateObject,
   localPoint,
+  movementHandlePoint,
   movementPoints,
+  moveMovementHandle,
   redo,
   simplify,
   undo,
@@ -260,6 +262,27 @@ describe("exercise model and geometry", () => {
     expect(copy.x).toBe(1026);
     expect(copy.y).toBe(676);
     expect(copy.rotation).toBe(object.rotation);
+  });
+  it("places the yellow handle on the curve and drags the curve through the new handle position", () => {
+    const curve = {
+      ...createObject("pass", point, "pass"),
+      path: "curve" as const,
+      points: [
+        { x: 5, y: 10 },
+        { x: 110, y: -130 },
+        { x: 200, y: 40 },
+      ],
+    };
+    const handle = movementHandlePoint(curve, 1);
+    expect(movementPoints(curve).slice(40, 42)).toEqual([handle.x, handle.y]);
+
+    const target = { x: 125, y: -65 };
+    const moved = moveMovementHandle(curve, 1, target);
+    expect(movementPoints(moved).slice(40, 42)).toEqual([target.x, target.y]);
+    expect(moved.points?.[0]).toEqual(curve.points[0]);
+    expect(moved.points?.[2]).toEqual(curve.points[2]);
+    expect(moveMovementHandle(curve, 1, handle)).toEqual(curve);
+    expect(moveMovementHandle(curve, 2, target).points?.[2]).toEqual(target);
   });
   it("keeps sampled dribbling geometry bounded even for complex paths", () => {
     const o = {
