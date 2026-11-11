@@ -199,7 +199,7 @@ export default function Canvas({
     }
     const object = createObject(tool, p, crypto.randomUUID());
     if (object.kind === "movement") {
-      object.path = tool.endsWith("-free") ? "freehand" : pathMode;
+      object.path = pathMode;
     }
     gesture.current = {
       object,

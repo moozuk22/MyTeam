@@ -6,6 +6,8 @@ Use **Нов план — Konva** to create a version-2 exercise or **Копир
 
 Existing objects and arrows can be selected and dragged directly, even while a placement/drawing tool is active. Tapping empty pitch continues using that active tool. The explicit Select tool remains available for manipulating objects without placing new ones. Resize/rotation and path handles work without changing tools.
 
+Use **Начин на рисуване** to draw **Бягане**, **Дрибъл**, **Пас** or **Удар** as a straight line, a curve with a handle, or a freehand stroke. Existing long passes and converted freehand movements retain their saved geometry.
+
 While drawing a freehand movement, the preview shows the stroke. After release, its arrowhead points along the short, straight finish at the tip. The dribbling wave fades into the centerline under the arrowhead.
 
 On desktop, drawing tools and object properties share a scrollable side panel. The pitch scales to fit the available viewport height and keeps its aspect ratio. On narrower screens, the tools, pitch and properties are stacked.

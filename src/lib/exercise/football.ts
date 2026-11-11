@@ -52,15 +52,7 @@ export const FOOTBALL_LABELS: Record<EquipmentType, string> = {
 export const FOOTBALL_TOOLS: { title: string; types: EquipmentType[] }[] = [
   {
     title: "Движения",
-    types: [
-      "run",
-      "run-free",
-      "dribble",
-      "dribble-free",
-      "pass",
-      "long-pass",
-      "shot",
-    ],
+    types: ["run", "dribble", "pass", "shot"],
   },
   {
     title: "Топки и врати",

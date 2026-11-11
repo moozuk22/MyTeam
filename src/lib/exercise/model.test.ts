@@ -54,9 +54,12 @@ describe("exercise model and geometry", () => {
       15,
     );
   });
-  it("exposes every supported football tool, including all goal sizes and the pole", () => {
+  it("exposes standard movement tools and keeps legacy variants out of the toolbar", () => {
+    const legacyVariants = ["run-free", "dribble-free", "long-pass"];
     expect(new Set(FOOTBALL.tools.flatMap((g) => g.types))).toEqual(
-      new Set(ALLOWED_EQUIPMENT_TYPES),
+      new Set(
+        ALLOWED_EQUIPMENT_TYPES.filter((type) => !legacyVariants.includes(type)),
+      ),
     );
   });
   it("rejects unexpected payloads hidden in non-movement objects", () => {

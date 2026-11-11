@@ -31,6 +31,11 @@ import Canvas from "./Canvas";
 
 const EQUIPMENT_LABELS = FOOTBALL.labels;
 const TOOLBAR_GROUPS = FOOTBALL.tools;
+const DRAWING_MODES = [
+  { value: "straight", label: "Право" },
+  { value: "curve", label: "Крива с ръкохватка" },
+  { value: "freehand", label: "Свободна ръка" },
+] as const;
 
 export type EditorProps = {
   plan: {
@@ -659,8 +664,6 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                     aria-pressed={tool === t}
                     onClick={() => {
                       setTool(t);
-                      if (t.endsWith("-free")) setPathMode("freehand");
-                      else if (t === "long-pass") setPathMode("curve");
                       setSelected(null);
                     }}
                   >
@@ -670,25 +673,20 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 ))}
               </div>
               <div className="ke-mode">
-                <strong>
-                  Активен инструмент:{" "}
-                  {tool === "select" ? "Избор" : EQUIPMENT_LABELS[tool]}
-                </strong>
                 {category === 0 && (
-                  <label>
-                    Начин на рисуване
-                    <select
-                      value={pathMode}
-                      disabled={tool.endsWith("-free")}
-                      onChange={(e) =>
-                        setPathMode(e.target.value as typeof pathMode)
-                      }
-                    >
-                      <option value="straight">Право</option>
-                      <option value="curve">Крива с ръкохватка</option>
-                      <option value="freehand">Свободна ръка</option>
-                    </select>
-                  </label>
+                  <fieldset className="ke-path-modes">
+                    <legend>Начин на рисуване</legend>
+                    {DRAWING_MODES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={pathMode === value}
+                        onClick={() => setPathMode(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </fieldset>
                 )}
                 <p>
                   {tool === "select"
