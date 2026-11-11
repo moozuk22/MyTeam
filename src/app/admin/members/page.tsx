@@ -91,31 +91,30 @@ export default async function AdminMembersPage(
 ) {
   const cookieStore = await cookies();
   const token = cookieStore.get("admin_session")?.value;
-  if (token) {
-    const session = await verifyAdminToken(token);
-    if (session?.roles.includes("coach") && !session.roles.includes("admin")) {
-      const resolvedSearchParams = await searchParams;
-      const clubIdValue = resolvedSearchParams.clubId;
-      const clubId = (Array.isArray(clubIdValue) ? clubIdValue[0] : clubIdValue ?? "").trim();
-      if (clubId) {
-        const club = await getClubData(clubId);
-        if (club?.notifyOnCoachVisit) {
-          after(async () => {
-            const now = new Date();
-            const час = new Intl.DateTimeFormat("bg-BG", {
-              timeZone: "Europe/Sofia",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            }).format(now);
-            await fireN8nWebhook({
-              "Отбор": club.name,
-              "Час": час,
-            });
+  const session = token ? await verifyAdminToken(token) : null;
+  const canUseSchedule2 = session?.roles.includes("admin") ?? false;
+  if (session?.roles.includes("coach") && !canUseSchedule2) {
+    const resolvedSearchParams = await searchParams;
+    const clubIdValue = resolvedSearchParams.clubId;
+    const clubId = (Array.isArray(clubIdValue) ? clubIdValue[0] : clubIdValue ?? "").trim();
+    if (clubId) {
+      const club = await getClubData(clubId);
+      if (club?.notifyOnCoachVisit) {
+        after(async () => {
+          const now = new Date();
+          const час = new Intl.DateTimeFormat("bg-BG", {
+            timeZone: "Europe/Sofia",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          }).format(now);
+          await fireN8nWebhook({
+            "Отбор": club.name,
+            "Час": час,
           });
-        }
+        });
       }
     }
   }
-  return <AdminMembersPageClient />;
+  return <AdminMembersPageClient canUseSchedule2={canUseSchedule2} />;
 }

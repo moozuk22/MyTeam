@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { PATCH } from "@/app/api/admin/clubs/[id]/custom-training-groups/[groupId]/route";
 import { syncFutureTrainingSessions } from "@/lib/trainingSessions";
-import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict } from "@/lib/trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, pickTrainingConflictCheckInput } from "@/lib/trainingFieldConflicts";
 import { isCustomTrainingGroupColorTakenInScope } from "@/lib/customTrainingGroupColorScope";
 import { verifyAdminToken } from "@/lib/adminAuth";
 
@@ -262,6 +262,32 @@ describe("custom group edits with legacy schedules without venues", () => {
     if (paymentWorkflow === "training_credits") expect(tx.trainingOptOut.createMany).toHaveBeenCalled();
     else expect(tx.trainingOptOut.createMany).not.toHaveBeenCalled();
   });
+  it("rejects an overlap on an existing date when extending the shared duration", async () => {
+    const newDate = "2026-10-23";
+    const { pickTrainingConflictCheckInput: pickAffectedDates } =
+      await vi.importActual<typeof import("@/lib/trainingFieldConflicts")>("@/lib/trainingFieldConflicts");
+    vi.mocked(pickTrainingConflictCheckInput).mockImplementationOnce(pickAffectedDates);
+    vi.mocked(assertNoTrainingFieldConflict).mockImplementationOnce(async ({ trainingDates }) => {
+      if (trainingDates.includes(date)) throw new Error("Теренът е зает.");
+    });
+    mocks.clubCustomTrainingGroup.findFirst.mockResolvedValue({
+      ...group(), trainingDates: [date], trainingDateTimes: { [date]: "18:00" }, trainingFieldId: fieldId,
+    });
+
+    const response = await edit({
+      trainingDates: [date, newDate],
+      trainingDateTimes: { [date]: "18:00", [newDate]: "18:00" },
+      trainingDurationMinutes: 90,
+    });
+
+    expect(response.status).toBe(400);
+    expect(assertNoTrainingFieldConflict).toHaveBeenCalledWith(expect.objectContaining({
+      trainingDates: [date, newDate], trainingDurationMinutes: 90,
+    }));
+    expect(mocks.clubCustomTrainingGroup.update).not.toHaveBeenCalled();
+    expect(syncFutureTrainingSessions).not.toHaveBeenCalled();
+  });
+
   it.each(["cancelled", "finished-today"])("preserves %s session state on mixed member and schedule edits", async (scenario) => {
     const actual = await vi.importActual<typeof import("@/lib/trainingSessions")>("@/lib/trainingSessions");
     vi.mocked(syncFutureTrainingSessions).mockImplementationOnce(actual.syncFutureTrainingSessions);

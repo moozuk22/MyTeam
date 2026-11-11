@@ -203,6 +203,7 @@ interface TrainingWeekSessionItem {
   isHome?: boolean;
   durationMinutes?: number;
   customGroupId?: string | null;
+  coachGroupId?: string | null;
   limitedSpots?: { id: string; maxSpots: number; registeredCount: number } | null;
 }
 
