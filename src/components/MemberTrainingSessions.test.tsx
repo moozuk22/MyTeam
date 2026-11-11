@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import MemberTrainingSessions from "./MemberTrainingSessions";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
 
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(), useState: (initial: unknown) => [initial, vi.fn()] }));
@@ -24,4 +25,10 @@ it("sends a scope target for an unstored session in a mixed day", async () => {
     await vi.waitFor(() => expect(onUpdated).toHaveBeenCalledOnce());
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ trainingDate: "2026-11-06", trainingScopeKey: "custom_group:second" });
   } finally { vi.unstubAllGlobals(); }
+});
+
+it("shows the custom-group name for a single training", () => {
+  const html = renderToStaticMarkup(<MemberTrainingSessions sessions={[{ id: "one", groupName: "Група 1", trainingTime: "18:00", trainingDurationMinutes: 90 }]} cardCode="CARD" onUpdated={async () => {}} />);
+  expect(html).toContain("Група 1 — ");
+  expect(html).toContain("18:00");
 });

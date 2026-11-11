@@ -91,6 +91,27 @@ describe("coach training API boundaries", () => {
     mocks.$transaction.mockImplementation(async (callback) => callback(mocks));
   });
   afterEach(() => vi.useRealTimers());
+  it("shows each player only their custom-group schedule with the custom-group name", async () => {
+    const card = await mocks.card.findFirst();
+    card.player.club.trainingGroupMode = "custom_group";
+    // Both players share a coach, but belong to different custom groups.
+    const coach = { ...card.player.coachGroups[0], name: "Треньор Иван", trainingDates: [], trainingWeekdays: [] };
+    const groups = [
+      { ...coach, id: firstId, coachGroupId: groupId, name: "Начинаещи", trainingDates: [date], trainingTime: "17:00", trainingDateTimes: {} },
+      { ...coach, id: secondId, coachGroupId: groupId, name: "Напреднали", trainingDates: ["2026-10-13"], trainingTime: "19:00", trainingDateTimes: {} },
+    ];
+    mocks.trainingSession.findMany.mockResolvedValue([]);
+    for (const group of groups) {
+      card.player.coachGroups = [coach];
+      card.player.customTrainingGroups = [{ group }];
+      const response = await GET(new NextRequest("http://localhost/training"), context);
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.dates).toHaveLength(1);
+      expect(data.dates[0]).toMatchObject({ date: group.trainingDates[0], sessions: [{ scopeKey: `custom_group:${group.id}`, groupName: group.name, trainingTime: group.trainingTime }] });
+      expect(data.dates[0].sessions).toHaveLength(1);
+    }
+  });
   it("returns custom training group names for multiple sessions on the same day", async () => {
     const card = await mocks.card.findFirst();
     const schedule = card.player.coachGroups[0];

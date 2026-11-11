@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MemberDetailModal } from './members-page-components';
+import { MemberDetailModal } from './MemberDetailModal';
 import { normalizeMember } from '../_utils/members-page-utils';
 
 const render = (cards:{cardCode:string;isActive:boolean}[], nfcTagId = '') => renderToStaticMarkup(<MemberDetailModal member={{...normalizeMember({id:'player',fullName:'Иван',status:'paid',cards,coachGroupIds:[],paymentLogs:[]}),nfcTagId}} onClose={vi.fn()} onRequestEdit={vi.fn()} onRequestDelete={vi.fn()} showManagementActions={false} showProfileLink />);
