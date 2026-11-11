@@ -14,6 +14,8 @@ import {
   ArrowUp,
   Check,
   Copy,
+  Maximize2,
+  Minimize2,
   Pencil,
   Plus,
   Redo2,
@@ -27,6 +29,7 @@ import { countEquipment, FOOTBALL } from "@/lib/exercise/football";
 import {
   HEIGHT,
   CUSTOM_TEAM_COLOR_ERROR,
+  MAX_TEXT_FONT_SIZE,
   WIDTH,
   addCustomTeam,
   createObject,
@@ -35,6 +38,7 @@ import {
   isMovementType,
   isZoneType,
   removeCustomTeam,
+  textFontSize,
   validateExercise,
   type Exercise,
   type ExerciseObject,
@@ -59,9 +63,11 @@ import {
 import { MAX_ITEMS } from "@/lib/trainingPlans";
 import Canvas from "./Canvas";
 import { EquipmentPreview } from "./Visuals";
+import { measurePitchText } from "./textLayout";
 
 const EQUIPMENT_LABELS = FOOTBALL.labels;
 const TOOLBAR_GROUPS = FOOTBALL.tools;
+const TEXT_CATEGORY = TOOLBAR_GROUPS.findIndex((group) => group.types[0] === "text");
 const TEAM_COLOR_SUGGESTIONS = ["#facc15", "#a855f7", "#fb923c", "#22d3ee", "#f472b6", "#a3e635"];
 const DRAWING_MODES = [
   { value: "straight", label: "Право" },
@@ -130,6 +136,7 @@ function ObjectColorInput({
 
 function ObjectActions({
   object,
+  editLabelOnMount,
   onColorChange,
   onLabelChange,
   onDuplicate,
@@ -140,8 +147,9 @@ function ObjectActions({
   canMoveForward,
 }: {
   object: ExerciseObject;
+  editLabelOnMount: boolean;
   onColorChange: (color: string, group: symbol, preview: boolean) => void;
-  onLabelChange: (label: string) => void;
+  onLabelChange: (label: string, fontSize?: number) => boolean;
   onDuplicate: () => void;
   onRemove: () => void;
   onReorder: (delta: number) => void;
@@ -149,42 +157,111 @@ function ObjectActions({
   canMoveBack: boolean;
   canMoveForward: boolean;
 }) {
-  const [editingLabel, setEditingLabel] = useState(false);
+  const [editingLabel, setEditingLabel] = useState(editLabelOnMount);
+  const [expanded, setExpanded] = useState(false);
+  const textInputId = useId();
   const editButton = useRef<HTMLButtonElement>(null);
+  const labelInput = useRef<HTMLInputElement>(null);
+  const textInput = useRef<HTMLTextAreaElement>(null);
+  const isText = object.kind === "text";
   const editTitle =
     object.kind === "player" ? "Редактирай номер" : "Редактирай текст";
 
+  useEffect(() => {
+    if (!editingLabel) return;
+    const frame = requestAnimationFrame(() => {
+      const input = textInput.current ?? labelInput.current;
+      input?.focus({ preventScroll: true });
+      input?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editingLabel]);
+
   function closeLabelEditor() {
     setEditingLabel(false);
+    setExpanded(false);
     requestAnimationFrame(() => editButton.current?.focus());
   }
 
   if (editingLabel) {
     return (
       <form
-        className="ke-object-label"
+        className={isText ? "ke-object-label ke-object-label--text" : "ke-object-label"}
+        data-expanded={isText && expanded ? "true" : undefined}
         onSubmit={(e) => {
           e.preventDefault();
-          const label = new FormData(e.currentTarget).get("label");
-          if (typeof label === "string" && label !== object.label) {
-            onLabelChange(label);
+          const data = new FormData(e.currentTarget);
+          const label = data.get("label");
+          if (typeof label !== "string") return;
+          if (isText && !label.trim()) {
+            textInput.current?.setCustomValidity("Въведете текст.");
+            textInput.current?.reportValidity();
+            return;
           }
-          closeLabelEditor();
+          const fontSize = isText ? Number(data.get("fontSize")) : undefined;
+          if (onLabelChange(label, fontSize)) closeLabelEditor();
         }}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             e.stopPropagation();
             closeLabelEditor();
+          } else if (isText && e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            e.currentTarget.requestSubmit();
           }
         }}
       >
-        <input
-          autoFocus
-          name="label"
-          defaultValue={object.label ?? ""}
-          maxLength={40}
-          aria-label={object.kind === "player" ? "Номер" : "Текст"}
-        />
+        {isText ? (
+          <>
+            <textarea
+              ref={textInput}
+              id={textInputId}
+              name="label"
+              defaultValue={object.label ?? ""}
+              maxLength={40}
+              rows={2}
+              required
+              aria-label="Текст"
+              onInput={(e) => e.currentTarget.setCustomValidity("")}
+            />
+            <label>
+              Размер на шрифта
+              <input
+                type="number"
+                name="fontSize"
+                inputMode="decimal"
+                min={1}
+                max={MAX_TEXT_FONT_SIZE}
+                step="any"
+                defaultValue={textFontSize(object)}
+                required
+              />
+            </label>
+            <button
+              type="button"
+              aria-label={expanded ? "Свий текстовото поле" : "Разшири текстовото поле"}
+              title={expanded ? "Свий текстовото поле" : "Разшири текстовото поле"}
+              aria-expanded={expanded}
+              aria-controls={textInputId}
+              onPointerDown={(e) => {
+                if (e.button === 0 && document.activeElement === textInput.current) {
+                  e.preventDefault();
+                }
+              }}
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <Minimize2 size={18} aria-hidden="true" /> : <Maximize2 size={18} aria-hidden="true" />}
+            </button>
+          </>
+        ) : (
+          <input
+            ref={labelInput}
+            name="label"
+            defaultValue={object.label ?? ""}
+            maxLength={40}
+            aria-label="Номер"
+          />
+        )}
         <button type="submit" aria-label="Потвърди" title="Потвърди">
           <Check size={18} aria-hidden="true" />
         </button>
@@ -362,8 +439,15 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     present: plan.layout,
     future: [],
   });
-  const [selected, setSelected] = useState<string | null>(null),
+  const [selection, setSelection] = useState<{ id: string; editLabel: boolean } | null>(null),
     [selectedTool, setTool] = useState<ExerciseTool | "select">("select");
+  const selected = selection?.id ?? null;
+  function setSelected(id: string | null) {
+    setSelection((current) => {
+      if (current?.id === id) return current;
+      return id ? { id, editLabel: false } : null;
+    });
+  }
   const [placementCount, setPlacementCount] = useState("1");
   const toolsRef = useRef<HTMLDivElement>(null);
   const addTeamButtonRef = useRef<HTMLButtonElement>(null);
@@ -416,7 +500,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     drawingMovement && tool !== "line" && tool !== "dashed-line";
   const placing =
     tool !== "select" && !drawingMovement && !isZoneType(tool);
-  const usesQuantity = tool !== "select";
+  const usesQuantity = tool !== "select" && tool !== "text";
   const placementCapacity = MAX_ITEMS - layout.objects.length;
   const quantity = Number(placementCount);
   const validQuantity =
@@ -443,6 +527,25 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
           o.id === object.id ? { ...o, ...changes } : o,
         ),
       });
+  }
+  function updateLabel(label: string, fontSize?: number) {
+    if (object?.kind === "text" && fontSize !== undefined) {
+      if (label === object.label && fontSize === textFontSize(object)) return true;
+      const { minWidth, minHeight } = measurePitchText(label, fontSize, object.width);
+      if (minWidth > WIDTH * 3 || minHeight > HEIGHT * 3) {
+        setError("Текстът е твърде голям за полето. Намалете размера на шрифта.");
+        return false;
+      }
+      patch({
+        label,
+        fontSize,
+        width: Math.max(object.width, minWidth),
+        height: Math.max(object.height, minHeight),
+      });
+    } else if (label !== object?.label) {
+      patch({ label });
+    }
+    return true;
   }
   function updateObjectColor(
     id: string,
@@ -496,10 +599,19 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     addTeamButtonRef.current?.focus();
   }
   function selectCategory(index: number) {
-    if (index !== activeCategory && (index >= firstCustomCategory || customTeamNumber !== undefined)) {
+    setCategory(index);
+    if (index === TEXT_CATEGORY) {
+      cancelPlacement();
+      if (tool !== "text") setTool("text");
+      return;
+    }
+    if (
+      tool === "text" ||
+      (index !== activeCategory &&
+        (index >= firstCustomCategory || customTeamNumber !== undefined))
+    ) {
       cancelPlacement();
     }
-    setCategory(index);
   }
   function cancelPlacementFromControls() {
     const tools = toolsRef.current;
@@ -519,7 +631,12 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     change({ ...layout, objects: [...layout.objects, copy] });
     if (layout.objects.length < MAX_ITEMS) setSelected(copy.id);
   }
-  function onPlaced() {
+  function onPlaced(placed: ExerciseObject) {
+    if (placed.kind === "text") {
+      setTool("select");
+      setSelection({ id: placed.id, editLabel: true });
+      return;
+    }
     setSelected(null);
     if (quantity <= 1) {
       setTool("select");
@@ -946,7 +1063,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   <button
                     type="button"
                     key={g.title}
-                    aria-pressed={activeCategory === i}
+                    aria-pressed={i === TEXT_CATEGORY ? tool === "text" : activeCategory === i}
                     onClick={() => selectCategory(i)}
                   >
                     {g.color && (
@@ -1015,54 +1132,56 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   </div>
                 </div>
               )}
-              <div
-                className="ke-tools"
-                ref={toolsRef}
-                role="group"
-                aria-label={toolGroup.title}
-              >
-                {toolGroup.types.map((t) => {
-                  const label = EQUIPMENT_LABELS[t];
-                  const count = equipmentCounts ? equipmentCounts[t] ?? 0 : undefined;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      aria-pressed={tool === t}
-                      aria-label={
-                        count === undefined ? undefined : `${label}, брой на игрището: ${count}`
-                      }
-                      onClick={() => {
-                        if (tool === t) {
-                          cancelPlacement();
-                          return;
+              {activeCategory !== TEXT_CATEGORY && (
+                <div
+                  className="ke-tools"
+                  ref={toolsRef}
+                  role="group"
+                  aria-label={toolGroup.title}
+                >
+                  {toolGroup.types.map((t) => {
+                    const label = EQUIPMENT_LABELS[t];
+                    const count = equipmentCounts ? equipmentCounts[t] ?? 0 : undefined;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        aria-pressed={tool === t}
+                        aria-label={
+                          count === undefined ? undefined : `${label}, брой на игрището: ${count}`
                         }
-                        setSelected(null);
-                        setPlacementCount("1");
-                        setTool(t);
-                        const defaultPath = FOOTBALL.defaultPaths[t];
-                        if (defaultPath) setPathMode(defaultPath);
-                      }}
-                    >
-                      {isMovementType(t) ? (
-                        <MovementPreview type={t} />
-                      ) : isZoneType(t) ? (
-                        <ZonePreview type={t} />
-                      ) : (
-                        <EquipmentPreview type={t} />
-                      )}
-                      <span>
-                        {label}
-                        {count !== undefined && (
-                          <span className="ke-equipment-count" aria-hidden="true">
-                            {count}
-                          </span>
+                        onClick={() => {
+                          if (tool === t) {
+                            cancelPlacement();
+                            return;
+                          }
+                          setSelected(null);
+                          setPlacementCount("1");
+                          setTool(t);
+                          const defaultPath = FOOTBALL.defaultPaths[t];
+                          if (defaultPath) setPathMode(defaultPath);
+                        }}
+                      >
+                        {isMovementType(t) ? (
+                          <MovementPreview type={t} />
+                        ) : isZoneType(t) ? (
+                          <ZonePreview type={t} />
+                        ) : (
+                          <EquipmentPreview type={t} />
                         )}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                        <span>
+                          {label}
+                          {count !== undefined && (
+                            <span className="ke-equipment-count" aria-hidden="true">
+                              {count}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div
                 className="ke-mode"
                 hidden={tool === "select" && customTeamNumber === undefined}
@@ -1138,11 +1257,13 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 )}
                 {tool !== "select" && (
                   <p>
-                    {placing
-                      ? "Изберете място за всеки обект."
-                      : drawingArrow
-                        ? "Плъзнете по игрището, за да нарисувате стрелка."
-                        : "Плъзнете по игрището, за да нарисувате линия или фигура."}
+                    {tool === "text"
+                      ? "Изберете място на игрището за текста. Esc отменя."
+                      : placing
+                        ? "Изберете място за всеки обект."
+                        : drawingArrow
+                          ? "Плъзнете по игрището, за да нарисувате стрелка."
+                          : "Плъзнете по игрището, за да нарисувате линия или фигура."}
                   </p>
                 )}
               </div>
@@ -1154,7 +1275,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 tool={
                   recovery || (usesQuantity && !validQuantity) ? "select" : tool
                 }
-                placementOnly={usesQuantity}
+                placementOnly={tool !== "select"}
                 customTeamNumber={customTeamNumber}
                 pathMode={pathMode}
                 colorPreviewId={
@@ -1168,10 +1289,11 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   <ObjectActions
                     key={object.id}
                     object={object}
+                    editLabelOnMount={selection?.editLabel ?? false}
                     onColorChange={(color, group, preview) =>
                       updateObjectColor(object.id, color, group, preview)
                     }
-                    onLabelChange={(label) => patch({ label })}
+                    onLabelChange={updateLabel}
                     onDuplicate={duplicate}
                     onRemove={remove}
                     onReorder={reorder}

@@ -16,6 +16,7 @@ import {
   createObject,
   getCustomTeamColors,
   nextPlayerLabel,
+  textFontSize,
   validateExercise,
   type Exercise,
   type ExerciseObject,
@@ -38,6 +39,12 @@ import {
   Pitch,
   type PitchIcons,
 } from "./Visuals";
+import { measurePitchText, resizePitchText } from "./textLayout";
+
+const BOX_ANCHORS = [
+  "top-left", "top-center", "top-right", "middle-left",
+  "middle-right", "bottom-left", "bottom-center", "bottom-right",
+];
 
 const ObjectHitArea = memo(function ObjectHitArea({
   width,
@@ -120,6 +127,7 @@ export default function Canvas({
   });
   const scale = width / WIDTH;
   const selectedObject = exercise.objects.find((o) => o.id === selected);
+  const ignoreTextPlacementClick = useRef(false);
   const colorPreviewIndex =
     colorPreviewId && exercise.objects.length > 1
       ? exercise.objects.findIndex((o) => o.id === colorPreviewId)
@@ -176,6 +184,7 @@ export default function Canvas({
         node.position(o);
         node.rotation(o.rotation);
         node.scale({ x: 1, y: 1 });
+        if (o.kind === "text") resizePitchText(node, o);
       }
       o.points?.forEach((_, i) => {
         const handle = handles.current.get(`${o.id}:${i}`);
@@ -226,25 +235,32 @@ export default function Canvas({
     const actions = toolbar.current;
     const transformable = node && kind !== "movement";
     box?.nodes(transformable ? [node] : []);
-    if (!node || !canvas || !actions || actions.hidden) return;
+    if (!node || !canvas || !actions) return;
 
-    const bounds = node.getClientRect({ relativeTo: canvas });
-    if (transformable && box) {
-      const controlsBounds = box.getClientRect({ relativeTo: canvas });
-      bounds.y = controlsBounds.y;
-      bounds.height = controlsBounds.height;
-    } else {
-      // Keep the toolbar clear of the path handles at every pitch scale.
-      bounds.y -= 12;
-      bounds.height += 24;
-    }
-    const position = selectionToolbarPosition(
-      bounds,
-      { width: actions.offsetWidth, height: actions.offsetHeight },
-      { width: canvas.width(), height: canvas.height() },
-    );
-    actions.style.left = `${position.x}px`;
-    actions.style.top = `${position.y}px`;
+    const positionActions = () => {
+      if (actions.hidden) return;
+      const bounds = node.getClientRect({ relativeTo: canvas });
+      if (transformable && box) {
+        const controlsBounds = box.getClientRect({ relativeTo: canvas });
+        bounds.y = controlsBounds.y;
+        bounds.height = controlsBounds.height;
+      } else {
+        // Keep the toolbar clear of the path handles at every pitch scale.
+        bounds.y -= 12;
+        bounds.height += 24;
+      }
+      const position = selectionToolbarPosition(
+        bounds,
+        { width: actions.offsetWidth, height: actions.offsetHeight },
+        { width: canvas.width(), height: canvas.height() },
+      );
+      actions.style.left = `${position.x}px`;
+      actions.style.top = `${position.y}px`;
+    };
+    positionActions();
+    const observer = new ResizeObserver(positionActions);
+    observer.observe(actions);
+    return () => observer.disconnect();
   }, [
     selected,
     kind,
@@ -318,6 +334,10 @@ export default function Canvas({
     if (object.kind === "movement") {
       object.path = pathMode;
     }
+    if (object.kind === "text") {
+      // Keep the placement tap from focusing the pitch over the new input.
+      e.evt.preventDefault();
+    }
     if (object.role === "player") {
       object.label = nextPlayerLabel(exercise.objects, object.team);
     }
@@ -370,6 +390,7 @@ export default function Canvas({
     }
     const next = { ...current, objects: [...current.objects, object] };
     if (!validateExercise(next)) {
+      ignoreTextPlacementClick.current = object.kind === "text";
       onCommit(next);
       onPlaced(object);
     }
@@ -418,11 +439,13 @@ export default function Canvas({
       onTransformStart={(e) => {
         isolateObject(e.target, true);
       }}
+      onTransform={o.kind === "text" ? (e) => resizePitchText(e.target, o) : undefined}
       onTransformEnd={(e) => {
         if (cancelling.current) return;
         const node = e.target,
           sx = node.scaleX(),
           sy = node.scaleY();
+        const textDimensions = o.kind === "text" ? resizePitchText(node, o) : undefined;
         const next = {
           ...o,
           x: clamp(node.x(), WIDTH),
@@ -430,9 +453,23 @@ export default function Canvas({
           rotation: ((node.rotation() + 360) % 720) - 360,
           width: Math.max(2, o.width * sx),
           height: Math.max(2, o.height * sy),
+          ...(textDimensions ? { ...textDimensions, fontSize: textFontSize(o) } : {}),
         };
         restoreDragLayer();
         node.scale({ x: 1, y: 1 });
+        if (o.kind === "text") resizePitchText(node, o);
+        if (
+          textDimensions &&
+          Math.abs(next.width - o.width) < 1e-6 &&
+          Math.abs(next.height - o.height) < 1e-6 &&
+          Math.abs(next.x - o.x) < 1e-6 &&
+          Math.abs(next.y - o.y) < 1e-6 &&
+          Math.abs(next.rotation - o.rotation) < 1e-6
+        ) {
+          node.position(o);
+          node.rotation(o.rotation);
+          return;
+        }
         if (!applyObject(next)) {
           node.position(o);
           node.rotation(o.rotation);
@@ -458,6 +495,17 @@ export default function Canvas({
       ref={host}
       role="group"
       tabIndex={0}
+      onPointerDownCapture={() => {
+        ignoreTextPlacementClick.current = false;
+      }}
+      onClickCapture={(e) => {
+        // The placement tap can generate a click over the newly mounted toolbar.
+        if (ignoreTextPlacementClick.current && e.detail > 0) {
+          ignoreTextPlacementClick.current = false;
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
       aria-label={
         placementOnly
           ? "Игрище за поставяне на обекти"
@@ -542,20 +590,11 @@ export default function Canvas({
               rotateEnabled
               flipEnabled={false}
               padding={12}
-              keepRatio={selectedObject?.kind !== "zone"}
-              ignoreStroke={selectedObject?.kind === "zone"}
+              keepRatio={kind !== "zone" && kind !== "text"}
+              ignoreStroke={kind === "zone" || kind === "text"}
               enabledAnchors={
-                selectedObject?.kind === "zone"
-                  ? [
-                      "top-left",
-                      "top-center",
-                      "top-right",
-                      "middle-left",
-                      "middle-right",
-                      "bottom-left",
-                      "bottom-center",
-                      "bottom-right",
-                    ]
+                kind === "zone" || kind === "text"
+                  ? BOX_ANCHORS
                   : ["top-left", "top-right", "bottom-left", "bottom-right"]
               }
               anchorSize={14}
@@ -567,6 +606,18 @@ export default function Canvas({
               anchorStroke="#204721"
               anchorFill="#dfffdf"
               boundBoxFunc={(old, next) => {
+                if (selectedObject?.kind === "text") {
+                  if (transformer.current?.getActiveAnchor() === "rotater") return next;
+                  const width = next.width / scale;
+                  const height = Math.round(next.height / scale * 1e6) / 1e6;
+                  if (width < 2 || height < 2 || width > WIDTH * 3 || height > HEIGHT * 3) return old;
+                  const { minWidth, minHeight } = measurePitchText(
+                    selectedObject.label ?? "",
+                    textFontSize(selectedObject),
+                    width,
+                  );
+                  return width < minWidth || height < minHeight ? old : next;
+                }
                 // Rotation must work even below the resize minimum on phones.
                 if (next.rotation !== old.rotation) return next;
                 return next.width < 8 || next.height < 8 ? old : next;

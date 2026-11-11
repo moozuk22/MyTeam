@@ -37,6 +37,23 @@ const point = { x: 200, y: 200 };
 const cone = createObject("cone", point, "cone");
 const exercise = { ...EMPTY_EXERCISE, objects: [cone] };
 describe("exercise model and geometry", () => {
+  it("preserves explicit text font sizes and accepts older text without one", () => {
+    const text = createObject("text", point, "text");
+    expect(validateSavedLayout({ ...EMPTY_EXERCISE, objects: [text] })).toBeNull();
+    const sized = { ...text, fontSize: 24.5 };
+    expect(validateSavedLayout(JSON.parse(JSON.stringify({
+      ...EMPTY_EXERCISE, objects: [sized],
+    })))).toBeNull();
+    for (const fontSize of [0, -4, 10000, "24", Infinity]) {
+      expect(validateSavedLayout({
+        ...EMPTY_EXERCISE, objects: [{ ...text, fontSize }],
+      })).toBeTruthy();
+    }
+    expect(validateSavedLayout({
+      ...EMPTY_EXERCISE, objects: [{ ...cone, fontSize: 24 }],
+    })).toBeTruthy();
+  });
+
   it("counts placed equipment by type and groups older markers under Шапка", () => {
     const objects = [
       cone,

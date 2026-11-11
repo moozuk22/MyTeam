@@ -50,12 +50,19 @@ export type ExerciseObject = {
   team?: number;
   role?: "player" | "coach" | "goalkeeper";
   label?: string;
+  fontSize?: number;
   action?: Action;
   path?: "straight" | "curve" | "freehand";
   points?: Point[];
   shape?: (typeof SHAPES)[number];
   hatched?: boolean;
 };
+export const MAX_TEXT_FONT_SIZE = Math.ceil(HEIGHT * 3 * 0.7);
+
+export function textFontSize(object: ExerciseObject): number {
+  return object.fontSize ?? object.height * 0.7;
+}
+
 export type Exercise = {
   version: 2;
   sport: "football";
@@ -149,7 +156,7 @@ export function validateExercise(raw: unknown): string | null {
   const kindFields: Record<string, string[]> = {
     equipment: ["equipment"],
     player: ["team", "role"],
-    text: [],
+    text: ["fontSize"],
     zone: ["shape", "hatched"],
     movement: ["action", "path", "points"],
   };
@@ -217,6 +224,8 @@ export function validateExercise(raw: unknown): string | null {
       case "text":
         if (typeof o.label !== "string" || !o.label.trim())
           return "Въведете текст.";
+        if (o.fontSize !== undefined && !finite(o.fontSize, 1, MAX_TEXT_FONT_SIZE))
+          return "Невалиден размер на шрифта.";
         break;
       case "zone":
         if (

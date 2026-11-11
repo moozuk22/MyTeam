@@ -282,6 +282,45 @@
 .ke-page .ke-object-label input {
   font-size: 16px;
 }
+.ke-object-label--text {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, var(--ke-action-size));
+  align-items: end;
+}
+.ke-object-label--text textarea {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  height: 58px;
+  padding: 8px;
+  border: 1px solid #ffffff29;
+  border-radius: 8px;
+  background: #18251d;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  resize: none;
+}
+.ke-object-label--text[data-expanded="true"] textarea {
+  height: 112px;
+}
+.ke-object-label--text label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.ke-page .ke-object-label--text input {
+  width: 4rem;
+}
+@media (min-width: 1000px) and (min-height: 560px) {
+  .ke-object-label--text[data-expanded="true"] {
+    width: 24rem;
+  }
+  .ke-object-label--text[data-expanded="true"] textarea {
+    height: 144px;
+  }
+}
 .ke-notice {
   padding: 14px;
   background: #263a21;

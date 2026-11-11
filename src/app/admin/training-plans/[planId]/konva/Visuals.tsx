@@ -14,6 +14,7 @@ import {
   HEIGHT,
   WIDTH,
   createObject,
+  textFontSize,
   type Exercise,
   type ExerciseObject,
   type ExerciseTool,
@@ -530,7 +531,7 @@ export const ObjectVisual = memo(function ObjectVisual({
         width={w}
         height={h}
         text={o.label}
-        fontSize={h * 0.7}
+        fontSize={textFontSize(o)}
         fill={c}
         align="center"
       />
