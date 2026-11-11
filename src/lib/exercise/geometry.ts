@@ -265,7 +265,11 @@ export function movementPoints(o: ExerciseObject): number[] {
   }
   return samples.flatMap((q) => [q.x, q.y]);
 }
-export function arrowheadPoints(points: number[], tension: number): number[] {
+export function arrowheadPoints(
+  points: number[],
+  tension: number,
+  length = ARROWHEAD_LENGTH,
+): number[] {
   const n = points.length;
   if (n < 4) return [];
 
@@ -287,15 +291,15 @@ export function arrowheadPoints(points: number[], tension: number): number[] {
   }
   const angle = Math.atan2(dy, dx);
   return [
-    x - Math.cos(angle - 0.5) * ARROWHEAD_LENGTH,
-    y - Math.sin(angle - 0.5) * ARROWHEAD_LENGTH,
+    x - Math.cos(angle - 0.5) * length,
+    y - Math.sin(angle - 0.5) * length,
     x,
     y,
-    x - Math.cos(angle + 0.5) * ARROWHEAD_LENGTH,
-    y - Math.sin(angle + 0.5) * ARROWHEAD_LENGTH,
+    x - Math.cos(angle + 0.5) * length,
+    y - Math.sin(angle + 0.5) * length,
   ];
 }
-export function offsetPolyline(points: number[], distance: number): number[] {
+function offsetPolyline(points: number[], distance: number): number[] {
   const result: number[] = [];
   for (let i = 0; i < points.length; i += 2) {
     const before = Math.max(0, i - 2),
@@ -309,4 +313,42 @@ export function offsetPolyline(points: number[], distance: number): number[] {
     );
   }
   return result;
+}
+
+export function shotShafts(points: number[], head: number[]): number[][] {
+  const halfGap = 3;
+  if (!head.length) {
+    return [offsetPolyline(points, halfGap), offsetPolyline(points, -halfGap)];
+  }
+
+  const [leftX, leftY, tipX, tipY, rightX, rightY] = head;
+  const middleX = (leftX + rightX) / 2;
+  const middleY = (leftY + rightY) / 2;
+  const halfHeadWidth = Math.hypot(rightX - leftX, rightY - leftY) / 2;
+  const fraction = Math.min(halfGap / halfHeadWidth, 1);
+  let remaining = Math.hypot(tipX - middleX, tipY - middleY) * fraction;
+
+  // Trim the centerline before offsetting it so neither shaft pokes through the head.
+  for (let end = points.length - 2; end >= 2; end -= 2) {
+    remaining -= Math.hypot(
+      points[end] - points[end - 2],
+      points[end + 1] - points[end - 1],
+    );
+    if (remaining >= 0) continue;
+
+    const center = points.slice(0, end);
+    center.push(
+      tipX + (middleX - tipX) * fraction,
+      tipY + (middleY - tipY) * fraction,
+    );
+    return [[leftX, leftY], [rightX, rightY]].map(([wingX, wingY], index) => {
+      const shaft = offsetPolyline(center, index === 0 ? halfGap : -halfGap);
+      shaft[shaft.length - 2] = tipX + (wingX - tipX) * fraction;
+      shaft[shaft.length - 1] = tipY + (wingY - tipY) * fraction;
+      return shaft;
+    });
+  }
+
+  // A shot shorter than the join has no room for a shaft behind the head.
+  return [];
 }

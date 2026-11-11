@@ -170,6 +170,16 @@
   width: 34px;
   height: 24px;
 }
+.ke-equipment-count {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-inline-start: 4px;
+  padding-inline: 4px;
+  border-radius: 8px;
+  background: #ffffff1a;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 .ke-equipment-preview > span {
   grid-area: 1 / 1;
 }

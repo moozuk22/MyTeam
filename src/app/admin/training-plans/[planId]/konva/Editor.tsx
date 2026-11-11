@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FOOTBALL } from "@/lib/exercise/football";
+import { countEquipment, FOOTBALL } from "@/lib/exercise/football";
 import {
   HEIGHT,
   CUSTOM_TEAM_COLOR_ERROR,
@@ -41,10 +41,11 @@ import {
   type ExerciseTool,
 } from "@/lib/exercise/model";
 import {
+  arrowheadPoints,
   commit,
   duplicateObject,
   movementPoints,
-  offsetPolyline,
+  shotShafts,
   redo,
   undo,
   type History,
@@ -334,29 +335,22 @@ function MovementPreview({ type }: { type: ExerciseTool }) {
       (s, n, i) => (i % 2 ? s : `${s}${i ? " L" : "M"}${n},${points[i + 1]}`),
       "",
     );
-  const d = pathData(o.action === "shot" ? offsetPolyline(p, 3) : p);
-  const n = p.length,
-    a = Math.atan2(p[n - 1] - p[n - 3], p[n - 2] - p[n - 4]);
-  const tip = `M${p[n - 2] - Math.cos(a - 0.5) * 9},${p[n - 1] - Math.sin(a - 0.5) * 9} L${p[n - 2]},${p[n - 1]} L${p[n - 2] - Math.cos(a + 0.5) * 9},${p[n - 1] - Math.sin(a + 0.5) * 9}`;
+  const head = style.arrow ? arrowheadPoints(p, 0, 9) : [];
+  const shafts = o.action === "shot" ? shotShafts(p, head) : [p];
   return (
     <svg viewBox="0 0 85 30" width="70" height="24" aria-hidden="true">
-      <path
-        d={d}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeDasharray={style.dash.join(" ")}
-      />
-      {o.action === "shot" && (
+      {shafts.map((shaft, index) => (
         <path
-          d={pathData(offsetPolyline(p, -3))}
+          key={index}
+          d={pathData(shaft)}
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth={2}
+          strokeDasharray={style.dash.join(" ")}
         />
-      )}
-      {style.arrow && (
-        <path d={tip} fill="none" stroke="currentColor" strokeWidth="2" />
+      ))}
+      {head.length > 0 && (
+        <path d={pathData(head)} fill="none" stroke="currentColor" strokeWidth="2" />
       )}
     </svg>
   );
@@ -394,7 +388,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   } | null>(null);
   const layout = history.present;
   const customTeamColors = getCustomTeamColors(layout);
-  const toolGroups = [
+  const toolGroups: (typeof TOOLBAR_GROUPS[number] | null)[] = [
     ...TOOLBAR_GROUPS,
     ...customTeamColors.map((color, index) =>
       color ? { title: `Отбор ${index + 3}`, types: FOOTBALL.customTeamTools, color } : null,
@@ -406,6 +400,10 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const activeCategory =
     category < firstCustomCategory || customTeamNumber !== undefined ? category : 0;
   const toolGroup = toolGroups[activeCategory] ?? TOOLBAR_GROUPS[0];
+  const equipmentCounts = useMemo(
+    () => (toolGroup.showCounts ? countEquipment(layout.objects) : null),
+    [layout.objects, toolGroup.showCounts],
+  );
   const tool =
     customTeamNumber === undefined && selectedTool.startsWith("custom-team-")
       ? "select"
@@ -418,7 +416,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     drawingMovement && tool !== "line" && tool !== "dashed-line";
   const placing =
     tool !== "select" && !drawingMovement && !isZoneType(tool);
-  const usesQuantity = placing || drawingArrow;
+  const usesQuantity = tool !== "select";
   const placementCapacity = MAX_ITEMS - layout.objects.length;
   const quantity = Number(placementCount);
   const validQuantity =
@@ -521,12 +519,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     change({ ...layout, objects: [...layout.objects, copy] });
     if (layout.objects.length < MAX_ITEMS) setSelected(copy.id);
   }
-  function onPlaced(placed: ExerciseObject) {
-    if (!usesQuantity) {
-      setSelected(placed.id);
-      return;
-    }
-
+  function onPlaced() {
     setSelected(null);
     if (quantity <= 1) {
       setTool("select");
@@ -1028,35 +1021,52 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 role="group"
                 aria-label={toolGroup.title}
               >
-                {toolGroup.types.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    aria-pressed={tool === t}
-                    onClick={() => {
-                      if (tool === t) {
-                        cancelPlacement();
-                        return;
+                {toolGroup.types.map((t) => {
+                  const label = EQUIPMENT_LABELS[t];
+                  const count = equipmentCounts ? equipmentCounts[t] ?? 0 : undefined;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      aria-pressed={tool === t}
+                      aria-label={
+                        count === undefined ? undefined : `${label}, брой на игрището: ${count}`
                       }
-                      setSelected(null);
-                      setPlacementCount("1");
-                      setTool(t);
-                      const defaultPath = FOOTBALL.defaultPaths[t];
-                      if (defaultPath) setPathMode(defaultPath);
-                    }}
-                  >
-                    {isMovementType(t) ? (
-                      <MovementPreview type={t} />
-                    ) : isZoneType(t) ? (
-                      <ZonePreview type={t} />
-                    ) : (
-                      <EquipmentPreview type={t} />
-                    )}
-                    <span>{EQUIPMENT_LABELS[t]}</span>
-                  </button>
-                ))}
+                      onClick={() => {
+                        if (tool === t) {
+                          cancelPlacement();
+                          return;
+                        }
+                        setSelected(null);
+                        setPlacementCount("1");
+                        setTool(t);
+                        const defaultPath = FOOTBALL.defaultPaths[t];
+                        if (defaultPath) setPathMode(defaultPath);
+                      }}
+                    >
+                      {isMovementType(t) ? (
+                        <MovementPreview type={t} />
+                      ) : isZoneType(t) ? (
+                        <ZonePreview type={t} />
+                      ) : (
+                        <EquipmentPreview type={t} />
+                      )}
+                      <span>
+                        {label}
+                        {count !== undefined && (
+                          <span className="ke-equipment-count" aria-hidden="true">
+                            {count}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="ke-mode">
+              <div
+                className="ke-mode"
+                hidden={tool === "select" && customTeamNumber === undefined}
+              >
                 {customTeamNumber !== undefined && (
                   <button type="button" onClick={deleteTeam}>
                     <Trash2 size={16} aria-hidden="true" />
@@ -1103,8 +1113,16 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                     <p>Или натиснете <kbd>Esc</kbd>.</p>
                   </div>
                 )}
-                {activeCategory === 0 && !placing && (
-                  <fieldset className="ke-path-modes">
+                {drawingMovement && (
+                  <fieldset
+                    className="ke-path-modes"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelPlacementFromControls();
+                      }
+                    }}
+                  >
                     <legend>Начин на рисуване</legend>
                     {DRAWING_MODES.map(({ value, label }) => (
                       <button
@@ -1118,15 +1136,15 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                     ))}
                   </fieldset>
                 )}
-                <p>
-                  {tool === "select"
-                    ? "Изберете обект за редакция или го плъзнете за преместване."
-                    : placing
+                {tool !== "select" && (
+                  <p>
+                    {placing
                       ? "Изберете място за всеки обект."
                       : drawingArrow
                         ? "Плъзнете по игрището, за да нарисувате стрелка."
-                        : "Плъзнете за движение или зона. Escape отменя."}
-                </p>
+                        : "Плъзнете по игрището, за да нарисувате линия или фигура."}
+                  </p>
+                )}
               </div>
             </div>
             <div className="ke-pitch-area">

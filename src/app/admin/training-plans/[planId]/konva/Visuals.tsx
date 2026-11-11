@@ -21,7 +21,7 @@ import {
 import {
   arrowheadPoints,
   movementPoints,
-  offsetPolyline,
+  shotShafts,
 } from "@/lib/exercise/geometry";
 
 // The original PNG has a transparent 15px margin on every side.
@@ -469,30 +469,27 @@ export const ObjectVisual = memo(function ObjectVisual({
     const points = movementPoints(o),
       style = FOOTBALL.actions[o.action!];
     const tension = o.path === "freehand" ? 0.25 : 0;
+    const head = style.arrow && showArrowhead ? arrowheadPoints(points, tension) : [];
+    const shafts = o.action === "shot" ? shotShafts(points, head) : [points];
     return (
       <Group>
-        <Line
-          points={o.action === "shot" ? offsetPolyline(points, 3) : points}
-          stroke={c}
-          strokeWidth={3}
-          dash={style.dash}
-          tension={tension}
-          hitStrokeWidth={hitWidth}
-          lineCap="round"
-          lineJoin="round"
-        />
-        {o.action === "shot" && (
+        {shafts.map((shaft, index) => (
           <Line
-            points={offsetPolyline(points, -3)}
+            key={index}
+            points={shaft}
             stroke={c}
             strokeWidth={3}
-            listening={false}
+            dash={style.dash}
             tension={tension}
+            hitStrokeWidth={hitWidth}
+            listening={index === 0}
+            lineCap="round"
+            lineJoin="round"
           />
-        )}
-        {style.arrow && showArrowhead && (
+        ))}
+        {head.length > 0 && (
           <Line
-            points={arrowheadPoints(points, tension)}
+            points={head}
             stroke={c}
             strokeWidth={3}
             lineCap="round"

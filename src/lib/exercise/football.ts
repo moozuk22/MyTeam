@@ -60,6 +60,7 @@ export const FOOTBALL_TOOLS: {
   title: string;
   types: ExerciseTool[];
   color?: string;
+  showCounts?: boolean;
 }[] = [
   {
     title: "Движения",
@@ -80,6 +81,7 @@ export const FOOTBALL_TOOLS: {
   },
   {
     title: "Пособия",
+    showCounts: true,
     types: [
       "cone",
       "ladder",
@@ -117,6 +119,16 @@ export const FOOTBALL_TOOLS: {
     types: ["team2-coach", "team2-goalkeeper", "team2-player-1"],
   },
 ];
+
+export function countEquipment(objects: readonly ExerciseObject[]) {
+  const counts: Partial<Record<ExerciseTool, number>> = {};
+  for (const object of objects) {
+    if (object.kind !== "equipment" || !object.equipment) continue;
+    const type = object.equipment.startsWith("marker-") ? "marker" : object.equipment;
+    counts[type] = (counts[type] ?? 0) + 1;
+  }
+  return counts;
+}
 const defaultPaths: Partial<
   Record<ExerciseTool, NonNullable<ExerciseObject["path"]>>
 > = {

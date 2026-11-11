@@ -27,15 +27,34 @@ import {
   redo,
   selectionToolbarPosition,
   simplify,
+  shotShafts,
   undo,
   worldPoint,
 } from "./geometry";
 import { draftKey, readDraft, sameExercise } from "./drafts";
-import { FOOTBALL } from "./football";
+import { countEquipment, FOOTBALL } from "./football";
 const point = { x: 200, y: 200 };
 const cone = createObject("cone", point, "cone");
 const exercise = { ...EMPTY_EXERCISE, objects: [cone] };
 describe("exercise model and geometry", () => {
+  it("counts placed equipment by type and groups older markers under Шапка", () => {
+    const objects = [
+      cone,
+      createObject("cone", point, "cone-2"),
+      createObject("wall", point, "wall"),
+      createObject("mannequin", point, "mannequin"),
+      createObject("marker", point, "marker"),
+      createObject("marker-blue", point, "old-marker"),
+      createObject("team1-player-1", point, "player"),
+    ];
+    expect(countEquipment(objects)).toEqual({
+      cone: 2,
+      wall: 1,
+      mannequin: 1,
+      marker: 2,
+    });
+  });
+
   it("adds more teams to an existing third-team exercise and keeps their colors and numbers", () => {
     const thirdTeam = { number: 3, color: "#a855f7" };
     const fourthTeam = { number: 4, color: "#22d3ee" };
@@ -383,6 +402,38 @@ describe("exercise model and geometry", () => {
         (tipX - secondX) * (secondX - firstX) +
           (tipY - secondY) * (secondY - firstY),
       ).toBeGreaterThan(0);
+    },
+  );
+  it.each(["straight", "curve", "freehand"] as const)(
+    "joins both %s shot lines to the arrowhead wings",
+    (path) => {
+      const shot = {
+        ...createObject("shot", point, "shot"),
+        path,
+        points: path === "straight"
+          ? [{ x: 0, y: 0 }, { x: 60, y: -50 }]
+          : [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: -50 }],
+      };
+      const center = movementPoints(shot);
+      const head = arrowheadPoints(
+        center,
+        path === "freehand" ? 0.25 : 0,
+      );
+      const shafts = shotShafts(center, head);
+      const [leftX, leftY, tipX, tipY, rightX, rightY] = head;
+      expect([tipX, tipY]).toEqual([60, -50]);
+      for (const [index, [wingX, wingY]] of [[leftX, leftY], [rightX, rightY]].entries()) {
+        const [endX, endY] = shafts[index].slice(-2);
+        const fraction = Math.hypot(endX - tipX, endY - tipY) / 14;
+        expect(fraction).toBeGreaterThan(0);
+        expect(fraction).toBeLessThan(1);
+        expect(endX).toBeCloseTo(tipX + (wingX - tipX) * fraction);
+        expect(endY).toBeCloseTo(tipY + (wingY - tipY) * fraction);
+      }
+      expect(Math.hypot(
+        shafts[0].at(-2)! - shafts[1].at(-2)!,
+        shafts[0].at(-1)! - shafts[1].at(-1)!,
+      )).toBeCloseTo(6);
     },
   );
   it("transforms handles between local and world space after translation and rotation", () => {
