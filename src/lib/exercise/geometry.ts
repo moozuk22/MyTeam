@@ -6,6 +6,7 @@ import {
   type ExerciseObject,
   type Point,
 } from "./model";
+import { FOOTBALL } from "./football";
 export const clamp = (n: number, max: number) => Math.max(0, Math.min(max, n));
 export function localPoint(p: Point, object: ExerciseObject): Point {
   const angle = (-object.rotation * Math.PI) / 180,
@@ -24,12 +25,18 @@ export function worldPoint(p: Point, object: ExerciseObject): Point {
   };
 }
 export function simplify(points: Point[], cap = 300): Point[] {
-  const filtered = points.filter(
-    (p, i) =>
-      !i ||
-      Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) >= 2 ||
-      i === points.length - 1,
-  );
+  const filtered: Point[] = [];
+  for (const [i, p] of points.entries()) {
+    const previous = filtered.at(-1);
+    if (!previous) {
+      filtered.push(p);
+      continue;
+    }
+    const distance = Math.hypot(p.x - previous.x, p.y - previous.y);
+    if (distance >= 2 || (distance > 0 && i === points.length - 1)) {
+      filtered.push(p);
+    }
+  }
   if (filtered.length <= cap) return filtered;
   return Array.from(
     { length: cap },
@@ -101,10 +108,53 @@ export function redo(h: History): History {
       }
     : h;
 }
+const ARROWHEAD_LENGTH = 14;
+
+function straightenArrowEnd(points: Point[]): Point[] {
+  if (points.length < 3) return points;
+  const tip = points[points.length - 1];
+  // Leave room for the spline to transition before reaching the wings.
+  let remaining = ARROWHEAD_LENGTH * 1.5;
+  for (let i = points.length - 1; i > 0; i--) {
+    const a = points[i - 1];
+    const b = points[i];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < remaining && i > 1) {
+      remaining -= length;
+      continue;
+    }
+    const fraction = Math.min(remaining / length, 1);
+    const start = {
+      x: b.x + (a.x - b.x) * fraction,
+      y: b.y + (a.y - b.y) * fraction,
+    };
+    const dx = tip.x - start.x;
+    const dy = tip.y - start.y;
+    if (dx === 0 && dy === 0) return points;
+    return [
+      ...points.slice(0, fraction === 1 ? i - 1 : i),
+      start,
+      { x: start.x + dx * 0.25, y: start.y + dy * 0.25 },
+      { x: start.x + dx * 0.5, y: start.y + dy * 0.5 },
+      tip,
+    ];
+  }
+  return points;
+}
+
 // Sample geometry for both toolbar previews and canvas drawing.
 export function movementPoints(o: ExerciseObject): number[] {
   const p = o.points ?? [];
   let samples: Point[] = p;
+  if (o.path === "freehand") {
+    // Drawings saved before endpoint deduplication can repeat the final point.
+    samples = p.filter(
+      (q, i) => i === 0 || q.x !== p[i - 1].x || q.y !== p[i - 1].y,
+    );
+    if (o.action && FOOTBALL.actions[o.action].arrow) {
+      samples = straightenArrowEnd(samples);
+    }
+  }
   if (o.path === "curve" && p.length === 3)
     samples = Array.from({ length: 41 }, (_, i) => {
       const t = i / 40,
@@ -124,6 +174,7 @@ export function movementPoints(o: ExerciseObject): number[] {
       0,
     );
     const step = Math.max(3, totalLength / 600);
+    let remainingLength = totalLength;
     for (let i = 1; i < samples.length; i++) {
       const a = samples[i - 1],
         b = samples[i],
@@ -132,17 +183,54 @@ export function movementPoints(o: ExerciseObject): number[] {
       for (let j = 0; j < n; j++) {
         const t = j / n,
           phase = wave.length * 0.75,
-          offset = Math.sin(phase) * 3;
+          distanceToEnd = remainingLength - length * t;
+        // Fade the wave into a centered shaft under the arrowhead.
+        const amplitude = clamp(
+          (distanceToEnd - ARROWHEAD_LENGTH) / ARROWHEAD_LENGTH,
+          1,
+        );
+        const offset = Math.sin(phase) * 3 * amplitude;
         wave.push({
           x: a.x + (b.x - a.x) * t - ((b.y - a.y) / (length || 1)) * offset,
           y: a.y + (b.y - a.y) * t + ((b.x - a.x) / (length || 1)) * offset,
         });
       }
+      remainingLength -= length;
     }
     if (samples.length) wave.push(samples.at(-1)!);
     samples = wave;
   }
   return samples.flatMap((q) => [q.x, q.y]);
+}
+export function arrowheadPoints(points: number[], tension: number): number[] {
+  const n = points.length;
+  if (n < 4) return [];
+
+  const x = points[n - 2], y = points[n - 1];
+  let dx = x - points[n - 4], dy = y - points[n - 3];
+  const lastLength = Math.hypot(dx, dy);
+  if (lastLength === 0) return [];
+
+  if (tension && n >= 6) {
+    // Konva ends an open smoothed line with a quadratic. Its tangent points
+    // from the final control point to the endpoint.
+    const previousLength = Math.hypot(
+      points[n - 4] - points[n - 6],
+      points[n - 3] - points[n - 5],
+    );
+    const weight = tension * lastLength / (previousLength + lastLength);
+    dx -= weight * (x - points[n - 6]);
+    dy -= weight * (y - points[n - 5]);
+  }
+  const angle = Math.atan2(dy, dx);
+  return [
+    x - Math.cos(angle - 0.5) * ARROWHEAD_LENGTH,
+    y - Math.sin(angle - 0.5) * ARROWHEAD_LENGTH,
+    x,
+    y,
+    x - Math.cos(angle + 0.5) * ARROWHEAD_LENGTH,
+    y - Math.sin(angle + 0.5) * ARROWHEAD_LENGTH,
+  ];
 }
 export function offsetPolyline(points: number[], distance: number): number[] {
   const result: number[] = [];

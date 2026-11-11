@@ -350,7 +350,10 @@ export default function Canvas({
                 listening={false}
                 opacity={0.75}
               >
-                <ObjectVisual object={preview} />
+                <ObjectVisual
+                  object={preview}
+                  showArrowhead={preview.path !== "freehand"}
+                />
               </Group>
             )}
           </Layer>

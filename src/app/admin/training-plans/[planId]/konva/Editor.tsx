@@ -512,7 +512,6 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
             Назад
           </button>
           <div>
-            <p className="ke-kicker">Футбол · Konva</p>
             <h1>{plan.title}</h1>
           </div>
           <button
@@ -585,295 +584,301 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         )}
         <fieldset disabled={!!recovery} className="ke-workspace">
           <legend className="ke-sr">Инструменти за упражнението</legend>
-          <div className="ke-toolbar">
-            <button
-              type="button"
-              aria-pressed={tool === "select"}
-              onClick={() => setTool("select")}
-            >
-              Избор
-            </button>
-            <button
-              type="button"
-              aria-label="Отмени"
-              disabled={!history.past.length}
-              onClick={() => setHistory(undo)}
-            >
-              <Undo2 size={18} />
-              Отмени
-            </button>
-            <button
-              type="button"
-              aria-label="Повтори"
-              disabled={!history.future.length}
-              onClick={() => setHistory(redo)}
-            >
-              <Redo2 size={18} />
-              Повтори
-            </button>
-            <label>
-              Игрище
-              <select
-                value={layout.surface}
-                onChange={(e) =>
-                  change({
-                    ...layout,
-                    surface: e.target.value as Exercise["surface"],
-                  })
-                }
-              >
-                {FOOTBALL.surfaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div
-            className="ke-categories"
-            role="group"
-            aria-label="Категории инструменти"
-          >
-            {TOOLBAR_GROUPS.map((g, i) => (
-              <button
-                type="button"
-                key={g.title}
-                aria-pressed={category === i}
-                onClick={() => setCategory(i)}
-              >
-                {g.title}
-              </button>
-            ))}
-          </div>
-          <div
-            className="ke-tools"
-            role="group"
-            aria-label={TOOLBAR_GROUPS[category].title}
-          >
-            {TOOLBAR_GROUPS[category].types.map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={tool === t}
-                onClick={() => {
-                  setTool(t);
-                  if (t.endsWith("-free")) setPathMode("freehand");
-                  else if (t === "long-pass") setPathMode("curve");
-                  setSelected(null);
-                }}
-              >
-                <MovementPreview type={t} />
-                <span>{EQUIPMENT_LABELS[t]}</span>
-              </button>
-            ))}
-          </div>
-          <div className="ke-mode">
-            <strong>
-              Активен инструмент:{" "}
-              {tool === "select" ? "Избор" : EQUIPMENT_LABELS[tool]}
-            </strong>
-            {category === 0 && (
-              <label>
-                Начин на рисуване
-                <select
-                  value={pathMode}
-                  disabled={tool.endsWith("-free")}
-                  onChange={(e) =>
-                    setPathMode(e.target.value as typeof pathMode)
-                  }
+          <div className="ke-layout">
+            <div className="ke-sidebar">
+              <div className="ke-toolbar">
+                <button
+                  type="button"
+                  aria-pressed={tool === "select"}
+                  onClick={() => setTool("select")}
                 >
-                  <option value="straight">Право</option>
-                  <option value="curve">Крива с ръкохватка</option>
-                  <option value="freehand">Свободна ръка</option>
-                </select>
-              </label>
-            )}
-            <p>
-              {tool === "select"
-                ? "Изберете обект. Плъзнете за преместване или използвайте полетата по-долу."
-                : "Докоснете обект или стрелка за избор и преместване. За поставяне докоснете празно място; за движения и зони плъзнете. Escape отменя."}
-            </p>
-          </div>
-          <Canvas
-            exercise={layout}
-            selected={selected}
-            tool={recovery ? "select" : tool}
-            pathMode={pathMode}
-            onSelect={setSelected}
-            onCommit={change}
-            onError={setError}
-          />
-          <section className="ke-properties" aria-label="Свойства на обекта">
-            <label>
-              Избран обект
-              <select
-                value={selected ?? ""}
-                onChange={(e) => {
-                  setSelected(e.target.value || null);
-                  setTool("select");
-                }}
+                  Избор
+                </button>
+                <button
+                  type="button"
+                  aria-label="Отмени"
+                  disabled={!history.past.length}
+                  onClick={() => setHistory(undo)}
+                >
+                  <Undo2 size={18} />
+                  Отмени
+                </button>
+                <button
+                  type="button"
+                  aria-label="Повтори"
+                  disabled={!history.future.length}
+                  onClick={() => setHistory(redo)}
+                >
+                  <Redo2 size={18} />
+                  Повтори
+                </button>
+                <label>
+                  Игрище
+                  <select
+                    value={layout.surface}
+                    onChange={(e) =>
+                      change({
+                        ...layout,
+                        surface: e.target.value as Exercise["surface"],
+                      })
+                    }
+                  >
+                    {FOOTBALL.surfaces.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div
+                className="ke-categories"
+                role="group"
+                aria-label="Категории инструменти"
               >
-                <option value="">Няма избран обект</option>
-                {layout.objects.map((o, i) => (
-                  <option key={o.id} value={o.id}>
-                    {i + 1}. {objectLabel(o)}
-                  </option>
+                {TOOLBAR_GROUPS.map((g, i) => (
+                  <button
+                    type="button"
+                    key={g.title}
+                    aria-pressed={category === i}
+                    onClick={() => setCategory(i)}
+                  >
+                    {g.title}
+                  </button>
                 ))}
-              </select>
-            </label>
-            {object && (
-              <>
-                <h2>{objectLabel(object)}</h2>
-                <div className="ke-property-grid">
+              </div>
+              <div
+                className="ke-tools"
+                role="group"
+                aria-label={TOOLBAR_GROUPS[category].title}
+              >
+                {TOOLBAR_GROUPS[category].types.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    aria-pressed={tool === t}
+                    onClick={() => {
+                      setTool(t);
+                      if (t.endsWith("-free")) setPathMode("freehand");
+                      else if (t === "long-pass") setPathMode("curve");
+                      setSelected(null);
+                    }}
+                  >
+                    <MovementPreview type={t} />
+                    <span>{EQUIPMENT_LABELS[t]}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="ke-mode">
+                <strong>
+                  Активен инструмент:{" "}
+                  {tool === "select" ? "Избор" : EQUIPMENT_LABELS[tool]}
+                </strong>
+                {category === 0 && (
                   <label>
-                    Цвят
-                    <input
-                      key={`${object.id}-${object.color}`}
-                      type="color"
-                      defaultValue={object.color}
-                      onBlur={(e) => {
-                        if (e.target.value !== object.color)
-                          patch({ color: e.target.value });
-                      }}
-                    />
+                    Начин на рисуване
+                    <select
+                      value={pathMode}
+                      disabled={tool.endsWith("-free")}
+                      onChange={(e) =>
+                        setPathMode(e.target.value as typeof pathMode)
+                      }
+                    >
+                      <option value="straight">Право</option>
+                      <option value="curve">Крива с ръкохватка</option>
+                      <option value="freehand">Свободна ръка</option>
+                    </select>
                   </label>
-                  {(object.kind === "player" || object.kind === "text") && (
-                    <label>
-                      Текст / номер
-                      <input
-                        key={`${object.id}-${object.label}`}
-                        defaultValue={object.label ?? ""}
-                        maxLength={40}
-                        onBlur={(e) => {
-                          if (e.target.value !== object.label)
-                            patch({ label: e.target.value });
-                        }}
-                      />
-                    </label>
-                  )}
-                  <NumberField
-                    label="X"
-                    value={object.x}
-                    min={0}
-                    max={WIDTH}
-                    onChange={(x) => patch({ x })}
-                  />
-                  <NumberField
-                    label="Y"
-                    value={object.y}
-                    min={0}
-                    max={HEIGHT}
-                    onChange={(y) => patch({ y })}
-                  />
-                  <NumberField
-                    label="Завъртане °"
-                    value={object.rotation}
-                    min={-360}
-                    max={360}
-                    onChange={(rotation) => patch({ rotation })}
-                  />
-                  {object.kind !== "movement" && (
-                    <>
-                      <NumberField
-                        label="Ширина"
-                        value={object.width}
-                        min={2}
-                        max={WIDTH * 3}
-                        onChange={(width) =>
-                          patch({
-                            width,
-                            ...(object.kind !== "zone"
-                              ? {
-                                  height:
-                                    (object.height * width) / object.width,
-                                }
-                              : {}),
-                          })
-                        }
-                      />
-                      <NumberField
-                        label="Височина"
-                        value={object.height}
-                        min={2}
-                        max={HEIGHT * 3}
-                        onChange={(height) =>
-                          patch({
-                            height,
-                            ...(object.kind !== "zone"
-                              ? {
-                                  width:
-                                    (object.width * height) / object.height,
-                                }
-                              : {}),
-                          })
-                        }
-                      />
-                    </>
-                  )}
-                  {object.kind === "movement" && (
-                    <>
+                )}
+                <p>
+                  {tool === "select"
+                    ? "Плъзнете обект за преместване или редактирайте свойствата му."
+                    : "Поставете обект на празно място. Плъзнете за движение или зона. Escape отменя."}
+                </p>
+              </div>
+              <section className="ke-properties" aria-label="Свойства на обекта">
+                <label>
+                  Избран обект
+                  <select
+                    value={selected ?? ""}
+                    onChange={(e) => {
+                      setSelected(e.target.value || null);
+                      setTool("select");
+                    }}
+                  >
+                    <option value="">Няма избран обект</option>
+                    {layout.objects.map((o, i) => (
+                      <option key={o.id} value={o.id}>
+                        {i + 1}. {objectLabel(o)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {object && (
+                  <>
+                    <h2>{objectLabel(object)}</h2>
+                    <div className="ke-property-grid">
                       <label>
-                        Път
-                        <select
-                          value={object.path}
-                          onChange={(e) =>
-                            changePath(e.target.value as typeof pathMode)
-                          }
-                        >
-                          <option value="straight">Прав</option>
-                          <option value="curve">Крива</option>
-                          <option value="freehand">Свободна ръка</option>
-                        </select>
+                        Цвят
+                        <input
+                          key={`${object.id}-${object.color}`}
+                          type="color"
+                          defaultValue={object.color}
+                          onBlur={(e) => {
+                            if (e.target.value !== object.color)
+                              patch({ color: e.target.value });
+                          }}
+                        />
                       </label>
+                      {(object.kind === "player" || object.kind === "text") && (
+                        <label>
+                          Текст / номер
+                          <input
+                            key={`${object.id}-${object.label}`}
+                            defaultValue={object.label ?? ""}
+                            maxLength={40}
+                            onBlur={(e) => {
+                              if (e.target.value !== object.label)
+                                patch({ label: e.target.value });
+                            }}
+                          />
+                        </label>
+                      )}
                       <NumberField
-                        label="Мащаб на пътя %"
-                        value={100}
-                        min={10}
-                        max={300}
-                        onChange={(n) =>
-                          patch({
-                            points: object.points!.map((p) => ({
-                              x: (p.x * n) / 100,
-                              y: (p.y * n) / 100,
-                            })),
-                          })
-                        }
+                        label="X"
+                        value={object.x}
+                        min={0}
+                        max={WIDTH}
+                        onChange={(x) => patch({ x })}
                       />
-                    </>
-                  )}
-                </div>
-                <div className="ke-toolbar">
-                  <button
-                    type="button"
-                    onClick={duplicate}
-                    disabled={layout.objects.length >= 200}
-                  >
-                    <Copy size={16} />
-                    Дублирай
-                  </button>
-                  <button type="button" onClick={remove}>
-                    <Trash2 size={16} />
-                    Изтрий
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => reorder(-1)}
-                    disabled={layout.objects[0].id === object.id}
-                  >
-                    Назад в слоевете
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => reorder(1)}
-                    disabled={layout.objects.at(-1)!.id === object.id}
-                  >
-                    Напред в слоевете
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
+                      <NumberField
+                        label="Y"
+                        value={object.y}
+                        min={0}
+                        max={HEIGHT}
+                        onChange={(y) => patch({ y })}
+                      />
+                      <NumberField
+                        label="Завъртане °"
+                        value={object.rotation}
+                        min={-360}
+                        max={360}
+                        onChange={(rotation) => patch({ rotation })}
+                      />
+                      {object.kind !== "movement" && (
+                        <>
+                          <NumberField
+                            label="Ширина"
+                            value={object.width}
+                            min={2}
+                            max={WIDTH * 3}
+                            onChange={(width) =>
+                              patch({
+                                width,
+                                ...(object.kind !== "zone"
+                                  ? {
+                                      height:
+                                        (object.height * width) / object.width,
+                                    }
+                                  : {}),
+                              })
+                            }
+                          />
+                          <NumberField
+                            label="Височина"
+                            value={object.height}
+                            min={2}
+                            max={HEIGHT * 3}
+                            onChange={(height) =>
+                              patch({
+                                height,
+                                ...(object.kind !== "zone"
+                                  ? {
+                                      width:
+                                        (object.width * height) / object.height,
+                                    }
+                                  : {}),
+                              })
+                            }
+                          />
+                        </>
+                      )}
+                      {object.kind === "movement" && (
+                        <>
+                          <label>
+                            Път
+                            <select
+                              value={object.path}
+                              onChange={(e) =>
+                                changePath(e.target.value as typeof pathMode)
+                              }
+                            >
+                              <option value="straight">Прав</option>
+                              <option value="curve">Крива</option>
+                              <option value="freehand">Свободна ръка</option>
+                            </select>
+                          </label>
+                          <NumberField
+                            label="Мащаб на пътя %"
+                            value={100}
+                            min={10}
+                            max={300}
+                            onChange={(n) =>
+                              patch({
+                                points: object.points!.map((p) => ({
+                                  x: (p.x * n) / 100,
+                                  y: (p.y * n) / 100,
+                                })),
+                              })
+                            }
+                          />
+                        </>
+                      )}
+                    </div>
+                    <div className="ke-toolbar">
+                      <button
+                        type="button"
+                        onClick={duplicate}
+                        disabled={layout.objects.length >= 200}
+                      >
+                        <Copy size={16} />
+                        Дублирай
+                      </button>
+                      <button type="button" onClick={remove}>
+                        <Trash2 size={16} />
+                        Изтрий
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => reorder(-1)}
+                        disabled={layout.objects[0].id === object.id}
+                      >
+                        Назад в слоевете
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => reorder(1)}
+                        disabled={layout.objects.at(-1)!.id === object.id}
+                      >
+                        Напред в слоевете
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+            <div className="ke-pitch-area">
+              <Canvas
+                exercise={layout}
+                selected={selected}
+                tool={recovery ? "select" : tool}
+                pathMode={pathMode}
+                onSelect={setSelected}
+                onCommit={change}
+                onError={setError}
+              />
+            </div>
+          </div>
         </fieldset>
       </div>
     </main>

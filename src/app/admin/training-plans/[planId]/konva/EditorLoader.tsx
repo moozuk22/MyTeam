@@ -6,21 +6,28 @@ import "./konva.css";
 function EditorSkeleton() {
   return (
     <main className="ke-page">
-      <h1>Редактор на упражнение</h1>
       <div
-        className="ke-skeleton"
+        className="ke-inner"
         role="status"
         aria-label="Зареждане"
         aria-busy="true"
       >
-        <div aria-hidden="true">
-          <SkeletonLine wide />
-          <div className="ke-skeleton-tools">
-            {Array.from({ length: 6 }, (_, i) => (
-              <SkeletonLine key={i} />
-            ))}
+        <header className="ke-header">
+          <h1>Редактор на упражнение</h1>
+        </header>
+        <div className="ke-workspace" aria-hidden="true">
+          <div className="ke-layout">
+            <div className="ke-sidebar">
+              <div className="ke-skeleton-tools">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <SkeletonLine key={i} />
+                ))}
+              </div>
+            </div>
+            <div className="ke-pitch-area">
+              <div className="ke-skeleton-pitch" />
+            </div>
           </div>
-          <div className="ke-skeleton-pitch" />
         </div>
       </div>
     </main>

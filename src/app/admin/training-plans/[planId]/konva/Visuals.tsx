@@ -7,7 +7,11 @@ import {
   type Exercise,
   type ExerciseObject,
 } from "@/lib/exercise/model";
-import { movementPoints, offsetPolyline } from "@/lib/exercise/geometry";
+import {
+  arrowheadPoints,
+  movementPoints,
+  offsetPolyline,
+} from "@/lib/exercise/geometry";
 
 export const Pitch = memo(function Pitch({
   surface,
@@ -147,9 +151,11 @@ export const Pitch = memo(function Pitch({
 export const ObjectVisual = memo(function ObjectVisual({
   object: o,
   hitWidth = 24,
+  showArrowhead = true,
 }: {
   object: ExerciseObject;
   hitWidth?: number;
+  showArrowhead?: boolean;
 }) {
   const w = o.width,
     h = o.height,
@@ -157,22 +163,7 @@ export const ObjectVisual = memo(function ObjectVisual({
   if (o.kind === "movement") {
     const points = movementPoints(o),
       style = FOOTBALL.actions[o.action!];
-    const n = points.length,
-      angle = Math.atan2(
-        points[n - 1] - points[n - 3],
-        points[n - 2] - points[n - 4],
-      );
-    const tip =
-      n >= 4
-        ? [
-            points[n - 2] - Math.cos(angle - 0.5) * 14,
-            points[n - 1] - Math.sin(angle - 0.5) * 14,
-            points[n - 2],
-            points[n - 1],
-            points[n - 2] - Math.cos(angle + 0.5) * 14,
-            points[n - 1] - Math.sin(angle + 0.5) * 14,
-          ]
-        : [];
+    const tension = o.path === "freehand" ? 0.25 : 0;
     return (
       <Group>
         <Line
@@ -180,7 +171,7 @@ export const ObjectVisual = memo(function ObjectVisual({
           stroke={c}
           strokeWidth={3}
           dash={style.dash}
-          tension={o.path === "freehand" ? 0.25 : 0}
+          tension={tension}
           hitStrokeWidth={hitWidth}
           lineCap="round"
           lineJoin="round"
@@ -191,12 +182,12 @@ export const ObjectVisual = memo(function ObjectVisual({
             stroke={c}
             strokeWidth={3}
             listening={false}
-            tension={o.path === "freehand" ? 0.25 : 0}
+            tension={tension}
           />
         )}
-        {style.arrow && (
+        {style.arrow && showArrowhead && (
           <Line
-            points={tip}
+            points={arrowheadPoints(points, tension)}
             stroke={c}
             strokeWidth={3}
             lineCap="round"

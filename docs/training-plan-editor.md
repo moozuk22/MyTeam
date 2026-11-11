@@ -6,6 +6,10 @@ Use **Нов план — Konva** to create a version-2 exercise or **Копир
 
 Existing objects and arrows can be selected and dragged directly, even while a placement/drawing tool is active. Tapping empty pitch continues using that active tool. The explicit Select tool remains available for manipulating objects without placing new ones. Resize/rotation and path handles work without changing tools.
 
+While drawing a freehand movement, the preview shows the stroke. After release, its arrowhead points along the short, straight finish at the tip. The dribbling wave fades into the centerline under the arrowhead.
+
+On desktop, drawing tools and object properties share a scrollable side panel. The pitch scales to fit the available viewport height and keeps its aspect ratio. On narrower screens, the tools, pitch and properties are stacked.
+
 ## Data and rendering
 
 The existing `TrainingPlan.layout` JSON column stores both versions; no schema migration or bulk conversion is required. Version 2 stores `sport`, `surface` and an ordered `objects` array. Array order determines stacking. Objects carry semantic kinds (`player`, `equipment`, `movement`, `zone`, `text`), stable IDs, logical coordinates, dimensions, rotation and appearance. Players store team, role and label. Movements store action, path type and local control points. This is application data, independent of Konva node serialization.

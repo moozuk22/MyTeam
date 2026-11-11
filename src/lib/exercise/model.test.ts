@@ -12,6 +12,7 @@ import {
   validateSavedLayout,
 } from "./model";
 import {
+  arrowheadPoints,
   commit,
   drawnObject,
   duplicateObject,
@@ -160,6 +161,91 @@ describe("exercise model and geometry", () => {
       );
     expect(validateExercise({ ...exercise, objects: [loop] })).toBeNull();
   });
+  it("keeps one endpoint when the pointer stops before releasing a freehand arrow", () => {
+    const turn = { x: 260, y: 200 };
+    const end = { x: 260, y: 150 };
+    const movement = createObject("run-free", point, "run");
+    const drawn = drawnObject(movement, point, end, [point, turn, end, end]);
+    expect(drawn.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 60, y: 0 },
+      { x: 60, y: -50 },
+    ]);
+  });
+  it("aligns the arrowhead with the smoothed end of an older freehand drawing", () => {
+    const movement = {
+      ...createObject("run-free", point, "run"),
+      points: [
+        { x: 0, y: 0 },
+        { x: 60, y: 0 },
+        { x: 60, y: -50 },
+        { x: 60, y: -50 },
+      ],
+    };
+    const points = movementPoints(movement);
+    expect(points.slice(0, 4)).toEqual([0, 0, 60, 0]);
+    expect(points.slice(-2)).toEqual([60, -50]);
+    expect(points.slice(-4, -2)).not.toEqual([60, -50]);
+    const [leftX, leftY, tipX, tipY, rightX, rightY] = arrowheadPoints(
+      points,
+      0.25,
+    );
+    expect([tipX, tipY]).toEqual([60, -50]);
+    const dx = tipX - (leftX + rightX) / 2;
+    const dy = tipY - (leftY + rightY) / 2;
+    expect(dy).toBeLessThan(0);
+    expect(dx).toBeCloseTo(0);
+  });
+  it("centers the dribbling arrowhead on the line after a freehand turn", () => {
+    const movement = {
+      ...createObject("dribble-free", point, "dribble"),
+      points: [
+        { x: 0, y: 0 },
+        { x: 60, y: 0 },
+        { x: 60, y: -50 },
+      ],
+    };
+    const points = movementPoints(movement);
+    const [firstX, firstY, tipX, tipY, secondX, secondY] = arrowheadPoints(
+      points,
+      0.25,
+    );
+    expect([tipX, tipY]).toEqual([60, -50]);
+    expect((firstX + secondX) / 2).toBeCloseTo(tipX);
+    expect(Math.min(firstX, secondX)).toBeLessThan(tipX);
+    expect(Math.max(firstX, secondX)).toBeGreaterThan(tipX);
+    expect(firstY).toBeCloseTo(secondY);
+    expect(firstY).toBeGreaterThan(tipY);
+    expect(points.at(-6)).toBe(60);
+    expect(points.at(-4)).toBe(60);
+    expect(points[3]).not.toBe(0);
+  });
+  it.each(["run", "dribble", "pass", "long-pass", "shot"] as const)(
+    "uses a straight centerline under the freehand %s arrowhead after a late turn",
+    (tool) => {
+      const movement = {
+        ...createObject(tool, point, tool),
+        path: "freehand" as const,
+        points: [
+          { x: 0, y: 0 },
+          { x: 80, y: 0 },
+          { x: 88, y: -3 },
+          { x: 91, y: -7 },
+        ],
+      };
+      const points = movementPoints(movement);
+      const [firstX, firstY, secondX, secondY, tipX, tipY] = points.slice(-6);
+      expect([tipX, tipY]).toEqual([91, -7]);
+      expect(
+        (secondX - firstX) * (tipY - secondY) -
+          (secondY - firstY) * (tipX - secondX),
+      ).toBeCloseTo(0);
+      expect(
+        (tipX - secondX) * (secondX - firstX) +
+          (tipY - secondY) * (secondY - firstY),
+      ).toBeGreaterThan(0);
+    },
+  );
   it("transforms handles between local and world space after translation and rotation", () => {
     const object = { ...cone, rotation: 67 };
     const p = { x: -21, y: 91 },
