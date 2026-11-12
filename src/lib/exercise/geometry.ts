@@ -8,6 +8,14 @@ import {
 } from "./model";
 import { FOOTBALL } from "./football";
 export const clamp = (n: number, max: number) => Math.max(0, Math.min(max, n));
+export function clampGroupTranslation(positions: readonly Point[], delta: Point): Point {
+  let { x, y } = delta;
+  for (const position of positions) {
+    x = Math.max(-position.x, Math.min(WIDTH - position.x, x));
+    y = Math.max(-position.y, Math.min(HEIGHT - position.y, y));
+  }
+  return { x, y };
+}
 export function selectionToolbarPosition(
   bounds: Point & { width: number; height: number },
   toolbar: { width: number; height: number },

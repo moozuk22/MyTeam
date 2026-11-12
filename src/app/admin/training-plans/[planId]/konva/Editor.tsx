@@ -446,7 +446,6 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const selected = selection?.id ?? null;
   const [multiSelection, setMultiSelection] = useState<Set<string> | null>(null);
   const multiActive = multiSelection !== null;
-  const multiToolbar = useRef<HTMLDivElement>(null);
   function setSelected(id: string | null) {
     setSelection((current) => {
       if (current?.id === id) return current;
@@ -505,6 +504,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     [layout.objects, multiSelection],
   );
   const batchIds = useMemo(() => new Set(batch.map((o) => o.id)), [batch]);
+  const multiAnchorId = multiSelection && [...multiSelection].find((id) => batchIds.has(id));
   const canDuplicateBatch = batch.length > 0 && layout.objects.length + batch.length <= MAX_ITEMS;
   const drawingMovement = isMovementType(tool);
   const drawingArrow =
@@ -605,7 +605,6 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     cancelPlacement();
     if (multiActive) return;
     setMultiSelection(new Set(selected ? [selected] : []));
-    requestAnimationFrame(() => multiToolbar.current?.scrollIntoView({ block: "nearest" }));
   }
   function selectOnPitch(id: string | null) {
     if (!multiActive) {
@@ -613,7 +612,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
       return;
     }
     setMultiSelection((current) => {
-      if (!current || !id) return new Set();
+      if (!current) return current;
+      if (!id) return current.size ? new Set() : current;
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -962,6 +962,46 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     next.splice(to, 0, object);
     change({ ...layout, objects: next });
   }
+  const multiActions = multiActive && (
+    <div className="ke-multi-actions" role="group" aria-label="Действия за множествен избор">
+      <p role="status">
+        {batch.length ? `Избрани обекти: ${batch.length}` : "Изберете обекти на игрището."}
+      </p>
+      <button
+        type="button"
+        disabled={batch.length === layout.objects.length}
+        onClick={() => setMultiSelection((current) =>
+          new Set([...(current ?? []), ...layout.objects.map((o) => o.id)]),
+        )}
+      >
+        Избери всички
+      </button>
+      {batch.length > 0 && (
+        <>
+          <ObjectColorInput
+            color={batch[0].color}
+            onCommit={(color, group, preview) => updateObjectColor(batchIds, color, group, preview)}
+          />
+          <button type="button" aria-label="Дублирай избраните" title="Дублирай избраните" onClick={duplicate} disabled={!canDuplicateBatch}>
+            <Copy size={18} aria-hidden="true" />
+          </button>
+          <button type="button" aria-label="Изтрий избраните" title="Изтрий избраните" onClick={remove}>
+            <Trash2 size={18} aria-hidden="true" />
+          </button>
+          <button type="button" aria-label="Изпрати избраните най-отзад" title="Изпрати избраните най-отзад" onClick={() => reorder(-1)}>
+            <ArrowDown size={18} aria-hidden="true" />
+          </button>
+          <button type="button" aria-label="Премести избраните най-отпред" title="Премести избраните най-отпред" onClick={() => reorder(1)}>
+            <ArrowUp size={18} aria-hidden="true" />
+          </button>
+        </>
+      )}
+      <button type="button" aria-label="Край на множествения избор" title="Край на множествения избор" onClick={cancelPlacement}>
+        <X size={18} aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   return (
     <main className="ke-page">
       <div className="ke-inner">
@@ -1323,49 +1363,13 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 )}
               </div>
             </div>
-            <div className={multiActive ? "ke-pitch-area ke-pitch-area--multi" : "ke-pitch-area"}>
-              {multiActive && (
-                <div className="ke-multi-actions" role="group" aria-label="Действия за множествен избор" ref={multiToolbar}>
-                  <p role="status">
-                    {batch.length ? `Избрани обекти: ${batch.length}` : "Изберете обекти на игрището."}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={batch.length === layout.objects.length}
-                    onClick={() => setMultiSelection(new Set(layout.objects.map((o) => o.id)))}
-                  >
-                    Избери всички
-                  </button>
-                  {batch.length > 0 && (
-                    <>
-                      <ObjectColorInput
-                        color={batch[0].color}
-                        onCommit={(color, group, preview) => updateObjectColor(batchIds, color, group, preview)}
-                      />
-                      <button type="button" aria-label="Дублирай избраните" title="Дублирай избраните" onClick={duplicate} disabled={!canDuplicateBatch}>
-                        <Copy size={18} aria-hidden="true" />
-                      </button>
-                      <button type="button" aria-label="Изтрий избраните" title="Изтрий избраните" onClick={remove}>
-                        <Trash2 size={18} aria-hidden="true" />
-                      </button>
-                      <button type="button" aria-label="Изпрати избраните най-отзад" title="Изпрати избраните най-отзад" onClick={() => reorder(-1)}>
-                        <ArrowDown size={18} aria-hidden="true" />
-                      </button>
-                      <button type="button" aria-label="Премести избраните най-отпред" title="Премести избраните най-отпред" onClick={() => reorder(1)}>
-                        <ArrowUp size={18} aria-hidden="true" />
-                      </button>
-                    </>
-                  )}
-                  <button type="button" aria-label="Край на множествения избор" title="Край на множествения избор" onClick={cancelPlacement}>
-                    <X size={18} aria-hidden="true" />
-                  </button>
-                </div>
-              )}
+            <div className="ke-pitch-area">
               <div className="ke-pitch-frame">
                 <Canvas
                   exercise={layout}
                   selected={selected}
                   multiSelection={multiActive ? batchIds : null}
+                  multiAnchorId={multiAnchorId ?? undefined}
                   tool={
                     recovery || (usesQuantity && !validQuantity) ? "select" : tool
                   }
@@ -1379,7 +1383,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                       : undefined
                   }
                   selectedLabel={object ? objectLabel(object) : undefined}
-                  objectActions={object && (
+                  objectActions={multiActive ? multiActions : object && (
                     <ObjectActions
                       key={object.id}
                       object={object}
@@ -1397,6 +1401,9 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                     />
                   )}
                   onSelect={selectOnPitch}
+                  onSelectArea={(ids) => setMultiSelection((current) =>
+                    current && (ids.length || current.size) ? new Set(ids) : current,
+                  )}
                   onCommit={change}
                   onPlaced={onPlaced}
                   onError={setError}

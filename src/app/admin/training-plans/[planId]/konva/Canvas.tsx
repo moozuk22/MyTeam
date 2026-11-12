@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Konva from "konva";
-import { Circle, Group, Layer, Shape, Stage, Transformer } from "react-konva";
+import { Circle, Group, Layer, Rect, Shape, Stage, Transformer } from "react-konva";
 import {
   HEIGHT,
   WIDTH,
@@ -26,6 +26,7 @@ import {
 import { MAX_ITEMS } from "@/lib/trainingPlans";
 import {
   clamp,
+  clampGroupTranslation,
   drawnObject,
   localPoint,
   movementHandlePoint,
@@ -45,6 +46,7 @@ const BOX_ANCHORS = [
   "top-left", "top-center", "top-right", "middle-left",
   "middle-right", "bottom-left", "bottom-center", "bottom-right",
 ];
+const MULTI_OUTLINE_MARGIN = 3;
 
 const ObjectHitArea = memo(function ObjectHitArea({
   width,
@@ -70,6 +72,7 @@ export type CanvasProps = {
   exercise: Exercise;
   selected: string | null;
   multiSelection: ReadonlySet<string> | null;
+  multiAnchorId?: string;
   tool: ExerciseTool | "select";
   customTeamNumber?: number;
   placementOnly: boolean;
@@ -78,6 +81,7 @@ export type CanvasProps = {
   selectedLabel?: string;
   colorPreviewId?: string;
   onSelect: (id: string | null) => void;
+  onSelectArea: (ids: string[]) => void;
   onCommit: (next: Exercise) => void;
   onPlaced: (object: ExerciseObject) => void;
   onError: (message: string) => void;
@@ -86,6 +90,7 @@ export default function Canvas({
   exercise,
   selected,
   multiSelection,
+  multiAnchorId,
   tool,
   customTeamNumber,
   placementOnly,
@@ -94,6 +99,7 @@ export default function Canvas({
   selectedLabel,
   colorPreviewId,
   onSelect,
+  onSelectArea,
   onCommit,
   onPlaced,
   onError,
@@ -105,10 +111,22 @@ export default function Canvas({
   const nodes = useRef(new Map<string, Konva.Group>());
   const handles = useRef(new Map<string, Konva.Circle>());
   const controls = useRef<Konva.Layer>(null);
+  const selectionBox = useRef<Konva.Rect>(null);
+  const boxGesture = useRef<{
+    start: Point;
+    pointerId: number;
+    targetId: string | null;
+    objects?: ExerciseObject[];
+    moved: boolean;
+  } | null>(null);
   const dragOrigin = useRef<{
     node: Konva.Node;
     parent: Konva.Container;
     index: number;
+  } | null>(null);
+  const selectionDrag = useRef<{
+    leader: ExerciseObject;
+    objects: ExerciseObject[];
   } | null>(null);
   const cancelling = useRef(false);
   const [width, setWidth] = useState(0),
@@ -129,11 +147,12 @@ export default function Canvas({
   });
   const scale = width / WIDTH;
   const selectedObject = exercise.objects.find((o) => o.id === selected);
+  const multiAnchor = multiAnchorId ? exercise.objects.find((o) => o.id === multiAnchorId) : undefined;
   const [multiCursor, setMultiCursor] = useState<string | null>(null);
   const cursorIndex = multiSelection
     ? exercise.objects.findIndex((o) => o.id === multiCursor)
     : -1;
-  const ignoreTextPlacementClick = useRef(false);
+  const ignorePitchClick = useRef(false);
   const colorPreviewIndex =
     colorPreviewId && exercise.objects.length > 1
       ? exercise.objects.findIndex((o) => o.id === colorPreviewId)
@@ -200,7 +219,13 @@ export default function Canvas({
         }
       });
     }
+    if (selectionDrag.current || boxGesture.current?.objects) {
+      selectionDrag.current = null;
+      controls.current?.batchDraw();
+    }
     restoreDragLayer();
+    boxGesture.current = null;
+    selectionBox.current?.hide();
     cancelling.current = false;
     cancelAnimationFrame(raf.current);
     raf.current = 0;
@@ -209,6 +234,10 @@ export default function Canvas({
     setPreview(null);
   }
   const cancelFromEffect = useEffectEvent(() => clear());
+
+  useLayoutEffect(() => {
+    if (selectionDrag.current || boxGesture.current) cancelFromEffect();
+  }, [exercise, multiSelection, tool, width]);
 
   useEffect(() => {
     const images = Object.entries(PITCH_ICON_FILES).map(([name, filename]) => {
@@ -241,16 +270,22 @@ export default function Canvas({
     const actions = toolbar.current;
     const transformable = node && kind !== "movement";
     box?.nodes(transformable ? [node] : []);
-    if (!node || !canvas || !actions) return;
+    const anchor = multiAnchor ? nodes.current.get(multiAnchor.id) : node;
+    if (!canvas || !actions) return;
+    if (!anchor) {
+      actions.style.left = "";
+      actions.style.top = "";
+      return;
+    }
 
     const positionActions = () => {
       if (actions.hidden) return;
-      const bounds = node.getClientRect({ relativeTo: canvas });
+      const bounds = anchor.getClientRect({ relativeTo: canvas });
       if (transformable && box) {
         const controlsBounds = box.getClientRect({ relativeTo: canvas });
         bounds.y = controlsBounds.y;
         bounds.height = controlsBounds.height;
-      } else {
+      } else if (!multiAnchor) {
         // Keep the toolbar clear of the path handles at every pitch scale.
         bounds.y -= 12;
         bounds.height += 24;
@@ -260,6 +295,16 @@ export default function Canvas({
         { width: actions.offsetWidth, height: actions.offsetHeight },
         { width: canvas.width(), height: canvas.height() },
       );
+      if (multiAnchor) {
+        // On short pitches the two-row toolbar can otherwise cover its own drag target.
+        const center = bounds.y + bounds.height / 2;
+        const clearance = 8;
+        if (position.y < center + clearance && position.y + actions.offsetHeight > center - clearance) {
+          position.y = center < canvas.height() / 2
+            ? center + clearance
+            : center - actions.offsetHeight - clearance;
+        }
+      }
       actions.style.left = `${position.x}px`;
       actions.style.top = `${position.y}px`;
     };
@@ -279,6 +324,7 @@ export default function Canvas({
     label,
     width,
     colorPreviewIndex,
+    multiAnchor,
   ]);
   useEffect(() => {
     const cancel = (e: KeyboardEvent) => {
@@ -296,11 +342,11 @@ export default function Canvas({
       window.removeEventListener("blur", blur);
     };
   }, []);
-  function position(): Point | null {
+  function position(clampToPitch = true): Point | null {
     const p = stage.current?.getPointerPosition();
-    return p && scale
-      ? { x: clamp(p.x / scale, WIDTH), y: clamp(p.y / scale, HEIGHT) }
-      : null;
+    if (!p || !scale) return null;
+    const point = { x: p.x / scale, y: p.y / scale };
+    return clampToPitch ? { x: clamp(point.x, WIDTH), y: clamp(point.y, HEIGHT) } : point;
   }
   function applyObject(object: ExerciseObject) {
     const next = {
@@ -317,10 +363,71 @@ export default function Canvas({
     latest.current.onCommit(next);
     return true;
   }
+  function selectionBounds(start: Point, end: Point) {
+    const width = Math.abs(end.x - start.x);
+    const height = Math.abs(end.y - start.y);
+    if (Math.max(width, height) * scale < 4) return null;
+    return {
+      x: Math.min(start.x, end.x),
+      y: Math.min(start.y, end.y),
+      width,
+      height,
+    };
+  }
+  function outlineBounds(id: string, margin: number) {
+    const node = nodes.current.get(id);
+    if (!node) return;
+    const bounds = node.getClientRect({ relativeTo: node.getParent() ?? undefined });
+    const padding = margin / scale;
+    return {
+      x: bounds.x - padding,
+      y: bounds.y - padding,
+      width: bounds.width + 2 * padding,
+      height: bounds.height + 2 * padding,
+    };
+  }
+  function outlinedObjectAt(point: Point, directId?: string) {
+    const hit = { ...point, width: 0, height: 0 };
+    const directBounds = directId ? outlineBounds(directId, MULTI_OUTLINE_MARGIN) : undefined;
+    let id = directId ?? null;
+    let smallestArea = directBounds ? directBounds.width * directBounds.height : Infinity;
+    for (const selectedId of multiSelection ?? []) {
+      const bounds = outlineBounds(selectedId, MULTI_OUTLINE_MARGIN);
+      if (!bounds || !Konva.Util.haveIntersection(bounds, hit)) continue;
+      const area = bounds.width * bounds.height;
+      // Prefer the more specific outline when a long path overlaps a smaller object.
+      if (area <= smallestArea) {
+        id = selectedId;
+        smallestArea = area;
+      }
+    }
+    return id;
+  }
+  function selectHitObject(id: string) {
+    const point = position();
+    onSelect(point ? outlinedObjectAt(point, id) : id);
+  }
+  function beginBoxGesture(e: Konva.KonvaEventObject<PointerEvent>, directId?: string) {
+    if (!multiSelection || e.evt.button !== 0 || boxGesture.current || selectionDrag.current) return;
+    const start = position();
+    if (!start) return;
+    const targetId = outlinedObjectAt(start, directId);
+    const objects = targetId && multiSelection.has(targetId)
+      ? exercise.objects.filter((object) => multiSelection.has(object.id))
+      : undefined;
+    if (directId && !objects) return;
+    boxGesture.current = { start, pointerId: e.evt.pointerId, targetId, objects, moved: false };
+    (e.evt.target as Element).setPointerCapture?.(e.evt.pointerId);
+  }
   function down(e: Konva.KonvaEventObject<PointerEvent>) {
-    if (e.evt.button !== 0 || gesture.current) return;
+    if (e.evt.button !== 0 || gesture.current || boxGesture.current) return;
     if (tool === "select") {
-      if (e.target === stage.current) onSelect(null);
+      if (e.target !== stage.current) return;
+      if (!multiSelection) {
+        onSelect(null);
+        return;
+      }
+      beginBoxGesture(e);
       return;
     }
     const p = position();
@@ -359,7 +466,27 @@ export default function Canvas({
 
   function move(e: Konva.KonvaEventObject<PointerEvent>) {
     const g = gesture.current;
-    const p = position();
+    const box = boxGesture.current;
+    const p = position(!box?.objects);
+    if (box && p && box.pointerId === e.evt.pointerId) {
+      const bounds = selectionBounds(box.start, p);
+      if (box.objects) {
+        if (!bounds && !box.moved) return;
+        box.moved = true;
+        ignorePitchClick.current = true;
+        translateSelection(box.objects, { x: p.x - box.start.x, y: p.y - box.start.y });
+        if (toolbar.current) toolbar.current.hidden = true;
+        return;
+      }
+      if (bounds) {
+        selectionBox.current?.setAttrs({ ...bounds, visible: true });
+        if (toolbar.current) toolbar.current.hidden = true;
+      } else {
+        selectionBox.current?.hide();
+        if (toolbar.current) toolbar.current.hidden = false;
+      }
+      return;
+    }
     if (!g || !p || g.pointerId !== e.evt.pointerId) return;
     if (g.object.kind !== "movement" && g.object.kind !== "zone") {
       previewAtFrame({ ...g.object, ...p });
@@ -375,8 +502,33 @@ export default function Canvas({
     previewAtFrame(drawnObject(g.object, g.start, p, [...g.samples, p]));
   }
   function up(e: Konva.KonvaEventObject<PointerEvent>) {
-    const g = gesture.current,
-      p = position();
+    const g = gesture.current;
+    const box = boxGesture.current;
+    const p = position(!box?.objects);
+    if (box && p && box.pointerId === e.evt.pointerId) {
+      const bounds = selectionBounds(box.start, p);
+      ignorePitchClick.current = true;
+      boxGesture.current = null;
+      selectionBox.current?.hide();
+      if (toolbar.current) toolbar.current.hidden = false;
+      if (box.objects && (bounds || box.moved)) {
+        const delta = translateSelection(box.objects, { x: p.x - box.start.x, y: p.y - box.start.y });
+        commitSelectionMove(delta);
+        return;
+      }
+      if (!bounds) {
+        onSelect(box.targetId);
+        return;
+      }
+      const ids = exercise.objects.flatMap(({ id }) => {
+        const node = nodes.current.get(id);
+        if (!node) return [];
+        const rect = node.getClientRect({ relativeTo: node.getParent() ?? undefined });
+        return Konva.Util.haveIntersection(bounds, rect) ? [id] : [];
+      });
+      onSelectArea(ids);
+      return;
+    }
     if (!g || !p || g.pointerId !== e.evt.pointerId) return;
     if (
       g.tool !== tool ||
@@ -396,7 +548,7 @@ export default function Canvas({
     }
     const next = { ...current, objects: [...current.objects, object] };
     if (!validateExercise(next)) {
-      ignoreTextPlacementClick.current = object.kind === "text";
+      ignorePitchClick.current = object.kind === "text";
       onCommit(next);
       onPlaced(object);
     }
@@ -404,6 +556,35 @@ export default function Canvas({
   const rendered = exercise.objects.map((o) =>
     preview?.id === o.id ? preview : o,
   );
+  function moveSelection(node: Konva.Node) {
+    const drag = selectionDrag.current;
+    if (!drag || drag.leader.id !== node.id()) return;
+    return translateSelection(drag.objects, {
+      x: node.x() - drag.leader.x,
+      y: node.y() - drag.leader.y,
+    });
+  }
+  function translateSelection(objects: ExerciseObject[], offset: Point) {
+    const delta = clampGroupTranslation(objects, offset);
+    for (const object of objects) {
+      nodes.current.get(object.id)?.position({
+        x: object.x + delta.x,
+        y: object.y + delta.y,
+      });
+    }
+    controls.current?.batchDraw();
+    return delta;
+  }
+  function commitSelectionMove(delta: Point) {
+    if (!multiSelection || (!delta.x && !delta.y)) return;
+    const current = latest.current.exercise;
+    latest.current.onCommit({
+      ...current,
+      objects: current.objects.map((object) => multiSelection.has(object.id)
+        ? { ...object, x: object.x + delta.x, y: object.y + delta.y }
+        : object),
+    });
+  }
   const renderObject = (o: ExerciseObject) => (
     <Group
       key={o.id}
@@ -419,19 +600,52 @@ export default function Canvas({
       y={o.y}
       rotation={o.rotation}
       listening={!placementOnly}
-      draggable={!placementOnly && !multiSelection}
+      draggable={!placementOnly && (!multiSelection || multiSelection.has(o.id))}
       onPointerDown={(e) => {
         e.cancelBubble = true;
-        onSelect(o.id);
+        if (!multiSelection) onSelect(o.id);
+        else if (!multiSelection.has(o.id)) beginBoxGesture(e, o.id);
       }}
+      onClick={multiSelection ? (e) => {
+        if (e.evt.button === 0 && !ignorePitchClick.current) selectHitObject(o.id);
+      } : undefined}
+      onTap={multiSelection ? () => {
+        if (ignorePitchClick.current) return;
+        ignorePitchClick.current = true;
+        selectHitObject(o.id);
+      } : undefined}
       onDragStart={(e) => {
         e.cancelBubble = true;
+        if (multiSelection) {
+          if (selectionDrag.current || boxGesture.current) {
+            e.target.stopDrag();
+            return;
+          }
+          selectionDrag.current = {
+            leader: o,
+            objects: exercise.objects.filter((object) => multiSelection.has(object.id)),
+          };
+          if (toolbar.current) toolbar.current.hidden = true;
+          return;
+        }
         isolateObject(e.target, true);
         onSelect(o.id);
       }}
+      onDragMove={multiSelection ? (e) => {
+        e.cancelBubble = true;
+        moveSelection(e.target);
+      } : undefined}
       onDragEnd={(e) => {
         e.cancelBubble = true;
         if (cancelling.current) return;
+        if (multiSelection) {
+          const delta = moveSelection(e.target);
+          if (!delta) return;
+          selectionDrag.current = null;
+          if (toolbar.current) toolbar.current.hidden = false;
+          commitSelectionMove(delta);
+          return;
+        }
         restoreDragLayer();
         const node = e.target;
         const next = {
@@ -503,16 +717,8 @@ export default function Canvas({
   ) {
     context.beginPath();
     for (const id of ids) {
-      const node = nodes.current.get(id);
-      if (!node) continue;
-      const bounds = node.getClientRect({ relativeTo: node.getParent() ?? undefined });
-      const padding = margin / scale;
-      context.rect(
-        bounds.x - padding,
-        bounds.y - padding,
-        bounds.width + 2 * padding,
-        bounds.height + 2 * padding,
-      );
+      const bounds = outlineBounds(id, margin);
+      if (bounds) context.rect(bounds.x, bounds.y, bounds.width, bounds.height);
     }
     context.strokeShape(shape);
   }
@@ -523,14 +729,14 @@ export default function Canvas({
       role="group"
       tabIndex={0}
       onPointerDownCapture={() => {
-        ignoreTextPlacementClick.current = false;
+        ignorePitchClick.current = false;
         if (multiCursor) setMultiCursor(null);
       }}
       onBlur={() => setMultiCursor(null)}
       onClickCapture={(e) => {
-        // The placement tap can generate a click over the newly mounted toolbar.
-        if (ignoreTextPlacementClick.current && e.detail > 0) {
-          ignoreTextPlacementClick.current = false;
+        // A pitch gesture can generate a click over the toolbar after it moves.
+        if (ignorePitchClick.current && e.detail > 0) {
+          ignorePitchClick.current = false;
           e.preventDefault();
           e.stopPropagation();
         }
@@ -539,7 +745,7 @@ export default function Canvas({
         placementOnly
           ? "Игрище за поставяне на обекти"
           : multiSelection
-            ? "Игрище за множествен избор. Използвайте Page Up и Page Down за преглед и интервал за избор."
+            ? "Игрище за множествен избор. Плъзнете от празно място за избор с рамка. Използвайте Page Up и Page Down за преглед и интервал за избор."
           : "Игрище за рисуване. Използвайте Page Up и Page Down за избор на обект."
       }
       onKeyDown={(e) => {
@@ -621,6 +827,18 @@ export default function Canvas({
             </>
           )}
           <Layer ref={controls} scaleX={scale} scaleY={scale}>
+            {multiSelection && (
+              <Rect
+                ref={selectionBox}
+                name="selection-box"
+                visible={false}
+                listening={false}
+                fill="#c4fa8233"
+                stroke="#c4fa82"
+                strokeWidth={1.5 / scale}
+                dash={[5 / scale, 3 / scale]}
+              />
+            )}
             {multiSelection && multiSelection.size > 0 && (
               <Shape
                 name="multi-selection-outline"
@@ -628,7 +846,7 @@ export default function Canvas({
                 stroke="#c4fa82"
                 strokeWidth={2 / scale}
                 dash={[5 / scale, 3 / scale]}
-                sceneFunc={(context, shape) => drawMultiOutline(context, shape, multiSelection, 3)}
+                sceneFunc={(context, shape) => drawMultiOutline(context, shape, multiSelection, MULTI_OUTLINE_MARGIN)}
               />
             )}
             {multiSelection && multiCursor && cursorIndex >= 0 && (
@@ -760,12 +978,18 @@ export default function Canvas({
           </Layer>
         </Stage>
       )}
-      {width > 0 && selectedObject && (
+      {width > 0 && (selectedObject || multiSelection) && (
         <div
-          className="ke-object-actions"
+          className={
+            multiAnchor
+              ? "ke-object-actions ke-object-actions--multi"
+              : multiSelection
+                ? "ke-object-actions ke-object-actions--multi-empty"
+                : "ke-object-actions"
+          }
           ref={toolbar}
-          role="group"
-          aria-label="Действия за избрания обект"
+          role={multiSelection ? undefined : "group"}
+          aria-label={multiSelection ? undefined : "Действия за избрания обект"}
         >
           {objectActions}
         </div>

@@ -17,6 +17,7 @@ import {
 } from "./model";
 import {
   arrowheadPoints,
+  clampGroupTranslation,
   commit,
   drawnObject,
   duplicateObject,
@@ -38,6 +39,13 @@ const point = { x: 200, y: 200 };
 const cone = createObject("cone", point, "cone");
 const exercise = { ...EMPTY_EXERCISE, objects: [cone] };
 describe("exercise model and geometry", () => {
+  it("limits group movement by the first object to reach each pitch edge", () => {
+    const objects = [{ x: 100, y: 650 }, { x: 1020, y: 40 }];
+    expect(clampGroupTranslation(objects, { x: 20, y: -10 })).toEqual({ x: 20, y: -10 });
+    expect(clampGroupTranslation(objects, { x: 500, y: 500 })).toEqual({ x: 30, y: 50 });
+    expect(clampGroupTranslation(objects, { x: -500, y: -500 })).toEqual({ x: -100, y: -40 });
+  });
+
   it("duplicates a selection together when it is near the edge of the pitch", () => {
     const objects = [
       { ...cone, x: 1000, y: 650 },

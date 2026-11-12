@@ -287,6 +287,36 @@
 .ke-object-actions[hidden] {
   display: none;
 }
+.ke-object-actions--multi-empty {
+  inset: 8px 8px auto auto;
+  max-width: calc(100% - 16px);
+}
+.ke-object-actions--multi-empty .ke-multi-actions {
+  justify-content: flex-end;
+  padding: 0;
+}
+.ke-object-actions--multi-empty .ke-multi-actions p {
+  flex-basis: auto;
+}
+.ke-page .ke-object-actions--multi-empty .ke-multi-actions button:not([aria-label]) {
+  flex: 0 0 auto;
+  width: auto;
+  padding-inline: 12px;
+}
+.ke-object-actions--multi {
+  width: min(calc(6 * var(--ke-action-size) + 5 * var(--ke-action-gap) + 8px), calc(100% - 16px));
+}
+.ke-object-actions--multi .ke-multi-actions {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--ke-action-gap);
+  padding: 0;
+}
+.ke-object-actions--multi .ke-multi-actions p,
+.ke-page .ke-object-actions--multi .ke-multi-actions button:not([aria-label]) {
+  grid-column: span 3;
+  width: 100%;
+}
 .ke-page .ke-object-actions button,
 .ke-page .ke-object-actions input[type="color"] {
   flex: 0 0 var(--ke-action-size);
@@ -501,9 +531,6 @@
     display: grid;
     place-items: center;
     container-type: size;
-  }
-  .ke-pitch-area--multi {
-    grid-template-rows: auto minmax(0, 1fr);
   }
   .ke-pitch-frame {
     display: grid;
