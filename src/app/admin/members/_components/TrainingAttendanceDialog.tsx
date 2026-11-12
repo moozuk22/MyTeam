@@ -26,8 +26,6 @@ type TrainingAttendanceDialogProps = {
   trainingAttendanceState: Pick<
     TrainingAttendanceState,
     | "trainingAttendanceOpen"
-    | "setTrainingAttendanceHideTeamsTab"
-    | "setTrainingDayDetailsOpen"
     | "trainingAttendanceView"
     | "trainingAttendanceHideTeamsTab"
     | "trainingAttendanceLoading"
@@ -41,6 +39,7 @@ type TrainingAttendanceDialogProps = {
     | "schedule2Error"
     | "trainingWeekSessions"
     | "trainingWeekDates"
+    | "trainingDayDetailsOpen"
     | "trainingDayDetailsOpening"
     | "trainingAttendanceMonth"
     | "trainingAttendanceDate"
@@ -71,11 +70,6 @@ type TrainingAttendanceDialogProps = {
     MatchEditorState,
     | "setMatchViewMatch"
     | "setMatchViewPopupOpen"
-    | "setMatchSelectedDates"
-    | "setMatchDetailsPerDay"
-    | "setMatchExistingIdByDate"
-    | "setMatchEditorError"
-    | "setMatchCalendarVisibleMonthIdx"
   >;
   trainingNoteSaving: boolean;
   handleTrainingAttendanceViewChange: (nextView: "teamGroup" | "trainingGroups" | "today") => Promise<void>;
@@ -173,8 +167,6 @@ export function TrainingAttendanceDialog({
 }: TrainingAttendanceDialogProps) {
   const {
     trainingAttendanceOpen,
-    setTrainingAttendanceHideTeamsTab,
-    setTrainingDayDetailsOpen,
     trainingAttendanceView,
     trainingAttendanceHideTeamsTab,
     trainingAttendanceLoading,
@@ -188,6 +180,7 @@ export function TrainingAttendanceDialog({
     schedule2Error,
     trainingWeekSessions,
     trainingWeekDates,
+    trainingDayDetailsOpen,
     trainingDayDetailsOpening,
     trainingAttendanceMonth,
     trainingAttendanceDate,
@@ -215,11 +208,6 @@ export function TrainingAttendanceDialog({
   const {
     setMatchViewMatch,
     setMatchViewPopupOpen,
-    setMatchSelectedDates,
-    setMatchDetailsPerDay,
-    setMatchExistingIdByDate,
-    setMatchEditorError,
-    setMatchCalendarVisibleMonthIdx,
   } = matchEditorState;
   return (
     <>
@@ -285,6 +273,7 @@ export function TrainingAttendanceDialog({
                   sessions={trainingWeekSessions}
                   loading={trainingWeekLoading}
                   openingEditor={trainingDaysEditorLoading}
+                  detailsActive={trainingDayDetailsOpening || trainingDayDetailsOpen}
                   error={schedule2Error}
                   today={todayIsoDate}
                   week={schedule2Week}

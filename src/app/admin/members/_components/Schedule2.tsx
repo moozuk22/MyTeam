@@ -15,6 +15,7 @@ type Props = {
   sessions: Schedule2Session[];
   loading: boolean;
   openingEditor?: boolean;
+  detailsActive?: boolean;
   error: string;
   today: string;
   week: number;
@@ -39,7 +40,7 @@ function getField(session: Schedule2Session) {
   return session.fieldName ?? session.location?.trim() ?? "";
 }
 
-export default function Schedule2({ dates, sessions, loading, openingEditor = false, error, today, week, lastWeek, canScheduleDate, onWeekChange, customGroups, onOpen, onCreate }: Props) {
+export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, today, week, lastWeek, canScheduleDate, onWeekChange, customGroups, onOpen, onCreate }: Props) {
   const [view, setView] = useState<"team" | "field">("team");
   const [team, setTeam] = useState("");
   const [field, setField] = useState("");
@@ -75,7 +76,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
     const accessibleLabel = [time, isMatch ? session.label : "Тренировка", !isMatch && label, session.location]
       .filter(Boolean).join(", ");
     return (
-      <button key={session.id} type="button" className={styles.event} data-match={isMatch} aria-label={accessibleLabel} disabled={openingEditor} onClick={() => onOpen(session)}>
+      <button key={session.id} type="button" className={styles.event} data-match={isMatch} aria-label={accessibleLabel} disabled={openingEditor || detailsActive} onClick={() => onOpen(session)}>
         <strong>{time}</strong>
         {label && <span>{label}</span>}
         {session.location && <small>{session.location}</small>}

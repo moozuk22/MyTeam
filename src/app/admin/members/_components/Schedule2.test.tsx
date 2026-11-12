@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import Schedule2, { type Schedule2Session } from "./Schedule2";
 
-it("places events by custom group ID and shows the linked coach below each group", () => {
+it.each([false, true])("renders grouped events with details active: %s", (detailsActive) => {
   const today = "2026-11-15";
   const tomorrow = "2026-11-16";
   const groups = [
@@ -35,6 +35,7 @@ it("places events by custom group ID and shows the linked coach below each group
       dates={[today, tomorrow]}
       sessions={[training, match, { ...match, id: "match-2", customGroupId: null, label: "Мач · Без група" }]}
       loading={false}
+      detailsActive={detailsActive}
       error=""
       today={today}
       week={0}
@@ -57,6 +58,11 @@ it("places events by custom group ID and shows the linked coach below each group
   const matchCell = rows[1].split("</td>")[1];
   expect(matchCell).toContain(">Академик</span>");
   expect(matchCell).toContain('aria-label="15:00, Мач · Академик"');
+  for (const row of [rows[0], matchCell]) {
+    const eventButton = row.match(/<button[^>]+data-match="(?:true|false)"[^>]*>/)?.[0];
+    expect(eventButton).toBeDefined();
+    expect(eventButton?.includes(' disabled=""')).toBe(detailsActive);
+  }
   expect(rows[2]).toMatch(/^Lemon<\/th>/);
   expect(rows[2]).toContain("Ново събитие за Lemon");
   expect(html).not.toContain(">Мачове</th>");

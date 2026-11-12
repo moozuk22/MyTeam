@@ -5,7 +5,6 @@ import { DEFAULT_TRAINING_DURATION_MINUTES, getTodayIsoDate } from "../_utils/me
 import {
   type TrainingAttendancePlayer,
   type TrainingUpcomingDateItem,
-  type TrainingWeekSessionItem,
   type LimitedEventDetail,
 } from "../_types/members-page-types";
 
@@ -61,6 +60,7 @@ export function useTrainingAttendanceState() {
   const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
 
   const [trainingDayDetailsOpening, setTrainingDayDetailsOpening] = useState(false);
+  const trainingDayDetailsRequest = useRef(0);
 
   const [trainingDayDetailsViewSnapshot, setTrainingDayDetailsViewSnapshot] = useState<
     "teamGroup" | "trainingGroups" | "today"
@@ -155,6 +155,7 @@ export function useTrainingAttendanceState() {
     setTrainingDayDetailsOpen,
     trainingDayDetailsOpening,
     setTrainingDayDetailsOpening,
+    trainingDayDetailsRequest,
     trainingDayDetailsViewSnapshot,
     setTrainingDayDetailsViewSnapshot,
     trainingDayDurationMinutes,

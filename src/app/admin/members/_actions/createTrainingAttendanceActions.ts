@@ -71,6 +71,7 @@ type Options = {
     | "setLimitedEvent"
     | "setLimitedEventLoading"
     | "setTrainingDayDetailsOpening"
+    | "trainingDayDetailsRequest"
     | "setTrainingDayDetailsViewSnapshot"
     | "trainingWeekSessions"
     | "setTrainingDayDetailsTab"
@@ -185,6 +186,7 @@ export function createTrainingAttendanceActions({
     setLimitedEvent,
     setLimitedEventLoading,
     setTrainingDayDetailsOpening,
+    trainingDayDetailsRequest,
     setTrainingDayDetailsViewSnapshot,
     trainingWeekSessions,
     setTrainingDayDetailsTab,
@@ -218,6 +220,7 @@ export function createTrainingAttendanceActions({
     legacyScopeOverride = false,
     customScopeOverride = false,
     schedule2Details = false,
+    isCurrent = () => true,
   ) => {
     if (!clubId) return;
     const resolvedView = viewOverride ?? trainingAttendanceView;
@@ -261,12 +264,10 @@ export function createTrainingAttendanceActions({
       }
 
       const payload = await response.json();
+      if (!isCurrent()) return;
       if (schedule2Details && payload.trainingDate !== date) {
         throw new Error("Тренировката не е намерена.");
       }
-      setTrainingAttendanceSessionId(
-        typeof payload.trainingSessionId === "string" ? payload.trainingSessionId : null,
-      );
       const players = Array.isArray(payload?.players)
         ? payload.players.map((item: unknown) => {
             const raw = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
@@ -338,6 +339,10 @@ export function createTrainingAttendanceActions({
           : mergeTrainingCalendarDates(companion, upcomingDates);
       }
 
+      if (!isCurrent()) return;
+      setTrainingAttendanceSessionId(
+        typeof payload.trainingSessionId === "string" ? payload.trainingSessionId : null,
+      );
       const resolvedDate = payload?.trainingDate || date || "";
       const resolvedScopeKey = payload.trainingSessionId
         ? `session:${payload.trainingSessionId}`
@@ -440,6 +445,7 @@ export function createTrainingAttendanceActions({
       );
       setTrainingDayCancelConfirmOpen(false);
     } catch (error) {
+      if (!isCurrent()) return;
       setTrainingAttendanceSessionId(null);
       setTrainingAttendancePlayers([]);
       setTrainingAttendanceStats({ total: 0, attending: 0, optedOut: 0 });
@@ -454,7 +460,7 @@ export function createTrainingAttendanceActions({
       setTrainingDayCancelConfirmOpen(false);
       setTrainingAttendanceError(error instanceof Error ? error.message : "Възникна грешка.");
     } finally {
-      setTrainingAttendanceLoading(false);
+      if (isCurrent()) setTrainingAttendanceLoading(false);
     }
   };
 
@@ -561,13 +567,17 @@ export function createTrainingAttendanceActions({
       setTrainingDaysEditorLoading(false);
     }
     ++trainingAttendanceOpenRequest.current;
+    ++trainingDayDetailsRequest.current;
     ++trainingWeekRequest.current;
     trainingWeekLoadingRequest.current = null;
     setTrainingWeekLoading(false);
     setSchedule2Open(false);
     setTrainingAttendanceOpen(false);
     setTrainingAttendanceHideTeamsTab(false);
+    setTrainingDayDetailsOpening(false);
     setTrainingDayDetailsOpen(false);
+    setTrainingAttendanceLoading(false);
+    setLimitedEventLoading(false);
     setTrainingDaysEditorOpen(false);
   };
 
@@ -790,20 +800,25 @@ export function createTrainingAttendanceActions({
 
   const fetchLimitedEventForSession = async (date: string, sessionId: string) => {
     if (!clubId) return;
+    const requestId = trainingDayDetailsRequest.current;
+    const isCurrent = () => requestId === trainingDayDetailsRequest.current;
     const scopeKey = getScopeKeyFromSessionId(sessionId);
     if (!scopeKey) {
       setLimitedEvent(null);
+      setLimitedEventLoading(false);
       return;
     }
     setLimitedEventLoading(true);
     try {
       const url = `/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events?date=${encodeURIComponent(date)}&scopeKey=${encodeURIComponent(scopeKey)}`;
       const res = await fetch(url, { cache: "no-store" });
+      if (!isCurrent()) return;
       if (!res.ok) {
         setLimitedEvent(null);
         return;
       }
       const data: unknown = await res.json();
+      if (!isCurrent()) return;
       let arr = Array.isArray(data) ? data : [];
       if (!arr.length && sessionId.startsWith("coach-")) {
         const groupId = sessionId.slice(6, 42);
@@ -826,6 +841,7 @@ export function createTrainingAttendanceActions({
           if (original?.id === sessionId.slice(43) && Array.isArray(legacy)) arr = legacy;
         }
       }
+      if (!isCurrent()) return;
       if (arr.length === 0) {
         setLimitedEvent(null);
         return;
@@ -844,6 +860,7 @@ export function createTrainingAttendanceActions({
         `/api/admin/clubs/${encodeURIComponent(clubId)}/limited-training-events/${encodeURIComponent(ev.id)}`,
         { cache: "no-store" },
       );
+      if (!isCurrent()) return;
       if (!detailRes.ok) {
         setLimitedEvent(null);
         return;
@@ -853,20 +870,23 @@ export function createTrainingAttendanceActions({
         registrations: LimitedEventDetail["registrations"];
         spotsRemaining: number;
       };
+      if (!isCurrent()) return;
       setLimitedEvent({
         ...detail.event,
         registrations: detail.registrations,
         spotsRemaining: detail.spotsRemaining,
       });
     } catch {
-      setLimitedEvent(null);
+      if (isCurrent()) setLimitedEvent(null);
     } finally {
-      setLimitedEventLoading(false);
+      if (isCurrent()) setLimitedEventLoading(false);
     }
   };
 
   const openTrainingDayDetails = async (date: string, sessionId?: string) => {
     const schedule2Details = schedule2Open && trainingAttendanceOpen;
+    const requestId = ++trainingDayDetailsRequest.current;
+    const isCurrent = () => requestId === trainingDayDetailsRequest.current;
     setMatchEditTarget(null);
     const month = getMonthKeyFromIsoDate(date);
     setTrainingDayDetailsOpening(true);
@@ -901,6 +921,8 @@ export function createTrainingAttendanceActions({
     setLimitedEventError("");
     setLimitedSpotsInput("10");
     if (schedule2Details && firstSessionId.startsWith("match-")) {
+      setTrainingAttendanceLoading(false);
+      setLimitedEventLoading(false);
       setTrainingDayDetailsOpen(true);
       setTrainingDayDetailsOpening(false);
       return;
@@ -946,13 +968,14 @@ export function createTrainingAttendanceActions({
           !firstSessionId.startsWith("coach-"),
           schedule2CustomScope,
           schedule2Details,
+          isCurrent,
         ),
         schedule2Details ? undefined : fetchClubMatches(),
         fetchLimitedEventForSession(date, firstSessionId),
       ]);
-      setTrainingDayDetailsOpen(true);
+      if (isCurrent()) setTrainingDayDetailsOpen(true);
     } finally {
-      setTrainingDayDetailsOpening(false);
+      if (isCurrent()) setTrainingDayDetailsOpening(false);
     }
   };
 

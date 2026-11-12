@@ -118,3 +118,89 @@ it("clears loading and reports a failed attendance request", async () => {
   expect(input.trainingAttendanceState.setTrainingAttendanceLoading).toHaveBeenLastCalledWith(false);
   expect(input.trainingAttendanceState.setTrainingAttendancePlayers).toHaveBeenCalledWith([]);
 });
+
+function schedule2Requests() {
+  const input = options();
+  input.trainingAttendanceState.schedule2Open = true;
+  input.trainingAttendanceState.trainingAttendanceOpen = true;
+  const pending = new Map<string, (response: Response) => void>();
+  vi.stubGlobal("fetch", vi.fn((path: string) => {
+    const url = new URL(path, "https://example.invalid");
+    const key = url.searchParams.get("customTrainingGroupId") ??
+      url.searchParams.get("scopeKey") ?? url.pathname.split("/").at(-1)!;
+    return new Promise<Response>((resolve) => pending.set(key, resolve));
+  }));
+
+  return {
+    input,
+    respond(key: string, body: unknown, status = 200) {
+      const resolve = pending.get(key);
+      if (!resolve) throw new Error(`Missing request for ${key}`);
+      resolve(Response.json(body, { status }));
+    },
+  };
+}
+
+const detailDate = "2026-11-10";
+
+it.each([200, 500])("keeps the latest Schedule 2 details after a stale %i response", async (status) => {
+  const { input, respond } = schedule2Requests();
+  const state = input.trainingAttendanceState;
+  const first = createTrainingAttendanceActions(input).openTrainingDayDetails(detailDate, `${detailDate}-custom-first`);
+  respond("custom_group:first", [{ id: "first-event" }]);
+  await vi.waitFor(() => expect(fetch).toHaveBeenCalledWith(
+    expect.stringMatching(/\/limited-training-events\/first-event$/),
+    { cache: "no-store" },
+  ));
+
+  // A render between clicks creates a new action factory with the same state refs.
+  const secondTab = `${detailDate}-custom-second`;
+  const second = createTrainingAttendanceActions(input).openTrainingDayDetails(detailDate, secondTab);
+  respond("second", {
+    trainingDate: detailDate,
+    trainingSessionId: "second-session",
+    players: [{ id: "second-player", fullName: "Играч" }],
+    trainingTime: "18:00",
+    trainingField: { id: "second-field", name: "Терен" },
+    note: "Описание",
+  });
+  respond("custom_group:second", [{ id: "second-event" }]);
+  await vi.waitFor(() => expect(fetch).toHaveBeenCalledWith(
+    expect.stringMatching(/\/limited-training-events\/second-event$/),
+    { cache: "no-store" },
+  ));
+  respond("second-event", { event: { id: "second-event" }, registrations: [], spotsRemaining: 3 });
+  await second;
+
+  respond("first", { trainingDate: detailDate, trainingSessionId: "first-session" }, status);
+  respond("first-event", { event: { id: "first-event" }, registrations: [], spotsRemaining: 1 }, status);
+  await first;
+
+  expect(state.setTrainingDayDetailsTab).toHaveBeenLastCalledWith(secondTab);
+  expect(state.setTrainingAttendanceSessionId).toHaveBeenLastCalledWith("second-session");
+  expect(state.setTrainingAttendancePlayers).toHaveBeenLastCalledWith([expect.objectContaining({ id: "second-player" })]);
+  expect(state.setTrainingAttendanceStats).toHaveBeenLastCalledWith({ total: 1, attending: 1, optedOut: 0 });
+  expect(state.setTrainingDayTime).toHaveBeenLastCalledWith("18:00");
+  expect(state.setTrainingDayField).toHaveBeenLastCalledWith(expect.objectContaining({ id: "second-field" }));
+  expect(input.setTrainingNote).toHaveBeenLastCalledWith("Описание");
+  expect(state.setLimitedEvent).toHaveBeenLastCalledWith(expect.objectContaining({ id: "second-event" }));
+  expect(state.setTrainingAttendanceError).toHaveBeenLastCalledWith("");
+  expect(state.setTrainingDayDetailsOpen).toHaveBeenCalledTimes(1);
+});
+
+it("ignores pending Schedule 2 details when the planner is closed", async () => {
+  const { input, respond } = schedule2Requests();
+  const state = input.trainingAttendanceState;
+  const actions = createTrainingAttendanceActions(input);
+  const pending = actions.openTrainingDayDetails(detailDate, `${detailDate}-custom-first`);
+  actions.closeTrainingAttendance();
+  respond("first", { trainingDate: detailDate, trainingSessionId: "first-session" });
+  respond("custom_group:first", []);
+  await pending;
+
+  expect(state.setTrainingDayDetailsOpen).toHaveBeenLastCalledWith(false);
+  expect(state.setTrainingDayDetailsOpening).toHaveBeenLastCalledWith(false);
+  expect(state.setTrainingAttendanceLoading).toHaveBeenLastCalledWith(false);
+  expect(state.setLimitedEventLoading).toHaveBeenLastCalledWith(false);
+  expect(state.setTrainingAttendanceSessionId).not.toHaveBeenCalled();
+});
