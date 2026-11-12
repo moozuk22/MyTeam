@@ -118,6 +118,7 @@ export function useTrainingDaysForm({
   const [trainingDaysSuccessMessage, setTrainingDaysSuccessMessage] = useState("");
 
   const [trainingDayScheduleNotes, setTrainingDayScheduleNotes] = useState<Record<string, string>>({});
+  const [schedule2InitialNote, setSchedule2InitialNote] = useState("");
 
   const [trainingDaysEditorMode, setTrainingDaysEditorMode] = useState<
     "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup"
@@ -605,7 +606,9 @@ export function useTrainingDaysForm({
     normalizedTrainingDaysSelection.join("|") === normalizedTrainingDaysInitial.join("|") &&
     normalizedTrainingDateTimesSelectionKey === normalizedTrainingDateTimesInitialKey &&
     normalizedTrainingDurationSelection === trainingDaysInitialDurationMinutes &&
-    normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey;
+    normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey &&
+    (!schedule2CustomEdit ||
+      (trainingDayScheduleNotes[trainingDaysSingleEditDate!] ?? "").trim() === schedule2InitialNote.trim());
 
   useEffect(() => {
     setTrainingDateTimes((prev) => {
@@ -837,6 +840,7 @@ export function useTrainingDaysForm({
     setTrainingDaysSuccessMessage,
     trainingDayScheduleNotes,
     setTrainingDayScheduleNotes,
+    setSchedule2InitialNote,
     trainingDaysEditorMode,
     setTrainingDaysEditorMode,
     coachWizardGroupId,

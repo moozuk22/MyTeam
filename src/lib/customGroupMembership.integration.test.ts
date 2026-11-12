@@ -36,10 +36,11 @@ beforeAll(async () => {
     CREATE TABLE training_opt_outs(player_id uuid, training_date date, reason_code text, reason_text text, UNIQUE(player_id,training_date));
     CREATE TABLE "_PlayerCoachGroups"("A" uuid,"B" uuid,UNIQUE("A","B"));
     CREATE TABLE club_custom_training_group_players(group_id uuid,player_id uuid,PRIMARY KEY(group_id,player_id));
-    CREATE TABLE training_sessions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),club_id uuid,scope_key text,status text,training_date date,training_time text,removed_from_schedule boolean DEFAULT false);
+    CREATE TABLE training_sessions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),club_id uuid,scope_key text,scope_id uuid,scope_type text,occurrence_key text DEFAULT '',status text,training_date date,training_time text,removed_from_schedule boolean DEFAULT false);
+    CREATE TABLE limited_training_events(club_id uuid,scope_key text,training_date date,UNIQUE(club_id,scope_key,training_date));
     CREATE TABLE training_session_players(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),training_session_id uuid,player_id uuid,player_name text,team_group integer,present boolean DEFAULT true,attendance_recorded boolean DEFAULT false,credit_charged_at timestamptz,reason_code text,reason_text text,updated_at timestamptz,UNIQUE(training_session_id,player_id));
   `);
-  for (const migration of ["20261020130000_attendance_membership_history", "20261020133000_membership_sessions_without_time", "20261020140000_membership_check_in_compatibility", "20261020160000_membership_preserve_opt_outs", "20261021170000_attendance_roster_lock"]) {
+  for (const migration of ["20261020130000_attendance_membership_history", "20261020133000_membership_sessions_without_time", "20261020140000_membership_check_in_compatibility", "20261020160000_membership_preserve_opt_outs", "20261021170000_attendance_roster_lock", "20261113010000_schedule2_enrollment_roster"]) {
     await db.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8"));
   }
 }, 30000);
@@ -47,7 +48,7 @@ afterAll(async () => { await db.close(); });
 beforeEach(async () => {
   vi.clearAllMocks();
   failAfterMembershipWrite = false;
-  await db.exec("TRUNCATE attendance_memberships,training_session_players,club_custom_training_group_players,training_sessions,training_opt_outs,players,clubs CASCADE");
+  await db.exec("TRUNCATE attendance_memberships,training_session_players,club_custom_training_group_players,training_sessions,limited_training_events,training_opt_outs,players,clubs CASCADE");
   await db.query("INSERT INTO clubs VALUES ($1,'calendar_month')", [clubId]);
   for (const id of [playerId, otherPlayerId]) await db.query("INSERT INTO players(id,club_id,full_name,is_active) VALUES ($1,$2,'Player',true)", [id, clubId]);
   await db.query(`INSERT INTO training_sessions(club_id,scope_key,status,training_date,training_time,removed_from_schedule)
@@ -84,6 +85,30 @@ it("keeps cancelled and removed sessions unchanged while enrolling into only sch
   await edit([playerId]);
   expect((await db.query("SELECT * FROM training_sessions ORDER BY training_date")).rows).toEqual(before);
   expect((await db.query("SELECT s.status,s.removed_from_schedule FROM training_session_players r JOIN training_sessions s ON s.id=r.training_session_id")).rows).toEqual([{ status: "scheduled", removed_from_schedule: false }]);
+});
+it.each(["calendar_month", "training_credits"])("adds newly enrolled players to future Schedule 2 sessions for %s", async (workflow) => {
+  const sessions = [
+    { id: "00000000-0000-4000-8000-000000000010", day: 1, status: "scheduled", locked: false },
+    { id: "00000000-0000-4000-8000-000000000011", day: 1, status: "scheduled", locked: false },
+    { id: "00000000-0000-4000-8000-000000000012", day: -1, status: "scheduled", locked: false },
+    { id: "00000000-0000-4000-8000-000000000013", day: 1, status: "cancelled", locked: false },
+    { id: "00000000-0000-4000-8000-000000000014", day: 1, status: "scheduled", locked: true },
+  ];
+  await db.query("UPDATE clubs SET payment_workflow=$1", [workflow]);
+  for (const { id, day, status, locked } of sessions) {
+    await db.query(
+      `INSERT INTO training_sessions(id,club_id,scope_key,scope_id,scope_type,occurrence_key,status,training_date,training_time,roster_locked_at)
+       VALUES ($1,$2,$3,$4,'customGroup',$1::uuid::text,$5,CURRENT_DATE+$6::integer,'17:00',CASE WHEN $7::boolean THEN now() END)`,
+      [id, clubId, `${scopeKey}:session:${id}`, groupId, status, day, locked],
+    );
+  }
+  await db.query("INSERT INTO limited_training_events SELECT club_id,scope_key,training_date FROM training_sessions WHERE id=$1", [sessions[1].id]);
+  await edit([playerId]);
+  expect((await db.query(`SELECT training_session_id,present,reason_code FROM training_session_players
+    WHERE training_session_id=ANY($1::uuid[]) ORDER BY training_session_id`, [sessions.map(({ id }) => id)])).rows).toEqual([
+    { training_session_id: sessions[0].id, present: workflow === "calendar_month", reason_code: null },
+    { training_session_id: sessions[1].id, present: false, reason_code: workflow === "calendar_month" ? "limited_event" : null },
+  ]);
 });
 it("keeps weekday-based sessions intact and updates their roster even without explicit dates", async () => {
   storedGroup.trainingDates = [];

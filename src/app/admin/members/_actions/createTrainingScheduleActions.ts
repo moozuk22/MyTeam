@@ -37,6 +37,7 @@ type Options = {
     | "setTrainingFieldSelections"
     | "setTrainingDaysInitialFieldSelections"
     | "setTrainingDayScheduleNotes"
+    | "setSchedule2InitialNote"
     | "setTrainingDaysInitialDates"
     | "setTrainingDaysInitialDurationMinutes"
     | "setTrainingDaysInitialFieldId"
@@ -190,6 +191,7 @@ export function createTrainingScheduleActions({
     setTrainingFieldSelections,
     setTrainingDaysInitialFieldSelections,
     setTrainingDayScheduleNotes,
+    setSchedule2InitialNote,
     setTrainingDaysInitialDates,
     setTrainingDaysInitialDurationMinutes,
     setTrainingDaysInitialFieldId,
@@ -390,6 +392,7 @@ export function createTrainingScheduleActions({
       if (!isCurrent()) return;
       if (mode === "customGroup" && customTarget) {
         const date = editDate ?? scheduleCellDate;
+        setSchedule2InitialNote(editDate ? trainingNote : "");
         const dates = date ? [date] : [];
         const time = customTarget.edit?.time ?? "";
         const duration = customTarget.edit?.duration ?? DEFAULT_TRAINING_DURATION_MINUTES;
