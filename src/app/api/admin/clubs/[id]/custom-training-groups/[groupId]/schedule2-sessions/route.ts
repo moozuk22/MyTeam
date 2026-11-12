@@ -5,7 +5,7 @@ import { isEligibleForMembership, isEligibleForTraining } from "@/lib/attendance
 import type { CoachTraining } from "@/lib/coachTrainingSchedule";
 import { prisma } from "@/lib/db";
 import { notifySchedule2CustomTrainingChanges } from "@/lib/push/coachTrainingNotifications";
-import { hasTrustedOrigin } from "@/lib/requestOrigin";
+import { hasTrustedSchedule2Origin } from "@/lib/requestOrigin";
 import { getConfiguredTrainingDates, getTodayIsoDateInTimeZone, isIsoDate, isoDateToUtcMidnight } from "@/lib/training";
 import { trainingRequiresCheckIn } from "@/lib/trainingAttendanceDefaults";
 import { publishTrainingAttendanceUpdated } from "@/lib/trainingAttendanceEvents";
@@ -60,8 +60,11 @@ function parseSession(value: unknown) {
 async function mutate(request: NextRequest, context: Context, operation: "create" | "edit" | "delete") {
   const token = request.cookies.get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
-  if (!session?.roles.includes("admin") || !hasTrustedOrigin(request)) {
+  if (!session?.roles.includes("admin")) {
     return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
+  }
+  if (!hasTrustedSchedule2Origin(request)) {
+    return NextResponse.json({ error: "Адресът на сайта не е разрешен за промени в График 2." }, { status: 403 });
   }
   const { id: clubId, groupId } = await context.params;
   if (!UUID.test(clubId) || !UUID.test(groupId)) return NextResponse.json({ error: "Невалидна група." }, { status: 400 });

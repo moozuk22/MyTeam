@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import { hasTrustedOrigin } from "@/lib/requestOrigin";
+import { hasTrustedSchedule2Origin } from "@/lib/requestOrigin";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { sendPushToMember } from "@/lib/push/service";
 import { publishMemberUpdated } from "@/lib/memberEvents";
@@ -141,7 +141,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
     if (existing.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(existing.scopeKey) &&
-        (!session.roles.includes("admin") || !hasTrustedOrigin(request))) {
+        (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
       return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
 
@@ -261,7 +261,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
     if (existing.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(existing.scopeKey) &&
-        (!session.roles.includes("admin") || !hasTrustedOrigin(request))) {
+        (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
       return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
 

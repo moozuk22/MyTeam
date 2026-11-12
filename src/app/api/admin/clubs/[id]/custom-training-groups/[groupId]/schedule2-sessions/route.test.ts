@@ -25,9 +25,11 @@ const session = { date, time: "17:00", duration: 60 };
 const baseScope = `custom_group:${groupId}`;
 const params = Promise.resolve({ id: clubId, groupId });
 
-function request(method: string, body: unknown) {
-  return new NextRequest("http://localhost/schedule2-sessions", {
-    method, headers: { cookie: "admin_session=test" }, body: JSON.stringify(body),
+function request(method: string, body: unknown, origin?: string) {
+  const headers = new Headers({ cookie: "admin_session=test" });
+  if (origin) headers.set("origin", origin);
+  return new NextRequest("http://localhost:3000/schedule2-sessions", {
+    method, headers, body: JSON.stringify(body),
   });
 }
 
@@ -52,7 +54,32 @@ describe("Schedule 2 custom-group occurrences", () => {
       trainingOptOut: { findMany: vi.fn().mockResolvedValue([]) },
     }));
   });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it("lets a local admin save in development with a deployed public base URL", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("APP_BASE_URL", "https://myteam7.com");
+
+    expect((await POST(request("POST", { sessions: [session] }, "http://localhost:3000"), { params })).status).toBe(200);
+    expect(mocks.create).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["development", "http://localhost:3001", "admin"],
+    ["development", "https://untrusted.example", "admin"],
+    ["production", "http://localhost:3000", "admin"],
+    ["development", "http://localhost:3000", "coach"],
+  ])("rejects %s requests from %s with the %s role when access checks fail", async (env, origin, role) => {
+    vi.stubEnv("NODE_ENV", env);
+    vi.stubEnv("APP_BASE_URL", "https://myteam7.com");
+    mocks.auth.mockResolvedValue({ roles: [role] });
+
+    expect((await POST(request("POST", { sessions: [session] }, origin), { params })).status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
 
   it("creates separate sessions for the same custom roster and date", async () => {
     expect((await POST(request("POST", { sessions: [session] }), { params })).status).toBe(200);

@@ -13,3 +13,12 @@ export function hasTrustedOrigin(request: NextRequest, requireOrigin = false): b
     return false;
   }
 }
+
+export function hasTrustedSchedule2Origin(request: NextRequest): boolean {
+  if (hasTrustedOrigin(request)) return true;
+
+  const { hostname, origin } = request.nextUrl;
+  return process.env.NODE_ENV === "development" &&
+    (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") &&
+    request.headers.get("origin") === origin;
+}
