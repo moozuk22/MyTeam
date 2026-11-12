@@ -204,3 +204,29 @@ it("ignores pending Schedule 2 details when the planner is closed", async () => 
   expect(state.setLimitedEventLoading).toHaveBeenLastCalledWith(false);
   expect(state.setTrainingAttendanceSessionId).not.toHaveBeenCalled();
 });
+
+it("loads registrations for the newly selected Schedule 2 training tab", async () => {
+  const input = options();
+  input.trainingAttendanceState.schedule2Open = true;
+  input.trainingAttendanceState.trainingAttendanceOpen = true;
+  vi.stubGlobal("fetch", vi.fn((path: string) => {
+    const url = new URL(path, "https://example.invalid");
+    if (url.pathname.endsWith("/training-attendance")) {
+      return Promise.resolve(Response.json({ trainingDate: detailDate, players: [] }));
+    }
+    if (url.searchParams.get("scopeKey") === "custom_group:second") {
+      return Promise.resolve(Response.json([{ id: "second-event" }]));
+    }
+    return Promise.resolve(Response.json({ event: { id: "second-event" }, registrations: [], spotsRemaining: 2 }));
+  }));
+
+  await createTrainingAttendanceActions(input).loadDayDetailsSessionAttendance({
+    id: `${detailDate}-custom-second`, date: detailDate, scopeType: "trainingGroup",
+    trainingTime: "18:00", teamGroups: [], label: "Втора група",
+  }, detailDate);
+
+  expect(input.trainingAttendanceState.setLimitedEvent).toHaveBeenNthCalledWith(1, null);
+  expect(input.trainingAttendanceState.setLimitedEvent).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: "second-event" }),
+  );
+});

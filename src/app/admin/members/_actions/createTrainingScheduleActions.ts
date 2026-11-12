@@ -383,7 +383,11 @@ export function createTrainingScheduleActions({
       if (!isCurrent()) return;
       const loadedGroups = !isCustomTrainingGroupMode && !customTarget ? await loadTrainingScheduleGroups() : [];
       if (!isCurrent()) return;
-      const loadedCustomGroups = isCustomTrainingGroupMode || customTarget ? await loadCustomTrainingGroups(customTarget?.group) : [];
+      const loadedCustomGroups = customTarget && mode === "coachGroup"
+        ? []
+        : isCustomTrainingGroupMode || customTarget
+          ? await loadCustomTrainingGroups(customTarget?.group)
+          : [];
       if (!isCurrent()) return;
       if (mode === "customGroup") {
         const groupId = customTarget?.group.id ?? selectedTrainingGroupId;
@@ -393,10 +397,18 @@ export function createTrainingScheduleActions({
         if (!resolvedGroup) {
           throw new Error("Персонализираната група не е намерена.");
         }
+        if (customTarget && resolvedGroup.hasWeekdayRecurrence) {
+          throw new Error(customTarget.group.coachGroupId
+            ? "Групата има повтарящ се график. За допълнителна тренировка изберете „Тренировка за треньорската група“."
+            : "Групата има повтарящ се график. За допълнителни тренировки я свържете с треньорска група.");
+        }
         const nextWindowDates = [...resolvedGroup.trainingDates]
           .map((value) => String(value ?? "").trim())
           .filter((value) => schedulerCalendarDateSet.has(value))
           .sort((a, b) => a.localeCompare(b));
+        if (scheduleCellDate && nextWindowDates.includes(scheduleCellDate)) {
+          throw new Error("Персонализираната група вече има тренировка за тази дата.");
+        }
         const resolvedDateTimes = normalizeTrainingDateTimes(
           resolvedGroup.trainingDateTimes,
           nextWindowDates,
@@ -518,9 +530,14 @@ export function createTrainingScheduleActions({
           coachTarget?.sessionId ? `session:${coachTarget.sessionId}` : "new",
           rows,
           rules,
-          editDate,
+          scheduleCellDate ?? editDate,
           payload.limitedEvents ?? [],
         );
+        if (scheduleCellDate) {
+          const monthIndex = schedulerCalendarMonthsTrimmed.findIndex((month) => month.key === scheduleCellDate.slice(0, 7));
+          setSchedulerCalendarVisibleMonthIdx(Math.max(0, monthIndex));
+          setTrainingDaysActiveStep("time");
+        }
         setTrainingDaysEditorOpen(true);
         return;
       }

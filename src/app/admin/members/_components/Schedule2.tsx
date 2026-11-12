@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TrainingWeekSessionItem } from "../_types/members-page-types";
+import { SkeletonLine } from "./FinanceSkeleton";
 import styles from "./Schedule2.module.css";
 
 export type Schedule2Session = TrainingWeekSessionItem & { fieldName?: string };
@@ -89,7 +90,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
       <header className={styles.header}>
         <div>
           <h3>Седмично планиране</h3>
-          <p>{dates.length > 0 && `${formatDay(dates[0])} – ${formatDay(dates[dates.length - 1])} · `}{visibleSessions.length} събития</p>
+          {!loading && <p>{dates.length > 0 && `${formatDay(dates[0])} – ${formatDay(dates[dates.length - 1])} · `}{visibleSessions.length} събития</p>}
         </div>
         <div className={styles.actions}>
           {customGroups.length > 1 && (
@@ -134,8 +135,31 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
         <p className={styles.notice}>Мачовете без персонализирана група са в „Терени и часове“ при избрани „Всички групи“.</p>
       )}
       {error && <p role="alert" className="amp-confirm-error">{error}</p>}
-      {openingEditor && <p role="status">Зареждане на редактора…</p>}
-      {loading ? <p role="status">Зареждане…</p> : view === "team" && dates.length > 0 && visibleGroups.length > 0 ? (
+      {openingEditor && <div role="status" aria-label="Зареждане" aria-busy="true"><SkeletonLine /></div>}
+      {loading ? (
+        <div role="status" aria-label="Зареждане" aria-busy="true">
+          {view === "team" ? (
+            <div className={styles.grid} aria-hidden="true">
+              <table className={styles.skeletonTable}>
+                <tbody>
+                  {[0, 1, 2].map((row) => (
+                    <tr key={row}>
+                      <th><SkeletonLine wide /></th>
+                      {Array.from({ length: 7 }, (_, day) => <td key={day}><SkeletonLine wide /></td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className={styles.fieldDays} aria-hidden="true">
+              {[0, 1, 2].map((day) => (
+                <div className={styles.fieldDay} key={day}><SkeletonLine /><SkeletonLine wide /></div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : view === "team" && dates.length > 0 && visibleGroups.length > 0 ? (
         <div className={styles.grid} tabIndex={0} role="region" aria-label="Таблица на седмичния график">
           <table>
             <thead>
@@ -163,9 +187,10 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                     const entries = visibleSessions.filter((session) => session.date === date && belongsToGroup(session, group));
                     return (
                       <td key={date} data-today={date === today}>
-                        {entries.length > 0 ? entries.map((session) => eventButton(session)) : !activeField && canScheduleDate(date) ? (
-                          <button type="button" className={styles.emptyCell} aria-label={`Ново събитие за ${group.name}, ${formatDay(date)}`} disabled={openingEditor} onClick={() => onCreate(group.id, date)}>+</button>
-                        ) : <span className={styles.dash}>—</span>}
+                        {entries.map((session) => eventButton(session))}
+                        {!activeField && canScheduleDate(date) && (entries.length === 0 || group.coachGroupId) ? (
+                          <button type="button" className={styles.emptyCell} aria-label={`Ново събитие за ${group.name}, ${formatDay(date)}`} disabled={openingEditor || detailsActive} onClick={() => onCreate(group.id, date)}>+</button>
+                        ) : entries.length === 0 && <span className={styles.dash}>—</span>}
                       </td>
                     );
                   })}

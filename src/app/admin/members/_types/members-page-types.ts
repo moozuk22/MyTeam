@@ -146,6 +146,7 @@ interface CustomTrainingGroup {
   playerIds: string[];
   coachGroupId?: string | null;
   trainingDates: string[];
+  hasWeekdayRecurrence?: boolean;
   trainingTime?: string | null;
   trainingDateTimes?: Record<string, string> | null;
   trainingDurationMinutes?: number;

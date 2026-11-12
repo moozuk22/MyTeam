@@ -52,6 +52,7 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
   expect(rows).toHaveLength(3);
   expect(rows[0]).toMatch(/^Loko<small[^>]*>Треньор на 2026<\/small>/);
   expect(rows[0]).toContain("18:00");
+  expect(rows[0].split("</td>")[0]).toContain('aria-label="Ново събитие за Loko,');
   expect(rows[0]).not.toContain("Академик");
   expect(rows[1].split("</td>")[0]).not.toContain("Академик");
   expect(rows[0]).not.toContain(">Тренировка<");

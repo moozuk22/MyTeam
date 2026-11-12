@@ -243,6 +243,7 @@ export function useTrainingGroups({
       const search = new URLSearchParams();
       const scope = target ? target.coachGroupId : coachGroupId;
       if (scope) search.set("coachGroupId", scope);
+      if (target) search.set("schedule2GroupId", target.id);
       const response = await fetch(
         `/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups${search.size ? `?${search.toString()}` : ""}`,
         {
@@ -272,6 +273,7 @@ export function useTrainingGroups({
                 coachGroupId: normalizeOptionalId(raw.coachGroupId),
                 playerIds,
                 trainingDates,
+                ...(target ? { hasWeekdayRecurrence: raw.hasWeekdayRecurrence === true } : {}),
                 trainingTime:
                   typeof raw.trainingTime === "string" && TRAINING_TIME_REGEX.test(raw.trainingTime.trim())
                     ? raw.trainingTime.trim()

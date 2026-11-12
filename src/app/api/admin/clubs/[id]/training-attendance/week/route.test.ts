@@ -91,6 +91,20 @@ describe("График 2 weekly schedule", () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it("returns both coach sessions when they share a training date", async () => {
+    mocks.sessions.mockImplementation(async ({ where }) => where.scopeType === "coachGroup" ? [
+      { id: "first", scopeId: "coach-group-1", trainingDate: new Date("2026-11-17"), trainingTime: "16:00", trainingDurationMinutes: 60 },
+      { id: "second", scopeId: "coach-group-1", trainingDate: new Date("2026-11-17"), trainingTime: "18:30", trainingDurationMinutes: 75 },
+    ] : []);
+    const response = await request("?view=schedule2&week=1");
+    expect(response.status).toBe(200);
+    const { sessions } = await response.json();
+    expect(sessions).toEqual([
+      expect.objectContaining({ id: "coach-coach-group-1-first", date: "2026-11-17", trainingTime: "16:00" }),
+      expect.objectContaining({ id: "coach-coach-group-1-second", date: "2026-11-17", trainingTime: "18:30" }),
+    ]);
+  });
+
   it("rejects coaches before loading planner data while preserving their original schedule access", async () => {
     mocks.auth.mockResolvedValue({ roles: ["coach"] });
     expect((await request("?view=schedule2")).status).toBe(403);

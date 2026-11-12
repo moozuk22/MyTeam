@@ -22,8 +22,9 @@ type ScheduleEventDialogProps = {
   schedule2EventTarget: { groupId: string; date?: string } | null;
   schedule2EventGroup: Schedule2Group | undefined;
   schedule2CanCreateTraining: boolean;
+  schedule2CustomTrainingExists: boolean;
   openTrainingDaysEditor: (
-    mode: "customGroup", editDate: undefined, coachTarget: undefined,
+    mode: "customGroup" | "coachGroup", editDate: undefined, coachTarget: { groupId: string } | undefined,
     customTarget: { group: Schedule2Group; date?: string },
   ) => Promise<void>;
   matchEditorState: Pick<
@@ -68,6 +69,7 @@ export function ScheduleEventDialog({
   schedule2EventTarget,
   schedule2EventGroup,
   schedule2CanCreateTraining,
+  schedule2CustomTrainingExists,
   openTrainingDaysEditor,
   matchEditorState,
   trainingAttendanceState,
@@ -106,6 +108,9 @@ export function ScheduleEventDialog({
   } = matchEditorState;
   const { trainingAttendanceView } = trainingAttendanceState;
   const { isCustomTrainingGroupMode } = trainingGroups;
+  const schedule2CoachGroupId = schedule2EventGroup?.coachGroupId;
+  const customTrainingUnavailable = Boolean(schedule2EventTarget &&
+    (!schedule2EventGroup || !schedule2CanCreateTraining || schedule2CustomTrainingExists));
   return (
     <>
       {scheduleEventModalOpen && (
@@ -146,12 +151,28 @@ export function ScheduleEventDialog({
             <div className="amp-modal-body">
               {scheduleEventStep === "type" ? (
                 <div className={schedule2EventTarget ? "amp-schedule-event-type-picker amp-schedule-event-type-picker--schedule2" : "amp-schedule-event-type-picker"}>
+                  {schedule2EventGroup && schedule2CoachGroupId && (
+                    <button
+                      type="button"
+                      className="amp-btn amp-schedule-event-type-btn"
+                      onClick={() => {
+                        setScheduleEventModalOpen(false);
+                        void openTrainingDaysEditor("coachGroup", undefined, { groupId: schedule2CoachGroupId }, {
+                          group: schedule2EventGroup,
+                          date: schedule2EventTarget?.date,
+                        });
+                      }}
+                    >
+                      <span className="amp-schedule-event-type-icon amp-schedule-event-type-icon--training" aria-hidden="true" />
+                      Тренировка за треньорската група
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="amp-btn amp-schedule-event-type-btn"
-                    disabled={Boolean(schedule2EventTarget && (!schedule2EventGroup || !schedule2CanCreateTraining))}
+                    disabled={customTrainingUnavailable}
                     onClick={() => {
-                      if (schedule2EventTarget && (!schedule2EventGroup || !schedule2CanCreateTraining)) return;
+                      if (customTrainingUnavailable) return;
                       setScheduleEventModalOpen(false);
                       if (schedule2EventGroup) {
                         void openTrainingDaysEditor("customGroup", undefined, undefined, {
@@ -167,10 +188,13 @@ export function ScheduleEventDialog({
                       className="amp-schedule-event-type-icon amp-schedule-event-type-icon--training"
                       aria-hidden="true"
                     />
-                    Тренировка
+                    {schedule2CoachGroupId ? "Тренировка за персонализираната група" : "Тренировка"}
                   </button>
                   {schedule2EventTarget && !schedule2CanCreateTraining && (
-                    <p className="amp-lbl">Тренировки за персонализирани групи могат да се добавят само в режим „Персонализирани групи“.</p>
+                    <p className="amp-lbl">Тренировки за персонализирани групи могат да се добавят в режим „Персонализирани групи“.</p>
+                  )}
+                  {schedule2CustomTrainingExists && (
+                    <p className="amp-lbl">Персонализираната група вече има тренировка за тази дата.</p>
                   )}
                   <button
                     type="button"

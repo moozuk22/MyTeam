@@ -981,6 +981,10 @@ export function createTrainingAttendanceActions({
 
   const loadDayDetailsSessionAttendance = async (session: TrainingWeekSessionItem, date: string) => {
     const schedule2Details = schedule2Open && trainingAttendanceOpen;
+    if (schedule2Details) {
+      await openTrainingDayDetails(date, session.id);
+      return;
+    }
     if (session.id.startsWith("coach-")) {
       setTrainingDayDetailsTabLoading(true);
       try {
@@ -993,7 +997,6 @@ export function createTrainingAttendanceActions({
           session.id.slice(43),
           false,
           false,
-          schedule2Details,
         );
       } finally {
         setTrainingDayDetailsTabLoading(false);
@@ -1008,7 +1011,7 @@ export function createTrainingAttendanceActions({
         const groupScope = tg !== undefined && Number.isInteger(tg) ? String(tg) : "all";
         setTrainingAttendanceView("teamGroup");
         setTrainingGroupScope(groupScope);
-        await fetchTrainingAttendance(date, groupScope, undefined, "teamGroup", month, undefined, true, false, schedule2Details);
+        await fetchTrainingAttendance(date, groupScope, undefined, "teamGroup", month, undefined, true);
       } else {
         const groupPrefix = `${date}-group-`;
         const customPrefix = `${date}-custom-`;
@@ -1021,7 +1024,7 @@ export function createTrainingAttendanceActions({
         if (groupId) {
           setTrainingAttendanceView("trainingGroups");
           setSelectedTrainingGroupId(groupId);
-          await fetchTrainingAttendance(date, undefined, groupId, "trainingGroups", month, undefined, true, schedule2Details && session.id.startsWith(customPrefix), schedule2Details);
+          await fetchTrainingAttendance(date, undefined, groupId, "trainingGroups", month, undefined, true);
         }
       }
     } finally {

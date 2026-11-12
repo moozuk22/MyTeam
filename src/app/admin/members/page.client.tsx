@@ -1230,6 +1230,9 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
   } = trainingAttendanceActions;
 
   const schedule2EventGroup = schedule2Groups.find((group) => group.id === schedule2EventTarget?.groupId);
+  const schedule2CustomTrainingExists = Boolean(schedule2EventTarget?.date && trainingWeekSessions.some(
+    (session) => session.id === `${schedule2EventTarget.date}-custom-${schedule2EventTarget.groupId}`,
+  ));
   const openScheduleEvent = (target?: { groupId: string; date?: string }) => {
     if (target && trainingDaysForm.trainingDaysEditorRequest.current !== null) return;
     setSchedule2EventTarget(target ?? null);
@@ -1613,6 +1616,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
         schedule2EventTarget={schedule2EventTarget}
         schedule2EventGroup={schedule2EventGroup}
         schedule2CanCreateTraining={trainingAttendanceState.schedule2CanCreateTraining}
+        schedule2CustomTrainingExists={schedule2CustomTrainingExists}
         openTrainingDaysEditor={openTrainingDaysEditor}
         matchEditorState={matchEditorState}
         trainingAttendanceState={trainingAttendanceState}

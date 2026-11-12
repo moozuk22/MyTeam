@@ -181,6 +181,8 @@ export function TrainingDayDetailsDialog({
     dayDetailsMatchOriginalResult,
   } = matchEditorState;
   const { customTrainingGroups, isCustomTrainingGroupMode } = trainingGroups;
+  const schedule2ActionPending = schedule2DayDetails &&
+    (limitedEventSaving || trainingDayCancelLoading || dayDetailsMatchSaving);
   return (
     <>
       {(trainingDayDetailsOpen || trainingDayDetailsOpening) && (
@@ -190,7 +192,8 @@ export function TrainingDayDetailsDialog({
             if (
               !trainingNoteSaving &&
               !trainingDayDetailsTabLoading &&
-              !trainingDayDetailsOpening
+              !trainingDayDetailsOpening &&
+              !schedule2ActionPending
             ) {
               setTrainingDayDetailsOpen(false);
               setTrainingAttendanceView(trainingDayDetailsViewSnapshot);
@@ -224,7 +227,8 @@ export function TrainingDayDetailsDialog({
                   trainingNoteSaving ||
                   trainingDayDetailsTabLoading ||
                   dayDetailsMatchSaving ||
-                  trainingDayDetailsOpening
+                   trainingDayDetailsOpening ||
+                   schedule2ActionPending
                 }
               >
                 <XIcon />
@@ -287,7 +291,7 @@ export function TrainingDayDetailsDialog({
                             }
                           }}
                           disabled={
-                            trainingDayDetailsTabLoading || trainingNoteSaving
+                            trainingDayDetailsTabLoading || trainingNoteSaving || schedule2ActionPending
                           }
                         >
                           <span className="amp-day-details-tab-type">
@@ -359,7 +363,7 @@ export function TrainingDayDetailsDialog({
                           setDayDetailsMatchError("");
                         }}
                         disabled={
-                          trainingDayDetailsTabLoading || trainingNoteSaving
+                          trainingDayDetailsTabLoading || trainingNoteSaving || schedule2ActionPending
                         }
                       >
                         <span className="amp-day-details-tab-type">

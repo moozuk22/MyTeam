@@ -191,6 +191,18 @@
   color: var(--green);
 }
 
+.event + .emptyCell {
+  margin-top: 0.25rem;
+}
+
+.skeletonTable tr {
+  height: 56px;
+}
+
+.fieldDay > span + span {
+  margin-top: 0.75rem;
+}
+
 .fieldDays {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
