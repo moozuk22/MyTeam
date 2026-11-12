@@ -25,7 +25,7 @@ import {
   parseTrainingFieldSelectionsByDate,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
-import { deleteFutureTrainingSessionsForScope, removeTrainingSessionsPreservingHistory, syncFutureTrainingSessions } from "@/lib/trainingSessions";
+import { deleteFutureTrainingSessionsForScope, removeFutureSchedule2Sessions, syncFutureTrainingSessions } from "@/lib/trainingSessions";
 import { parseCustomTrainingGroupColorFromBody } from "@/lib/customTrainingGroupColors";
 import { isCustomTrainingGroupColorTakenInScope } from "@/lib/customTrainingGroupColorScope";
 
@@ -157,14 +157,7 @@ export async function DELETE(
           scope: { type: "customGroup", id: groupId },
           todayIso,
         });
-        const occurrences = {
-          clubId, scopeKey: { startsWith: `custom_group:${groupId}:session:` },
-          trainingDate: { gte: new Date(`${todayIso}T00:00:00Z`) },
-        };
-        await tx.limitedTrainingEvent.deleteMany({ where: occurrences });
-        await removeTrainingSessionsPreservingHistory(tx, {
-          ...occurrences, status: "scheduled",
-        });
+        await removeFutureSchedule2Sessions(tx, clubId, groupId, todayIso);
       }
       return result;
     });

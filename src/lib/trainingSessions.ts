@@ -294,6 +294,21 @@ export async function deleteFutureTrainingSessionsForScope(input: {
   });
 }
 
+export async function removeFutureSchedule2Sessions(
+  tx: Pick<TrainingSessionWriter, "trainingSession" | "$queryRaw"> & Pick<typeof prisma, "limitedTrainingEvent">,
+  clubId: string,
+  groupId: string,
+  todayIso: string,
+) {
+  const occurrences = {
+    clubId, scopeKey: { startsWith: `custom_group:${groupId}:session:` },
+    trainingDate: { gte: isoDateToUtcMidnight(todayIso) },
+  };
+  // Registration locks the session before writing to the limited event.
+  await removeTrainingSessionsPreservingHistory(tx, { ...occurrences, status: "scheduled" });
+  await tx.limitedTrainingEvent.deleteMany({ where: occurrences });
+}
+
 export async function removeTrainingSessionsPreservingHistory(tx: Pick<TrainingSessionWriter, "trainingSession" | "$queryRaw">, where: Prisma.TrainingSessionWhereInput & { clubId: string; scopeKey: string | { startsWith: string } }) {
   // Match the check-in endpoint's session lock before deciding whether a
   // session is untouched. Otherwise a concurrent check-in could be cascaded away.

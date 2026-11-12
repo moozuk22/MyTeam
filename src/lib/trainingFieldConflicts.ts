@@ -36,6 +36,7 @@ interface ExistingSchedule {
   trainingDates: string[];
   trainingDateTimes: unknown;
   trainingDurationMinutes: number;
+  trainingDurationsByDate?: Record<string, number>;
   trainingFieldId: string | null;
   trainingFieldPieceIds: string[];
   trainingFieldSelections: unknown;
@@ -327,28 +328,41 @@ function getCancelledDatesForScope(cancelledSet: Set<string>, scopeKey: string, 
   return new Set(relevantDates.filter((date) => cancelledSet.has(`${scopeKey}|${date}`)));
 }
 
-async function loadIndividualSessionSchedules(clubId: string, relevantDates: string[], db: ScheduleReader): Promise<ExistingSchedule[]> {
+async function loadSessionSchedules(clubId: string, relevantDates: string[], db: ScheduleReader) {
   const [sessions, groups] = await Promise.all([
-    db.trainingSession.findMany({ where: { clubId, OR: [{ scopeType: "coachGroup" }, { scopeType: "customGroup", occurrenceKey: { not: "" } }], status: "scheduled", trainingDate: { in: relevantDates.map((d) => new Date(`${d}T00:00:00Z`)) } } }),
+    db.trainingSession.findMany({ where: {
+      clubId, OR: [{ scopeType: "coachGroup" }, { scopeType: "customGroup" }],
+      status: "scheduled", removedFromSchedule: false,
+      trainingDate: { in: relevantDates.map((date) => new Date(`${date}T00:00:00Z`)) },
+    } }),
     db.coachGroup.findMany({ where: { clubId }, select: { id: true, name: true } }),
   ]);
   const names = new Map(groups.map((g) => [g.id, g.name]));
-  return sessions.map((s) => {
+  const individualSchedules: ExistingSchedule[] = [];
+  const durationsByScope = new Map<string, Record<string, number>>();
+  for (const s of sessions) {
     const date = s.trainingDate.toISOString().slice(0, 10);
     const custom = s.scopeType === "customGroup";
-    return {
+    if (custom && s.occurrenceKey === "") {
+      const durations = durationsByScope.get(s.scopeKey) ?? {};
+      durations[date] = s.trainingDurationMinutes;
+      durationsByScope.set(s.scopeKey, durations);
+      continue;
+    }
+    individualSchedules.push({
       label: custom ? "персонализирана група" : `треньорска група ${names.get(s.scopeId ?? "") ?? ""}`,
       type: custom ? "customGroup" : "coachGroup",
       id: s.scopeId ?? undefined, sessionId: s.id, scopeKey: s.scopeKey, cancelledDates: new Set<string>(),
       trainingDates: [date], trainingDateTimes: { [date]: s.trainingTime },
       trainingDurationMinutes: s.trainingDurationMinutes, trainingFieldId: s.trainingFieldId,
       trainingFieldPieceIds: s.trainingFieldPieceIds, trainingFieldSelections: null,
-    };
-  });
+    });
+  }
+  return { individualSchedules, durationsByScope };
 }
 
 async function loadSchedules(clubId: string, relevantDates: string[], db: ScheduleReader): Promise<ExistingSchedule[]> {
-  const [club, teamSchedules, trainingGroups, customGroups, coachGroups, cancelledSet] = await Promise.all([
+  const [club, teamSchedules, trainingGroups, customGroups, sessionSchedules, cancelledSet] = await Promise.all([
     db.club.findUnique({
       where: { id: clubId },
       select: {
@@ -411,7 +425,7 @@ async function loadSchedules(clubId: string, relevantDates: string[], db: Schedu
         trainingFieldSelections: true,
       },
     }),
-    loadIndividualSessionSchedules(clubId, relevantDates, db),
+    loadSessionSchedules(clubId, relevantDates, db),
     loadCancelledSessionSet(clubId, relevantDates, db),
   ]);
 
@@ -479,19 +493,20 @@ async function loadSchedules(clubId: string, relevantDates: string[], db: Schedu
       trainingDates: configuredDates,
       trainingDateTimes: Object.fromEntries(relevantDates.map((date) => [date, times[date] ?? group.trainingTime])),
       trainingDurationMinutes: group.trainingDurationMinutes,
+      trainingDurationsByDate: sessionSchedules.durationsByScope.get(`custom_group:${group.id}`),
       trainingFieldId: group.trainingFieldId,
       trainingFieldPieceIds: group.trainingFieldPieceIds,
       trainingFieldSelections: group.trainingFieldSelections,
     });
   }
 
-  schedules.push(...coachGroups);
+  schedules.push(...sessionSchedules.individualSchedules);
 
   return schedules;
 }
 
 async function loadAllSchedules(clubId: string, relevantDates: string[], db: ScheduleReader): Promise<ExistingSchedule[]> {
-  const [club, teamSchedules, trainingGroups, customGroups, coachGroups, cancelledSet] = await Promise.all([
+  const [club, teamSchedules, trainingGroups, customGroups, sessionSchedules, cancelledSet] = await Promise.all([
     db.club.findUnique({
       where: { id: clubId },
       select: {
@@ -543,7 +558,7 @@ async function loadAllSchedules(clubId: string, relevantDates: string[], db: Sch
         trainingFieldSelections: true,
       },
     }),
-    loadIndividualSessionSchedules(clubId, relevantDates, db),
+    loadSessionSchedules(clubId, relevantDates, db),
     loadCancelledSessionSet(clubId, relevantDates, db),
   ]);
 
@@ -611,13 +626,14 @@ async function loadAllSchedules(clubId: string, relevantDates: string[], db: Sch
       trainingDates: configuredDates,
       trainingDateTimes: Object.fromEntries(relevantDates.map((date) => [date, times[date] ?? group.trainingTime])),
       trainingDurationMinutes: group.trainingDurationMinutes,
+      trainingDurationsByDate: sessionSchedules.durationsByScope.get(`custom_group:${group.id}`),
       trainingFieldId: group.trainingFieldId,
       trainingFieldPieceIds: group.trainingFieldPieceIds,
       trainingFieldSelections: group.trainingFieldSelections,
     });
   }
 
-  schedules.push(...coachGroups);
+  schedules.push(...sessionSchedules.individualSchedules);
 
   return schedules;
 }
@@ -661,11 +677,12 @@ export async function assertNoTrainingFieldConflict(input: TrainingFieldConflict
       if (nextStart === null || existingStart === null) {
         continue;
       }
-      if (overlaps(nextStart, input.trainingDurationsByDate?.[date] ?? input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
+      const existingDuration = schedule.trainingDurationsByDate?.[date] ?? schedule.trainingDurationMinutes;
+      if (overlaps(nextStart, input.trainingDurationsByDate?.[date] ?? input.trainingDurationMinutes, existingStart, existingDuration)) {
         throw new Error(formatConflictMessage({
           date,
           startMinutes: existingStart,
-          durationMinutes: schedule.trainingDurationMinutes,
+          durationMinutes: existingDuration,
           label: schedule.label,
         }));
       }
@@ -707,11 +724,12 @@ export async function assertNoTrainingTimeConflict(input: {
       const nextStart = parseTimeToMinutes(input.trainingDateTimes[date] ?? "");
       const existingStart = parseTimeToMinutes(scheduleDateTimes[date] ?? "");
       if (nextStart === null || existingStart === null) continue;
-      if (overlaps(nextStart, input.trainingDurationsByDate?.[date] ?? input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
+      const existingDuration = schedule.trainingDurationsByDate?.[date] ?? schedule.trainingDurationMinutes;
+      if (overlaps(nextStart, input.trainingDurationsByDate?.[date] ?? input.trainingDurationMinutes, existingStart, existingDuration)) {
         throw new Error(formatTimeConflictMessage({
           date,
           startMinutes: existingStart,
-          durationMinutes: schedule.trainingDurationMinutes,
+          durationMinutes: existingDuration,
           label: schedule.label,
         }));
       }
@@ -757,7 +775,8 @@ export async function getOccupiedFieldResources(input: OccupiedResourcesInput): 
       if (nextStart === null || existingStart === null) {
         continue;
       }
-      if (overlaps(nextStart, input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
+      const existingDuration = schedule.trainingDurationsByDate?.[date] ?? schedule.trainingDurationMinutes;
+      if (overlaps(nextStart, input.trainingDurationMinutes, existingStart, existingDuration)) {
         const key = `${date}:${scheduleSelection.trainingFieldId}:${[...scheduleSelection.trainingFieldPieceIds].sort().join(",")}:${schedule.label}`;
         if (!seen.has(key)) {
           seen.add(key);

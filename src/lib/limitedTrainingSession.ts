@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { isEligibleForMembership } from "@/lib/attendanceEligibility";
 import { trainingRequiresCheckIn } from "@/lib/trainingAttendanceDefaults";
 
 export type LimitedSessionWriter = Pick<typeof prisma, "$queryRaw" | "trainingSession" | "trainingSessionPlayer" | "club" | "player">;
@@ -26,17 +27,30 @@ export async function setLimitedSessionAttendance(clubId: string, scopeKey: stri
       id: trainingSessionId, clubId,
       ...(customOccurrence ? { scopeKey, status: "scheduled", removedFromSchedule: false } : {}),
     },
-    select: { rosterLockedAt: true, players: { where: { playerId: { in: playerIds } }, select: { playerId: true } } },
+    select: {
+      scopeId: true, trainingDate: true, trainingTime: true, rosterLockedAt: true,
+      players: { where: { playerId: { in: playerIds } }, select: { playerId: true } },
+    },
   });
   if (!session) return true;
   const allowedPlayerIds = session.rosterLockedAt ? session.players.flatMap((row) => row.playerId ? [row.playerId] : []) : playerIds;
   if (allowedPlayerIds.length === 0) return true;
   const club = await tx.club.findUniqueOrThrow({ where: { id: clubId }, select: { paymentWorkflow: true } });
   const requiresCheckIn = trainingRequiresCheckIn(club.paymentWorkflow);
-  const players = await tx.player.findMany({ where: { clubId, id: { in: allowedPlayerIds }, isActive: true }, select: { id: true, fullName: true, teamGroup: true } });
-  if (!session.rosterLockedAt) await tx.trainingSessionPlayer.createMany({ data: players.map((p) => ({ trainingSessionId, playerId: p.id, playerName: p.fullName, teamGroup: p.teamGroup, present: !requiresCheckIn })), skipDuplicates: true });
+  const players = await tx.player.findMany({
+    where: {
+      clubId, id: { in: allowedPlayerIds }, isActive: true,
+      ...(customOccurrence && !session.rosterLockedAt ? { customTrainingGroups: { some: { groupId: session.scopeId! } } } : {}),
+    },
+    select: { id: true, fullName: true, teamGroup: true, createdAt: true, attendanceStartedAt: true, attendanceMemberships: true },
+  });
+  const eligible = customOccurrence && !session.rosterLockedAt
+    ? players.filter((player) => isEligibleForMembership(player, session.trainingDate.toISOString().slice(0, 10), session.trainingTime, scopeKey))
+    : players;
+  if (!session.rosterLockedAt && eligible.length) await tx.trainingSessionPlayer.createMany({ data: eligible.map((p) => ({ trainingSessionId, playerId: p.id, playerName: p.fullName, teamGroup: p.teamGroup, present: !requiresCheckIn })), skipDuplicates: true });
   // Reservation changes must not record or reverse credit-based attendance.
   if (requiresCheckIn) return true;
-  await tx.trainingSessionPlayer.updateMany({ where: { trainingSessionId, playerId: { in: allowedPlayerIds }, trainingSession: { clubId } }, data: { present, reasonCode: present ? null : "limited_event", reasonText: null } });
+  const attendancePlayerIds = customOccurrence && !session.rosterLockedAt ? eligible.map(({ id }) => id) : allowedPlayerIds;
+  if (attendancePlayerIds.length) await tx.trainingSessionPlayer.updateMany({ where: { trainingSessionId, playerId: { in: attendancePlayerIds }, trainingSession: { clubId } }, data: { present, reasonCode: present ? null : "limited_event", reasonText: null } });
   return true;
 }

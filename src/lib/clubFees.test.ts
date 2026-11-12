@@ -5,6 +5,9 @@ const tx = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
   club: { findUniqueOrThrow: vi.fn(), update: vi.fn() },
   coachGroup: { findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  clubCustomTrainingGroup: { findMany: vi.fn() },
+  limitedTrainingEvent: { deleteMany: vi.fn() },
+  trainingSession: { updateMany: vi.fn(), deleteMany: vi.fn() },
   player: { findMany: vi.fn(), update: vi.fn() },
 }));
 vi.mock("@/lib/db", () => ({ prisma: { $transaction: (callback: (client: typeof tx) => unknown) => callback(tx) } }));
@@ -16,6 +19,7 @@ beforeEach(() => {
   tx.$queryRaw.mockResolvedValue([{ id: "club" }]);
   tx.club.findUniqueOrThrow.mockResolvedValue({ defaultPaymentAmount: decimal("85.00") });
   tx.coachGroup.findMany.mockResolvedValue(groups);
+  tx.clubCustomTrainingGroup.findMany.mockResolvedValue([]);
   tx.player.findMany.mockResolvedValue([player()]);
 });
 it("changes the club default without writing to personal fees", async () => {
@@ -70,4 +74,17 @@ it("returns the saved revision so another assignment can be saved without reopen
   expect(saved.revision).not.toBe(initial.revision);
   tx.player.findMany.mockResolvedValue([player({ billingCoachGroupId: "a" })]);
   await expect(updateClubFees("club", { expectedRevision: saved.revision, assignments: { p: ["a"] } })).resolves.toBeDefined();
+});
+
+it("cleans up linked Schedule 2 occurrences before deleting their coach group", async () => {
+  tx.clubCustomTrainingGroup.findMany.mockResolvedValue([{ id: "custom" }]);
+  await updateClubFees("club", { deleteGroupId: "a" });
+  expect(tx.clubCustomTrainingGroup.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { clubId: "club", coachGroupId: "a" } }));
+  const scope = { clubId: "club", scopeKey: { startsWith: "custom_group:custom:session:" }, trainingDate: { gte: expect.any(Date) } };
+  expect(tx.trainingSession.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+    where: expect.objectContaining(scope), data: { status: "cancelled", removedFromSchedule: true },
+  }));
+  expect(tx.limitedTrainingEvent.deleteMany).toHaveBeenCalledWith({ where: scope });
+  expect(tx.$queryRaw.mock.invocationCallOrder[1]).toBeLessThan(tx.limitedTrainingEvent.deleteMany.mock.invocationCallOrder[0]);
+  expect(tx.limitedTrainingEvent.deleteMany.mock.invocationCallOrder[0]).toBeLessThan(tx.coachGroup.delete.mock.invocationCallOrder[0]);
 });
