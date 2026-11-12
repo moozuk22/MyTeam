@@ -23,7 +23,7 @@ type ScheduleEventDialogProps = {
   schedule2EventGroup: Schedule2Group | undefined;
   schedule2CanCreateTraining: boolean;
   openTrainingDaysEditor: (
-    mode: "customGroup" | "coachGroup", editDate: undefined, coachTarget: { groupId: string } | undefined,
+    mode: "customGroup", editDate: undefined, coachTarget: undefined,
     customTarget: { group: Schedule2Group; date?: string },
   ) => Promise<void>;
   matchEditorState: Pick<
@@ -106,7 +106,6 @@ export function ScheduleEventDialog({
   } = matchEditorState;
   const { trainingAttendanceView } = trainingAttendanceState;
   const { isCustomTrainingGroupMode } = trainingGroups;
-  const schedule2CoachGroupId = schedule2EventGroup?.coachGroupId;
   const customTrainingUnavailable = Boolean(schedule2EventTarget &&
     (!schedule2EventGroup || !schedule2CanCreateTraining));
   return (
@@ -149,22 +148,6 @@ export function ScheduleEventDialog({
             <div className="amp-modal-body">
               {scheduleEventStep === "type" ? (
                 <div className={schedule2EventTarget ? "amp-schedule-event-type-picker amp-schedule-event-type-picker--schedule2" : "amp-schedule-event-type-picker"}>
-                  {schedule2EventGroup && schedule2CoachGroupId && (
-                    <button
-                      type="button"
-                      className="amp-btn amp-schedule-event-type-btn"
-                      onClick={() => {
-                        setScheduleEventModalOpen(false);
-                        void openTrainingDaysEditor("coachGroup", undefined, { groupId: schedule2CoachGroupId }, {
-                          group: schedule2EventGroup,
-                          date: schedule2EventTarget?.date,
-                        });
-                      }}
-                    >
-                      <span className="amp-schedule-event-type-icon amp-schedule-event-type-icon--training" aria-hidden="true" />
-                      Тренировка за треньорската група
-                    </button>
-                  )}
                   <button
                     type="button"
                     className="amp-btn amp-schedule-event-type-btn"
@@ -186,7 +169,7 @@ export function ScheduleEventDialog({
                       className="amp-schedule-event-type-icon amp-schedule-event-type-icon--training"
                       aria-hidden="true"
                     />
-                    {schedule2CoachGroupId ? "Тренировка за персонализираната група" : "Тренировка"}
+                    Тренировка
                   </button>
                   {schedule2EventTarget && !schedule2CanCreateTraining && (
                     <p className="amp-lbl">Тренировки за персонализирани групи могат да се добавят в режим „Персонализирани групи“.</p>
@@ -219,7 +202,7 @@ export function ScheduleEventDialog({
                       className="amp-schedule-event-type-icon amp-schedule-event-type-icon--match"
                       aria-hidden="true"
                     />
-                    {schedule2EventTarget ? "Мач / състезание" : "Мач / Двубой / Състезание / Участие"}
+                    Мач / Двубой / Състезание / Участие
                   </button>
                 </div>
               ) : scheduleEventStep === "match-type" ? (
