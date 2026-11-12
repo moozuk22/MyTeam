@@ -1,10 +1,14 @@
 import { prisma } from "@/lib/db";
+import { getConfiguredTrainingDates } from "@/lib/training";
+
+type ScheduleReader = Pick<typeof prisma, "club" | "clubTrainingGroupSchedule" | "clubTrainingScheduleGroup" | "clubCustomTrainingGroup" | "trainingSession" | "coachGroup">;
 
 interface TrainingFieldConflictInput {
   clubId: string;
   trainingDates: string[];
   trainingDateTimes: Record<string, string>;
   trainingDurationMinutes: number;
+  trainingDurationsByDate?: Record<string, number>;
   trainingFieldId: string | null;
   trainingFieldPieceIds: string[];
   trainingFieldSelections?: Record<string, { trainingFieldId: string | null; trainingFieldPieceIds: string[] }>;
@@ -229,7 +233,7 @@ function isSameExcludedSchedule(
   if (exclude.type === "club") {
     return true;
   }
-  return Boolean(exclude.id && schedule.id === exclude.id);
+  return Boolean(exclude.id && schedule.id === exclude.id && (exclude.type !== "customGroup" || !schedule.sessionId));
 }
 
 function isExcludedTeamGroupSchedule(
@@ -306,9 +310,9 @@ function formatTimeConflictMessage(input: {
   return `На ${formatIsoDateForBgDisplay(input.date)} вече има тренировка от ${startTime} до ${endTime} за ${input.label}.`;
 }
 
-async function loadCancelledSessionSet(clubId: string, relevantDates: string[]) {
+async function loadCancelledSessionSet(clubId: string, relevantDates: string[], db: ScheduleReader) {
   if (relevantDates.length === 0) return new Set<string>();
-  const rows = await prisma.trainingSession.findMany({
+  const rows = await db.trainingSession.findMany({
     where: {
       clubId,
       status: "cancelled",
@@ -323,21 +327,29 @@ function getCancelledDatesForScope(cancelledSet: Set<string>, scopeKey: string, 
   return new Set(relevantDates.filter((date) => cancelledSet.has(`${scopeKey}|${date}`)));
 }
 
-async function loadCoachSessionSchedules(clubId: string, relevantDates: string[]): Promise<ExistingSchedule[]> {
+async function loadIndividualSessionSchedules(clubId: string, relevantDates: string[], db: ScheduleReader): Promise<ExistingSchedule[]> {
   const [sessions, groups] = await Promise.all([
-    prisma.trainingSession.findMany({ where: { clubId, scopeType: "coachGroup", status: "scheduled", trainingDate: { in: relevantDates.map((d) => new Date(`${d}T00:00:00Z`)) } } }),
-    prisma.coachGroup.findMany({ where: { clubId }, select: { id: true, name: true } }),
+    db.trainingSession.findMany({ where: { clubId, OR: [{ scopeType: "coachGroup" }, { scopeType: "customGroup", occurrenceKey: { not: "" } }], status: "scheduled", trainingDate: { in: relevantDates.map((d) => new Date(`${d}T00:00:00Z`)) } } }),
+    db.coachGroup.findMany({ where: { clubId }, select: { id: true, name: true } }),
   ]);
   const names = new Map(groups.map((g) => [g.id, g.name]));
   return sessions.map((s) => {
     const date = s.trainingDate.toISOString().slice(0, 10);
-    return { label: `треньорска група ${names.get(s.scopeId ?? "") ?? ""}`, type: "coachGroup", id: s.scopeId ?? undefined, sessionId: s.id, scopeKey: s.scopeKey, cancelledDates: new Set<string>(), trainingDates: [date], trainingDateTimes: { [date]: s.trainingTime }, trainingDurationMinutes: s.trainingDurationMinutes, trainingFieldId: s.trainingFieldId, trainingFieldPieceIds: s.trainingFieldPieceIds, trainingFieldSelections: null };
+    const custom = s.scopeType === "customGroup";
+    return {
+      label: custom ? "персонализирана група" : `треньорска група ${names.get(s.scopeId ?? "") ?? ""}`,
+      type: custom ? "customGroup" : "coachGroup",
+      id: s.scopeId ?? undefined, sessionId: s.id, scopeKey: s.scopeKey, cancelledDates: new Set<string>(),
+      trainingDates: [date], trainingDateTimes: { [date]: s.trainingTime },
+      trainingDurationMinutes: s.trainingDurationMinutes, trainingFieldId: s.trainingFieldId,
+      trainingFieldPieceIds: s.trainingFieldPieceIds, trainingFieldSelections: null,
+    };
   });
 }
 
-async function loadSchedules(clubId: string, relevantDates: string[]): Promise<ExistingSchedule[]> {
+async function loadSchedules(clubId: string, relevantDates: string[], db: ScheduleReader): Promise<ExistingSchedule[]> {
   const [club, teamSchedules, trainingGroups, customGroups, coachGroups, cancelledSet] = await Promise.all([
-    prisma.club.findUnique({
+    db.club.findUnique({
       where: { id: clubId },
       select: {
         trainingDates: true,
@@ -348,7 +360,7 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
         trainingFieldSelections: true,
       },
     }),
-    prisma.clubTrainingGroupSchedule.findMany({
+    db.clubTrainingGroupSchedule.findMany({
       where: {
         clubId,
         trainingDates: { hasSome: relevantDates },
@@ -364,7 +376,7 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
         trainingFieldSelections: true,
       },
     }),
-    prisma.clubTrainingScheduleGroup.findMany({
+    db.clubTrainingScheduleGroup.findMany({
       where: {
         clubId,
         trainingDates: { hasSome: relevantDates },
@@ -382,15 +394,15 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
         trainingFieldSelections: true,
       },
     }),
-    prisma.clubCustomTrainingGroup.findMany({
+    db.clubCustomTrainingGroup.findMany({
       where: {
         clubId,
-        trainingDates: { hasSome: relevantDates },
-        trainingFieldId: { not: null },
+        OR: [{ trainingDates: { hasSome: relevantDates } }, { trainingDates: { isEmpty: true }, trainingWeekdays: { isEmpty: false } }],
       },
       select: {
         id: true,
         name: true,
+        trainingWeekdays: true, trainingWindowDays: true, trainingTime: true,
         trainingDates: true,
         trainingDateTimes: true,
         trainingDurationMinutes: true,
@@ -399,8 +411,8 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
         trainingFieldSelections: true,
       },
     }),
-    loadCoachSessionSchedules(clubId, relevantDates),
-    loadCancelledSessionSet(clubId, relevantDates),
+    loadIndividualSessionSchedules(clubId, relevantDates, db),
+    loadCancelledSessionSet(clubId, relevantDates, db),
   ]);
 
   const schedules: ExistingSchedule[] = [];
@@ -454,14 +466,18 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
   }
 
   for (const group of customGroups) {
+    const configuredDates = group.trainingDates.length ? group.trainingDates : getConfiguredTrainingDates({
+      weekdays: group.trainingWeekdays, windowDays: group.trainingWindowDays, timeZone: "Europe/Sofia",
+    });
+    const times = normalizeStoredDateTimes(group.trainingDateTimes);
     schedules.push({
       label: `персонализирана група ${group.name}`,
       type: "customGroup",
       id: group.id,
       scopeKey: `custom_group:${group.id}`,
       cancelledDates: getCancelledDatesForScope(cancelledSet, `custom_group:${group.id}`, relevantDates),
-      trainingDates: group.trainingDates,
-      trainingDateTimes: group.trainingDateTimes,
+      trainingDates: configuredDates,
+      trainingDateTimes: Object.fromEntries(relevantDates.map((date) => [date, times[date] ?? group.trainingTime])),
       trainingDurationMinutes: group.trainingDurationMinutes,
       trainingFieldId: group.trainingFieldId,
       trainingFieldPieceIds: group.trainingFieldPieceIds,
@@ -474,9 +490,9 @@ async function loadSchedules(clubId: string, relevantDates: string[]): Promise<E
   return schedules;
 }
 
-async function loadAllSchedules(clubId: string, relevantDates: string[]): Promise<ExistingSchedule[]> {
+async function loadAllSchedules(clubId: string, relevantDates: string[], db: ScheduleReader): Promise<ExistingSchedule[]> {
   const [club, teamSchedules, trainingGroups, customGroups, coachGroups, cancelledSet] = await Promise.all([
-    prisma.club.findUnique({
+    db.club.findUnique({
       where: { id: clubId },
       select: {
         trainingDates: true,
@@ -487,7 +503,7 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
         trainingFieldSelections: true,
       },
     }),
-    prisma.clubTrainingGroupSchedule.findMany({
+    db.clubTrainingGroupSchedule.findMany({
       where: { clubId, trainingDates: { hasSome: relevantDates } },
       select: {
         teamGroup: true,
@@ -499,7 +515,7 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
         trainingFieldSelections: true,
       },
     }),
-    prisma.clubTrainingScheduleGroup.findMany({
+    db.clubTrainingScheduleGroup.findMany({
       where: { clubId, trainingDates: { hasSome: relevantDates } },
       select: {
         id: true,
@@ -513,11 +529,12 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
         trainingFieldSelections: true,
       },
     }),
-    prisma.clubCustomTrainingGroup.findMany({
-      where: { clubId, trainingDates: { hasSome: relevantDates } },
+    db.clubCustomTrainingGroup.findMany({
+      where: { clubId, OR: [{ trainingDates: { hasSome: relevantDates } }, { trainingDates: { isEmpty: true }, trainingWeekdays: { isEmpty: false } }] },
       select: {
         id: true,
         name: true,
+        trainingWeekdays: true, trainingWindowDays: true, trainingTime: true,
         trainingDates: true,
         trainingDateTimes: true,
         trainingDurationMinutes: true,
@@ -526,8 +543,8 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
         trainingFieldSelections: true,
       },
     }),
-    loadCoachSessionSchedules(clubId, relevantDates),
-    loadCancelledSessionSet(clubId, relevantDates),
+    loadIndividualSessionSchedules(clubId, relevantDates, db),
+    loadCancelledSessionSet(clubId, relevantDates, db),
   ]);
 
   const schedules: ExistingSchedule[] = [];
@@ -581,14 +598,18 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
   }
 
   for (const group of customGroups) {
+    const configuredDates = group.trainingDates.length ? group.trainingDates : getConfiguredTrainingDates({
+      weekdays: group.trainingWeekdays, windowDays: group.trainingWindowDays, timeZone: "Europe/Sofia",
+    });
+    const times = normalizeStoredDateTimes(group.trainingDateTimes);
     schedules.push({
       label: `персонализирана група ${group.name}`,
       type: "customGroup",
       id: group.id,
       scopeKey: `custom_group:${group.id}`,
       cancelledDates: getCancelledDatesForScope(cancelledSet, `custom_group:${group.id}`, relevantDates),
-      trainingDates: group.trainingDates,
-      trainingDateTimes: group.trainingDateTimes,
+      trainingDates: configuredDates,
+      trainingDateTimes: Object.fromEntries(relevantDates.map((date) => [date, times[date] ?? group.trainingTime])),
       trainingDurationMinutes: group.trainingDurationMinutes,
       trainingFieldId: group.trainingFieldId,
       trainingFieldPieceIds: group.trainingFieldPieceIds,
@@ -601,7 +622,7 @@ async function loadAllSchedules(clubId: string, relevantDates: string[]): Promis
   return schedules;
 }
 
-export async function assertNoTrainingFieldConflict(input: TrainingFieldConflictInput): Promise<void> {
+export async function assertNoTrainingFieldConflict(input: TrainingFieldConflictInput, db: ScheduleReader = prisma): Promise<void> {
   const hasAnySelectedField = input.trainingFieldId || Object.values(input.trainingFieldSelections ?? {}).some(
     (selection) => selection.trainingFieldId,
   );
@@ -610,7 +631,7 @@ export async function assertNoTrainingFieldConflict(input: TrainingFieldConflict
   }
 
   const relevantDates = Array.from(new Set(input.trainingDates));
-  const schedules = await loadSchedules(input.clubId, relevantDates);
+  const schedules = await loadSchedules(input.clubId, relevantDates, db);
   const excludedTeamGroups = new Set(input.excludeTeamGroups ?? []);
 
   for (const schedule of schedules) {
@@ -640,7 +661,7 @@ export async function assertNoTrainingFieldConflict(input: TrainingFieldConflict
       if (nextStart === null || existingStart === null) {
         continue;
       }
-      if (overlaps(nextStart, input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
+      if (overlaps(nextStart, input.trainingDurationsByDate?.[date] ?? input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
         throw new Error(formatConflictMessage({
           date,
           startMinutes: existingStart,
@@ -660,11 +681,12 @@ export async function assertNoTrainingTimeConflict(input: {
   exclude?: TrainingFieldConflictInput["exclude"];
   excludeTeamGroups?: number[];
   ignoreFieldResourceSchedules?: boolean;
-}): Promise<void> {
+  trainingDurationsByDate?: Record<string, number>;
+}, db: ScheduleReader = prisma): Promise<void> {
   if (input.trainingDates.length === 0) return;
 
   const relevantDates = Array.from(new Set(input.trainingDates));
-  const schedules = await loadAllSchedules(input.clubId, relevantDates);
+  const schedules = await loadAllSchedules(input.clubId, relevantDates, db);
   const excludedTeamGroups = new Set(input.excludeTeamGroups ?? []);
 
   for (const schedule of schedules) {
@@ -685,7 +707,7 @@ export async function assertNoTrainingTimeConflict(input: {
       const nextStart = parseTimeToMinutes(input.trainingDateTimes[date] ?? "");
       const existingStart = parseTimeToMinutes(scheduleDateTimes[date] ?? "");
       if (nextStart === null || existingStart === null) continue;
-      if (overlaps(nextStart, input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
+      if (overlaps(nextStart, input.trainingDurationsByDate?.[date] ?? input.trainingDurationMinutes, existingStart, schedule.trainingDurationMinutes)) {
         throw new Error(formatTimeConflictMessage({
           date,
           startMinutes: existingStart,
@@ -703,7 +725,7 @@ export async function getOccupiedFieldResources(input: OccupiedResourcesInput): 
   }
 
   const relevantDates = Array.from(new Set(input.trainingDates));
-  const schedules = await loadSchedules(input.clubId, relevantDates);
+  const schedules = await loadSchedules(input.clubId, relevantDates, prisma);
   const excludedTeamGroups = new Set(input.excludeTeamGroups ?? []);
 
   const seen = new Set<string>();

@@ -1,9 +1,23 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { saveMemberNotificationHistory } from "@/lib/push/history";
 import { sendPushToMember } from "@/lib/push/service";
 import type { CoachTraining } from "@/lib/coachTrainingSchedule";
 
 export async function notifyCoachTrainingChanges(clubId: string, groupId: string, previous: CoachTraining[], next: CoachTraining[]) {
+  await notifyTrainingChanges(clubId, { coachGroups: { some: { id: groupId } } }, previous, next);
+}
+
+export async function notifySchedule2CustomTrainingChanges(clubId: string, groupId: string, previous: CoachTraining[], next: CoachTraining[]) {
+  await notifyTrainingChanges(clubId, { customTrainingGroups: { some: { groupId } } }, previous, next);
+}
+
+async function notifyTrainingChanges(
+  clubId: string,
+  roster: Pick<Prisma.PlayerWhereInput, "coachGroups" | "customTrainingGroups">,
+  previous: CoachTraining[],
+  next: CoachTraining[],
+) {
   const before = new Map(previous.map((t) => [t.id, t]));
   const after = new Map(next.map((t) => [t.id, t]));
   const changed = [...new Set([...before.keys(), ...after.keys()])].filter((id) => {
@@ -12,7 +26,7 @@ export async function notifyCoachTrainingChanges(clubId: string, groupId: string
   });
   if (!changed.length) return;
   const [members, fields] = await Promise.all([
-    prisma.player.findMany({ where: { clubId, isActive: true, coachGroups: { some: { id: groupId } } }, select: { id: true, cards: { where: { isActive: true }, take: 1, select: { cardCode: true } } } }),
+    prisma.player.findMany({ where: { clubId, isActive: true, ...roster }, select: { id: true, cards: { where: { isActive: true }, take: 1, select: { cardCode: true } } } }),
     prisma.field.findMany({ where: { clubId }, select: { id: true, name: true, pieces: { select: { id: true, name: true } } } }),
   ]);
   for (const id of changed) {

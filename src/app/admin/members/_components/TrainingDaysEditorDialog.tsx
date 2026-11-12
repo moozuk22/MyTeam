@@ -363,7 +363,7 @@ export function TrainingDaysEditorDialog({
                         type="button"
                         className={`amp-training-step${effectiveTrainingDaysActiveStep === "days" ? " is-active" : " is-complete"}`}
                         onClick={() => setTrainingDaysActiveStep("days")}
-                        disabled={trainingDaysEditorSaving}
+                        disabled={trainingDaysEditorSaving || Boolean(schedule2TrainingGroup && trainingDaysEditorMode === "customGroup" && trainingDaysSingleEditDate)}
                       >
                         <span className="amp-training-step-index">1</span>
                         {trainingDaysStartedFromScheduleCell ? "Още дати" : "Дни"}

@@ -1,4 +1,4 @@
-import { getScopeKeyFromSessionId } from "../_utils/training-session-scope";
+import { getScopeKeyFromSessionId, parseSchedule2CustomSession, schedule2CustomSessionsUrl, type Schedule2TrainingTarget } from "../_utils/training-session-scope";
 import type * as React from "react";
 import { mergeTrainingCalendarDates } from "@/lib/trainingCalendarDates";
 import { getNewTrainingEditorMode } from "@/lib/coachTrainingWizard";
@@ -22,7 +22,7 @@ import { type TrainingGroups } from "../_hooks/useTrainingGroups";
 import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceState";
 import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
-import type { Schedule2Group, Schedule2Session } from "../_components/Schedule2";
+import type { Schedule2Session } from "../_components/Schedule2";
 
 type Options = {
   canUseSchedule2?: boolean;
@@ -83,6 +83,10 @@ type Options = {
     | "trainingDayCancelLoading"
     | "setTrainingDayCancelLoading"
     | "trainingAttendanceSessionId"
+    | "trainingDayTime"
+    | "trainingDayDurationMinutes"
+    | "trainingDayField"
+    | "trainingDayFieldPieceIds"
   >;
   trainingGroups: Pick<
     TrainingGroups,
@@ -114,7 +118,7 @@ type Options = {
     mode?: "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup",
     editDate?: string,
     coachTarget?: { groupId: string; sessionId?: string },
-    customTarget?: { group: Schedule2Group; date?: string },
+    customTarget?: Schedule2TrainingTarget,
   ) => Promise<void>;
   trainingUpcomingByDate: Map<string, TrainingUpcomingDateItem>;
 };
@@ -774,9 +778,23 @@ export function createTrainingAttendanceActions({
   };
 
   const openSingleTrainingDayEditForCurrentScope = async (date: string) => {
-    const targetGroup = schedule2Open && schedule2Groups.find(({ id }) => trainingDayDetailsTab === date + "-custom-" + id);
-    if (targetGroup) {
-      await openTrainingDaysEditor("customGroup", date, undefined, { group: targetGroup });
+    const custom = schedule2Open && parseSchedule2CustomSession(trainingDayDetailsTab);
+    if (custom) {
+      const group = schedule2Groups.find(({ id }) => id === custom.groupId);
+      if (!group) {
+        setSchedule2Error("Групата вече не е в графика.");
+        return;
+      }
+      await openTrainingDaysEditor("customGroup", date, undefined, {
+        group,
+        edit: {
+          sessionId: custom.sessionId,
+          time: trainingAttendanceState.trainingDayTime,
+          duration: trainingAttendanceState.trainingDayDurationMinutes,
+          fieldId: trainingAttendanceState.trainingDayField?.id ?? null,
+          fieldPieceIds: trainingAttendanceState.trainingDayFieldPieceIds,
+        },
+      });
       return;
     }
     if (trainingDayDetailsTab.startsWith("coach-")) {
@@ -916,6 +934,10 @@ export function createTrainingAttendanceActions({
         ? `coach-${coachGroupId}-${calendarSession.id}`
         : (firstSession?.id ?? "training"));
     setTrainingDayDetailsTab(firstSessionId);
+    if (schedule2Details) {
+      setTrainingAttendanceSessionId(null);
+      setTrainingDayCancelConfirmOpen(false);
+    }
     setLimitedEvent(null);
     setShowLimitedForm(false);
     setLimitedEventError("");
@@ -931,6 +953,7 @@ export function createTrainingAttendanceActions({
     let _viewOverride: "teamGroup" | "trainingGroups" | undefined;
     let _groupScopeOverride: string | undefined;
     let _trainingGroupIdOverride: string | undefined;
+    const custom = schedule2Details ? parseSchedule2CustomSession(firstSessionId) : null;
     let schedule2CustomScope = false;
     if (sessionId && !sessionId.startsWith("match-")) {
       const customM = sessionId.match(/^\d{4}-\d{2}-\d{2}-custom-(.+)$/);
@@ -964,7 +987,7 @@ export function createTrainingAttendanceActions({
           _trainingGroupIdOverride,
           _viewOverride,
           month,
-          firstSessionId.startsWith("coach-") ? firstSessionId.slice(43) : undefined,
+          custom?.sessionId ?? (firstSessionId.startsWith("coach-") ? firstSessionId.slice(43) : undefined),
           !firstSessionId.startsWith("coach-"),
           schedule2CustomScope,
           schedule2Details,
@@ -1035,15 +1058,34 @@ export function createTrainingAttendanceActions({
   const handleDeleteTrainingDay = async () => {
     if (!clubId || !trainingAttendanceDate || trainingDayCancelLoading) return;
     setTrainingDayCancelConfirmOpen(false);
+    const schedule2 = schedule2Open && trainingAttendanceOpen;
+    const selected = schedule2 ? trainingWeekSessions.find((session) =>
+      session.id === trainingDayDetailsTab && session.date === trainingAttendanceDate && session.eventType === "training",
+    ) : undefined;
+    if (schedule2 && !selected) {
+      setTrainingAttendanceError("Тренировката вече не е в графика.");
+      return;
+    }
     setTrainingDayCancelLoading(true);
     try {
       const body: Record<string, unknown> = { date: trainingAttendanceDate };
-      if (trainingAttendanceSessionId) body.trainingSessionId = trainingAttendanceSessionId;
-      const dayDetailsCustomGroupId = schedule2Open && trainingAttendanceOpen
-        ? trainingWeekSessions.find(({ id }) => id === trainingDayDetailsTab)?.customGroupId
-        : null;
-      if (dayDetailsCustomGroupId) {
-        body.customTrainingGroupId = dayDetailsCustomGroupId;
+      let url = `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/session`;
+      if (selected) {
+        const custom = parseSchedule2CustomSession(selected.id);
+        if (custom && selected.customGroupId === custom.groupId) {
+          url = schedule2CustomSessionsUrl(clubId, custom.groupId);
+          body.sessionId = custom.sessionId;
+        } else if (selected.id.startsWith("coach-")) {
+          body.trainingSessionId = selected.id.slice(43);
+        } else if (selected.id.startsWith(`${trainingAttendanceDate}-group-`)) {
+          body.trainingGroupId = selected.id.slice(17);
+        } else if (selected.id.startsWith(`${trainingAttendanceDate}-team-`) && selected.teamGroups.length === 1) {
+          body.teamGroup = selected.teamGroups[0];
+        } else {
+          throw new Error("Тренировката вече не е в графика.");
+        }
+      } else if (trainingAttendanceSessionId) {
+        body.trainingSessionId = trainingAttendanceSessionId;
       } else if (trainingAttendanceView === "trainingGroups" && selectedTrainingGroupId) {
         body[isCustomTrainingGroupMode ? "customTrainingGroupId" : "trainingGroupId"] =
           selectedTrainingGroupId;
@@ -1051,7 +1093,7 @@ export function createTrainingAttendanceActions({
         const tg = parseSelectedTeamGroup(trainingGroupScope);
         if (tg !== null) body.teamGroup = tg;
       }
-      const res = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/session`, {
+      const res = await fetch(url, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -1071,6 +1113,14 @@ export function createTrainingAttendanceActions({
     }
   };
 
+  const dismissSchedule2Details = () => {
+    ++trainingDayDetailsRequest.current;
+    setTrainingDayDetailsOpening(false);
+    setTrainingAttendanceLoading(false);
+    setLimitedEventLoading(false);
+    setTrainingDayCancelConfirmOpen(false);
+  };
+
   return {
     fetchTrainingAttendance,
     fetchTrainingWeekSessions,
@@ -1085,6 +1135,7 @@ export function createTrainingAttendanceActions({
     openSingleTrainingDayEditForCurrentScope,
     fetchLimitedEventForSession,
     openTrainingDayDetails,
+    dismissSchedule2Details,
     loadDayDetailsSessionAttendance,
     handleDeleteTrainingDay,
   };

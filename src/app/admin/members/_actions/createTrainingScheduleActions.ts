@@ -18,7 +18,7 @@ import { type TrainingDaysForm } from "../_hooks/useTrainingDaysForm";
 import { type TrainingGroups } from "../_hooks/useTrainingGroups";
 import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceState";
 
-import type { Schedule2Group } from "../_components/Schedule2";
+import { schedule2CustomSessionsUrl, type Schedule2TrainingTarget } from "../_utils/training-session-scope";
 
 type Options = {
   schedulerCalendarMonthsTrimmed: { key: string }[];
@@ -55,6 +55,9 @@ type Options = {
     | "trainingDaysEditorRequest"
     | "schedule2TrainingGroup"
     | "setSchedule2TrainingGroup"
+    | "schedule2TrainingSessionId"
+    | "setSchedule2TrainingSessionId"
+    | "trainingDaysSingleEditDate"
     | "setTrainingDaysStartedFromScheduleCell"
     | "trainingEditorCustomGroupId"
     | "setTrainingDaysEditorOpen"
@@ -205,6 +208,9 @@ export function createTrainingScheduleActions({
     trainingDaysEditorRequest,
     schedule2TrainingGroup,
     setSchedule2TrainingGroup,
+    schedule2TrainingSessionId,
+    setSchedule2TrainingSessionId,
+    trainingDaysSingleEditDate,
     setTrainingDaysStartedFromScheduleCell,
     trainingEditorCustomGroupId,
     setTrainingDaysEditorOpen,
@@ -337,7 +343,7 @@ export function createTrainingScheduleActions({
     mode: "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup" = "teamGroup",
     editDate?: string,
     coachTarget?: { groupId: string; sessionId?: string },
-    customTarget?: { group: Schedule2Group; date?: string },
+    customTarget?: Schedule2TrainingTarget,
   ) => {
     if (!clubId || trainingDaysEditorRequest.current !== null) return;
     if (coachGroupId && mode === "teamGroup") mode = "coachGroup";
@@ -354,6 +360,7 @@ export function createTrainingScheduleActions({
     const isCurrent = () => trainingDaysEditorRequest.current === request;
     const scheduleCellDate = customTarget?.date;
     setSchedule2TrainingGroup(customTarget?.group ?? null);
+    setSchedule2TrainingSessionId(customTarget?.edit?.sessionId ?? null);
     setTrainingDaysStartedFromScheduleCell(Boolean(scheduleCellDate));
     setTrainingDaysEditorMode(mode);
     setTrainingDaysSingleEditDate(editDate ?? null);
@@ -381,34 +388,54 @@ export function createTrainingScheduleActions({
     try {
       await loadTrainingFields();
       if (!isCurrent()) return;
+      if (mode === "customGroup" && customTarget) {
+        const date = editDate ?? scheduleCellDate;
+        const dates = date ? [date] : [];
+        const time = customTarget.edit?.time ?? "";
+        const duration = customTarget.edit?.duration ?? DEFAULT_TRAINING_DURATION_MINUTES;
+        const field = {
+          trainingFieldId: customTarget.edit?.fieldId ?? "",
+          trainingFieldPieceIds: customTarget.edit?.fieldPieceIds ?? [],
+        };
+        const times = date && time ? { [date]: time } : {};
+        const fields = date ? { [date]: field } : {};
+        setTrainingDaysPreExistingDates([]);
+        setSchedulerForm((prev) => ({
+          ...prev, trainingDates: dates, trainingTime: time,
+          trainingDurationMinutes: getTrainingDurationFormValue(duration), ...field,
+        }));
+        setTrainingDaysInitialDates(dates);
+        setTrainingDaysInitialDurationMinutes(duration);
+        setTrainingDaysInitialFieldId(field.trainingFieldId);
+        setTrainingDaysInitialFieldPieceIds(field.trainingFieldPieceIds);
+        setTrainingDateTimes(times);
+        setTrainingDaysInitialDateTimes(times);
+        setTrainingFieldSelections(fields);
+        setTrainingDaysInitialFieldSelections(fields);
+        setTrainingFieldActiveDate(date ?? "");
+        if (date) {
+          const monthIndex = schedulerCalendarMonthsTrimmed.findIndex((month) => month.key === date.slice(0, 7));
+          setSchedulerCalendarVisibleMonthIdx(Math.max(0, monthIndex));
+        }
+        setTrainingDaysEditorOpen(true);
+        return;
+      }
       const loadedGroups = !isCustomTrainingGroupMode && !customTarget ? await loadTrainingScheduleGroups() : [];
       if (!isCurrent()) return;
-      const loadedCustomGroups = customTarget && mode === "coachGroup"
-        ? []
-        : isCustomTrainingGroupMode || customTarget
-          ? await loadCustomTrainingGroups(customTarget?.group)
-          : [];
+      const loadedCustomGroups = isCustomTrainingGroupMode && !customTarget ? await loadCustomTrainingGroups() : [];
       if (!isCurrent()) return;
       if (mode === "customGroup") {
-        const groupId = customTarget?.group.id ?? selectedTrainingGroupId;
+        const groupId = selectedTrainingGroupId;
         const resolvedGroup =
           loadedCustomGroups.find((group) => group.id === groupId) ??
-          (!customTarget ? customTrainingGroups.find((group) => group.id === groupId) : undefined);
+          customTrainingGroups.find((group) => group.id === groupId);
         if (!resolvedGroup) {
           throw new Error("Персонализираната група не е намерена.");
-        }
-        if (customTarget && resolvedGroup.hasWeekdayRecurrence) {
-          throw new Error(customTarget.group.coachGroupId
-            ? "Групата има повтарящ се график. За допълнителна тренировка изберете „Тренировка за треньорската група“."
-            : "Групата има повтарящ се график. За допълнителни тренировки я свържете с треньорска група.");
         }
         const nextWindowDates = [...resolvedGroup.trainingDates]
           .map((value) => String(value ?? "").trim())
           .filter((value) => schedulerCalendarDateSet.has(value))
           .sort((a, b) => a.localeCompare(b));
-        if (scheduleCellDate && nextWindowDates.includes(scheduleCellDate)) {
-          throw new Error("Персонализираната група вече има тренировка за тази дата.");
-        }
         const resolvedDateTimes = normalizeTrainingDateTimes(
           resolvedGroup.trainingDateTimes,
           nextWindowDates,
@@ -424,7 +451,7 @@ export function createTrainingScheduleActions({
           },
         );
         const customEditDates = editDate ? [editDate].filter((d) => nextWindowDates.includes(d)) : [];
-        const customDates = scheduleCellDate ? [scheduleCellDate] : customEditDates;
+        const customDates = customEditDates;
         setTrainingDaysPreExistingDates(nextWindowDates);
         setSchedulerForm((prev) => ({
           ...prev,
@@ -444,12 +471,8 @@ export function createTrainingScheduleActions({
         setTrainingDaysInitialDateTimes(resolvedDateTimes);
         setTrainingFieldSelections(resolvedFieldSelections);
         setTrainingDaysInitialFieldSelections(resolvedFieldSelections);
-        setTrainingFieldActiveDate(scheduleCellDate ?? editDate ?? nextWindowDates[0] ?? "");
-        if (scheduleCellDate) {
-          const monthIndex = schedulerCalendarMonthsTrimmed.findIndex((month) => month.key === scheduleCellDate.slice(0, 7));
-          setSchedulerCalendarVisibleMonthIdx(Math.max(0, monthIndex));
-        }
-        setTrainingTimeMode(scheduleCellDate ? "all" : inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
+        setTrainingFieldActiveDate(editDate ?? nextWindowDates[0] ?? "");
+        setTrainingTimeMode(inferTrainingTimeMode(nextWindowDates, resolvedDateTimes));
         setTrainingDaysEditorOpen(true);
         return;
       }
@@ -822,6 +845,37 @@ export function createTrainingScheduleActions({
     setTrainingDaysEditorSaving(true);
     setTrainingDaysEditorError("");
     try {
+      if (trainingDaysEditorMode === "customGroup" && schedule2TrainingGroup) {
+        if (hasMissingTrainingTime) throw new Error("Въведете валиден час на тренировка (HH:mm).");
+        if (hasInvalidTrainingDuration) throw new Error("Въведете продължителност между 1 и 1440 минути.");
+        if (hasMissingTrainingField) throw new Error(missingTrainingFieldMessage);
+        const dates = trainingDaysSingleEditDate ? [trainingDaysSingleEditDate] : normalizedTrainingDaysSelection;
+        const sessions = dates.map((date) => {
+          const config = schedulerPerDayLimited
+            ? schedulerPerDayConfig[date]
+            : { limited: schedulerLimitedMode, spots: schedulerLimitedSpots };
+          return {
+            date,
+            time: normalizedTrainingDateTimesSelection[date],
+            duration: normalizedTrainingDurationSelection,
+            ...(trainingFieldSelections[date] ?? primaryTrainingFieldSelection),
+            note: trainingDayScheduleNotes[date] ?? "",
+            maxSpots: config?.limited ? Number(config.spots) : null,
+          };
+        });
+        const response = await fetch(schedule2CustomSessionsUrl(clubId, schedule2TrainingGroup.id), {
+          method: trainingDaysSingleEditDate ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: schedule2TrainingSessionId, sessions }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "Неуспешно запазване на тренировката.");
+        setTrainingDaysEditorOpen(false);
+        setTrainingDaysSuccessMessage("Тренировките са запазени успешно.");
+        setTrainingDaysSuccessOpen(true);
+        await fetchTrainingWeekSessions();
+        return;
+      }
       if (trainingDaysEditorMode === "coachGroup") {
         if (hasMissingTrainingTime) throw new Error("Въведете валиден час на тренировка (HH:mm).");
         if (hasInvalidTrainingDuration) throw new Error("Въведете продължителност между 1 и 1440 минути.");
@@ -934,9 +988,7 @@ export function createTrainingScheduleActions({
               trainingFieldPieceIds: primaryTrainingFieldSelection.trainingFieldPieceIds,
               trainingFieldSelections: mergedTrainingFieldSelectionsForPayload,
               trainingDateTimes: mergedTrainingDateTimesForPayload,
-              // Schedule 2 saves the whole group. Let the server check every changed date,
-              // including existing sessions affected by a change to the shared duration.
-              conflictCheckDates: schedule2TrainingGroup ? undefined : nextTrainingDates,
+              conflictCheckDates: nextTrainingDates,
             }),
           },
         );
@@ -1014,10 +1066,8 @@ export function createTrainingScheduleActions({
         setTrainingDaysEditorGroupName("");
         setTrainingDaysEditorGroups([]);
         if (trainingDaysEditorMode === "customGroup") {
-          if (!schedule2TrainingGroup) {
-            await loadCustomTrainingGroups();
-            await fetchTrainingAttendance(trainingAttendanceDate);
-          }
+          await loadCustomTrainingGroups();
+          await fetchTrainingAttendance(trainingAttendanceDate);
           await fetchTrainingWeekSessions();
           setTrainingDaysEditorOpen(false);
         } else {

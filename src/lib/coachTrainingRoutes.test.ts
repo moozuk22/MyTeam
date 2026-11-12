@@ -374,7 +374,7 @@ describe("coach training API boundaries", () => {
     mocks.trainingSession.findFirst.mockResolvedValue(row);
     const response = await update(new NextRequest("http://localhost/training", { method: update === POST ? "POST" : "DELETE", body: JSON.stringify({ trainingSessionId: secondId, reasonCode: "sick" }) }), context);
     expect(response.status).toBe(200);
-    expect(mocks.trainingSession.findFirst.mock.calls[0][0].where.OR).toContainEqual({ scopeType: { not: "coachGroup" }, players: { some: { playerId } } });
+    expect(mocks.trainingSession.findFirst.mock.calls[0][0].where.OR).toContainEqual({ scopeType: { not: "coachGroup" }, occurrenceKey: "", players: { some: { playerId } } });
     expect(mocks.trainingSessionPlayer.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { trainingSessionId_playerId: { trainingSessionId: secondId, playerId } } }));
     expect(mocks.trainingOptOut.upsert).not.toHaveBeenCalled();
     expect(mocks.trainingOptOut.deleteMany).not.toHaveBeenCalled();
@@ -399,6 +399,29 @@ describe("coach training API boundaries", () => {
     expect(mocks.trainingSessionPlayer.upsert).toHaveBeenCalledOnce();
     expect(mocks.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(mocks.trainingSession.findFirst.mock.invocationCallOrder[0]);
     expect(mocks.trainingSession.findFirst.mock.invocationCallOrder[0]).toBeLessThan(mocks.trainingSessionPlayer.upsert.mock.invocationCallOrder[0]);
+  });
+  it("shows distinct Schedule 2 sessions for a member of an unlinked custom group", async () => {
+    const card = await mocks.card.findFirst();
+    card.player.club.trainingGroupMode = "custom_group";
+    card.player.club.trainingDates = [];
+    card.player.coachGroups = [];
+    card.player.customTrainingGroups = [{
+      group: { ...card.player.club, id: groupId, coachGroupId: null, name: "Персонализирана група" },
+    }];
+    const occurrences = [session(firstId, "09:00", false), session(secondId, "18:00", true)].map((row) => ({
+      ...row, occurrenceKey: row.id, scopeType: "customGroup", scopeKey: `custom_group:${groupId}:session:${row.id}`,
+    }));
+    mocks.trainingSession.findMany.mockImplementation(async ({ where }) => where.occurrenceKey ? occurrences : []);
+    const response = await GET(new NextRequest("http://localhost/api/members/CARD/training"), context);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.dates[0].sessions).toMatchObject([
+      { id: firstId, trainingTime: "09:00", optedOut: true },
+      { id: secondId, trainingTime: "18:00", optedOut: false },
+    ]);
+    expect(mocks.trainingSession.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ clubId, scopeId: { in: [groupId] }, scopeType: "customGroup" }),
+    }));
   });
   it("shows coach trainings alongside custom-group trainings, including different dates", async () => {
     const card = await mocks.card.findFirst();

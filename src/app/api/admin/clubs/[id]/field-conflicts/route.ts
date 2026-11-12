@@ -70,7 +70,7 @@ export async function GET(
   } else if (excludeType === "trainingGroup" && excludeId) {
     exclude = { type: "trainingGroup", id: excludeId };
   } else if (excludeType === "customGroup" && excludeId) {
-    exclude = { type: "customGroup", id: excludeId };
+    exclude = { type: "customGroup", id: excludeId, sessionId: sp.get("excludeSessionId") ?? undefined };
   } else if (excludeType === "coachGroup" && excludeId) {
     exclude = { type: "coachGroup", id: excludeId, sessionId: sp.get("excludeSessionId") ?? undefined, sessionIds: sp.has("excludeSessionIds") ? (sp.get("excludeSessionIds") ?? "").split(",") : undefined };
   }

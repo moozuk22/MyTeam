@@ -266,6 +266,7 @@ export async function updateTrainingSessionPlayerAttendance(input: {
       trainingSession: {
         clubId: input.clubId,
         scopeType: { not: "coachGroup" },
+        occurrenceKey: "",
         trainingDate: isoDateToUtcMidnight(input.trainingDate),
       },
     },
@@ -293,10 +294,14 @@ export async function deleteFutureTrainingSessionsForScope(input: {
   });
 }
 
-export async function removeTrainingSessionsPreservingHistory(tx: Pick<TrainingSessionWriter, "trainingSession" | "$queryRaw">, where: Prisma.TrainingSessionWhereInput & { clubId: string; scopeKey: string }) {
+export async function removeTrainingSessionsPreservingHistory(tx: Pick<TrainingSessionWriter, "trainingSession" | "$queryRaw">, where: Prisma.TrainingSessionWhereInput & { clubId: string; scopeKey: string | { startsWith: string } }) {
   // Match the check-in endpoint's session lock before deciding whether a
   // session is untouched. Otherwise a concurrent check-in could be cascaded away.
-  await tx.$queryRaw`SELECT id FROM training_sessions WHERE club_id = ${where.clubId}::uuid AND scope_key = ${where.scopeKey} ORDER BY id FOR UPDATE`;
+  if (typeof where.scopeKey === "string") {
+    await tx.$queryRaw`SELECT id FROM training_sessions WHERE club_id = ${where.clubId}::uuid AND scope_key = ${where.scopeKey} ORDER BY id FOR UPDATE`;
+  } else {
+    await tx.$queryRaw`SELECT id FROM training_sessions WHERE club_id = ${where.clubId}::uuid AND starts_with(scope_key, ${where.scopeKey.startsWith}) ORDER BY id FOR UPDATE`;
+  }
   const today = isoDateToUtcMidnight(getTodayIsoDateInTimeZone("Europe/Sofia"));
   const localTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Sofia", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(new Date());
   const history: Prisma.TrainingSessionPlayerWhereInput = { OR: [

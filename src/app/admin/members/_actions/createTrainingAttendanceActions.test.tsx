@@ -143,6 +143,38 @@ function schedule2Requests() {
 
 const detailDate = "2026-11-10";
 
+it("does not delete any training when the selected Schedule 2 session disappears", async () => {
+  const input = options();
+  Object.assign(input.trainingAttendanceState, {
+    schedule2Open: true,
+    trainingAttendanceOpen: true,
+    trainingAttendanceDate: detailDate,
+    trainingDayDetailsTab: `${detailDate}-custom-removed`,
+    trainingWeekSessions: [],
+  });
+  const fetch = vi.fn().mockResolvedValue(Response.json({ error: "Unexpected deletion" }, { status: 400 }));
+  vi.stubGlobal("fetch", fetch);
+
+  await createTrainingAttendanceActions(input).handleDeleteTrainingDay();
+
+  expect(fetch).not.toHaveBeenCalled();
+  expect(input.trainingAttendanceState.setTrainingAttendanceError).toHaveBeenCalledWith("Тренировката вече не е в графика.");
+});
+
+it("dismisses Schedule 2 details during loading and ignores the late response", async () => {
+  const { input, respond } = schedule2Requests();
+  const actions = createTrainingAttendanceActions(input);
+  const opening = actions.openTrainingDayDetails(detailDate, `${detailDate}-custom-first`);
+
+  actions.dismissSchedule2Details();
+  respond("first", { trainingDate: detailDate });
+  respond("custom_group:first", []);
+  await opening;
+
+  expect(input.trainingAttendanceState.setTrainingDayDetailsOpening).toHaveBeenLastCalledWith(false);
+  expect(input.trainingAttendanceState.setTrainingDayDetailsOpen).not.toHaveBeenCalledWith(true);
+});
+
 it.each([200, 500])("keeps the latest Schedule 2 details after a stale %i response", async (status) => {
   const { input, respond } = schedule2Requests();
   const state = input.trainingAttendanceState;
@@ -202,7 +234,7 @@ it("ignores pending Schedule 2 details when the planner is closed", async () => 
   expect(state.setTrainingDayDetailsOpening).toHaveBeenLastCalledWith(false);
   expect(state.setTrainingAttendanceLoading).toHaveBeenLastCalledWith(false);
   expect(state.setLimitedEventLoading).toHaveBeenLastCalledWith(false);
-  expect(state.setTrainingAttendanceSessionId).not.toHaveBeenCalled();
+  expect(vi.mocked(state.setTrainingAttendanceSessionId).mock.calls).toEqual([[null]]);
 });
 
 it("loads registrations for the newly selected Schedule 2 training tab", async () => {

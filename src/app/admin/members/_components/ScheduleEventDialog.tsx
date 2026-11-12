@@ -22,7 +22,6 @@ type ScheduleEventDialogProps = {
   schedule2EventTarget: { groupId: string; date?: string } | null;
   schedule2EventGroup: Schedule2Group | undefined;
   schedule2CanCreateTraining: boolean;
-  schedule2CustomTrainingExists: boolean;
   openTrainingDaysEditor: (
     mode: "customGroup" | "coachGroup", editDate: undefined, coachTarget: { groupId: string } | undefined,
     customTarget: { group: Schedule2Group; date?: string },
@@ -69,7 +68,6 @@ export function ScheduleEventDialog({
   schedule2EventTarget,
   schedule2EventGroup,
   schedule2CanCreateTraining,
-  schedule2CustomTrainingExists,
   openTrainingDaysEditor,
   matchEditorState,
   trainingAttendanceState,
@@ -110,7 +108,7 @@ export function ScheduleEventDialog({
   const { isCustomTrainingGroupMode } = trainingGroups;
   const schedule2CoachGroupId = schedule2EventGroup?.coachGroupId;
   const customTrainingUnavailable = Boolean(schedule2EventTarget &&
-    (!schedule2EventGroup || !schedule2CanCreateTraining || schedule2CustomTrainingExists));
+    (!schedule2EventGroup || !schedule2CanCreateTraining));
   return (
     <>
       {scheduleEventModalOpen && (
@@ -192,9 +190,6 @@ export function ScheduleEventDialog({
                   </button>
                   {schedule2EventTarget && !schedule2CanCreateTraining && (
                     <p className="amp-lbl">Тренировки за персонализирани групи могат да се добавят в режим „Персонализирани групи“.</p>
-                  )}
-                  {schedule2CustomTrainingExists && (
-                    <p className="amp-lbl">Персонализираната група вече има тренировка за тази дата.</p>
                   )}
                   <button
                     type="button"

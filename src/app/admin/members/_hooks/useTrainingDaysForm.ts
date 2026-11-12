@@ -169,6 +169,7 @@ export function useTrainingDaysForm({
   } | null>(null);
 
   const [schedule2TrainingGroup, setSchedule2TrainingGroup] = useState<Schedule2Group | null>(null);
+  const [schedule2TrainingSessionId, setSchedule2TrainingSessionId] = useState<string | null>(null);
   const [trainingDaysStartedFromScheduleCell, setTrainingDaysStartedFromScheduleCell] = useState(false);
   const trainingEditorCustomGroupId = schedule2TrainingGroup?.id ?? selectedTrainingGroupId;
   const latestFieldConflictsParams = useRef<string | null>(null);
@@ -204,9 +205,10 @@ export function useTrainingDaysForm({
     if (trainingDaysEditorMode === "trainingGroup" && selectedTrainingGroupId) {
       params.set("excludeType", "trainingGroup");
       params.set("excludeId", selectedTrainingGroupId);
-    } else if (trainingDaysEditorMode === "customGroup" && trainingEditorCustomGroupId) {
+    } else if (trainingDaysEditorMode === "customGroup" && trainingEditorCustomGroupId && (!schedule2TrainingGroup || trainingDaysSingleEditDate)) {
       params.set("excludeType", "customGroup");
       params.set("excludeId", trainingEditorCustomGroupId);
+      if (schedule2TrainingSessionId) params.set("excludeSessionId", schedule2TrainingSessionId);
     } else if (trainingDaysEditorMode === "coachGroup") {
       if (coachWizardSelection.startsWith("session:")) {
         params.set("excludeType", "coachGroup");
@@ -244,6 +246,9 @@ export function useTrainingDaysForm({
     trainingTimeMode,
     selectedTrainingGroupId,
     trainingEditorCustomGroupId,
+    schedule2TrainingGroup,
+    schedule2TrainingSessionId,
+    trainingDaysSingleEditDate,
     coachWizardSelection,
     coachWizardGroupId,
     coachWizardTrainings,
@@ -432,9 +437,10 @@ export function useTrainingDaysForm({
   const canShowTrainingDaysFieldStep =
     canShowTrainingDaysTimeStep && !hasMissingTrainingTime && !hasInvalidTrainingDuration;
 
+  const schedule2CustomEdit = Boolean(schedule2TrainingGroup && trainingDaysEditorMode === "customGroup" && trainingDaysSingleEditDate);
   const spotsStepSupportedByMode =
     trainingDaysEditorMode === "teamGroup" ||
-    trainingDaysEditorMode === "customGroup" ||
+    (trainingDaysEditorMode === "customGroup" && !schedule2CustomEdit) ||
     trainingDaysEditorMode === "coachGroup";
 
   const canShowTrainingDaysSpotsStep = canShowTrainingDaysFieldStep && spotsStepSupportedByMode;
@@ -535,7 +541,7 @@ export function useTrainingDaysForm({
   const showTrainingStepBack =
     trainingDaysEditorMode !== "createGroup" &&
     effectiveTrainingDaysActiveStep !== "days" &&
-    !(trainingDaysStartedFromScheduleCell && effectiveTrainingDaysActiveStep === "time");
+    !((trainingDaysStartedFromScheduleCell || schedule2CustomEdit) && effectiveTrainingDaysActiveStep === "time");
 
   const showTrainingStepNext =
     trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep !== "notes";
@@ -782,6 +788,8 @@ export function useTrainingDaysForm({
     trainingDaysEditorRequest,
     schedule2TrainingGroup,
     setSchedule2TrainingGroup,
+    schedule2TrainingSessionId,
+    setSchedule2TrainingSessionId,
     trainingDaysStartedFromScheduleCell,
     setTrainingDaysStartedFromScheduleCell,
     trainingEditorCustomGroupId,

@@ -241,24 +241,35 @@ export async function GET(
 
     const sessions: WeekSession[] = [];
     const elapsedDates = includeFields ? dates.filter((date) => date < todayIso) : [];
-    const [coachSessions, coachGroups, fields, storedSessions] = await Promise.all([
+    const [coachSessions, coachGroups, fields, storedSessions, customOccurrences] = await Promise.all([
       prisma.trainingSession.findMany({ where: { clubId: id, scopeType: "coachGroup", status: "scheduled", trainingDate: { in: dates.map((d) => new Date(`${d}T00:00:00Z`)) } }, select: { id: true, scopeId: true, trainingDate: true, trainingTime: true, trainingDurationMinutes: true, trainingFieldId: includeFields, trainingFieldPieceIds: includeFields } }),
       prisma.coachGroup.findMany({ where: { clubId: id }, select: { id: true, name: true } }),
       includeFields ? prisma.field.findMany({
         where: { clubId: id },
         select: { id: true, name: true, pieces: { orderBy: { sortOrder: "asc" }, select: { id: true, name: true } } },
       }) : [],
-      elapsedDates.length > 0 ? prisma.trainingSession.findMany({
+      (elapsedDates.length > 0 || (includeFields && club.trainingGroupMode === "custom_group")) ? prisma.trainingSession.findMany({
         where: {
           clubId: id,
           scopeType: { in: club.trainingGroupMode === "custom_group" ? ["customGroup"] : ["trainingGroup", "teamGroup"] },
           status: "scheduled",
           removedFromSchedule: false,
           occurrenceKey: "",
-          trainingDate: { in: elapsedDates.map((date) => new Date(`${date}T00:00:00Z`)) },
+          trainingDate: { in: (club.trainingGroupMode === "custom_group" ? dates : elapsedDates).map((date) => new Date(`${date}T00:00:00Z`)) },
         },
         select: {
           scopeKey: true, teamGroup: true, teamGroups: true, trainingDate: true, trainingTime: true,
+          trainingDurationMinutes: true, trainingFieldId: true, trainingFieldPieceIds: true,
+        },
+      }) : [],
+      includeFields && club.trainingGroupMode === "custom_group" ? prisma.trainingSession.findMany({
+        where: {
+          clubId: id, scopeType: "customGroup", occurrenceKey: { not: "" },
+          status: "scheduled", removedFromSchedule: false,
+          trainingDate: { in: dates.map((date) => new Date(`${date}T00:00:00Z`)) },
+        },
+        select: {
+          id: true, scopeId: true, scopeKey: true, trainingDate: true, trainingTime: true,
           trainingDurationMinutes: true, trainingFieldId: true, trainingFieldPieceIds: true,
         },
       }) : [],
@@ -302,12 +313,25 @@ export async function GET(
     for (const item of coachSessions) sessions.push({ id: `coach-${item.scopeId}-${item.id}`, date: item.trainingDate.toISOString().slice(0, 10), trainingTime: item.trainingTime, durationMinutes: item.trainingDurationMinutes, ...describeField(item.trainingDate.toISOString().slice(0, 10), item), scopeType: "trainingGroup", eventType: "training", label: coachNames.get(item.scopeId ?? "") ?? "Треньорска група", teamGroups: [], ...(includeFields ? { coachGroupId: item.scopeId } : {}), limitedSpots: limitedEventByKey.get(`coach_group:${item.scopeId}:session:${item.id}|${item.trainingDate.toISOString().slice(0, 10)}`) ?? null });
 
     if (club.trainingGroupMode === "custom_group") {
+      const groupsById = new Map(customTrainingGroups.map((group) => [group.id, group]));
+      for (const session of customOccurrences) {
+        const group = groupsById.get(session.scopeId ?? "");
+        if (!group) continue;
+        const date = session.trainingDate.toISOString().slice(0, 10);
+        sessions.push({
+          id: `custom-session-${group.id}-${session.id}`, date,
+          trainingTime: session.trainingTime, durationMinutes: session.trainingDurationMinutes,
+          scopeType: "trainingGroup", eventType: "training", label: group.name,
+          ...describeField(date, session), teamGroups: [], color: group.color ?? null, customGroupId: group.id,
+          limitedSpots: limitedEventByKey.get(`${session.scopeKey}|${date}`) ?? null,
+        });
+      }
       for (const date of dates) {
         for (const group of customTrainingGroups) {
           const scopeDate = `custom_group:${group.id}|${date}`;
           if (cancelledSet.has(scopeDate)) continue;
           const stored = storedByScopeAndDate.get(scopeDate);
-          if (!stored && !hasTrainingOnDate({
+          if (!(stored && date < todayIso) && !hasTrainingOnDate({
             date,
             trainingDates: group.trainingDates,
             weekdays: group.trainingWeekdays,

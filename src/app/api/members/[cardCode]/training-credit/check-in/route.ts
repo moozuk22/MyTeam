@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, { params }: Context) {
     ]);
     return NextResponse.json({ trainings: rows.map((row) => ({
       id: row.trainingSessionId, date: utcDateToIsoDate(row.trainingSession.trainingDate), time: row.trainingSession.trainingTime,
-      groupName: names.get(row.trainingSession.scopeKey) || (row.trainingSession.teamGroup !== null ? `Отбор ${row.trainingSession.teamGroup}` : card.player.club.name),
+      groupName: names.get(row.trainingSession.scopeKey.split(":session:")[0]) || (row.trainingSession.teamGroup !== null ? `Отбор ${row.trainingSession.teamGroup}` : card.player.club.name),
       reasonCode: row.reasonCode, reasonText: row.reasonText, charged: !!row.creditChargedAt,
     })) });
   } catch (error) { return errorResponse(error); }

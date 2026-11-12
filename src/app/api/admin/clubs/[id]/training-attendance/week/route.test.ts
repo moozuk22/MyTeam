@@ -68,7 +68,7 @@ describe("График 2 weekly schedule", () => {
       if (where.status === "cancelled") {
         return [{ scopeKey: "custom_group:cancelled", trainingDate: monday }];
       }
-      if (where.scopeType === "coachGroup") return [];
+      if (where.scopeType === "coachGroup" || where.scopeType === "customGroup") return [];
       return [{
         scopeKey: "custom_group:group-1", trainingDate: monday, trainingTime: "18:30",
         trainingDurationMinutes: 75, trainingFieldId: "field-1", trainingFieldPieceIds: ["piece-1"],
@@ -84,7 +84,8 @@ describe("График 2 weekly schedule", () => {
     expect(sessions).not.toContainEqual(expect.objectContaining({ id: "2026-11-09-custom-cancelled" }));
     expect(mocks.sessions).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        clubId: "club-1", removedFromSchedule: false, trainingDate: { in: [monday] },
+        clubId: "club-1", occurrenceKey: "", removedFromSchedule: false,
+        trainingDate: { in: expect.arrayContaining([monday]) },
       }),
     }));
   });
@@ -196,6 +197,20 @@ describe("График 2 weekly schedule", () => {
       { id: "group-1", name: "Loko", coachGroupId: "coach-group-1", coachName: "Треньор на 2026" },
     ]);
     expect(data.sessions).toContainEqual(expect.objectContaining({ customGroupId: "group-1", date: "2026-11-18", trainingTime: "17:30" }));
+  });
+
+  it("returns multiple distinct Schedule 2 sessions for an unlinked custom group on one day", async () => {
+    mocks.customGroups.mockResolvedValue([{ id: "group-1", name: "Loko", coachGroupId: null, trainingDates: [] }]);
+    mocks.sessions.mockImplementation(async ({ where }) => where.scopeType === "customGroup" ? [
+      { id: "first", scopeId: "group-1", scopeKey: "custom_group:group-1:session:first", trainingDate: new Date("2026-11-18"), trainingTime: "17:00" },
+      { id: "second", scopeId: "group-1", scopeKey: "custom_group:group-1:session:second", trainingDate: new Date("2026-11-18"), trainingTime: "19:00" },
+    ] : []);
+    const response = await request("?view=schedule2&week=1");
+    expect((await response.json()).sessions).toEqual([
+      expect.objectContaining({ id: "custom-session-group-1-first", customGroupId: "group-1", trainingTime: "17:00" }),
+      expect.objectContaining({ id: "custom-session-group-1-second", customGroupId: "group-1", trainingTime: "19:00" }),
+    ]);
+    expect((await (await request("")).json()).sessions).toEqual([]);
   });
 
   it.each(["custom_group", "team_group"])("loads custom group matches in %s mode without a match coach column", async (trainingGroupMode) => {

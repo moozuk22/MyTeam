@@ -108,7 +108,7 @@ async function resolvePushCoachGroupId(scopeKey: string): Promise<string | null>
     return scopeKey.split(":")[1];
   }
   if (scopeKey.startsWith("custom_group:")) {
-    const groupId = scopeKey.slice("custom_group:".length);
+    const groupId = scopeKey.split(":")[1];
     const group = await prisma.clubCustomTrainingGroup.findUnique({
       where: { id: groupId },
       select: { coachGroupId: true },
@@ -127,7 +127,7 @@ function isPlayerInScope(
     return player.teamGroup === tg;
   }
   if (scopeKey.startsWith("custom_group:")) {
-    const cgId = scopeKey.slice("custom_group:".length);
+    const cgId = scopeKey.split(":")[1];
     return player.customGroupIds.includes(cgId);
   }
   if (scopeKey.startsWith("coach_group:")) {

@@ -188,7 +188,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                     return (
                       <td key={date} data-today={date === today}>
                         {entries.map((session) => eventButton(session))}
-                        {!activeField && canScheduleDate(date) && (entries.length === 0 || group.coachGroupId) ? (
+                        {!activeField && canScheduleDate(date) ? (
                           <button type="button" className={styles.emptyCell} aria-label={`Ново събитие за ${group.name}, ${formatDay(date)}`} disabled={openingEditor || detailsActive} onClick={() => onCreate(group.id, date)}>+</button>
                         ) : entries.length === 0 && <span className={styles.dash}>—</span>}
                       </td>
