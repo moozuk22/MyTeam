@@ -204,6 +204,15 @@ export function ScheduleEventDialog({
                     />
                     Мач / Двубой / Състезание / Участие
                   </button>
+                  {schedule2EventTarget && (
+                    <button type="button" className="amp-btn amp-schedule-event-type-btn">
+                      <span
+                        className="amp-schedule-event-type-icon amp-schedule-event-type-icon--rest"
+                        aria-hidden="true"
+                      />
+                      Почивен ден
+                    </button>
+                  )}
                 </div>
               ) : scheduleEventStep === "match-type" ? (
                 <>
