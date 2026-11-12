@@ -22,6 +22,7 @@ type ScheduleEventDialogProps = {
   schedule2EventTarget: { groupId: string; date?: string } | null;
   schedule2EventGroup: Schedule2Group | undefined;
   schedule2CanCreateTraining: boolean;
+  onSchedule2RestDay?: () => void;
   openTrainingDaysEditor: (
     mode: "customGroup", editDate: undefined, coachTarget: undefined,
     customTarget: { group: Schedule2Group; date?: string },
@@ -68,6 +69,7 @@ export function ScheduleEventDialog({
   schedule2EventTarget,
   schedule2EventGroup,
   schedule2CanCreateTraining,
+  onSchedule2RestDay,
   openTrainingDaysEditor,
   matchEditorState,
   trainingAttendanceState,
@@ -204,8 +206,8 @@ export function ScheduleEventDialog({
                     />
                     Мач / Двубой / Състезание / Участие
                   </button>
-                  {schedule2EventTarget && (
-                    <button type="button" className="amp-btn amp-schedule-event-type-btn">
+                  {schedule2EventTarget?.date && onSchedule2RestDay && (
+                    <button type="button" className="amp-btn amp-schedule-event-type-btn" onClick={onSchedule2RestDay}>
                       <span
                         className="amp-schedule-event-type-icon amp-schedule-event-type-icon--rest"
                         aria-hidden="true"

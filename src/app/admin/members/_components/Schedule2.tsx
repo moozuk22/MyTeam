@@ -24,6 +24,7 @@ type Props = {
   canScheduleDate: (date: string) => boolean;
   onWeekChange: (week: number) => void;
   customGroups: Schedule2Group[];
+  restDays: Record<string, string[]>;
   onOpen: (session: Schedule2Session) => void;
   onCreate: (groupId: string, date?: string) => void;
 };
@@ -41,24 +42,24 @@ function getField(session: Schedule2Session) {
   return session.fieldName ?? session.location?.trim() ?? "";
 }
 
-export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, today, week, lastWeek, canScheduleDate, onWeekChange, customGroups, onOpen, onCreate }: Props) {
+export function schedule2SessionBelongsToGroup(session: Schedule2Session, group: Schedule2Group) {
+  if (session.customGroupId) return session.customGroupId === group.id;
+  return session.eventType === "training" && Boolean(group.coachGroupId && group.coachGroupId === session.coachGroupId);
+}
+
+export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, today, week, lastWeek, canScheduleDate, onWeekChange, customGroups, restDays, onOpen, onCreate }: Props) {
   const [view, setView] = useState<"team" | "field">("team");
   const [team, setTeam] = useState("");
   const [field, setField] = useState("");
   const [newGroup, setNewGroup] = useState("");
 
-  function belongsToGroup(session: Schedule2Session, group: Schedule2Group) {
-    if (session.customGroupId) return session.customGroupId === group.id;
-    return session.eventType === "training" && Boolean(group.coachGroupId && group.coachGroupId === session.coachGroupId);
-  }
-
   const activeTeam = customGroups.some(({ id }) => id === team) ? team : "";
   const visibleGroups = customGroups.filter(({ id }) => !activeTeam || id === activeTeam);
   const teamSessions = sessions.filter((session) =>
-    (view === "field" && !activeTeam) || visibleGroups.some((group) => belongsToGroup(session, group)),
+    (view === "field" && !activeTeam) || visibleGroups.some((group) => schedule2SessionBelongsToGroup(session, group)),
   );
   const hasUngroupedMatches = sessions.some((session) =>
-    session.eventType === "match" && !customGroups.some((group) => belongsToGroup(session, group)),
+    session.eventType === "match" && !customGroups.some((group) => schedule2SessionBelongsToGroup(session, group)),
   );
   const fields = [...new Set(teamSessions.map(getField).filter(Boolean))].sort((a, b) => a.localeCompare(b, "bg"));
   const activeField = fields.includes(field) ? field : "";
@@ -184,13 +185,25 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                     {group.coachName && <small className={styles.coachName}>{group.coachName}</small>}
                   </th>
                   {dates.map((date) => {
-                    const entries = visibleSessions.filter((session) => session.date === date && belongsToGroup(session, group));
+                    const entries = visibleSessions.filter((session) => session.date === date && schedule2SessionBelongsToGroup(session, group));
+                    const restDay = entries.length === 0 && restDays[group.id]?.includes(date);
+                    const canAddEvent = !activeField && canScheduleDate(date);
                     return (
                       <td key={date} data-today={date === today}>
                         {entries.map((session) => eventButton(session))}
-                        {!activeField && canScheduleDate(date) ? (
-                          <button type="button" className={styles.emptyCell} aria-label={`Ново събитие за ${group.name}, ${formatDay(date)}`} disabled={openingEditor || detailsActive} onClick={() => onCreate(group.id, date)}>+</button>
-                        ) : entries.length === 0 && <span className={styles.dash}>—</span>}
+                        {canAddEvent ? (
+                          <button
+                            type="button"
+                            className={styles.emptyCell}
+                            data-rest-day={restDay || undefined}
+                            aria-label={`${restDay ? "Почивен ден" : "Ново събитие"} за ${group.name}, ${formatDay(date)}`}
+                            disabled={openingEditor || detailsActive}
+                            onClick={() => onCreate(group.id, date)}
+                          >
+                            {restDay ? "Почивен ден" : "+"}
+                          </button>
+                        ) : !activeField && restDay ? <span className={styles.dash}>Почивен ден</span>
+                          : entries.length === 0 && <span className={styles.dash}>—</span>}
                       </td>
                     );
                   })}

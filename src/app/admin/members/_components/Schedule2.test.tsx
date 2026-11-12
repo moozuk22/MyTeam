@@ -43,6 +43,7 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
       canScheduleDate={() => true}
       onWeekChange={() => {}}
       customGroups={groups}
+      restDays={{ first: [today, tomorrow], second: [tomorrow] }}
       onOpen={() => {}}
       onCreate={() => {}}
     />,
@@ -53,12 +54,15 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
   expect(rows[0]).toMatch(/^Loko<small[^>]*>Треньор на 2026<\/small>/);
   expect(rows[0]).toContain("18:00");
   expect(rows[0].split("</td>")[0]).toContain('aria-label="Ново събитие за Loko,');
+  expect(rows[0].split("</td>")[0]).not.toContain("Почивен ден");
+  expect(rows[0].split("</td>")[1]).toContain(">Почивен ден</button>");
   expect(rows[0]).not.toContain("Академик");
   expect(rows[1].split("</td>")[0]).not.toContain("Академик");
   expect(rows[0]).not.toContain(">Тренировка<");
   const matchCell = rows[1].split("</td>")[1];
   expect(matchCell).toContain(">Академик</span>");
   expect(matchCell).toContain('aria-label="15:00, Мач · Академик"');
+  expect(matchCell).not.toContain("Почивен ден");
   for (const row of [rows[0], matchCell]) {
     const eventButton = row.match(/<button[^>]+data-match="(?:true|false)"[^>]*>/)?.[0];
     expect(eventButton).toBeDefined();

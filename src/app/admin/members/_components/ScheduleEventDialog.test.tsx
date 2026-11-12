@@ -13,6 +13,7 @@ it.each([
       schedule2EventTarget={schedule2 ? { groupId: "custom-group", date: "2026-11-12" } : null}
       schedule2EventGroup={schedule2 ? { id: "custom-group", name: "Група", coachGroupId: "coach-group", coachName: "Треньор" } : undefined}
       schedule2CanCreateTraining
+      onSchedule2RestDay={schedule2 ? noop : undefined}
       openTrainingDaysEditor={noopAsync}
       matchEditorState={{
         matchEditorSaving: false,

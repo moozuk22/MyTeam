@@ -22,6 +22,7 @@ type TrainingAttendanceDialogProps = {
   canUseSchedule2: boolean;
   closeTrainingAttendance: () => void;
   openScheduleEvent: (target?: { groupId: string; date?: string }) => void;
+  schedule2RestDays: Record<string, string[]>;
   fetchTrainingWeekSessions: (options?: { week?: number }) => Promise<unknown>;
   trainingAttendanceState: Pick<
     TrainingAttendanceState,
@@ -136,6 +137,7 @@ export function TrainingAttendanceDialog({
   canUseSchedule2,
   closeTrainingAttendance,
   openScheduleEvent,
+  schedule2RestDays,
   fetchTrainingWeekSessions,
   trainingAttendanceState,
   trainingDaysForm,
@@ -284,6 +286,7 @@ export function TrainingAttendanceDialog({
                     void fetchTrainingWeekSessions({ week });
                   }}
                   customGroups={schedule2Groups}
+                  restDays={schedule2RestDays}
                   onOpen={(session) => void openTrainingDayDetails(session.date, session.id)}
                   onCreate={(groupId, date) => openScheduleEvent({ groupId, date })}
                 />

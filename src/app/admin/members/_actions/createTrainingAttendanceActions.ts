@@ -22,7 +22,7 @@ import { type TrainingGroups } from "../_hooks/useTrainingGroups";
 import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceState";
 import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
-import type { Schedule2Session } from "../_components/Schedule2";
+import type { Schedule2Group, Schedule2Session } from "../_components/Schedule2";
 
 type Options = {
   canUseSchedule2?: boolean;
@@ -121,6 +121,7 @@ type Options = {
     customTarget?: Schedule2TrainingTarget,
   ) => Promise<void>;
   trainingUpcomingByDate: Map<string, TrainingUpcomingDateItem>;
+  onSchedule2WeekLoaded?: (groups: Schedule2Group[], sessions: Schedule2Session[]) => void;
 };
 
 export function createTrainingAttendanceActions({
@@ -143,6 +144,7 @@ export function createTrainingAttendanceActions({
   setTrainingGroupScope,
   resolvedTrainingGroupScope,
   openTrainingDaysEditor,
+  onSchedule2WeekLoaded,
   trainingUpcomingByDate,
   canUseSchedule2 = false,
 }: Options) {
@@ -539,9 +541,11 @@ export function createTrainingAttendanceActions({
         : [];
       if (!isCurrent()) return;
       if (includeFields) {
-        setSchedule2Groups(Array.isArray(payload.customGroups) ? payload.customGroups : []);
+        const groups: Schedule2Group[] = Array.isArray(payload.customGroups) ? payload.customGroups : [];
+        setSchedule2Groups(groups);
         setSchedule2Matches(Array.isArray(payload.matches) ? payload.matches : []);
         setSchedule2CanCreateTraining(payload.canCreateCustomTraining === true);
+        onSchedule2WeekLoaded?.(groups, sessions);
       }
       setTrainingWeekDates(dates);
       setTrainingWeekSessions(sessions);

@@ -62,6 +62,7 @@ import { MemberBirthdaysDialog } from "./_components/MemberBirthdaysDialog";
 import { CoachGroupsDialog } from "./_components/CoachGroupsDialog";
 import { MatchPreviewDialog } from "./_components/MatchPreviewDialog";
 import { TrainingAttendanceDialog } from "./_components/TrainingAttendanceDialog";
+import { schedule2SessionBelongsToGroup } from "./_components/Schedule2";
 import { TeamGroupWarningDialog } from "./_components/TeamGroupWarningDialog";
 import { PostScheduleSaveDialog } from "./_components/PostScheduleSaveDialog";
 import { TrainingGroupEditorDialog } from "./_components/TrainingGroupEditorDialog";
@@ -181,6 +182,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
   const [trainingNoteComparisonLoading, setTrainingNoteComparisonLoading] = useState(false);
 
   const [schedule2EventTarget, setSchedule2EventTarget] = useState<{ groupId: string; date?: string } | null>(null);
+  const [schedule2RestDays, setSchedule2RestDays] = useState<Record<string, string[]>>({});
   const [scheduleEventModalOpen, setScheduleEventModalOpen] = useState(false);
 
   const [scheduleEventStep, setScheduleEventStep] = useState<
@@ -1212,6 +1214,23 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
     resolvedTrainingGroupScope,
     openTrainingDaysEditor: (...args) => openTrainingDaysEditor(...args),
     trainingUpcomingByDate,
+    onSchedule2WeekLoaded: (groups, sessions) => {
+      setSchedule2RestDays((previous) => {
+        let next = previous;
+        for (const group of groups) {
+          const dates = previous[group.id];
+          if (!dates?.length) continue;
+          const remaining = dates.filter((date) => !sessions.some((session) =>
+            session.date === date && schedule2SessionBelongsToGroup(session, group),
+          ));
+          if (remaining.length === dates.length) continue;
+          if (next === previous) next = { ...previous };
+          if (remaining.length) next[group.id] = remaining;
+          else delete next[group.id];
+        }
+        return next;
+      });
+    },
   });
   const {
     fetchTrainingAttendance,
@@ -1231,6 +1250,17 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
   } = trainingAttendanceActions;
 
   const schedule2EventGroup = schedule2Groups.find((group) => group.id === schedule2EventTarget?.groupId);
+  const schedule2EventDate = schedule2EventTarget?.date;
+  const markSchedule2RestDay = schedule2EventGroup && schedule2EventDate && !trainingWeekSessions.some((session) =>
+    session.date === schedule2EventDate && schedule2SessionBelongsToGroup(session, schedule2EventGroup),
+  ) ? () => {
+    const groupId = schedule2EventGroup.id;
+    setSchedule2RestDays((previous) => {
+      const dates = previous[groupId] ?? [];
+      return dates.includes(schedule2EventDate) ? previous : { ...previous, [groupId]: [...dates, schedule2EventDate] };
+    });
+    setScheduleEventModalOpen(false);
+  } : undefined;
   const openScheduleEvent = (target?: { groupId: string; date?: string }) => {
     if (target && trainingDaysForm.trainingDaysEditorRequest.current !== null) return;
     setSchedule2EventTarget(target ?? null);
@@ -1555,6 +1585,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
         canUseSchedule2={canUseSchedule2}
         closeTrainingAttendance={closeTrainingAttendance}
         openScheduleEvent={openScheduleEvent}
+        schedule2RestDays={schedule2RestDays}
         fetchTrainingWeekSessions={fetchTrainingWeekSessions}
         trainingAttendanceState={trainingAttendanceState}
         trainingDaysForm={trainingDaysForm}
@@ -1614,6 +1645,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
         schedule2EventTarget={schedule2EventTarget}
         schedule2EventGroup={schedule2EventGroup}
         schedule2CanCreateTraining={trainingAttendanceState.schedule2CanCreateTraining}
+        onSchedule2RestDay={markSchedule2RestDay}
         openTrainingDaysEditor={openTrainingDaysEditor}
         matchEditorState={matchEditorState}
         trainingAttendanceState={trainingAttendanceState}

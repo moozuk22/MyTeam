@@ -195,6 +195,10 @@
   margin-top: 0.25rem;
 }
 
+.emptyCell[data-rest-day="true"] {
+  color: var(--muted);
+}
+
 .skeletonTable tr {
   height: 56px;
 }
