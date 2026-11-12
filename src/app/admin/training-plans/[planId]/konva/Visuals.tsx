@@ -317,6 +317,36 @@ function ColorEquipmentIcon({
   );
 }
 
+function PitchArc({
+  x,
+  y,
+  radius,
+  rotation = 0,
+  chordDistance = 0,
+}: {
+  x: number;
+  y: number;
+  radius: number;
+  rotation?: number;
+  chordDistance?: number;
+}) {
+  const halfAngle = Math.acos(chordDistance / radius);
+  return (
+    <Shape
+      x={x}
+      y={y}
+      rotation={rotation}
+      stroke="#d9e5d7"
+      strokeWidth={2}
+      sceneFunc={(context, shape) => {
+        context.beginPath();
+        context.arc(0, 0, radius, -halfAngle, halfAngle);
+        context.strokeShape(shape);
+      }}
+    />
+  );
+}
+
 export const Pitch = memo(function Pitch({
   surface,
 }: {
@@ -388,12 +418,7 @@ export const Pitch = memo(function Pitch({
                     strokeWidth={2}
                   />
                   <Circle x={135} y={350} radius={3} fill="#d9e5d7" />
-                  <Line
-                    points={[185, 280, 205, 310, 212, 350, 205, 390, 185, 420]}
-                    tension={0.5}
-                    stroke="#d9e5d7"
-                    strokeWidth={2}
-                  />
+                  <PitchArc x={135} y={350} radius={77} chordDistance={45} />
                   <Rect
                     x={10}
                     y={315}
@@ -424,12 +449,7 @@ export const Pitch = memo(function Pitch({
                 strokeWidth={2}
               />
               <Circle x={525} y={185} radius={3} fill="#d9e5d7" />
-              <Line
-                points={[420, 248, 470, 280, 525, 290, 580, 280, 630, 248]}
-                tension={0.5}
-                stroke="#d9e5d7"
-                strokeWidth={2}
-              />
+              <PitchArc x={525} y={185} radius={105} rotation={90} chordDistance={60} />
               <Rect
                 x={475}
                 y={10}
@@ -438,12 +458,7 @@ export const Pitch = memo(function Pitch({
                 stroke="#d9e5d7"
                 strokeWidth={2}
               />
-              <Line
-                points={[410, 675, 430, 610, 525, 570, 620, 610, 640, 675]}
-                tension={0.5}
-                stroke="#d9e5d7"
-                strokeWidth={2}
-              />
+              <PitchArc x={525} y={675} radius={105} rotation={-90} />
             </>
           )}
         </>

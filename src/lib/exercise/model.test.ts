@@ -10,10 +10,12 @@ import {
   createObject,
   EMPTY_EXERCISE,
   getCustomTeamColors,
+  getPitchQuadrants,
   nextPlayerLabel,
   removeCustomTeam,
   validateExercise,
   validateSavedLayout,
+  type Exercise,
 } from "./model";
 import {
   arrowheadPoints,
@@ -33,7 +35,7 @@ import {
   undo,
   worldPoint,
 } from "./geometry";
-import { draftKey, readDraft, sameExercise } from "./drafts";
+import { draftKey, matchesDraft, readDraft, sameExercise } from "./drafts";
 import { countEquipment, FOOTBALL } from "./football";
 const point = { x: 200, y: 200 };
 const cone = createObject("cone", point, "cone");
@@ -84,6 +86,9 @@ describe("exercise model and geometry", () => {
       createObject("mannequin", point, "mannequin"),
       createObject("marker", point, "marker"),
       createObject("marker-blue", point, "old-marker"),
+      createObject("ball", point, "ball"),
+      createObject("balls", point, "balls"),
+      createObject("goal-5m", point, "goal"),
       createObject("team1-player-1", point, "player"),
     ];
     expect(countEquipment(objects)).toEqual({
@@ -91,7 +96,15 @@ describe("exercise model and geometry", () => {
       wall: 1,
       mannequin: 1,
       marker: 2,
+      ball: 1,
+      balls: 1,
+      "goal-5m": 1,
     });
+  });
+
+  it("shows pitch counts for the single-ball and goal tools", () => {
+    const group = FOOTBALL.tools.find((group) => group.title === "Топки и врати");
+    expect(group?.showCounts).toBe(true);
   });
 
   it("adds more teams to an existing third-team exercise and keeps their colors and numbers", () => {
@@ -232,7 +245,7 @@ describe("exercise model and geometry", () => {
   });
   it("keeps legacy tool variants out of the toolbar", () => {
     const legacyVariants = [
-      "run-free", "dribble-free", "long-pass",
+      "run-free", "dribble-free", "long-pass", "balls",
       "marker-blue", "marker-orange", "marker-yellow",
       "team1-player-2", "team1-player-more", "team2-player-2", "team2-player-more",
     ];
@@ -555,6 +568,28 @@ describe("history and recovery", () => {
     expect(h.past).toHaveLength(100);
     expect(commit(h, h.present)).toBe(h);
   });
+  it("validates saved pitch quadrants and treats all four as the default", () => {
+    const cropped = { ...exercise, quadrants: ["top-right"] } satisfies Exercise;
+    expect(validateExercise(cropped)).toBeNull();
+    expect(sameExercise(exercise, cropped)).toBe(false);
+    expect(sameExercise(exercise, {
+      ...exercise,
+      quadrants: ["bottom-right", "top-left", "bottom-left", "top-right"],
+    })).toBe(true);
+    for (const quadrants of [[], ["top-left", "top-left"], ["center"]]) {
+      expect(validateExercise({ ...exercise, quadrants })).toBeTruthy();
+    }
+    expect(validateExercise({ ...cropped, surface: "half" })).toBeTruthy();
+  });
+  it("uses the entire blank field even when an earlier save contains a crop", () => {
+    const quadrants = ["top-right"] as const;
+    const cropped = { ...exercise, quadrants: [...quadrants] };
+    const blank = { ...cropped, surface: "blank" } satisfies Exercise;
+
+    expect(validateExercise(blank)).toBeNull();
+    expect(getPitchQuadrants(blank)).toEqual(getPitchQuadrants(exercise));
+    expect(getPitchQuadrants(cropped)).toEqual(quadrants);
+  });
   it("scopes drafts, accepts stale but valid recovery, rejects corrupt and unsupported content", () => {
     expect(draftKey("user", "club", "plan")).not.toBe(
       draftKey("user2", "club", "plan"),
@@ -565,10 +600,22 @@ describe("history and recovery", () => {
       savedAt: 1,
     };
     expect(readDraft(JSON.stringify(draft))).toEqual(draft);
+    const renamed = { ...draft, title: "Ново име" };
+    expect(readDraft(JSON.stringify(renamed))).toEqual(renamed);
+    expect(matchesDraft(renamed, exercise, "Старо име")).toBe(false);
+    expect(matchesDraft(renamed, exercise, "Ново име")).toBe(true);
+    expect(matchesDraft(draft, exercise, "Текущо име")).toBe(true);
+    const described = { ...renamed, description: "Упражнение за пасове" };
+    expect(readDraft(JSON.stringify(described))).toEqual(described);
+    expect(matchesDraft(described, exercise, "Ново име", "Старо описание")).toBe(false);
+    expect(matchesDraft(described, exercise, "Ново име", "Упражнение за пасове")).toBe(true);
+    expect(matchesDraft({ ...described, description: "" }, exercise, "Ново име", "Старо описание")).toBe(false);
     for (const value of [
       null,
       "bad",
       "{}",
+      JSON.stringify({ ...draft, title: 42 }),
+      JSON.stringify({ ...draft, description: 42 }),
       JSON.stringify({ ...draft, layout: { version: 3 } }),
     ])
       expect(readDraft(value)).toBeNull();

@@ -4,17 +4,23 @@ import {
   useEffect,
   useEffectEvent,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 import Konva from "konva";
 import { Circle, Group, Layer, Rect, Shape, Stage, Transformer } from "react-konva";
 import {
   HEIGHT,
+  PITCH_QUADRANT_BOUNDS,
+  PITCH_QUADRANTS,
   WIDTH,
   createObject,
   getCustomTeamColors,
+  getPitchQuadrants,
+  isInPitchQuadrants,
   nextPlayerLabel,
   textFontSize,
   validateExercise,
@@ -70,6 +76,9 @@ const ObjectHitArea = memo(function ObjectHitArea({
 
 export type CanvasProps = {
   exercise: Exercise;
+  visibleObjects: readonly ExerciseObject[];
+  surfacePreview?: "full";
+  pitchOverlay?: ReactNode;
   selected: string | null;
   multiSelection: ReadonlySet<string> | null;
   multiAnchorId?: string;
@@ -88,6 +97,9 @@ export type CanvasProps = {
 };
 export default function Canvas({
   exercise,
+  visibleObjects,
+  surfacePreview,
+  pitchOverlay,
   selected,
   multiSelection,
   multiAnchorId,
@@ -145,17 +157,35 @@ export default function Canvas({
   useLayoutEffect(() => {
     latest.current = { exercise, onCommit, onError };
   });
-  const scale = width / WIDTH;
-  const selectedObject = exercise.objects.find((o) => o.id === selected);
-  const multiAnchor = multiAnchorId ? exercise.objects.find((o) => o.id === multiAnchorId) : undefined;
+  const quadrants = surfacePreview ? PITCH_QUADRANTS : getPitchQuadrants(exercise);
+  const viewport = useMemo(() => {
+    const origins = quadrants.map((part) => PITCH_QUADRANT_BOUNDS[part]);
+    const x = Math.min(...origins.map((origin) => origin.x));
+    const y = Math.min(...origins.map((origin) => origin.y));
+    const w = Math.max(...origins.map((origin) => origin.x)) - x + WIDTH / 2;
+    const h = Math.max(...origins.map((origin) => origin.y)) - y + HEIGHT / 2;
+    const clipFunc = w * h > origins.length * (WIDTH / 2) * (HEIGHT / 2)
+      ? (context: Konva.Context) => {
+        for (const origin of origins) context.rect(origin.x, origin.y, WIDTH / 2, HEIGHT / 2);
+      }
+      : undefined;
+    return { x, y, width: w, height: h, clipFunc };
+  }, [quadrants]);
+  const scale = width / viewport.width;
+  const viewLayer = {
+    x: -viewport.x * scale, y: -viewport.y * scale,
+    scaleX: scale, scaleY: scale, clipFunc: viewport.clipFunc,
+  };
+  const selectedObject = visibleObjects.find((o) => o.id === selected);
+  const multiAnchor = multiAnchorId ? visibleObjects.find((o) => o.id === multiAnchorId) : undefined;
   const [multiCursor, setMultiCursor] = useState<string | null>(null);
   const cursorIndex = multiSelection
-    ? exercise.objects.findIndex((o) => o.id === multiCursor)
+    ? visibleObjects.findIndex((o) => o.id === multiCursor)
     : -1;
   const ignorePitchClick = useRef(false);
   const colorPreviewIndex =
-    colorPreviewId && exercise.objects.length > 1
-      ? exercise.objects.findIndex((o) => o.id === colorPreviewId)
+    colorPreviewId && visibleObjects.length > 1
+      ? visibleObjects.findIndex((o) => o.id === colorPreviewId)
       : -1;
   const {
     kind,
@@ -236,8 +266,8 @@ export default function Canvas({
   const cancelFromEffect = useEffectEvent(() => clear());
 
   useLayoutEffect(() => {
-    if (selectionDrag.current || boxGesture.current) cancelFromEffect();
-  }, [exercise, multiSelection, tool, width]);
+    if (surfacePreview || selectionDrag.current || boxGesture.current) cancelFromEffect();
+  }, [exercise, multiSelection, surfacePreview, tool, width]);
 
   useEffect(() => {
     const images = Object.entries(PITCH_ICON_FILES).map(([name, filename]) => {
@@ -325,6 +355,7 @@ export default function Canvas({
     width,
     colorPreviewIndex,
     multiAnchor,
+    viewport,
   ]);
   useEffect(() => {
     const cancel = (e: KeyboardEvent) => {
@@ -346,9 +377,13 @@ export default function Canvas({
     const p = stage.current?.getPointerPosition();
     if (!p || !scale) return null;
     const point = { x: p.x / scale, y: p.y / scale };
-    return clampToPitch ? { x: clamp(point.x, WIDTH), y: clamp(point.y, HEIGHT) } : point;
+    return {
+      x: viewport.x + (clampToPitch ? clamp(point.x, viewport.width) : point.x),
+      y: viewport.y + (clampToPitch ? clamp(point.y, viewport.height) : point.y),
+    };
   }
   function applyObject(object: ExerciseObject) {
+    if (!isInPitchQuadrants(object, quadrants)) return false;
     const next = {
       ...latest.current.exercise,
       objects: latest.current.exercise.objects.map((o) =>
@@ -410,7 +445,7 @@ export default function Canvas({
   function beginBoxGesture(e: Konva.KonvaEventObject<PointerEvent>, directId?: string) {
     if (!multiSelection || e.evt.button !== 0 || boxGesture.current || selectionDrag.current) return;
     const start = position();
-    if (!start) return;
+    if (!start || !isInPitchQuadrants(start, quadrants)) return;
     const targetId = outlinedObjectAt(start, directId);
     const objects = targetId && multiSelection.has(targetId)
       ? exercise.objects.filter((object) => multiSelection.has(object.id))
@@ -431,7 +466,7 @@ export default function Canvas({
       return;
     }
     const p = position();
-    if (!p) return;
+    if (!p || !isInPitchQuadrants(p, quadrants)) return;
     if (exercise.objects.length >= MAX_ITEMS) {
       onError(`Позволени са до ${MAX_ITEMS} обекта.`);
       return;
@@ -520,7 +555,7 @@ export default function Canvas({
         onSelect(box.targetId);
         return;
       }
-      const ids = exercise.objects.flatMap(({ id }) => {
+      const ids = visibleObjects.flatMap(({ id }) => {
         const node = nodes.current.get(id);
         if (!node) return [];
         const rect = node.getClientRect({ relativeTo: node.getParent() ?? undefined });
@@ -532,6 +567,7 @@ export default function Canvas({
     if (!g || !p || g.pointerId !== e.evt.pointerId) return;
     if (
       g.tool !== tool ||
+      !isInPitchQuadrants(p, quadrants) ||
       (g.tool.startsWith("custom-team-") && g.object.team !== customTeamNumber)
     ) {
       clear();
@@ -547,13 +583,13 @@ export default function Canvas({
       object.label = nextPlayerLabel(current.objects, object.team);
     }
     const next = { ...current, objects: [...current.objects, object] };
-    if (!validateExercise(next)) {
+    if (isInPitchQuadrants(object, quadrants) && !validateExercise(next)) {
       ignorePitchClick.current = object.kind === "text";
       onCommit(next);
       onPlaced(object);
     }
   }
-  const rendered = exercise.objects.map((o) =>
+  const rendered = visibleObjects.map((o) =>
     preview?.id === o.id ? preview : o,
   );
   function moveSelection(node: Konva.Node) {
@@ -565,7 +601,7 @@ export default function Canvas({
     });
   }
   function translateSelection(objects: ExerciseObject[], offset: Point) {
-    const delta = clampGroupTranslation(objects, offset);
+    const delta = clampGroupTranslation(objects, offset, viewport);
     for (const object of objects) {
       nodes.current.get(object.id)?.position({
         x: object.x + delta.x,
@@ -578,12 +614,15 @@ export default function Canvas({
   function commitSelectionMove(delta: Point) {
     if (!multiSelection || (!delta.x && !delta.y)) return;
     const current = latest.current.exercise;
-    latest.current.onCommit({
-      ...current,
-      objects: current.objects.map((object) => multiSelection.has(object.id)
-        ? { ...object, x: object.x + delta.x, y: object.y + delta.y }
-        : object),
-    });
+    const objects = current.objects.map((object) => multiSelection.has(object.id)
+      ? { ...object, x: object.x + delta.x, y: object.y + delta.y }
+      : object);
+    if (objects.some((object, index) => object !== current.objects[index] && !isInPitchQuadrants(object, quadrants))) {
+      clear();
+      controls.current?.batchDraw();
+      return;
+    }
+    latest.current.onCommit({ ...current, objects });
   }
   const renderObject = (o: ExerciseObject) => (
     <Group
@@ -650,11 +689,11 @@ export default function Canvas({
         const node = e.target;
         const next = {
           ...o,
-          x: clamp(node.x(), WIDTH),
-          y: clamp(node.y(), HEIGHT),
+          x: viewport.x + clamp(node.x() - viewport.x, viewport.width),
+          y: viewport.y + clamp(node.y() - viewport.y, viewport.height),
         };
         node.position(next);
-        applyObject(next);
+        if (!applyObject(next)) node.position(o);
       }}
       onTransformStart={(e) => {
         isolateObject(e.target, true);
@@ -668,8 +707,8 @@ export default function Canvas({
         const textDimensions = o.kind === "text" ? resizePitchText(node, o) : undefined;
         const next = {
           ...o,
-          x: clamp(node.x(), WIDTH),
-          y: clamp(node.y(), HEIGHT),
+          x: viewport.x + clamp(node.x() - viewport.x, viewport.width),
+          y: viewport.y + clamp(node.y() - viewport.y, viewport.height),
           rotation: ((node.rotation() + 360) % 720) - 360,
           width: Math.max(2, o.width * sx),
           height: Math.max(2, o.height * sy),
@@ -724,10 +763,11 @@ export default function Canvas({
   }
   return (
     <div
-      className="ke-canvas"
+      className={viewport.height === HEIGHT / 2 && viewport.width === WIDTH ? "ke-canvas ke-canvas--shallow" : "ke-canvas"}
+      style={{ "--ke-pitch-ratio": viewport.width / viewport.height } as CSSProperties}
       ref={host}
       role="group"
-      tabIndex={0}
+      tabIndex={surfacePreview ? undefined : 0}
       onPointerDownCapture={() => {
         ignorePitchClick.current = false;
         if (multiCursor) setMultiCursor(null);
@@ -742,7 +782,9 @@ export default function Canvas({
         }
       }}
       aria-label={
-        placementOnly
+        surfacePreview
+          ? "Преглед на игрището"
+          : placementOnly
           ? "Игрище за поставяне на обекти"
           : multiSelection
             ? "Игрище за множествен избор. Плъзнете от празно място за избор с рамка. Използвайте Page Up и Page Down за преглед и интервал за избор."
@@ -750,9 +792,10 @@ export default function Canvas({
       }
       onKeyDown={(e) => {
         if (
+          surfacePreview ||
           placementOnly ||
           e.target !== e.currentTarget ||
-          !exercise.objects.length ||
+          !visibleObjects.length ||
           e.currentTarget.closest("fieldset:disabled")
         ) {
           return;
@@ -760,40 +803,41 @@ export default function Canvas({
 
         if (multiSelection && e.key === " " && cursorIndex >= 0) {
           e.preventDefault();
-          onSelect(exercise.objects[cursorIndex].id);
+          onSelect(visibleObjects[cursorIndex].id);
           return;
         }
         if (e.key !== "PageUp" && e.key !== "PageDown") return;
         e.preventDefault();
-        const count = exercise.objects.length;
-        const current = multiSelection ? cursorIndex : exercise.objects.findIndex((o) => o.id === selected);
+        const count = visibleObjects.length;
+        const current = multiSelection ? cursorIndex : visibleObjects.findIndex((o) => o.id === selected);
         const step = e.key === "PageDown" ? 1 : -1;
         const start = current < 0 && step < 0 ? 0 : current;
         const next = (start + step + count) % count;
-        if (multiSelection) setMultiCursor(exercise.objects[next].id);
-        else onSelect(exercise.objects[next].id);
+        if (multiSelection) setMultiCursor(visibleObjects[next].id);
+        else onSelect(visibleObjects[next].id);
       }}
       onPointerCancel={clear}
       onContextMenu={(e) => e.preventDefault()}
     >
       <span className="ke-sr" role="status">
         {multiSelection
-          ? cursorIndex >= 0 && `Обект ${cursorIndex + 1} от ${exercise.objects.length}`
+          ? cursorIndex >= 0 && `Обект ${cursorIndex + 1} от ${visibleObjects.length}`
           : selectedLabel ? `Избран обект: ${selectedLabel}` : "Няма избран обект"}
       </span>
       {width > 0 && (
         <Stage
           ref={stage}
           width={width}
-          height={(width * HEIGHT) / WIDTH}
+          height={viewport.height * scale}
+          listening={!surfacePreview}
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
         >
-          <Layer scaleX={scale} scaleY={scale} listening={false}>
-            <Pitch surface={exercise.surface} />
+          <Layer {...viewLayer} listening={false}>
+            <Pitch surface={surfacePreview ?? exercise.surface} />
           </Layer>
-          <Layer scaleX={scale} scaleY={scale}>
+          <Layer {...viewLayer}>
             {(colorPreviewIndex < 0
               ? rendered
               : rendered.slice(0, colorPreviewIndex)
@@ -816,17 +860,17 @@ export default function Canvas({
           {/* Keep the surrounding layers still during live color changes. */}
           {colorPreviewIndex >= 0 && (
             <>
-              <Layer scaleX={scale} scaleY={scale}>
+              <Layer {...viewLayer}>
                 {renderObject(rendered[colorPreviewIndex])}
               </Layer>
               {colorPreviewIndex < rendered.length - 1 && (
-                <Layer scaleX={scale} scaleY={scale}>
+                <Layer {...viewLayer}>
                   {rendered.slice(colorPreviewIndex + 1).map(renderObject)}
                 </Layer>
               )}
             </>
           )}
-          <Layer ref={controls} scaleX={scale} scaleY={scale}>
+          <Layer ref={controls} {...viewLayer}>
             {multiSelection && (
               <Rect
                 ref={selectionBox}
@@ -978,6 +1022,7 @@ export default function Canvas({
           </Layer>
         </Stage>
       )}
+      {width > 0 && pitchOverlay}
       {width > 0 && (selectedObject || multiSelection) && (
         <div
           className={

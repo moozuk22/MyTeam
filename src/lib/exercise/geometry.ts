@@ -8,11 +8,15 @@ import {
 } from "./model";
 import { FOOTBALL } from "./football";
 export const clamp = (n: number, max: number) => Math.max(0, Math.min(max, n));
-export function clampGroupTranslation(positions: readonly Point[], delta: Point): Point {
+export function clampGroupTranslation(
+  positions: readonly Point[],
+  delta: Point,
+  bounds = { x: 0, y: 0, width: WIDTH, height: HEIGHT },
+): Point {
   let { x, y } = delta;
   for (const position of positions) {
-    x = Math.max(-position.x, Math.min(WIDTH - position.x, x));
-    y = Math.max(-position.y, Math.min(HEIGHT - position.y, y));
+    x = Math.max(bounds.x - position.x, Math.min(bounds.x + bounds.width - position.x, x));
+    y = Math.max(bounds.y - position.y, Math.min(bounds.y + bounds.height - position.y, y));
   }
   return { x, y };
 }

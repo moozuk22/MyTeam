@@ -4,6 +4,12 @@ The original HTML/CSS editor remains at `/admin/training-plans/[planId]`. The se
 
 Use **Нов план — Konva** to create a version-2 exercise or **Копирай в Konva** to convert a legacy exercise into a new record. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error instead of dropping objects. The original editor and its drawing code remain available.
 
+Edit **Име на плана** and **Описание** in the Konva editor, then choose **Запази**. Local draft recovery includes unsaved changes to both fields.
+
+Choose **Празно поле** to open the whole blank field immediately. For **Футболно игрище**, click the quadrants directly on the full-pitch preview and choose **Приложи**. Reopen the preview with **Избери части от игрището**. All four parts start selected. The editor crops to the selected parts and leaves gaps when they do not form a rectangle. If any objects are outside the selected parts, the editor asks for confirmation before removing them. Cancel to return to the preview or use **Отмени** after confirming to restore the objects and the previous pitch. **Избери всички**, **Изчисти игрището** and the equipment counts apply to the visible parts. Existing half-pitch plans keep their original view until you choose a different pitch type.
+
+The tool buttons in **Топки и врати** and **Пособия** show how many objects of each type are on the pitch.
+
 For equipment, players, arrows, lines and zones, **Брой обекти за поставяне** defaults to one and counts down after each successful placement or completed drawing. While one of these tools is active, you can place items or start drawings directly over existing items. Once the requested number is reached, the editor returns to selection mode with no object selected. Choose **Откажи поставянето**, tap the active tool again, or press Esc to cancel early and reset the count to one. In selection mode, click or drag existing items directly and use their handles to resize, rotate or reshape them.
 
 Selecting an object opens a toolbar on the pitch to change its color, duplicate it, delete it, or move it one layer forward or back. For players and text objects, the pencil button edits the number or text. To select objects with the keyboard, focus the pitch and use Page Up or Page Down. Color updates as the picker moves, and one undo restores the color before that adjustment. The toolbar moves below the object when there is insufficient room above it.

@@ -226,20 +226,28 @@ describe("training plan access and persistence", () => {
     const fourthTeam = { number: 4, color: "#22d3ee" };
     const layout = {
       ...EMPTY_EXERCISE,
+      quadrants: ["top-right", "bottom-right"],
       customTeamColors: ["#a855f7", fourthTeam.color],
       objects: [
         createObject("wall", { x: 200, y: 150 }, "wall"),
         createObject("custom-team-player", { x: 260, y: 150 }, "player", fourthTeam),
       ],
     };
-    mocks.findUnique.mockResolvedValue({ ...row, layout });
+    const title = "План за пасове";
+    const description = "Пасове по двойки.\nДве серии.";
+    mocks.findUnique.mockResolvedValue({ ...row, layout, title, description });
     const response = await PUT(
-      request("PUT", { layout, expectedUpdatedAt: revision }),
+      request("PUT", { layout, title: ` ${title} `, description: ` ${description} `, expectedUpdatedAt: revision }),
       params,
     );
     expect(response.status).toBe(200);
     expect(mocks.updateMany.mock.calls[1][0].data.layout).toEqual(layout);
-    expect((await response.json()).plan.layout).toEqual(layout);
+    expect(mocks.updateMany.mock.calls[1][0].data.title).toBe(title);
+    expect(mocks.updateMany.mock.calls[1][0].data.description).toBe(description);
+    const payload = await response.json();
+    expect(payload.plan.layout).toEqual(layout);
+    expect(payload.plan.title).toBe(title);
+    expect(payload.plan.description).toBe(description);
     expect(mocks.transaction).toHaveBeenCalledTimes(2);
   });
   it("allows only one of two saves from the same revision", async () => {

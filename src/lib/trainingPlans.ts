@@ -1,3 +1,6 @@
+export const MAX_PLAN_TITLE_LENGTH = 200;
+export const MAX_PLAN_DESCRIPTION_LENGTH = 1000;
+
 export const ALLOWED_EQUIPMENT_TYPES = [
   "cone",
   "ball",

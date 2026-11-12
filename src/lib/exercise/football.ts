@@ -1,6 +1,5 @@
 import {
   TEAM_COLORS,
-  type Exercise,
   type ExerciseObject,
   type ExerciseTool,
 } from "./model";
@@ -68,9 +67,9 @@ export const FOOTBALL_TOOLS: {
   },
   {
     title: "Топки и врати",
+    showCounts: true,
     types: [
       "ball",
-      "balls",
       "goal-small",
       "goal-full",
       "goal-7m",
@@ -148,10 +147,15 @@ export const FOOTBALL = {
   labels: FOOTBALL_LABELS,
   defaultPaths,
   surfaces: [
-    { id: "full", label: "Цяло игрище" },
-    { id: "half", label: "Половин игрище" },
+    { id: "full", label: "Футболно игрище" },
     { id: "blank", label: "Празно поле" },
-  ] as { id: Exercise["surface"]; label: string }[],
+  ] as const,
+  quadrantLabels: {
+    "top-left": "Горе вляво",
+    "top-right": "Горе вдясно",
+    "bottom-left": "Долу вляво",
+    "bottom-right": "Долу вдясно",
+  },
   actions: {
     run: { dash: [12, 6], arrow: true },
     dribble: { dash: [], arrow: true },

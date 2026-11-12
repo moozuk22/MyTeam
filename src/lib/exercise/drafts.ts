@@ -1,7 +1,10 @@
-import { validateExercise, type Exercise } from "./model";
+import { MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_TITLE_LENGTH } from "@/lib/trainingPlans";
+import { sameExercise, validateExercise, type Exercise } from "./model";
 export type RecoveryDraft = {
   baseRevision: string;
   layout: Exercise;
+  title?: string;
+  description?: string;
   savedAt: number;
 };
 export function draftKey(userId: string, clubId: string, planId: string) {
@@ -14,6 +17,10 @@ export function readDraft(value: string | null): RecoveryDraft | null {
     return typeof d.baseRevision === "string" &&
       Number.isFinite(Date.parse(d.baseRevision)) &&
       typeof d.savedAt === "number" &&
+      (d.title === undefined ||
+        (typeof d.title === "string" && d.title.length <= MAX_PLAN_TITLE_LENGTH)) &&
+      (d.description === undefined ||
+        (typeof d.description === "string" && d.description.length <= MAX_PLAN_DESCRIPTION_LENGTH)) &&
       !validateExercise(d.layout)
       ? d
       : null;
@@ -21,4 +28,9 @@ export function readDraft(value: string | null): RecoveryDraft | null {
     return null;
   }
 }
-export { sameExercise } from "./model";
+export function matchesDraft(draft: RecoveryDraft, layout: Exercise, title: string, description = "") {
+  return (draft.title === undefined || draft.title.trim() === title.trim()) &&
+    (draft.description === undefined || draft.description.trim() === description.trim()) &&
+    sameExercise(draft.layout, layout);
+}
+export { sameExercise };

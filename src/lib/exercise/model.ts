@@ -9,6 +9,22 @@ import {
 export const WIDTH = 1050;
 export const HEIGHT = 700;
 export type Point = { x: number; y: number };
+export const PITCH_QUADRANTS = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
+export type PitchQuadrant = (typeof PITCH_QUADRANTS)[number];
+export const PITCH_QUADRANT_BOUNDS = {
+  "top-left": { x: 0, y: 0 },
+  "top-right": { x: WIDTH / 2, y: 0 },
+  "bottom-left": { x: 0, y: HEIGHT / 2 },
+  "bottom-right": { x: WIDTH / 2, y: HEIGHT / 2 },
+} satisfies Record<PitchQuadrant, Point>;
+
+export function isInPitchQuadrants(point: Point, quadrants: readonly PitchQuadrant[]) {
+  return quadrants.some((quadrant) => {
+    const { x, y } = PITCH_QUADRANT_BOUNDS[quadrant];
+    return point.x >= x && point.x <= x + WIDTH / 2 &&
+      point.y >= y && point.y <= y + HEIGHT / 2;
+  });
+}
 export const ACTIONS = [
   "run",
   "dribble",
@@ -67,10 +83,16 @@ export type Exercise = {
   version: 2;
   sport: "football";
   surface: "full" | "half" | "blank";
+  quadrants?: PitchQuadrant[];
   customTeamColors?: (string | null)[];
   thirdTeamColor?: string;
   objects: ExerciseObject[];
 };
+
+export function getPitchQuadrants(layout: Exercise): readonly PitchQuadrant[] {
+  return layout.surface === "full" ? layout.quadrants ?? PITCH_QUADRANTS : PITCH_QUADRANTS;
+}
+
 const EMPTY_TEAM_COLORS: readonly (string | null)[] = [];
 
 export function getCustomTeamColors(layout: Exercise): readonly (string | null)[] {
@@ -137,10 +159,18 @@ export function validateExercise(raw: unknown): string | null {
   if (
     Object.keys(raw).some(
       (key) =>
-        !["version", "sport", "surface", "objects", "customTeamColors", "thirdTeamColor"].includes(key),
+        !["version", "sport", "surface", "quadrants", "objects", "customTeamColors", "thirdTeamColor"].includes(key),
     )
   )
     return "Непознато поле във формата на упражнението.";
+  if (raw.quadrants !== undefined &&
+    (raw.surface === "half" ||
+      !Array.isArray(raw.quadrants) ||
+      raw.quadrants.length === 0 ||
+      raw.quadrants.length > PITCH_QUADRANTS.length ||
+      !raw.quadrants.every((quadrant) => PITCH_QUADRANTS.includes(quadrant)) ||
+      new Set(raw.quadrants).size !== raw.quadrants.length)
+  ) return "Изберете валидни части от игрището.";
   let customTeamColors = EMPTY_TEAM_COLORS;
   if (raw.customTeamColors !== undefined) {
     if (
@@ -503,10 +533,14 @@ export function sameExercise(a: Exercise, b: Exercise): boolean {
   if (a === b) return true;
   const teamsA = getCustomTeamColors(a);
   const teamsB = getCustomTeamColors(b);
+  const quadrantsA = a.quadrants ?? PITCH_QUADRANTS;
+  const quadrantsB = b.quadrants ?? PITCH_QUADRANTS;
   return (
     a.version === b.version &&
     a.sport === b.sport &&
     a.surface === b.surface &&
+    (quadrantsA === quadrantsB ||
+      (quadrantsA.length === quadrantsB.length && quadrantsA.every((part) => quadrantsB.includes(part)))) &&
     (teamsA === teamsB ||
       (teamsA.length === teamsB.length && teamsA.every((color, i) => color === teamsB[i]))) &&
     a.objects.length === b.objects.length &&

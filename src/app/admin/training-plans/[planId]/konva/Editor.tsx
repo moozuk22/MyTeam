@@ -31,12 +31,15 @@ import {
   HEIGHT,
   CUSTOM_TEAM_COLOR_ERROR,
   MAX_TEXT_FONT_SIZE,
+  PITCH_QUADRANTS,
   WIDTH,
   addCustomTeam,
   createObject,
   getCustomTeamColors,
+  getPitchQuadrants,
   isCustomTeamColor,
   isMovementType,
+  isInPitchQuadrants,
   isZoneType,
   removeCustomTeam,
   textFontSize,
@@ -44,6 +47,7 @@ import {
   type Exercise,
   type ExerciseObject,
   type ExerciseTool,
+  type PitchQuadrant,
 } from "@/lib/exercise/model";
 import {
   arrowheadPoints,
@@ -58,11 +62,12 @@ import {
 } from "@/lib/exercise/geometry";
 import {
   draftKey,
+  matchesDraft,
   readDraft,
   sameExercise,
   type RecoveryDraft,
 } from "@/lib/exercise/drafts";
-import { MAX_ITEMS } from "@/lib/trainingPlans";
+import { MAX_ITEMS, MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_TITLE_LENGTH } from "@/lib/trainingPlans";
 import Canvas from "./Canvas";
 import { EquipmentPreview } from "./Visuals";
 import { measurePitchText } from "./textLayout";
@@ -446,6 +451,9 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const selected = selection?.id ?? null;
   const [multiSelection, setMultiSelection] = useState<Set<string> | null>(null);
   const multiActive = multiSelection !== null;
+  const [pitchSelection, setPitchSelection] = useState<readonly PitchQuadrant[] | null>(null);
+  const pitchPicker = useRef<HTMLDivElement>(null);
+  const pitchPickerTrigger = useRef<HTMLButtonElement>(null);
   function setSelected(id: string | null) {
     setSelection((current) => {
       if (current?.id === id) return current;
@@ -467,6 +475,11 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     [conflict, setConflict] = useState(false);
   const [revision, setRevision] = useState(plan.updatedAt),
     [saved, setSaved] = useState(plan.layout);
+  const [title, setTitle] = useState(plan.title);
+  const [savedTitle, setSavedTitle] = useState(plan.title);
+  const initialDescription = plan.description ?? "";
+  const [description, setDescription] = useState(initialDescription);
+  const [savedDescription, setSavedDescription] = useState(initialDescription);
   const [recovery, setRecovery] = useState<RecoveryDraft | null>(null),
     [draftReady, setDraftReady] = useState(false);
   const [storageError, setStorageError] = useState(false);
@@ -488,20 +501,28 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const activeCategory =
     category < firstCustomCategory || customTeamNumber !== undefined ? category : 0;
   const toolGroup = toolGroups[activeCategory] ?? TOOLBAR_GROUPS[0];
+  const quadrants = getPitchQuadrants(layout);
+  const visibleObjects = useMemo(
+    () => quadrants.length === PITCH_QUADRANTS.length
+      ? layout.objects
+      : layout.objects.filter((object) => isInPitchQuadrants(object, quadrants)),
+    [layout.objects, quadrants],
+  );
   const equipmentCounts = useMemo(
-    () => (toolGroup.showCounts ? countEquipment(layout.objects) : null),
-    [layout.objects, toolGroup.showCounts],
+    () => (toolGroup.showCounts ? countEquipment(visibleObjects) : null),
+    [visibleObjects, toolGroup.showCounts],
   );
   const tool =
     customTeamNumber === undefined && selectedTool.startsWith("custom-team-")
       ? "select"
       : selectedTool;
   const validTeamColor = isCustomTeamColor(teamColor);
-  const dirty = useMemo(() => !sameExercise(layout, saved), [layout, saved]);
-  const object = layout.objects.find((o) => o.id === selected);
+  const layoutDirty = useMemo(() => !sameExercise(layout, saved), [layout, saved]);
+  const dirty = title.trim() !== savedTitle || description.trim() !== savedDescription || layoutDirty;
+  const object = visibleObjects.find((o) => o.id === selected);
   const batch = useMemo(
-    () => multiSelection ? layout.objects.filter((o) => multiSelection.has(o.id)) : [],
-    [layout.objects, multiSelection],
+    () => multiSelection ? visibleObjects.filter((o) => multiSelection.has(o.id)) : [],
+    [visibleObjects, multiSelection],
   );
   const batchIds = useMemo(() => new Set(batch.map((o) => o.id)), [batch]);
   const multiAnchorId = multiSelection && [...multiSelection].find((id) => batchIds.has(id));
@@ -518,8 +539,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     Number.isInteger(quantity) && quantity >= 1 && quantity <= placementCapacity;
   const key = draftKey(userId, clubId, plan.id),
     endpoint = `/api/admin/clubs/${clubId}/training-plans/${plan.id}`;
-  const state = useRef({ layout, dirty, revision, saved });
-  state.current = { layout, dirty, revision, saved };
+  const state = useRef({ layout, title, description, dirty, revision, saved });
+  state.current = { layout, title, description, dirty, revision, saved };
   const savingRef = useRef(false);
   const change = useCallback((next: Exercise) => {
     const invalid = validateExercise(next);
@@ -531,13 +552,13 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     setStatus("");
   }, []);
   function patch(changes: Partial<ExerciseObject>) {
-    if (object)
-      change({
-        ...layout,
-        objects: layout.objects.map((o) =>
-          o.id === object.id ? { ...o, ...changes } : o,
-        ),
-      });
+    if (!object) return;
+    const updated = { ...object, ...changes };
+    if (!isInPitchQuadrants(updated, quadrants)) return;
+    change({
+      ...layout,
+      objects: layout.objects.map((o) => o.id === object.id ? updated : o),
+    });
   }
   function updateLabel(label: string, fontSize?: number) {
     if (object?.kind === "text" && fontSize !== undefined) {
@@ -601,6 +622,48 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     setTool("select");
     setPlacementCount("1");
   }
+  function openPitchPicker(trigger: HTMLButtonElement) {
+    cancelPlacement();
+    pitchPickerTrigger.current = trigger;
+    setPitchSelection((current) => current ?? quadrants);
+    requestAnimationFrame(() => {
+      pitchPicker.current?.scrollIntoView({ block: "nearest" });
+      pitchPicker.current?.querySelector<HTMLButtonElement>(".ke-pitch-quadrants button:not(:disabled)")
+        ?.focus({ preventScroll: true });
+    });
+  }
+  function selectBlankField() {
+    setPitchSelection(null);
+    cancelPlacement();
+    change({ ...layout, surface: "blank", quadrants: undefined });
+  }
+  function toggleQuadrant(quadrant: PitchQuadrant) {
+    setPitchSelection((current) => {
+      if (!current) return current;
+      const enabled = current.includes(quadrant);
+      if (enabled && current.length === 1) return current;
+      return PITCH_QUADRANTS.filter((part) =>
+        part === quadrant ? !enabled : current.includes(part),
+      );
+    });
+  }
+  function closePitchPicker(apply: boolean) {
+    if (apply && pitchSelection) {
+      const objects = pitchSelection.length === PITCH_QUADRANTS.length
+        ? layout.objects
+        : layout.objects.filter((object) => isInPitchQuadrants(object, pitchSelection));
+      if (
+        objects.length < layout.objects.length &&
+        !window.confirm(
+          "Обектите в неизбраните части на игрището ще бъдат премахнати. Искате ли да продължите?",
+        )
+      ) return;
+      change({ ...layout, surface: "full", quadrants: [...pitchSelection], objects });
+    }
+    setPitchSelection(null);
+    cancelPlacement();
+    pitchPickerTrigger.current?.focus({ preventScroll: true });
+  }
   function toggleMultiSelect() {
     cancelPlacement();
     if (multiActive) return;
@@ -658,19 +721,26 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     cancelPlacement();
   }
   function clearPitch() {
-    change({ ...layout, objects: [] });
+    change({ ...layout, objects: layout.objects.filter((object) => !isInPitchQuadrants(object, quadrants)) });
     cancelPlacement();
   }
   function duplicate() {
     if (multiActive) {
       if (!canDuplicateBatch) return;
-      const copies = duplicateObjects(batch, () => crypto.randomUUID());
+      const shifted = duplicateObjects(batch, () => crypto.randomUUID());
+      const copies = shifted.every((copy) => isInPitchQuadrants(copy, quadrants))
+        ? shifted
+        : shifted.map((copy, index) => ({ ...copy, x: batch[index].x, y: batch[index].y }));
       change({ ...layout, objects: [...layout.objects, ...copies] });
       setMultiSelection(new Set(copies.map((o) => o.id)));
       return;
     }
     if (!object) return;
     const copy = duplicateObject(object, crypto.randomUUID());
+    if (!isInPitchQuadrants(copy, quadrants)) {
+      copy.x = object.x;
+      copy.y = object.y;
+    }
     change({ ...layout, objects: [...layout.objects, copy] });
     if (layout.objects.length < MAX_ITEMS) setSelected(copy.id);
   }
@@ -691,12 +761,12 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   useEffect(() => {
     try {
       const draft = readDraft(localStorage.getItem(key));
-      if (draft && !sameExercise(draft.layout, plan.layout)) setRecovery(draft);
+      if (draft && !matchesDraft(draft, plan.layout, plan.title, initialDescription)) setRecovery(draft);
     } catch {
       setStorageError(true);
     }
     setDraftReady(true);
-  }, [key, plan.layout]);
+  }, [key, plan.layout, plan.title, initialDescription]);
   useEffect(() => {
     if (!draftReady || recovery) return;
     const timer = setTimeout(() => {
@@ -707,20 +777,22 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
             JSON.stringify({
               baseRevision: revision,
               layout,
+              title,
+              description,
               savedAt: Date.now(),
             } satisfies RecoveryDraft),
           );
         // Remove only this editor's saved snapshot; another tab may have a newer draft.
         else {
           const d = readDraft(localStorage.getItem(key));
-          if (d && sameExercise(d.layout, saved)) localStorage.removeItem(key);
+          if (d && matchesDraft(d, saved, savedTitle, savedDescription)) localStorage.removeItem(key);
         }
       } catch {
         setStorageError(true);
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [layout, dirty, revision, saved, key, draftReady, recovery]);
+  }, [layout, title, description, dirty, revision, saved, savedTitle, savedDescription, key, draftReady, recovery]);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       if (!state.current.dirty && !recovery) return;
@@ -731,6 +803,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
             JSON.stringify({
               baseRevision: state.current.revision,
               layout: state.current.layout,
+              title: state.current.title,
+              description: state.current.description,
               savedAt: Date.now(),
             }),
           );
@@ -749,6 +823,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
             JSON.stringify({
               baseRevision: state.current.revision,
               layout: state.current.layout,
+              title: state.current.title,
+              description: state.current.description,
               savedAt: Date.now(),
             }),
           );
@@ -786,6 +862,13 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         )
       )
         return;
+      if (pitchSelection) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closePitchPicker(false);
+        }
+        return;
+      }
       if (e.key === "Escape") {
         if (!e.defaultPrevented) cancelPlacement();
         return;
@@ -845,12 +928,18 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     return () => window.removeEventListener("keydown", handler);
   });
   async function save(asCopy = false) {
-    if (savingRef.current || recovery) return;
+    if (savingRef.current || recovery || pitchSelection) return;
+    const snapshotTitle = state.current.title.trim();
+    if (!snapshotTitle) {
+      setError("Името е задължително.");
+      return;
+    }
     savingRef.current = true;
     setSaving(true);
     setError("");
     setStatus("");
     const snapshot = state.current.layout,
+      snapshotDescription = state.current.description.trim(),
       base = state.current.revision;
     try {
       const res = await fetch(
@@ -861,11 +950,11 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
           body: JSON.stringify(
             asCopy
               ? {
-                  title: `${plan.title.slice(0, 185)} — копие`,
-                  description: plan.description ?? "",
+                  title: `${snapshotTitle.slice(0, 185)} — копие`,
+                  description: snapshotDescription,
                   layout: snapshot,
                 }
-              : { layout: snapshot, expectedUpdatedAt: base },
+              : { title: snapshotTitle, description: snapshotDescription, layout: snapshot, expectedUpdatedAt: base },
           ),
         },
       );
@@ -880,12 +969,16 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         setCopyId(payload.plan.id);
       } else {
         setSaved(snapshot);
+        setTitle(snapshotTitle);
+        setSavedTitle(snapshotTitle);
+        setDescription(snapshotDescription);
+        setSavedDescription(snapshotDescription);
         setRevision(payload.plan.updatedAt);
         setConflict(false);
         setStatus("Промените са запазени.");
         try {
           const d = readDraft(localStorage.getItem(key));
-          if (d && sameExercise(d.layout, snapshot))
+          if (d && matchesDraft(d, snapshot, snapshotTitle, snapshotDescription))
             localStorage.removeItem(key);
         } catch {
           setStorageError(true);
@@ -906,7 +999,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   async function reload() {
     if (
       !window.confirm(
-        "Да заменим текущата рисунка с последния запис от сървъра?",
+        "Да заменим текущите промени с последния запис от сървъра?",
       )
     )
       return;
@@ -921,9 +1014,14 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         throw new Error(data.error || "Невалиден запис.");
       setHistory({ past: [], present: data.plan.layout, future: [] });
       setSaved(data.plan.layout);
+      setTitle(data.plan.title);
+      setSavedTitle(data.plan.title);
+      setDescription(data.plan.description ?? "");
+      setSavedDescription(data.plan.description ?? "");
       setRevision(data.plan.updatedAt);
       setConflict(false);
       setSelected(null);
+      setPitchSelection(null);
       try {
         localStorage.removeItem(key);
       } catch {
@@ -939,6 +1037,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   function restoreDraft(restore: boolean) {
     if (restore && recovery) {
       change(recovery.layout);
+      if (recovery.title !== undefined) setTitle(recovery.title);
+      if (recovery.description !== undefined) setDescription(recovery.description);
       if (recovery.baseRevision !== revision) setConflict(true);
     }
     try {
@@ -969,9 +1069,9 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
       </p>
       <button
         type="button"
-        disabled={batch.length === layout.objects.length}
+        disabled={batch.length === visibleObjects.length}
         onClick={() => setMultiSelection((current) =>
-          new Set([...(current ?? []), ...layout.objects.map((o) => o.id)]),
+          new Set([...(current ?? []), ...visibleObjects.map((o) => o.id)]),
         )}
       >
         Избери всички
@@ -1021,13 +1121,41 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
             <ArrowLeft size={18} />
             Назад
           </button>
-          <div>
-            <h1>{plan.title}</h1>
+          <div className="ke-plan-details">
+            <h1 className="ke-sr">{savedTitle}</h1>
+            <label>
+              Име на плана
+              <input
+                type="text"
+                value={title}
+                maxLength={MAX_PLAN_TITLE_LENGTH}
+                required
+                disabled={saving || !!recovery}
+                onChange={(event) => {
+                  setTitle(event.currentTarget.value);
+                  setStatus("");
+                  if (error === "Името е задължително.") setError("");
+                }}
+              />
+            </label>
+            <label>
+              Описание
+              <textarea
+                value={description}
+                maxLength={MAX_PLAN_DESCRIPTION_LENGTH}
+                rows={2}
+                disabled={saving || !!recovery}
+                onChange={(event) => {
+                  setDescription(event.currentTarget.value);
+                  setStatus("");
+                }}
+              />
+            </label>
           </div>
           <button
             type="button"
             className="ke-primary"
-            disabled={saving || !dirty || !!recovery || conflict}
+            disabled={saving || !dirty || !!recovery || conflict || !!pitchSelection}
             onClick={() => void save()}
           >
             <Save size={18} />
@@ -1059,10 +1187,10 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         </div>
         {recovery && (
           <section className="ke-notice" aria-label="Локално възстановяване">
-            <h2>Открита е незапазена рисунка</h2>
+            <h2>Открити са незапазени промени</h2>
             <p>
               {recovery.baseRevision !== revision
-                ? "Записът на сървъра е променен. Възстановете рисунката и я запазете като копие или я отхвърлете."
+                ? "Записът на сървъра е променен. Възстановете промените и запазете копие или ги отхвърлете."
                 : "Да възстановим ли локалните промени?"}
             </p>
             <button type="button" onClick={() => restoreDraft(true)}>
@@ -1075,10 +1203,10 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         )}
         {conflict && (
           <section className="ke-notice">
-            <p>Има по-нов запис. Текущата рисунка е запазена в редактора.</p>
+            <p>Има по-нов запис. Текущите промени остават в редактора.</p>
             <button
               type="button"
-              disabled={saving || !!recovery}
+              disabled={saving || !!recovery || !!pitchSelection}
               onClick={() => void save(true)}
             >
               Запази като нов план
@@ -1096,7 +1224,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
           <legend className="ke-sr">Инструменти за упражнението</legend>
           <div className="ke-layout">
             <div className="ke-sidebar">
-              <div className="ke-toolbar">
+              <div className="ke-toolbar" inert={!!pitchSelection}>
                 <button
                   type="button"
                   aria-label="Отмени"
@@ -1125,33 +1253,41 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 </button>
                 <button
                   type="button"
-                  disabled={layout.objects.length === 0}
+                  disabled={visibleObjects.length === 0}
                   onClick={clearPitch}
                 >
                   <Trash2 size={18} aria-hidden="true" />
                   Изчисти игрището
                 </button>
-                <label>
-                  Игрище
-                  <select
-                    value={layout.surface}
-                    onChange={(e) =>
-                      change({
-                        ...layout,
-                        surface: e.target.value as Exercise["surface"],
-                      })
-                    }
-                  >
-                    {FOOTBALL.surfaces.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
+              <fieldset className="ke-pitch-options">
+                <legend>Игрище</legend>
+                {FOOTBALL.surfaces.map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={(pitchSelection ? "full" : layout.surface) === id}
+                    onClick={id === "blank" ? selectBlankField : (event) => openPitchPicker(event.currentTarget)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </fieldset>
+              {layout.surface === "half" ? (
+                <p className="ke-pitch-legacy">Запазено половин игрище</p>
+              ) : layout.surface === "full" && (
+                <button
+                  className="ke-pitch-parts-button"
+                  type="button"
+                  aria-expanded={!!pitchSelection}
+                  onClick={(event) => openPitchPicker(event.currentTarget)}
+                >
+                  Избери части от игрището
+                </button>
+              )}
               <div
                 className="ke-categories"
+                inert={!!pitchSelection}
                 role="group"
                 aria-label="Категории инструменти"
               >
@@ -1231,6 +1367,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
               {activeCategory !== TEXT_CATEGORY && (
                 <div
                   className="ke-tools"
+                  inert={!!pitchSelection}
                   ref={toolsRef}
                   role="group"
                   aria-label={toolGroup.title}
@@ -1363,10 +1500,39 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 )}
               </div>
             </div>
-            <div className="ke-pitch-area">
+            <div
+              className={pitchSelection ? "ke-pitch-area ke-pitch-area--picker" : "ke-pitch-area"}
+              ref={pitchPicker}
+            >
+              {pitchSelection && (
+                <div className="ke-pitch-picker-actions">
+                  <p>Изберете части директно върху игрището.</p>
+                  <button type="button" className="ke-primary" onClick={() => closePitchPicker(true)}>Приложи</button>
+                  <button type="button" onClick={() => closePitchPicker(false)}>Отказ</button>
+                </div>
+              )}
               <div className="ke-pitch-frame">
                 <Canvas
                   exercise={layout}
+                  visibleObjects={pitchSelection ? layout.objects : visibleObjects}
+                  surfacePreview={pitchSelection ? "full" : undefined}
+                  pitchOverlay={pitchSelection && (
+                    <div className="ke-pitch-quadrants" role="group" aria-label="Части от игрището">
+                      {PITCH_QUADRANTS.map((quadrant) => {
+                        const enabled = pitchSelection.includes(quadrant);
+                        return (
+                          <button
+                            key={quadrant}
+                            type="button"
+                            aria-label={FOOTBALL.quadrantLabels[quadrant]}
+                            aria-pressed={enabled}
+                            disabled={enabled && pitchSelection.length === 1}
+                            onClick={() => toggleQuadrant(quadrant)}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
                   selected={selected}
                   multiSelection={multiActive ? batchIds : null}
                   multiAnchorId={multiAnchorId ?? undefined}
