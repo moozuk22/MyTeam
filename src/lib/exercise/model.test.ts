@@ -20,6 +20,7 @@ import {
   commit,
   drawnObject,
   duplicateObject,
+  duplicateObjects,
   localPoint,
   movementHandlePoint,
   movementPoints,
@@ -37,6 +38,19 @@ const point = { x: 200, y: 200 };
 const cone = createObject("cone", point, "cone");
 const exercise = { ...EMPTY_EXERCISE, objects: [cone] };
 describe("exercise model and geometry", () => {
+  it("duplicates a selection together when it is near the edge of the pitch", () => {
+    const objects = [
+      { ...cone, x: 1000, y: 650 },
+      createObject("text", { x: 1050, y: 700 }, "label"),
+    ];
+    const ids = ["copy-cone", "copy-label"];
+    const copies = duplicateObjects(objects, () => ids.shift()!);
+    expect(copies).toEqual([
+      { ...objects[0], id: "copy-cone", x: 976, y: 626 },
+      { ...objects[1], id: "copy-label", x: 1026, y: 676 },
+    ]);
+  });
+
   it("preserves explicit text font sizes and accepts older text without one", () => {
     const text = createObject("text", point, "text");
     expect(validateSavedLayout({ ...EMPTY_EXERCISE, objects: [text] })).toBeNull();

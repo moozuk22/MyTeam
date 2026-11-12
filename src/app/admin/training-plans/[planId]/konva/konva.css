@@ -252,6 +252,26 @@
 .ke-canvas canvas {
   display: block;
 }
+.ke-multi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding-block: 4px;
+}
+.ke-multi-actions p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: #d8dfda;
+}
+.ke-page .ke-multi-actions button[aria-label],
+.ke-page .ke-multi-actions input[type="color"] {
+  width: 44px;
+  height: 44px;
+  padding: 6px;
+}
 .ke-object-actions {
   --ke-action-size: 44px;
   --ke-action-gap: 3px;
@@ -275,8 +295,9 @@
   padding: 6px;
 }
 .ke-object-label {
+  --ke-label-width: calc(6 * var(--ke-action-size) + 5 * var(--ke-action-gap));
   display: flex;
-  width: calc(6 * var(--ke-action-size) + 5 * var(--ke-action-gap));
+  width: var(--ke-label-width);
   gap: var(--ke-action-gap);
 }
 .ke-page .ke-object-label input {
@@ -284,8 +305,11 @@
 }
 .ke-object-label--text {
   display: grid;
+  width: calc(var(--ke-label-width) + 14px);
   grid-template-columns: minmax(0, 1fr) repeat(3, var(--ke-action-size));
-  align-items: end;
+  align-items: center;
+  row-gap: 10px;
+  padding: 5px;
 }
 .ke-object-label--text textarea {
   grid-column: 1 / -1;
@@ -305,13 +329,22 @@
   height: 112px;
 }
 .ke-object-label--text label {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  line-height: 1.25;
 }
 .ke-page .ke-object-label--text input {
-  width: 4rem;
+  appearance: textfield;
+  height: var(--ke-action-size);
+  padding-inline: 6px;
+}
+.ke-object-label--text input::-webkit-inner-spin-button,
+.ke-object-label--text input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
 }
 @media (min-width: 1000px) and (min-height: 560px) {
   .ke-object-label--text[data-expanded="true"] {
@@ -467,6 +500,17 @@
   .ke-pitch-area {
     display: grid;
     place-items: center;
+    container-type: size;
+  }
+  .ke-pitch-area--multi {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .ke-pitch-frame {
+    display: grid;
+    place-items: center;
+    align-self: stretch;
+    width: 100%;
+    min-height: 0;
     container-type: size;
   }
   .ke-canvas,

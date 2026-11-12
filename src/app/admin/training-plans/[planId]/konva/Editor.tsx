@@ -20,6 +20,7 @@ import {
   Plus,
   Redo2,
   Save,
+  SquareDashed,
   Trash2,
   Undo2,
   X,
@@ -48,6 +49,7 @@ import {
   arrowheadPoints,
   commit,
   duplicateObject,
+  duplicateObjects,
   movementPoints,
   shotShafts,
   redo,
@@ -442,6 +444,9 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const [selection, setSelection] = useState<{ id: string; editLabel: boolean } | null>(null),
     [selectedTool, setTool] = useState<ExerciseTool | "select">("select");
   const selected = selection?.id ?? null;
+  const [multiSelection, setMultiSelection] = useState<Set<string> | null>(null);
+  const multiActive = multiSelection !== null;
+  const multiToolbar = useRef<HTMLDivElement>(null);
   function setSelected(id: string | null) {
     setSelection((current) => {
       if (current?.id === id) return current;
@@ -495,6 +500,12 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const validTeamColor = isCustomTeamColor(teamColor);
   const dirty = useMemo(() => !sameExercise(layout, saved), [layout, saved]);
   const object = layout.objects.find((o) => o.id === selected);
+  const batch = useMemo(
+    () => multiSelection ? layout.objects.filter((o) => multiSelection.has(o.id)) : [],
+    [layout.objects, multiSelection],
+  );
+  const batchIds = useMemo(() => new Set(batch.map((o) => o.id)), [batch]);
+  const canDuplicateBatch = batch.length > 0 && layout.objects.length + batch.length <= MAX_ITEMS;
   const drawingMovement = isMovementType(tool);
   const drawingArrow =
     drawingMovement && tool !== "line" && tool !== "dashed-line";
@@ -548,15 +559,15 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     return true;
   }
   function updateObjectColor(
-    id: string,
+    targets: string | ReadonlySet<string>,
     color: string,
     group: symbol,
     preview: boolean,
   ) {
     if (!/^#[0-9a-f]{6}$/i.test(color)) return;
     setColorPreview((current) => {
-      if (!preview) return null;
-      return current?.group === group ? current : { id, group };
+      if (!preview || typeof targets !== "string") return null;
+      return current?.group === group ? current : { id: targets, group };
     });
     setHistory((h) =>
       commit(
@@ -564,7 +575,10 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         {
           ...h.present,
           objects: h.present.objects.map((o) =>
-            o.id === id && o.color !== color ? { ...o, color } : o,
+            o.color !== color &&
+              (typeof targets === "string" ? o.id === targets : targets.has(o.id))
+              ? { ...o, color }
+              : o,
           ),
         },
         group,
@@ -573,16 +587,38 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     setStatus("");
   }
   function remove() {
+    if (multiActive && !batch.length) return;
     change({
       ...layout,
-      objects: layout.objects.filter((o) => o.id !== selected),
+      objects: layout.objects.filter((o) => multiActive ? !batchIds.has(o.id) : o.id !== selected),
     });
     setSelected(null);
+    if (multiActive) setMultiSelection(new Set());
   }
   function cancelPlacement() {
     setSelected(null);
+    setMultiSelection(null);
     setTool("select");
     setPlacementCount("1");
+  }
+  function toggleMultiSelect() {
+    cancelPlacement();
+    if (multiActive) return;
+    setMultiSelection(new Set(selected ? [selected] : []));
+    requestAnimationFrame(() => multiToolbar.current?.scrollIntoView({ block: "nearest" }));
+  }
+  function selectOnPitch(id: string | null) {
+    if (!multiActive) {
+      setSelected(id);
+      return;
+    }
+    setMultiSelection((current) => {
+      if (!current || !id) return new Set();
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
   function createTeam() {
     if (!validTeamColor) return;
@@ -626,6 +662,13 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     cancelPlacement();
   }
   function duplicate() {
+    if (multiActive) {
+      if (!canDuplicateBatch) return;
+      const copies = duplicateObjects(batch, () => crypto.randomUUID());
+      change({ ...layout, objects: [...layout.objects, ...copies] });
+      setMultiSelection(new Set(copies.map((o) => o.id)));
+      return;
+    }
     if (!object) return;
     const copy = duplicateObject(object, crypto.randomUUID());
     change({ ...layout, objects: [...layout.objects, copy] });
@@ -757,11 +800,11 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
       } else if (
         (e.metaKey || e.ctrlKey) &&
         e.key.toLowerCase() === "d" &&
-        object
+        (object || batch.length)
       ) {
         e.preventDefault();
         duplicate();
-      } else if ((e.key === "Delete" || e.key === "Backspace") && object) {
+      } else if ((e.key === "Delete" || e.key === "Backspace") && (object || batch.length)) {
         e.preventDefault();
         remove();
       } else if (
@@ -906,6 +949,11 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     setRecovery(null);
   }
   function reorder(delta: number) {
+    if (multiActive) {
+      const rest = layout.objects.filter((o) => !batchIds.has(o.id));
+      change({ ...layout, objects: delta < 0 ? [...batch, ...rest] : [...rest, ...batch] });
+      return;
+    }
     if (!object) return;
     const next = [...layout.objects],
       at = next.findIndex((o) => o.id === object.id),
@@ -1026,6 +1074,14 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 >
                   <Redo2 size={18} />
                   Повтори
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={multiActive}
+                  onClick={toggleMultiSelect}
+                >
+                  <SquareDashed size={18} aria-hidden="true" />
+                  Множествен избор
                 </button>
                 <button
                   type="button"
@@ -1155,8 +1211,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                             cancelPlacement();
                             return;
                           }
-                          setSelected(null);
-                          setPlacementCount("1");
+                          cancelPlacement();
                           setTool(t);
                           const defaultPath = FOOTBALL.defaultPaths[t];
                           if (defaultPath) setPathMode(defaultPath);
@@ -1268,45 +1323,85 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 )}
               </div>
             </div>
-            <div className="ke-pitch-area">
-              <Canvas
-                exercise={layout}
-                selected={selected}
-                tool={
-                  recovery || (usesQuantity && !validQuantity) ? "select" : tool
-                }
-                placementOnly={tool !== "select"}
-                customTeamNumber={customTeamNumber}
-                pathMode={pathMode}
-                colorPreviewId={
-                  colorPreview?.group === history.group &&
-                  colorPreview?.id === selected
-                    ? colorPreview.id
-                    : undefined
-                }
-                selectedLabel={object ? objectLabel(object) : undefined}
-                objectActions={object && (
-                  <ObjectActions
-                    key={object.id}
-                    object={object}
-                    editLabelOnMount={selection?.editLabel ?? false}
-                    onColorChange={(color, group, preview) =>
-                      updateObjectColor(object.id, color, group, preview)
-                    }
-                    onLabelChange={updateLabel}
-                    onDuplicate={duplicate}
-                    onRemove={remove}
-                    onReorder={reorder}
-                    canDuplicate={layout.objects.length < MAX_ITEMS}
-                    canMoveBack={layout.objects[0].id !== object.id}
-                    canMoveForward={layout.objects.at(-1)!.id !== object.id}
-                  />
-                )}
-                onSelect={setSelected}
-                onCommit={change}
-                onPlaced={onPlaced}
-                onError={setError}
-              />
+            <div className={multiActive ? "ke-pitch-area ke-pitch-area--multi" : "ke-pitch-area"}>
+              {multiActive && (
+                <div className="ke-multi-actions" role="group" aria-label="Действия за множествен избор" ref={multiToolbar}>
+                  <p role="status">
+                    {batch.length ? `Избрани обекти: ${batch.length}` : "Изберете обекти на игрището."}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={batch.length === layout.objects.length}
+                    onClick={() => setMultiSelection(new Set(layout.objects.map((o) => o.id)))}
+                  >
+                    Избери всички
+                  </button>
+                  {batch.length > 0 && (
+                    <>
+                      <ObjectColorInput
+                        color={batch[0].color}
+                        onCommit={(color, group, preview) => updateObjectColor(batchIds, color, group, preview)}
+                      />
+                      <button type="button" aria-label="Дублирай избраните" title="Дублирай избраните" onClick={duplicate} disabled={!canDuplicateBatch}>
+                        <Copy size={18} aria-hidden="true" />
+                      </button>
+                      <button type="button" aria-label="Изтрий избраните" title="Изтрий избраните" onClick={remove}>
+                        <Trash2 size={18} aria-hidden="true" />
+                      </button>
+                      <button type="button" aria-label="Изпрати избраните най-отзад" title="Изпрати избраните най-отзад" onClick={() => reorder(-1)}>
+                        <ArrowDown size={18} aria-hidden="true" />
+                      </button>
+                      <button type="button" aria-label="Премести избраните най-отпред" title="Премести избраните най-отпред" onClick={() => reorder(1)}>
+                        <ArrowUp size={18} aria-hidden="true" />
+                      </button>
+                    </>
+                  )}
+                  <button type="button" aria-label="Край на множествения избор" title="Край на множествения избор" onClick={cancelPlacement}>
+                    <X size={18} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+              <div className="ke-pitch-frame">
+                <Canvas
+                  exercise={layout}
+                  selected={selected}
+                  multiSelection={multiActive ? batchIds : null}
+                  tool={
+                    recovery || (usesQuantity && !validQuantity) ? "select" : tool
+                  }
+                  placementOnly={tool !== "select"}
+                  customTeamNumber={customTeamNumber}
+                  pathMode={pathMode}
+                  colorPreviewId={
+                    colorPreview?.group === history.group &&
+                    colorPreview?.id === selected
+                      ? colorPreview.id
+                      : undefined
+                  }
+                  selectedLabel={object ? objectLabel(object) : undefined}
+                  objectActions={object && (
+                    <ObjectActions
+                      key={object.id}
+                      object={object}
+                      editLabelOnMount={selection?.editLabel ?? false}
+                      onColorChange={(color, group, preview) =>
+                        updateObjectColor(object.id, color, group, preview)
+                      }
+                      onLabelChange={updateLabel}
+                      onDuplicate={duplicate}
+                      onRemove={remove}
+                      onReorder={reorder}
+                      canDuplicate={layout.objects.length < MAX_ITEMS}
+                      canMoveBack={layout.objects[0].id !== object.id}
+                      canMoveForward={layout.objects.at(-1)!.id !== object.id}
+                    />
+                  )}
+                  onSelect={selectOnPitch}
+                  onCommit={change}
+                  onPlaced={onPlaced}
+                  onError={setError}
+                />
+              </div>
             </div>
           </div>
         </fieldset>

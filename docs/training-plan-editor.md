@@ -8,6 +8,8 @@ For equipment, players, arrows, lines and zones, **Брой обекти за п
 
 Selecting an object opens a toolbar on the pitch to change its color, duplicate it, delete it, or move it one layer forward or back. For players and text objects, the pencil button edits the number or text. To select objects with the keyboard, focus the pitch and use Page Up or Page Down. Color updates as the picker moves, and one undo restores the color before that adjustment. The toolbar moves below the object when there is insufficient room above it.
 
+Choose **Множествен избор** to select several placed objects. Tap an object again to deselect it, or choose **Избери всички** to select the whole pitch. The shared controls change the color, duplicate or delete the selection, and move it to the front or back. Each action can be undone in one step. With the pitch focused, use Page Up or Page Down to find an object and Space to add or remove it from the selection.
+
 Choose **Текст** and tap the pitch to place one label and open its editor. The multiline field accepts up to 40 characters. Use **Разшири текстовото поле** to switch to a larger field while editing. Set **Размер на шрифта** before confirming. Resize the box to change how many lines the text occupies. The font size stays fixed, and the handles stop at sizes that would cut off the text.
 
 Use **Добави отбор** to choose a default color and add another team to the exercise. Each team offers a coach, goalkeeper and player tool. Placed players receive the lowest available number for their team. The exercise stores added teams' default colors in order in `customTeamColors`, including teams with no figures on the pitch. Earlier exercises with `thirdTeamColor` retain that team's color and number.

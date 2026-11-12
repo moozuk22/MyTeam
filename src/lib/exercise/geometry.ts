@@ -123,13 +123,26 @@ export function drawnObject(
           : [{ x: 0, y: 0 }, e],
   };
 }
-export function duplicateObject(o: ExerciseObject, id: string): ExerciseObject {
+export function duplicateObject(o: ExerciseObject, id: string, offset?: Point): ExerciseObject {
   return {
     ...structuredClone(o),
     id,
-    x: clamp(o.x + (o.x > WIDTH - 40 ? -24 : 24), WIDTH),
-    y: clamp(o.y + (o.y > HEIGHT - 40 ? -24 : 24), HEIGHT),
+    x: clamp(o.x + (offset?.x ?? (o.x > WIDTH - 40 ? -24 : 24)), WIDTH),
+    y: clamp(o.y + (offset?.y ?? (o.y > HEIGHT - 40 ? -24 : 24)), HEIGHT),
   };
+}
+export function duplicateObjects(objects: ExerciseObject[], makeId: () => string): ExerciseObject[] {
+  if (!objects.length) return [];
+  const offset = (positions: number[], limit: number) => {
+    const forward = Math.min(24, limit - Math.max(...positions));
+    const backward = Math.min(24, Math.min(...positions));
+    return forward >= backward ? forward : -backward;
+  };
+  const delta = {
+    x: offset(objects.map((o) => o.x), WIDTH),
+    y: offset(objects.map((o) => o.y), HEIGHT),
+  };
+  return objects.map((object) => duplicateObject(object, makeId(), delta));
 }
 export type History = {
   past: Exercise[];

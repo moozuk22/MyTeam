@@ -69,6 +69,7 @@ const ObjectHitArea = memo(function ObjectHitArea({
 export type CanvasProps = {
   exercise: Exercise;
   selected: string | null;
+  multiSelection: ReadonlySet<string> | null;
   tool: ExerciseTool | "select";
   customTeamNumber?: number;
   placementOnly: boolean;
@@ -84,6 +85,7 @@ export type CanvasProps = {
 export default function Canvas({
   exercise,
   selected,
+  multiSelection,
   tool,
   customTeamNumber,
   placementOnly,
@@ -127,6 +129,10 @@ export default function Canvas({
   });
   const scale = width / WIDTH;
   const selectedObject = exercise.objects.find((o) => o.id === selected);
+  const [multiCursor, setMultiCursor] = useState<string | null>(null);
+  const cursorIndex = multiSelection
+    ? exercise.objects.findIndex((o) => o.id === multiCursor)
+    : -1;
   const ignoreTextPlacementClick = useRef(false);
   const colorPreviewIndex =
     colorPreviewId && exercise.objects.length > 1
@@ -413,7 +419,7 @@ export default function Canvas({
       y={o.y}
       rotation={o.rotation}
       listening={!placementOnly}
-      draggable={!placementOnly}
+      draggable={!placementOnly && !multiSelection}
       onPointerDown={(e) => {
         e.cancelBubble = true;
         onSelect(o.id);
@@ -489,6 +495,27 @@ export default function Canvas({
       />
     </Group>
   );
+  function drawMultiOutline(
+    context: Konva.Context,
+    shape: Konva.Shape,
+    ids: Iterable<string>,
+    margin: number,
+  ) {
+    context.beginPath();
+    for (const id of ids) {
+      const node = nodes.current.get(id);
+      if (!node) continue;
+      const bounds = node.getClientRect({ relativeTo: node.getParent() ?? undefined });
+      const padding = margin / scale;
+      context.rect(
+        bounds.x - padding,
+        bounds.y - padding,
+        bounds.width + 2 * padding,
+        bounds.height + 2 * padding,
+      );
+    }
+    context.strokeShape(shape);
+  }
   return (
     <div
       className="ke-canvas"
@@ -497,7 +524,9 @@ export default function Canvas({
       tabIndex={0}
       onPointerDownCapture={() => {
         ignoreTextPlacementClick.current = false;
+        if (multiCursor) setMultiCursor(null);
       }}
+      onBlur={() => setMultiCursor(null)}
       onClickCapture={(e) => {
         // The placement tap can generate a click over the newly mounted toolbar.
         if (ignoreTextPlacementClick.current && e.detail > 0) {
@@ -509,32 +538,42 @@ export default function Canvas({
       aria-label={
         placementOnly
           ? "Игрище за поставяне на обекти"
+          : multiSelection
+            ? "Игрище за множествен избор. Използвайте Page Up и Page Down за преглед и интервал за избор."
           : "Игрище за рисуване. Използвайте Page Up и Page Down за избор на обект."
       }
       onKeyDown={(e) => {
         if (
           placementOnly ||
           e.target !== e.currentTarget ||
-          (e.key !== "PageUp" && e.key !== "PageDown") ||
           !exercise.objects.length ||
           e.currentTarget.closest("fieldset:disabled")
         ) {
           return;
         }
 
+        if (multiSelection && e.key === " " && cursorIndex >= 0) {
+          e.preventDefault();
+          onSelect(exercise.objects[cursorIndex].id);
+          return;
+        }
+        if (e.key !== "PageUp" && e.key !== "PageDown") return;
         e.preventDefault();
         const count = exercise.objects.length;
-        const current = exercise.objects.findIndex((o) => o.id === selected);
+        const current = multiSelection ? cursorIndex : exercise.objects.findIndex((o) => o.id === selected);
         const step = e.key === "PageDown" ? 1 : -1;
         const start = current < 0 && step < 0 ? 0 : current;
         const next = (start + step + count) % count;
-        onSelect(exercise.objects[next].id);
+        if (multiSelection) setMultiCursor(exercise.objects[next].id);
+        else onSelect(exercise.objects[next].id);
       }}
       onPointerCancel={clear}
       onContextMenu={(e) => e.preventDefault()}
     >
       <span className="ke-sr" role="status">
-        {selectedLabel ? `Избран обект: ${selectedLabel}` : "Няма избран обект"}
+        {multiSelection
+          ? cursorIndex >= 0 && `Обект ${cursorIndex + 1} от ${exercise.objects.length}`
+          : selectedLabel ? `Избран обект: ${selectedLabel}` : "Няма избран обект"}
       </span>
       {width > 0 && (
         <Stage
@@ -582,6 +621,24 @@ export default function Canvas({
             </>
           )}
           <Layer ref={controls} scaleX={scale} scaleY={scale}>
+            {multiSelection && multiSelection.size > 0 && (
+              <Shape
+                name="multi-selection-outline"
+                listening={false}
+                stroke="#c4fa82"
+                strokeWidth={2 / scale}
+                dash={[5 / scale, 3 / scale]}
+                sceneFunc={(context, shape) => drawMultiOutline(context, shape, multiSelection, 3)}
+              />
+            )}
+            {multiSelection && multiCursor && cursorIndex >= 0 && (
+              <Shape
+                listening={false}
+                stroke="#ffffff"
+                strokeWidth={2 / scale}
+                sceneFunc={(context, shape) => drawMultiOutline(context, shape, [multiCursor], 6)}
+              />
+            )}
             <Transformer
               ref={transformer}
               onPointerDown={(e) => {
