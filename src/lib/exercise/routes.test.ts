@@ -227,6 +227,7 @@ describe("training plan access and persistence", () => {
     const layout = {
       ...EMPTY_EXERCISE,
       quadrants: ["top-right", "bottom-right"],
+      pitchRotation: 90,
       customTeamColors: ["#a855f7", fourthTeam.color],
       objects: [
         createObject("wall", { x: 200, y: 150 }, "wall"),

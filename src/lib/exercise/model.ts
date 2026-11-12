@@ -9,6 +9,8 @@ import {
 export const WIDTH = 1050;
 export const HEIGHT = 700;
 export type Point = { x: number; y: number };
+export const PITCH_ROTATIONS = [0, 90, 180, 270] as const;
+export type PitchRotation = (typeof PITCH_ROTATIONS)[number];
 export const PITCH_QUADRANTS = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
 export type PitchQuadrant = (typeof PITCH_QUADRANTS)[number];
 export const PITCH_QUADRANT_BOUNDS = {
@@ -83,6 +85,7 @@ export type Exercise = {
   version: 2;
   sport: "football";
   surface: "full" | "half" | "blank";
+  pitchRotation?: PitchRotation;
   quadrants?: PitchQuadrant[];
   customTeamColors?: (string | null)[];
   thirdTeamColor?: string;
@@ -159,10 +162,12 @@ export function validateExercise(raw: unknown): string | null {
   if (
     Object.keys(raw).some(
       (key) =>
-        !["version", "sport", "surface", "quadrants", "objects", "customTeamColors", "thirdTeamColor"].includes(key),
+        !["version", "sport", "surface", "pitchRotation", "quadrants", "objects", "customTeamColors", "thirdTeamColor"].includes(key),
     )
   )
     return "Непознато поле във формата на упражнението.";
+  if (raw.pitchRotation !== undefined && !PITCH_ROTATIONS.includes(raw.pitchRotation as PitchRotation))
+    return "Изберете валидно завъртане на игрището.";
   if (raw.quadrants !== undefined &&
     (raw.surface === "half" ||
       !Array.isArray(raw.quadrants) ||
@@ -539,6 +544,7 @@ export function sameExercise(a: Exercise, b: Exercise): boolean {
     a.version === b.version &&
     a.sport === b.sport &&
     a.surface === b.surface &&
+    (a.pitchRotation ?? 0) === (b.pitchRotation ?? 0) &&
     (quadrantsA === quadrantsB ||
       (quadrantsA.length === quadrantsB.length && quadrantsA.every((part) => quadrantsB.includes(part)))) &&
     (teamsA === teamsB ||

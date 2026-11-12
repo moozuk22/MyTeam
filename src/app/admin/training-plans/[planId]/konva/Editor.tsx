@@ -19,6 +19,7 @@ import {
   Pencil,
   Plus,
   Redo2,
+  RotateCw,
   Save,
   SquareDashed,
   Trash2,
@@ -32,6 +33,7 @@ import {
   CUSTOM_TEAM_COLOR_ERROR,
   MAX_TEXT_FONT_SIZE,
   PITCH_QUADRANTS,
+  PITCH_ROTATIONS,
   WIDTH,
   addCustomTeam,
   createObject,
@@ -76,6 +78,13 @@ const EQUIPMENT_LABELS = FOOTBALL.labels;
 const TOOLBAR_GROUPS = FOOTBALL.tools;
 const TEXT_CATEGORY = TOOLBAR_GROUPS.findIndex((group) => group.types[0] === "text");
 const TEAM_COLOR_SUGGESTIONS = ["#facc15", "#a855f7", "#fb923c", "#22d3ee", "#f472b6", "#a3e635"];
+// Original quadrant indices in screen order after rotation.
+const PITCH_QUADRANT_ORDER = {
+  0: [0, 1, 2, 3],
+  90: [2, 0, 3, 1],
+  180: [3, 2, 1, 0],
+  270: [1, 3, 0, 2],
+} as const;
 const DRAWING_MODES = [
   { value: "straight", label: "Право" },
   { value: "curve", label: "Крива с ръкохватка" },
@@ -502,6 +511,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     category < firstCustomCategory || customTeamNumber !== undefined ? category : 0;
   const toolGroup = toolGroups[activeCategory] ?? TOOLBAR_GROUPS[0];
   const quadrants = getPitchQuadrants(layout);
+  const pitchRotation = layout.pitchRotation ?? 0;
   const visibleObjects = useMemo(
     () => quadrants.length === PITCH_QUADRANTS.length
       ? layout.objects
@@ -636,6 +646,11 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     setPitchSelection(null);
     cancelPlacement();
     change({ ...layout, surface: "blank", quadrants: undefined });
+  }
+  function rotatePitch() {
+    cancelPlacement();
+    const next = (PITCH_ROTATIONS.indexOf(pitchRotation) + 1) % PITCH_ROTATIONS.length;
+    change({ ...layout, pitchRotation: PITCH_ROTATIONS[next] });
   }
   function toggleQuadrant(quadrant: PitchQuadrant) {
     setPitchSelection((current) => {
@@ -1243,6 +1258,10 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   <Redo2 size={18} />
                   Повтори
                 </button>
+                <button type="button" onClick={rotatePitch}>
+                  <RotateCw size={18} aria-hidden="true" />
+                  Завърти игрището на 90°
+                </button>
                 <button
                   type="button"
                   aria-pressed={multiActive}
@@ -1518,13 +1537,14 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   surfacePreview={pitchSelection ? "full" : undefined}
                   pitchOverlay={pitchSelection && (
                     <div className="ke-pitch-quadrants" role="group" aria-label="Части от игрището">
-                      {PITCH_QUADRANTS.map((quadrant) => {
+                      {PITCH_QUADRANT_ORDER[pitchRotation].map((index, screenIndex) => {
+                        const quadrant = PITCH_QUADRANTS[index];
                         const enabled = pitchSelection.includes(quadrant);
                         return (
                           <button
                             key={quadrant}
                             type="button"
-                            aria-label={FOOTBALL.quadrantLabels[quadrant]}
+                            aria-label={FOOTBALL.quadrantLabels[PITCH_QUADRANTS[screenIndex]]}
                             aria-pressed={enabled}
                             disabled={enabled && pitchSelection.length === 1}
                             onClick={() => toggleQuadrant(quadrant)}

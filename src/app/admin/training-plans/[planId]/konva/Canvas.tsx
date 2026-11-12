@@ -171,11 +171,24 @@ export default function Canvas({
       : undefined;
     return { x, y, width: w, height: h, clipFunc };
   }, [quadrants]);
-  const scale = width / viewport.width;
+  const pitchRotation = exercise.pitchRotation ?? 0;
+  const sideways = pitchRotation === 90 || pitchRotation === 270;
+  const viewWidth = sideways ? viewport.height : viewport.width;
+  const viewHeight = sideways ? viewport.width : viewport.height;
+  const scale = width / viewWidth;
   const viewLayer = {
-    x: -viewport.x * scale, y: -viewport.y * scale,
+    rotation: pitchRotation,
+    offsetX: viewport.x + (pitchRotation === 180 || pitchRotation === 270 ? viewport.width : 0),
+    offsetY: viewport.y + (pitchRotation === 90 || pitchRotation === 180 ? viewport.height : 0),
     scaleX: scale, scaleY: scale, clipFunc: viewport.clipFunc,
   };
+  function objectRotationOffset(kind: ExerciseObject["kind"]) {
+    // Directions and marked areas follow the pitch. Symbols and text face the viewer.
+    return kind === "movement" || kind === "zone" ? 0 : pitchRotation;
+  }
+  function displayedRotation(object: ExerciseObject) {
+    return object.rotation - objectRotationOffset(object.kind);
+  }
   const selectedObject = visibleObjects.find((o) => o.id === selected);
   const multiAnchor = multiAnchorId ? visibleObjects.find((o) => o.id === multiAnchorId) : undefined;
   const [multiCursor, setMultiCursor] = useState<string | null>(null);
@@ -237,7 +250,7 @@ export default function Canvas({
       if (node) {
         if (node.isDragging()) node.stopDrag();
         node.position(o);
-        node.rotation(o.rotation);
+        node.rotation(displayedRotation(o));
         node.scale({ x: 1, y: 1 });
         if (o.kind === "text") resizePitchText(node, o);
       }
@@ -266,7 +279,7 @@ export default function Canvas({
   const cancelFromEffect = useEffectEvent(() => clear());
 
   useLayoutEffect(() => {
-    if (surfacePreview || selectionDrag.current || boxGesture.current) cancelFromEffect();
+    if (surfacePreview || gesture.current || selectionDrag.current || boxGesture.current) cancelFromEffect();
   }, [exercise, multiSelection, surfacePreview, tool, width]);
 
   useEffect(() => {
@@ -356,6 +369,7 @@ export default function Canvas({
     colorPreviewIndex,
     multiAnchor,
     viewport,
+    pitchRotation,
   ]);
   useEffect(() => {
     const cancel = (e: KeyboardEvent) => {
@@ -375,11 +389,13 @@ export default function Canvas({
   }, []);
   function position(clampToPitch = true): Point | null {
     const p = stage.current?.getPointerPosition();
-    if (!p || !scale) return null;
-    const point = { x: p.x / scale, y: p.y / scale };
+    const layer = controls.current;
+    if (!p || !scale || !layer) return null;
+    const point = layer.getAbsoluteTransform().copy().invert().point(p);
+    if (!clampToPitch) return point;
     return {
-      x: viewport.x + (clampToPitch ? clamp(point.x, viewport.width) : point.x),
-      y: viewport.y + (clampToPitch ? clamp(point.y, viewport.height) : point.y),
+      x: viewport.x + clamp(point.x - viewport.x, viewport.width),
+      y: viewport.y + clamp(point.y - viewport.y, viewport.height),
     };
   }
   function applyObject(object: ExerciseObject) {
@@ -637,7 +653,7 @@ export default function Canvas({
       id={o.id}
       x={o.x}
       y={o.y}
-      rotation={o.rotation}
+      rotation={displayedRotation(o)}
       listening={!placementOnly}
       draggable={!placementOnly && (!multiSelection || multiSelection.has(o.id))}
       onPointerDown={(e) => {
@@ -709,7 +725,7 @@ export default function Canvas({
           ...o,
           x: viewport.x + clamp(node.x() - viewport.x, viewport.width),
           y: viewport.y + clamp(node.y() - viewport.y, viewport.height),
-          rotation: ((node.rotation() + 360) % 720) - 360,
+          rotation: (node.rotation() + objectRotationOffset(o.kind)) % 360,
           width: Math.max(2, o.width * sx),
           height: Math.max(2, o.height * sy),
           ...(textDimensions ? { ...textDimensions, fontSize: textFontSize(o) } : {}),
@@ -726,12 +742,12 @@ export default function Canvas({
           Math.abs(next.rotation - o.rotation) < 1e-6
         ) {
           node.position(o);
-          node.rotation(o.rotation);
+          node.rotation(displayedRotation(o));
           return;
         }
         if (!applyObject(next)) {
           node.position(o);
-          node.rotation(o.rotation);
+          node.rotation(displayedRotation(o));
         }
       }}
     >
@@ -763,8 +779,8 @@ export default function Canvas({
   }
   return (
     <div
-      className={viewport.height === HEIGHT / 2 && viewport.width === WIDTH ? "ke-canvas ke-canvas--shallow" : "ke-canvas"}
-      style={{ "--ke-pitch-ratio": viewport.width / viewport.height } as CSSProperties}
+      className={viewWidth / viewHeight >= 3 ? "ke-canvas ke-canvas--shallow" : "ke-canvas"}
+      style={{ "--ke-pitch-ratio": viewWidth / viewHeight } as CSSProperties}
       ref={host}
       role="group"
       tabIndex={surfacePreview ? undefined : 0}
@@ -828,7 +844,7 @@ export default function Canvas({
         <Stage
           ref={stage}
           width={width}
-          height={viewport.height * scale}
+          height={viewHeight * scale}
           listening={!surfacePreview}
           onPointerDown={down}
           onPointerMove={move}
@@ -846,6 +862,7 @@ export default function Canvas({
               <Group
                 x={preview.x}
                 y={preview.y}
+                rotation={displayedRotation(preview)}
                 listening={false}
                 opacity={0.75}
               >

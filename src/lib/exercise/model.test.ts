@@ -590,6 +590,16 @@ describe("history and recovery", () => {
     expect(getPitchQuadrants(blank)).toEqual(getPitchQuadrants(exercise));
     expect(getPitchQuadrants(cropped)).toEqual(quadrants);
   });
+  it("validates quarter-turn pitch rotations and treats zero as the default", () => {
+    for (const pitchRotation of [0, 90, 180, 270] as const) {
+      const rotated = { ...exercise, pitchRotation } satisfies Exercise;
+      expect(validateExercise(rotated)).toBeNull();
+      expect(sameExercise(exercise, rotated)).toBe(pitchRotation === 0);
+    }
+    for (const pitchRotation of [-90, 45, 360, "90"]) {
+      expect(validateExercise({ ...exercise, pitchRotation })).toBeTruthy();
+    }
+  });
   it("scopes drafts, accepts stale but valid recovery, rejects corrupt and unsupported content", () => {
     expect(draftKey("user", "club", "plan")).not.toBe(
       draftKey("user2", "club", "plan"),

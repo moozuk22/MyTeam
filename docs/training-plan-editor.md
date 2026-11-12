@@ -10,6 +10,8 @@ Choose **Празно поле** to open the whole blank field immediately. For 
 
 The tool buttons in **Топки и врати** and **Пособия** show how many objects of each type are on the pitch.
 
+**Завърти игрището на 90°** turns the pitch clockwise. Arrows and zones turn with the markings. Players, equipment, and text move with the pitch and keep their individual orientation on screen. Rotation works on blank and cropped pitches and is saved with the plan. Use **Отмени** to restore the previous orientation.
+
 For equipment, players, arrows, lines and zones, **Брой обекти за поставяне** defaults to one and counts down after each successful placement or completed drawing. While one of these tools is active, you can place items or start drawings directly over existing items. Once the requested number is reached, the editor returns to selection mode with no object selected. Choose **Откажи поставянето**, tap the active tool again, or press Esc to cancel early and reset the count to one. In selection mode, click or drag existing items directly and use their handles to resize, rotate or reshape them.
 
 Selecting an object opens a toolbar on the pitch to change its color, duplicate it, delete it, or move it one layer forward or back. For players and text objects, the pencil button edits the number or text. To select objects with the keyboard, focus the pitch and use Page Up or Page Down. Color updates as the picker moves, and one undo restores the color before that adjustment. The toolbar moves below the object when there is insufficient room above it.
