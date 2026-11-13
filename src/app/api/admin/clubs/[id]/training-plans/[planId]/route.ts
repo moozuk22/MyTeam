@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
+import { isTrainingPlanCategoryAvailable } from "@/lib/exercise/categories";
 import { isV2, layoutVersion, validateSavedLayout } from "@/lib/exercise/model";
 
 export const runtime = "nodejs";
@@ -33,6 +34,7 @@ export async function GET(
       clubId: true,
       title: true,
       description: true,
+      categoryId: true,
       layout: true,
       updatedAt: true,
       createdAt: true,
@@ -80,10 +82,11 @@ export async function PUT(
   const data: {
     title?: string;
     description?: string | null;
+    categoryId?: string | null;
     layout?: Prisma.InputJsonValue;
-    updatedByUserId: string;
+    updatedByUserId: string | null;
   } = {
-    updatedByUserId: session.sub,
+    updatedByUserId: UUID_RE.test(session.sub) ? session.sub : null,
   };
 
   if (Object.hasOwn(body, "title")) {
@@ -110,6 +113,12 @@ export async function PUT(
       );
     }
     data.description = description;
+  }
+
+  if (Object.hasOwn(body, "categoryId")) {
+    if (body.categoryId !== null && !(await isTrainingPlanCategoryAvailable(id, body.categoryId)))
+      return NextResponse.json({ error: "Невалидна категория." }, { status: 400 });
+    data.categoryId = body.categoryId as string | null;
   }
 
   if (Object.hasOwn(body, "layout")) {
@@ -158,6 +167,7 @@ export async function PUT(
         id: true,
         title: true,
         description: true,
+        categoryId: true,
         layout: true,
         createdAt: true,
         updatedAt: true,

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import {
   Circle,
   Ellipse,
@@ -42,6 +42,28 @@ export const PITCH_ICON_FILES = {
 export type PitchIcons = Partial<
   Record<keyof typeof PITCH_ICON_FILES, HTMLImageElement>
 >;
+
+let pitchIconsPromise: Promise<PitchIcons> | undefined;
+
+export function usePitchIcons() {
+  const [icons, setIcons] = useState<PitchIcons>({});
+  useEffect(() => {
+    let mounted = true;
+    pitchIconsPromise ??= Promise.all(Object.entries(PITCH_ICON_FILES).map(([name, filename]) =>
+      new Promise<readonly [string, HTMLImageElement | undefined]>((resolve) => {
+        const image = new window.Image();
+        image.onload = () => resolve([name, image]);
+        image.onerror = () => resolve([name, undefined]);
+        image.src = `/icons/${filename}`;
+      }),
+    )).then((entries) => Object.fromEntries(entries));
+    void pitchIconsPromise.then((loaded) => {
+      if (mounted) setIcons(loaded);
+    });
+    return () => { mounted = false; };
+  }, []);
+  return icons;
+}
 
 const TINTED_ICON_CROPS = {
   goal: { x: 12, y: 50, width: 178, height: 98 },
@@ -485,7 +507,7 @@ export const ObjectVisual = memo(function ObjectVisual({
     const points = movementPoints(o),
       style = FOOTBALL.actions[o.action!];
     const tension = o.path === "freehand" ? 0.25 : 0;
-    const head = style.arrow && showArrowhead ? arrowheadPoints(points, tension) : [];
+    const head = (style.arrow || o.arrowhead) && showArrowhead ? arrowheadPoints(points, tension) : [];
     const shafts = o.action === "shot" ? shotShafts(points, head) : [points];
     return (
       <Group>

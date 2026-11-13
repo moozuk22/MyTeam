@@ -11,6 +11,7 @@ import {
 import {
   ArrowDown,
   ArrowLeft,
+  ArrowRight,
   ArrowUp,
   Check,
   Copy,
@@ -27,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { trainingPlanSearch } from "@/lib/exercise/planLocation";
 import { countEquipment, FOOTBALL } from "@/lib/exercise/football";
 import {
   HEIGHT,
@@ -40,6 +42,7 @@ import {
   getCustomTeamColors,
   getPitchQuadrants,
   isCustomTeamColor,
+  isLineType,
   isMovementType,
   isInPitchQuadrants,
   isZoneType,
@@ -155,6 +158,7 @@ function ObjectActions({
   editLabelOnMount,
   onColorChange,
   onLabelChange,
+  onToggleArrowhead,
   onDuplicate,
   onRemove,
   onReorder,
@@ -166,6 +170,7 @@ function ObjectActions({
   editLabelOnMount: boolean;
   onColorChange: (color: string, group: symbol, preview: boolean) => void;
   onLabelChange: (label: string, fontSize?: number) => boolean;
+  onToggleArrowhead: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
   onReorder: (delta: number) => void;
@@ -296,6 +301,17 @@ function ObjectActions({
   return (
     <>
       <ObjectColorInput color={object.color} onCommit={onColorChange} />
+      {isLineType(object.action) && (
+        <button
+          type="button"
+          aria-label="Връх на стрелка"
+          title="Връх на стрелка"
+          aria-pressed={!!object.arrowhead}
+          onClick={onToggleArrowhead}
+        >
+          <ArrowRight size={18} aria-hidden="true" />
+        </button>
+      )}
       <button
         type="button"
         aria-label="Дублирай"
@@ -348,14 +364,17 @@ function ObjectActions({
 
 export type EditorProps = {
   plan: {
-    id: string;
+    id: string | null;
     title: string;
     description?: string | null;
+    categoryId?: string | null;
     layout: Exercise;
     updatedAt: string;
   };
+  categories: readonly { id: string; name: string }[];
   clubId: string;
   userId: string;
+  coachGroupId?: string;
 };
 function objectLabel(o: ExerciseObject) {
   return o.kind === "player"
@@ -407,7 +426,7 @@ function ZonePreview({ type }: { type: ExerciseTool }) {
     </svg>
   );
 }
-function MovementPreview({ type }: { type: ExerciseTool }) {
+function MovementPreview({ type, arrowhead }: { type: ExerciseTool; arrowhead: boolean }) {
   const o = createObject(type, { x: 0, y: 0 }, "preview");
   if (o.kind !== "movement") return null;
   o.points =
@@ -428,7 +447,7 @@ function MovementPreview({ type }: { type: ExerciseTool }) {
       (s, n, i) => (i % 2 ? s : `${s}${i ? " L" : "M"}${n},${points[i + 1]}`),
       "",
     );
-  const head = style.arrow ? arrowheadPoints(p, 0, 9) : [];
+  const head = style.arrow || arrowhead ? arrowheadPoints(p, 0, 9) : [];
   const shafts = o.action === "shot" ? shotShafts(p, head) : [p];
   return (
     <svg viewBox="0 0 85 30" width="70" height="24" aria-hidden="true">
@@ -448,8 +467,10 @@ function MovementPreview({ type }: { type: ExerciseTool }) {
     </svg>
   );
 }
-export default function Editor({ plan, clubId, userId }: EditorProps) {
+export default function Editor({ plan, categories = [], clubId, userId, coachGroupId }: EditorProps) {
   const router = useRouter();
+  const [planId, setPlanId] = useState(plan.id);
+  const titleInput = useRef<HTMLInputElement>(null);
   const [history, setHistory] = useState<History>({
     past: [],
     present: plan.layout,
@@ -477,6 +498,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const [pathMode, setPathMode] = useState<"straight" | "curve" | "freehand">(
     "straight",
   );
+  const [lineArrowhead, setLineArrowhead] = useState(false);
   const [category, setCategory] = useState(0),
     [error, setError] = useState(""),
     [status, setStatus] = useState("");
@@ -486,6 +508,14 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     [saved, setSaved] = useState(plan.layout);
   const [title, setTitle] = useState(plan.title);
   const [savedTitle, setSavedTitle] = useState(plan.title);
+  const initialCategoryId = plan.categoryId ?? null;
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
+  const [savedCategoryId, setSavedCategoryId] = useState(initialCategoryId);
+  const [categoryOptions, setCategoryOptions] = useState(categories);
+  const [newCategoryName, setNewCategoryName] = useState<string | null>(null);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+  const categorySelect = useRef<HTMLSelectElement>(null);
   const initialDescription = plan.description ?? "";
   const [description, setDescription] = useState(initialDescription);
   const [savedDescription, setSavedDescription] = useState(initialDescription);
@@ -528,7 +558,10 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
       : selectedTool;
   const validTeamColor = isCustomTeamColor(teamColor);
   const layoutDirty = useMemo(() => !sameExercise(layout, saved), [layout, saved]);
-  const dirty = title.trim() !== savedTitle || description.trim() !== savedDescription || layoutDirty;
+  const dirty = layoutDirty ||
+    title.trim() !== savedTitle ||
+    description.trim() !== savedDescription ||
+    categoryId !== savedCategoryId;
   const object = visibleObjects.find((o) => o.id === selected);
   const batch = useMemo(
     () => multiSelection ? visibleObjects.filter((o) => multiSelection.has(o.id)) : [],
@@ -538,8 +571,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const multiAnchorId = multiSelection && [...multiSelection].find((id) => batchIds.has(id));
   const canDuplicateBatch = batch.length > 0 && layout.objects.length + batch.length <= MAX_ITEMS;
   const drawingMovement = isMovementType(tool);
-  const drawingArrow =
-    drawingMovement && tool !== "line" && tool !== "dashed-line";
+  const drawingLine = isLineType(tool);
+  const drawingArrow = drawingMovement && (!drawingLine || lineArrowhead);
   const placing =
     tool !== "select" && !drawingMovement && !isZoneType(tool);
   const usesQuantity = tool !== "select" && tool !== "text";
@@ -547,10 +580,15 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   const quantity = Number(placementCount);
   const validQuantity =
     Number.isInteger(quantity) && quantity >= 1 && quantity <= placementCapacity;
-  const key = draftKey(userId, clubId, plan.id),
-    endpoint = `/api/admin/clubs/${clubId}/training-plans/${plan.id}`;
-  const state = useRef({ layout, title, description, dirty, revision, saved });
-  state.current = { layout, title, description, dirty, revision, saved };
+  const newDraftId = coachGroupId ? `new:${coachGroupId}` : "new";
+  const initialDraftKey = draftKey(userId, clubId, plan.id ?? newDraftId);
+  const key = draftKey(userId, clubId, planId ?? newDraftId);
+  const search = trainingPlanSearch(clubId, coachGroupId);
+  const collectionEndpoint = `/api/admin/clubs/${clubId}/training-plans`;
+  const endpoint = `${collectionEndpoint}/${planId}`;
+  const lastWrittenDraft = useRef<string | null>(null);
+  const state = useRef({ layout, title, description, categoryId, dirty, revision, saved });
+  state.current = { layout, title, description, categoryId, dirty, revision, saved };
   const savingRef = useRef(false);
   const change = useCallback((next: Exercise) => {
     const invalid = validateExercise(next);
@@ -775,39 +813,40 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
   }
   useEffect(() => {
     try {
-      const draft = readDraft(localStorage.getItem(key));
-      if (draft && !matchesDraft(draft, plan.layout, plan.title, initialDescription)) setRecovery(draft);
+      const draft = readDraft(localStorage.getItem(initialDraftKey));
+      if (draft && !matchesDraft(draft, plan.layout, plan.title, initialDescription, initialCategoryId)) setRecovery(draft);
     } catch {
       setStorageError(true);
     }
     setDraftReady(true);
-  }, [key, plan.layout, plan.title, initialDescription]);
+  }, [initialDraftKey, plan.layout, plan.title, initialDescription, initialCategoryId]);
   useEffect(() => {
     if (!draftReady || recovery) return;
     const timer = setTimeout(() => {
       try {
-        if (dirty)
-          localStorage.setItem(
-            key,
-            JSON.stringify({
-              baseRevision: revision,
-              layout,
-              title,
-              description,
-              savedAt: Date.now(),
-            } satisfies RecoveryDraft),
-          );
+        if (dirty) {
+          const draft = JSON.stringify({
+            baseRevision: revision,
+            layout,
+            title,
+            description,
+            categoryId,
+            savedAt: Date.now(),
+          } satisfies RecoveryDraft);
+          localStorage.setItem(key, draft);
+          lastWrittenDraft.current = draft;
+        }
         // Remove only this editor's saved snapshot; another tab may have a newer draft.
         else {
           const d = readDraft(localStorage.getItem(key));
-          if (d && matchesDraft(d, saved, savedTitle, savedDescription)) localStorage.removeItem(key);
+          if (d && matchesDraft(d, saved, savedTitle, savedDescription, savedCategoryId)) localStorage.removeItem(key);
         }
       } catch {
         setStorageError(true);
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [layout, title, description, dirty, revision, saved, savedTitle, savedDescription, key, draftReady, recovery]);
+  }, [layout, title, description, categoryId, dirty, revision, saved, savedTitle, savedDescription, savedCategoryId, key, draftReady, recovery]);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       if (!state.current.dirty && !recovery) return;
@@ -820,6 +859,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
               layout: state.current.layout,
               title: state.current.title,
               description: state.current.description,
+              categoryId: state.current.categoryId,
               savedAt: Date.now(),
             }),
           );
@@ -840,6 +880,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
               layout: state.current.layout,
               title: state.current.title,
               description: state.current.description,
+              categoryId: state.current.categoryId,
               savedAt: Date.now(),
             }),
           );
@@ -942,11 +983,38 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   });
+  async function addCategory() {
+    if (!newCategoryName?.trim() || addingCategory || savingRef.current) return;
+    setAddingCategory(true);
+    setCategoryError("");
+    try {
+      const response = await fetch(`${collectionEndpoint}/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCategoryName }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Грешка при добавяне на категория.");
+      const category: EditorProps["categories"][number] = payload.category;
+      setCategoryOptions((current) => current.some(({ id }) => id === category.id)
+        ? current
+        : [...current, category].sort((a, b) => a.name.localeCompare(b.name, "bg")));
+      setCategoryId(category.id);
+      setNewCategoryName(null);
+      setStatus("");
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : "Грешка при добавяне на категория.");
+    } finally {
+      setAddingCategory(false);
+      categorySelect.current?.focus();
+    }
+  }
   async function save(asCopy = false) {
-    if (savingRef.current || recovery || pitchSelection) return;
+    if (savingRef.current || recovery || pitchSelection || addingCategory) return;
     const snapshotTitle = state.current.title.trim();
     if (!snapshotTitle) {
       setError("Името е задължително.");
+      titleInput.current?.focus();
       return;
     }
     savingRef.current = true;
@@ -955,22 +1023,22 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
     setStatus("");
     const snapshot = state.current.layout,
       snapshotDescription = state.current.description.trim(),
+      snapshotCategoryId = state.current.categoryId,
       base = state.current.revision;
+    const creating = planId === null;
     try {
       const res = await fetch(
-        asCopy ? `/api/admin/clubs/${clubId}/training-plans` : endpoint,
+        asCopy || creating ? collectionEndpoint : endpoint,
         {
-          method: asCopy ? "POST" : "PUT",
+          method: asCopy || creating ? "POST" : "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            asCopy
-              ? {
-                  title: `${snapshotTitle.slice(0, 185)} — копие`,
-                  description: snapshotDescription,
-                  layout: snapshot,
-                }
-              : { title: snapshotTitle, description: snapshotDescription, layout: snapshot, expectedUpdatedAt: base },
-          ),
+          body: JSON.stringify({
+            title: asCopy ? `${snapshotTitle.slice(0, 185)} — копие` : snapshotTitle,
+            description: snapshotDescription,
+            categoryId: snapshotCategoryId,
+            layout: snapshot,
+            ...(asCopy || creating ? { coachGroupId } : { expectedUpdatedAt: base }),
+          }),
         },
       );
       const payload = await res.json();
@@ -983,17 +1051,25 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         setStatus("Копието е запазено. Текущият план остава отворен.");
         setCopyId(payload.plan.id);
       } else {
+        if (creating) {
+          setPlanId(payload.plan.id);
+          // Keep the canvas mounted so edits made during the save stay in the editor.
+          window.history.replaceState(null, "", `/admin/training-plans/${payload.plan.id}/konva?${search}`);
+        }
         setSaved(snapshot);
         setTitle(snapshotTitle);
         setSavedTitle(snapshotTitle);
         setDescription(snapshotDescription);
         setSavedDescription(snapshotDescription);
         setRevision(payload.plan.updatedAt);
+        setSavedCategoryId(snapshotCategoryId);
         setConflict(false);
-        setStatus("Промените са запазени.");
+        setStatus(creating ? "Планът е създаден." : "Промените са запазени.");
         try {
-          const d = readDraft(localStorage.getItem(key));
-          if (d && matchesDraft(d, snapshot, snapshotTitle, snapshotDescription))
+          const storedDraft = localStorage.getItem(key);
+          const d = readDraft(storedDraft);
+          if ((creating && storedDraft && storedDraft === lastWrittenDraft.current) ||
+              (d && matchesDraft(d, snapshot, snapshotTitle, snapshotDescription, snapshotCategoryId)))
             localStorage.removeItem(key);
         } catch {
           setStorageError(true);
@@ -1029,6 +1105,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         throw new Error(data.error || "Невалиден запис.");
       setHistory({ past: [], present: data.plan.layout, future: [] });
       setSaved(data.plan.layout);
+      setCategoryId(data.plan.categoryId ?? null);
+      setSavedCategoryId(data.plan.categoryId ?? null);
       setTitle(data.plan.title);
       setSavedTitle(data.plan.title);
       setDescription(data.plan.description ?? "");
@@ -1054,7 +1132,8 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
       change(recovery.layout);
       if (recovery.title !== undefined) setTitle(recovery.title);
       if (recovery.description !== undefined) setDescription(recovery.description);
-      if (recovery.baseRevision !== revision) setConflict(true);
+      if (recovery.categoryId !== undefined) setCategoryId(recovery.categoryId);
+      if (planId && recovery.baseRevision !== revision) setConflict(true);
     }
     try {
       if (!restore) localStorage.removeItem(key);
@@ -1130,17 +1209,18 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   "Има незапазени промени. Да напуснете ли редактора?",
                 )
               )
-                router.push(`/admin/training-plans?clubId=${clubId}`);
+                router.push(`/admin/training-plans?${search}`);
             }}
           >
             <ArrowLeft size={18} />
             Назад
           </button>
           <div className="ke-plan-details">
-            <h1 className="ke-sr">{savedTitle}</h1>
+            <h1 className="ke-sr">{savedTitle || "Нов план"}</h1>
             <label>
               Име на плана
               <input
+                ref={titleInput}
                 type="text"
                 value={title}
                 maxLength={MAX_PLAN_TITLE_LENGTH}
@@ -1153,6 +1233,52 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                 }}
               />
             </label>
+            <div className="ke-plan-category">
+              <label>
+                Категория
+                <select
+                  ref={categorySelect}
+                  value={categoryId ?? ""}
+                  disabled={saving || !!recovery || addingCategory}
+                  onChange={(event) => {
+                    setCategoryId(event.currentTarget.value || null);
+                    setStatus("");
+                  }}
+                >
+                  <option value="">Без категория</option>
+                  {categoryId && !categoryOptions.some(({ id }) => id === categoryId) && (
+                    <option value={categoryId}>Текуща категория</option>
+                  )}
+                  {categoryOptions.map(({ id, name }) => (
+                    <option key={id} value={id}>{name}</option>
+                  ))}
+                </select>
+              </label>
+              {newCategoryName === null ? (
+                <button type="button" disabled={saving || !!recovery} onClick={() => setNewCategoryName("")}>
+                  <Plus size={16} aria-hidden="true" /> Нова категория
+                </button>
+              ) : (
+                <form className="ke-plan-category" onSubmit={(event) => { event.preventDefault(); void addCategory(); }}>
+                  <label>
+                    Име на категорията
+                    <input autoFocus maxLength={60} value={newCategoryName} readOnly={addingCategory}
+                      onChange={(event) => setNewCategoryName(event.target.value)} />
+                  </label>
+                  {categoryError && <span className="ke-error" role="alert">{categoryError}</span>}
+                  <div className="ke-toolbar">
+                    <button type="submit" disabled={saving || addingCategory || !newCategoryName.trim()}>
+                      {addingCategory ? "Добавяне…" : "Добави"}
+                    </button>
+                    <button type="button" disabled={addingCategory} onClick={() => {
+                      setNewCategoryName(null);
+                      setCategoryError("");
+                      categorySelect.current?.focus();
+                    }}>Отказ</button>
+                  </div>
+                </form>
+              )}
+            </div>
             <label>
               Описание
               <textarea
@@ -1170,7 +1296,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
           <button
             type="button"
             className="ke-primary"
-            disabled={saving || !dirty || !!recovery || conflict || !!pitchSelection}
+            disabled={saving || !dirty || !!recovery || conflict || !!pitchSelection || addingCategory}
             onClick={() => void save()}
           >
             <Save size={18} />
@@ -1179,12 +1305,12 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
         </header>
         <div className="ke-feedback" aria-live="polite">
           <span>
-            {dirty ? "Незапазени промени" : "Всички промени са запазени"} ·{" "}
+            {dirty ? "Незапазени промени" : planId ? "Всички промени са запазени" : "Нов план"} ·{" "}
             {layout.objects.length}/{MAX_ITEMS}
           </span>
           {status && <p>{status}</p>}
           {copyId && (
-            <a href={`/admin/training-plans/${copyId}/konva?clubId=${clubId}`}>
+            <a href={`/admin/training-plans/${copyId}/konva?${search}`}>
               Отвори запазеното копие
             </a>
           )}
@@ -1204,7 +1330,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
           <section className="ke-notice" aria-label="Локално възстановяване">
             <h2>Открити са незапазени промени</h2>
             <p>
-              {recovery.baseRevision !== revision
+              {planId && recovery.baseRevision !== revision
                 ? "Записът на сървъра е променен. Възстановете промените и запазете копие или ги отхвърлете."
                 : "Да възстановим ли локалните промени?"}
             </p>
@@ -1414,7 +1540,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                         }}
                       >
                         {isMovementType(t) ? (
-                          <MovementPreview type={t} />
+                          <MovementPreview type={t} arrowhead={lineArrowhead && isLineType(t)} />
                         ) : isZoneType(t) ? (
                           <ZonePreview type={t} />
                         ) : (
@@ -1504,6 +1630,15 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                         {label}
                       </button>
                     ))}
+                    {drawingLine && (
+                      <button
+                        type="button"
+                        aria-pressed={lineArrowhead}
+                        onClick={() => setLineArrowhead(!lineArrowhead)}
+                      >
+                        Връх на стрелка
+                      </button>
+                    )}
                   </fieldset>
                 )}
                 {tool !== "select" && (
@@ -1562,6 +1697,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                   placementOnly={tool !== "select"}
                   customTeamNumber={customTeamNumber}
                   pathMode={pathMode}
+                  lineArrowhead={lineArrowhead}
                   colorPreviewId={
                     colorPreview?.group === history.group &&
                     colorPreview?.id === selected
@@ -1578,6 +1714,7 @@ export default function Editor({ plan, clubId, userId }: EditorProps) {
                         updateObjectColor(object.id, color, group, preview)
                       }
                       onLabelChange={updateLabel}
+                      onToggleArrowhead={() => patch({ arrowhead: object.arrowhead ? undefined : true })}
                       onDuplicate={duplicate}
                       onRemove={remove}
                       onReorder={reorder}

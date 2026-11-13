@@ -382,6 +382,17 @@ describe("exercise model and geometry", () => {
       { x: 60, y: -50 },
     ]);
   });
+  it.each(["line", "dashed-line"] as const)("saves an optional arrowhead on a %s", (type) => {
+    const line = createObject(type, point, type);
+    expect(validateSavedLayout({ ...exercise, objects: [line] })).toBeNull();
+    const end = { x: 300, y: 230 };
+    const drawn = drawnObject({ ...line, arrowhead: true }, point, end, [point, end]);
+    expect(drawn.arrowhead).toBe(true);
+    expect(validateSavedLayout(JSON.parse(JSON.stringify({ ...exercise, objects: [drawn] })))).toBeNull();
+    expect(duplicateObject(drawn, "copy").arrowhead).toBe(true);
+    expect(validateSavedLayout({ ...exercise, objects: [{ ...drawn, arrowhead: "true" }] })).not.toBeNull();
+    expect(validateSavedLayout({ ...exercise, objects: [{ ...drawn, action: "run" }] })).not.toBeNull();
+  });
   it("aligns the arrowhead with the smoothed end of an older freehand drawing", () => {
     const movement = {
       ...createObject("run-free", point, "run"),
@@ -620,12 +631,20 @@ describe("history and recovery", () => {
     expect(matchesDraft(described, exercise, "Ново име", "Старо описание")).toBe(false);
     expect(matchesDraft(described, exercise, "Ново име", "Упражнение за пасове")).toBe(true);
     expect(matchesDraft({ ...described, description: "" }, exercise, "Ново име", "Старо описание")).toBe(false);
+    const categoryId = "11111111-1111-4111-8111-111111111111";
+    const categorized = { ...draft, categoryId };
+    expect(readDraft(JSON.stringify(categorized))).toEqual(categorized);
+    expect(matchesDraft(categorized, exercise, "Име", "", categoryId)).toBe(true);
+    expect(matchesDraft(categorized, exercise, "Име", "", null)).toBe(false);
+    expect(matchesDraft({ ...draft, categoryId: null }, exercise, "Име", "", categoryId)).toBe(false);
+    expect(matchesDraft(draft, exercise, "Име", "", categoryId)).toBe(true);
     for (const value of [
       null,
       "bad",
       "{}",
       JSON.stringify({ ...draft, title: 42 }),
       JSON.stringify({ ...draft, description: 42 }),
+      JSON.stringify({ ...draft, categoryId: "invalid" }),
       JSON.stringify({ ...draft, layout: { version: 3 } }),
     ])
       expect(readDraft(value)).toBeNull();

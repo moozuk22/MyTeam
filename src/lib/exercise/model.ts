@@ -70,6 +70,7 @@ export type ExerciseObject = {
   label?: string;
   fontSize?: number;
   action?: Action;
+  arrowhead?: boolean;
   path?: "straight" | "curve" | "freehand";
   points?: Point[];
   shape?: (typeof SHAPES)[number];
@@ -139,6 +140,8 @@ const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 export const isMovementType = (type: string) =>
   [...ACTIONS, "run-free", "dribble-free"].includes(type as Action);
+export const isLineType = (type: unknown) =>
+  type === "line" || type === "dashed-line";
 export const isZoneType = (type: string) =>
   SHAPES.some((s) => type === s || type === `hatched-${s}`);
 export const isEquipmentType = (type: string) =>
@@ -193,7 +196,7 @@ export function validateExercise(raw: unknown): string | null {
     player: ["team", "role"],
     text: ["fontSize"],
     zone: ["shape", "hatched"],
-    movement: ["action", "path", "points"],
+    movement: ["action", "path", "points", "arrowhead"],
   };
   const commonFields = [
     "id",
@@ -276,6 +279,9 @@ export function validateExercise(raw: unknown): string | null {
           !Array.isArray(o.points)
         )
           return "Невалидно движение.";
+        if (o.arrowhead !== undefined &&
+          (typeof o.arrowhead !== "boolean" || !isLineType(o.action)))
+          return "Невалиден връх на стрелка.";
         const n = o.points.length;
         if (
           (o.path === "straight" && n !== 2) ||

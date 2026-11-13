@@ -11,8 +11,14 @@ const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
   delete: vi.fn(),
   club: vi.fn(),
+  coachGroup: vi.fn(),
   transaction: vi.fn(),
   queryRaw: vi.fn(),
+  categoryFindFirst: vi.fn(),
+  categoryCreate: vi.fn(),
+  categoryCount: vi.fn(),
+  categoryUpdate: vi.fn(),
+  categoryDelete: vi.fn(),
 }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.verify }));
 vi.mock("@/lib/db", () => ({
@@ -25,6 +31,8 @@ vi.mock("@/lib/db", () => ({
       delete: mocks.delete,
     },
     club: { findUnique: mocks.club },
+    coachGroup: { findFirst: mocks.coachGroup },
+    trainingPlanCategory: { findFirst: mocks.categoryFindFirst, deleteMany: mocks.categoryDelete },
     $transaction: mocks.transaction,
     $queryRaw: mocks.queryRaw,
   },
@@ -38,6 +46,9 @@ import {
   GET,
   PUT,
 } from "@/app/api/admin/clubs/[id]/training-plans/[planId]/route";
+import { POST as createCategory } from "@/app/api/admin/clubs/[id]/training-plans/categories/route";
+import * as categoryRoute from "@/app/api/admin/clubs/[id]/training-plans/categories/[categoryId]/route";
+import { GET as getPreviews } from "@/app/api/admin/clubs/[id]/training-plans/previews/route";
 const club = "11111111-1111-4111-8111-111111111111",
   otherClub = "22222222-2222-4222-8222-222222222222",
   id = "33333333-3333-4333-8333-333333333333";
@@ -48,6 +59,7 @@ const row = {
   clubId: club,
   title: "Упражнение",
   description: null,
+  categoryId: null,
   layout: EMPTY_EXERCISE,
   updatedAt: new Date(revision),
   createdAt: new Date(revision),
@@ -96,6 +108,13 @@ beforeEach(() => {
   mocks.updateMany.mockResolvedValue({ count: 1 });
   mocks.transaction.mockImplementation(async (fn) =>
     fn({
+      $queryRaw: mocks.queryRaw,
+      trainingPlanCategory: {
+        findFirst: mocks.categoryFindFirst,
+        create: mocks.categoryCreate,
+        count: mocks.categoryCount,
+        updateMany: mocks.categoryUpdate,
+      },
       trainingPlan: {
         updateMany: mocks.updateMany,
         findUnique: mocks.findUnique,
@@ -104,13 +123,94 @@ beforeEach(() => {
   );
 });
 afterEach(() => vi.unstubAllEnvs());
+describe("training plan previews", () => {
+  function previewRequest(ids: string) {
+    return new NextRequest(`http://localhost:3000/api/admin/clubs/${club}/training-plans/previews?ids=${ids}`, {
+      headers: { cookie: "admin_session=test" },
+    });
+  }
+
+  it("only requests drawings for the current club and skips invalid or legacy layouts", async () => {
+    mocks.findMany.mockResolvedValue([
+      { id, layout: EMPTY_EXERCISE },
+      { id: otherClub, layout: DEFAULT_LAYOUT },
+      { id: club, layout: { version: 2 } },
+    ]);
+    const response = await getPreviews(previewRequest(`${id},${otherClub},${club}`), params);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(mocks.findMany).toHaveBeenCalledExactlyOnceWith({
+      where: { clubId: club, id: { in: [id, otherClub, club] } },
+      select: { id: true, layout: true },
+    });
+    expect(await response.json()).toEqual({ previews: [{ id, layout: EMPTY_EXERCISE }] });
+  });
+
+  it("rejects oversized batches and coaches from another club before reading drawings", async () => {
+    expect((await getPreviews(previewRequest(Array(51).fill(id).join(",")), params)).status).toBe(400);
+    mocks.verify.mockResolvedValue({ sub: id, roles: ["coach"], defaultClubId: otherClub });
+    expect((await getPreviews(previewRequest(id), params)).status).toBe(403);
+    expect(mocks.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe("training plan access and persistence", () => {
+  it("records the coach group name and signed-in account when creating a plan from a group", async () => {
+    mocks.coachGroup.mockResolvedValue({ id: otherClub, name: "Треньор Иванов" });
+    const response = await POST(request("POST", { title: "Тест", coachGroupId: otherClub }), params);
+    expect(response.status).toBe(201);
+    expect(mocks.coachGroup).toHaveBeenCalledWith({
+      where: { id: otherClub, clubId: club }, select: { id: true, name: true },
+    });
+    expect(mocks.create.mock.calls[0][0].data).toMatchObject({
+      createdByCoachGroupId: otherClub, creatorName: "Треньор Иванов", createdByUserId: id,
+    });
+  });
+
+  it("rejects a group outside the club and labels creation from the main page as administrator", async () => {
+    mocks.coachGroup.mockResolvedValue(null);
+    expect((await POST(request("POST", { title: "Тест", coachGroupId: otherClub }), params)).status).toBe(400);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect((await POST(request("POST", { title: "Тест" }), params)).status).toBe(201);
+    expect(mocks.create.mock.calls[0][0].data).toMatchObject({
+      createdByCoachGroupId: null, creatorName: "Администратор", createdByUserId: id,
+    });
+  });
+
+  it("keeps the original creator when another account saves changes", async () => {
+    const response = await PUT(request("PUT", {
+      title: "Ново име", expectedUpdatedAt: revision, coachGroupId: otherClub, creatorName: "Друг автор",
+    }), params);
+    expect(response.status).toBe(200);
+    const { data } = mocks.updateMany.mock.calls[0][0];
+    expect(data).toMatchObject({ title: "Ново име", updatedByUserId: id });
+    expect(data).not.toHaveProperty("creatorName");
+    expect(data).not.toHaveProperty("createdByCoachGroupId");
+    expect(data).not.toHaveProperty("createdByUserId");
+  });
+
   it("creates a local Konva plan in development with a configured production URL", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("APP_BASE_URL", "https://myteam7.com");
     const response = await POST(request("POST", { title: "Тест", editorVersion: 2 }), params);
     expect(response.status).toBe(201);
     expect(mocks.create).toHaveBeenCalled();
+  });
+  it("saves the first drawing and its details in one creation request", async () => {
+    const layout = {
+      ...EMPTY_EXERCISE,
+      objects: [createObject("ball", { x: 100, y: 100 }, "first-ball")],
+    };
+    const details = { title: "Първи план", description: "Подавания", layout };
+    const response = await POST(request("POST", details), params);
+
+    expect(response.status).toBe(201);
+    expect(mocks.create).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ data: expect.objectContaining({ ...details, clubId: club }) }),
+    );
+    expect(await response.json()).toMatchObject({
+      plan: { id, layoutVersion: 2, updatedAt: revision },
+    });
   });
   it("rejects unauthenticated and scoped-coach cross-club requests for every operation", async () => {
     for (const session of [
@@ -179,7 +279,7 @@ describe("training plan access and persistence", () => {
     ).toBe(404);
     expect(mocks.findFirst).toHaveBeenCalledWith({
       where: { id, clubId: club },
-      select: { layout: true },
+      select: { layout: true, categoryId: true },
     });
     expect(mocks.create).not.toHaveBeenCalled();
   });
@@ -294,5 +394,133 @@ describe("training plan access and persistence", () => {
       expect((await POST(request("POST", body), params)).status).toBe(400);
       expect((await PUT(request("PUT", body), params)).status).toBe(400);
     }
+  });
+});
+
+describe("training plan categories", () => {
+  const category = { id: otherClub, name: "Преса" };
+  const categoryParams = { params: Promise.resolve({ id: club, categoryId: category.id }) };
+
+  it("renames a club category in place and normalizes its name", async () => {
+    mocks.categoryFindFirst.mockResolvedValueOnce(category);
+    mocks.categoryUpdate.mockResolvedValue({ count: 1 });
+    const response = await categoryRoute.PATCH(request("PATCH", { name: " Висока   преса " }), categoryParams);
+    expect(response.status).toBe(200);
+    expect(mocks.categoryFindFirst).toHaveBeenNthCalledWith(1, {
+      where: { id: category.id, clubId: club },
+      select: { id: true },
+    });
+    expect(mocks.categoryUpdate).toHaveBeenCalledWith({
+      where: { id: category.id, clubId: club },
+      data: { name: "Висока преса", nameKey: "висока преса" },
+    });
+    expect((await response.json()).category.id).toBe(category.id);
+  });
+
+  it("rejects duplicate names and protects default and other-club categories", async () => {
+    mocks.categoryFindFirst.mockResolvedValueOnce(category).mockResolvedValueOnce({ id });
+    expect((await categoryRoute.PATCH(request("PATCH", { name: "Атака" }), categoryParams)).status).toBe(409);
+    expect(mocks.categoryFindFirst).toHaveBeenLastCalledWith({
+      where: { id: { not: category.id }, nameKey: "атака", OR: [{ clubId: null }, { clubId: club }] },
+      select: { id: true },
+    });
+    expect((await categoryRoute.PATCH(request("PATCH", { name: "Новa" }), categoryParams)).status).toBe(404);
+    mocks.categoryDelete.mockResolvedValue({ count: 0 });
+    expect((await categoryRoute.DELETE(request("DELETE"), categoryParams)).status).toBe(404);
+    expect(mocks.categoryUpdate).not.toHaveBeenCalled();
+  });
+
+  it("deletes only the club's category and leaves its plans in place", async () => {
+    mocks.categoryDelete.mockResolvedValue({ count: 1 });
+    const response = await categoryRoute.DELETE(request("DELETE"), categoryParams);
+    expect(response.status).toBe(200);
+    expect(mocks.categoryDelete).toHaveBeenCalledWith({ where: { id: category.id, clubId: club } });
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("validates category mutations and rejects unauthorized requests", async () => {
+    expect((await categoryRoute.PATCH(request("PATCH", { name: " " }), categoryParams)).status).toBe(400);
+    expect((await categoryRoute.DELETE(request("DELETE"), {
+      params: Promise.resolve({ id: club, categoryId: "invalid" }),
+    })).status).toBe(400);
+    expect((await categoryRoute.DELETE(request("DELETE", undefined, "https://untrusted.example"), categoryParams)).status).toBe(403);
+    mocks.verify.mockResolvedValue({ sub: id, roles: ["coach"], defaultClubId: otherClub });
+    expect((await categoryRoute.PATCH(request("PATCH", { name: "Преса" }), categoryParams)).status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.categoryDelete).not.toHaveBeenCalled();
+  });
+
+  it("creates a normalized club category and reuses an existing name on retry", async () => {
+    mocks.categoryCount.mockResolvedValue(0);
+    mocks.categoryCreate.mockResolvedValue(category);
+    const response = await createCategory(request("POST", { name: "  Висока   преса " }), params);
+    expect(response.status).toBe(201);
+    expect(mocks.categoryCreate).toHaveBeenCalledWith({
+      data: { clubId: club, name: "Висока преса", nameKey: "висока преса" },
+      select: { id: true, name: true },
+    });
+
+    mocks.categoryFindFirst.mockResolvedValue(category);
+    const retry = await createCategory(request("POST", { name: "ВИСОКА ПРЕСА" }), params);
+    expect(retry.status).toBe(200);
+    expect((await retry.json()).category).toEqual(category);
+    expect(mocks.categoryFindFirst).toHaveBeenLastCalledWith({
+      where: { nameKey: "висока преса", OR: [{ clubId: null }, { clubId: club }] },
+      select: { id: true, name: true, clubId: true },
+    });
+    expect(mocks.categoryCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects invalid names, cross-club coaches, and foreign request origins", async () => {
+    expect((await createCategory(request("POST", { name: "   " }), params)).status).toBe(400);
+    expect((await createCategory(request("POST", { name: "Преса" }, "https://untrusted.example"), params)).status).toBe(403);
+    mocks.verify.mockResolvedValue({ sub: id, roles: ["coach"], defaultClubId: otherClub });
+    expect((await createCategory(request("POST", { name: "Преса" }), params)).status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("limits new custom categories while allowing existing names to be reused", async () => {
+    mocks.categoryCount.mockResolvedValue(100);
+    expect((await createCategory(request("POST", { name: "Преса" }), params)).status).toBe(400);
+    mocks.categoryFindFirst.mockResolvedValue(category);
+    expect((await createCategory(request("POST", { name: "Преса" }), params)).status).toBe(200);
+    expect(mocks.categoryCreate).not.toHaveBeenCalled();
+  });
+
+  it("only assigns shared or current-club categories on creation and update", async () => {
+    const body = { title: "Тест", categoryId: category.id, expectedUpdatedAt: revision };
+    mocks.categoryFindFirst.mockResolvedValue(null);
+    expect((await POST(request("POST", body), params)).status).toBe(400);
+    expect((await PUT(request("PUT", body), params)).status).toBe(400);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.categoryFindFirst).toHaveBeenCalledWith({
+      where: { id: category.id, OR: [{ clubId: null }, { clubId: club }] },
+      select: { id: true },
+    });
+
+    mocks.categoryFindFirst.mockResolvedValue(category);
+    expect((await POST(request("POST", body), params)).status).toBe(201);
+    expect(mocks.create.mock.calls[0][0].data.categoryId).toBe(category.id);
+    expect((await PUT(request("PUT", body), params)).status).toBe(200);
+    expect(mocks.updateMany.mock.calls[0][0].data.categoryId).toBe(category.id);
+  });
+
+  it("can clear the category and preserves it when drawing saves omit it", async () => {
+    await PUT(request("PUT", { layout: EMPTY_EXERCISE, expectedUpdatedAt: revision }), params);
+    expect(mocks.updateMany.mock.calls[0][0].data).not.toHaveProperty("categoryId");
+
+    await PUT(request("PUT", { categoryId: null, expectedUpdatedAt: revision }), params);
+    expect(mocks.updateMany.mock.calls[1][0].data.categoryId).toBeNull();
+    expect(mocks.categoryFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("retains the source category when copying and converting", async () => {
+    mocks.findFirst.mockResolvedValue({ layout: DEFAULT_LAYOUT, categoryId: category.id });
+    const body = { title: "Копие", sourcePlanId: id, editorVersion: 2 };
+    expect((await POST(request("POST", body), params)).status).toBe(201);
+    expect(mocks.create.mock.calls[0][0].data.categoryId).toBe(category.id);
+    expect((await POST(request("POST", { ...body, categoryId: null }), params)).status).toBe(201);
+    expect(mocks.create.mock.calls[1][0].data.categoryId).toBeNull();
   });
 });

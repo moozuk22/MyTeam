@@ -1,10 +1,17 @@
 # Football exercise editor
 
-The original HTML/CSS editor remains at `/admin/training-plans/[planId]`. The separate Konva editor is at `/admin/training-plans/[planId]/konva`. Both require the club ID in the query string and enforce club access on the server. Opening the wrong editor redirects to the compatible route. Invalid content displays an error; it is never replaced by an empty drawing.
+Konva is the training plan editor at `/admin/training-plans/[planId]/konva`. Selecting a plan card opens a read-only review at `/admin/training-plans/[planId]` with its saved pitch, category, description, and last update. **Редактирай** opens the editor from either the card or the review. Opening a plan requires the club ID in the query string and server-side club access. Invalid drawings display an error.
 
-Use **Нов план — Konva** to create a version-2 exercise or **Копирай в Konva** to convert a legacy exercise into a new record. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error instead of dropping objects. The original editor and its drawing code remain available.
+**Нов план — Konva** opens a blank drawing editor. Enter a name in the editor and choose **Запази** to create the plan and its drawing together. Plans from the original HTML/CSS editor remain in the list with **Копирай в Konva** to create an editable copy. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error.
 
 Edit **Име на плана** and **Описание** in the Konva editor, then choose **Запази**. Local draft recovery includes unsaved changes to both fields.
+
+Konva plan cards show a read-only preview of the saved pitch and drawing. Previews load in batches as cards approach the visible part of the list.
+
+Opening **Планове за тренировки** from a coach group carries that group through the list, editor, and back navigation. New plans and copies record the group's name at creation and the signed-in account when available. Creation from the club's main page displays **Администратор**. Older plans without recorded attribution display **Няма записан автор** in the review.
+
+Choose **Категория** in the editor. In Konva, **Запази** saves the category alongside the drawing, and local recovery preserves unsaved category changes. Every club starts with **Атака**, **Защита**, **Преход атака в защита**, **Преход защита в атака**, and **Статични положения**. Plans using a retired default keep that category as a club category. In the editor, **Нова категория** adds a category for the current club and selects it in the form. A plan can have one category or remain uncategorized. The list can filter by category, including **Без категория**, and copies retain their category. Plans without a category stay uncategorized.
+From the training plans list, **Управление на категориите** adds, renames, and deletes club categories. Shared defaults are available to every club. Renaming preserves plan assignments, and deleting moves affected plans to **Без категория**.
 
 Choose **Празно поле** to open the whole blank field immediately. For **Футболно игрище**, click the quadrants directly on the full-pitch preview and choose **Приложи**. Reopen the preview with **Избери части от игрището**. All four parts start selected. The editor crops to the selected parts and leaves gaps when they do not form a rectangle. If any objects are outside the selected parts, the editor asks for confirmation before removing them. Cancel to return to the preview or use **Отмени** after confirming to restore the objects and the previous pitch. **Избери всички**, **Изчисти игрището** and the equipment counts apply to the visible parts. Existing half-pitch plans keep their original view until you choose a different pitch type.
 
@@ -40,6 +47,8 @@ In Konva, **Стена** uses the full [“Barrier” icon by Magnific from Flat
 
 Use **Начин на рисуване** to draw **Бягане**, **Дрибъл**, **Пас** or **Удар** as a straight line, a curve with a handle, or a freehand stroke. Drag the yellow handle on the curve to reshape it. Existing long passes and converted freehand movements retain their saved geometry.
 
+**Линия** and **Прекъсната линия** start without arrowheads. Turn on **Връх на стрелка** before drawing, or select an existing line and use the arrow button in its toolbar. Each line saves its own setting.
+
 Selecting **Дрибъл** defaults to **Свободна ръка**. Selecting **Бягане**, **Пас** or **Удар** defaults to **Право**. The drawing mode buttons can override these defaults for the active tool.
 
 While drawing a freehand movement, the preview shows the stroke. After release, its arrowhead points along the short, straight finish at the tip. The dribbling wave fades into the centerline under the arrowhead.
@@ -48,7 +57,7 @@ On desktop, drawing tools sit in a scrollable side panel. The pitch scales to fi
 
 ## Data and rendering
 
-The existing `TrainingPlan.layout` JSON column stores both versions; no schema migration or bulk conversion is required. Version 2 stores `sport`, `surface` and an ordered `objects` array. Array order determines stacking. Objects carry semantic kinds (`player`, `equipment`, `movement`, `zone`, `text`), stable IDs, logical coordinates, dimensions, rotation and appearance. Players store team, role and label. Movements store action, path type and local control points. Text objects may store an explicit font size. Older text uses its saved box height to determine the original font size. This is application data, independent of Konva node serialization.
+The existing `TrainingPlan.layout` JSON column stores both drawing versions independently of the plan category. Version 2 stores `sport`, `surface` and an ordered `objects` array. Array order determines stacking. Objects carry semantic kinds (`player`, `equipment`, `movement`, `zone`, `text`), stable IDs, logical coordinates, dimensions, rotation and appearance. Players store team, role and label. Movements store action, path type and local control points. Text objects may store an explicit font size. Older text uses its saved box height to determine the original font size. This is application data, independent of Konva node serialization.
 
 The football registry owns toolbar labels, equipment choices, surfaces and movement styles. Football is the only registered sport. Selection, transformations, history, geometry, recovery and saves are shared editor operations. Future sports can add definitions and rendering; future 3D previews can consume semantic data without interpreting canvas pixels. Neither additional sports nor 3D rendering is implemented here.
 
@@ -72,7 +81,7 @@ Automated model/history/conversion tests, API authorization/concurrency contract
 
 Browser checks use actual editor/list components in a temporary local preview with mocked save endpoints. They cover the seven repository viewport sizes, touch placement/resizing/curve handles, keyboard controls, modal behavior, cancellation, recovery, storage/offline failures and edits during saves. Reduced-height viewport checks approximate keyboard space; a real mobile keyboard and lower-powered physical phone still require manual testing.
 
-The legacy editor remains available. Making Konva the default, deleting the old editor, image export, grouping, fullscreen, animation and 3D are separate follow-up work.
+Image export, grouping, fullscreen, animation and 3D are separate follow-up work.
 
 ### Results (10 November 2026)
 
@@ -80,6 +89,6 @@ The legacy editor remains available. Making Konva the default, deleting the old 
 - Production build (`npm run build`), type checking and ESLint for affected files passed. Repository-wide ESLint reports three pre-existing `no-require-imports` errors in `scripts/generate-pwa-icons.cjs`, plus existing warnings.
 - Actual component browser checks passed at 320×568, 360×800, 375×667, 390×844, 430×932, 768×1024 and 1440×900. Both editor and list dialogs were checked for horizontal overflow and interactions. Additional CDP touch checks covered resize/curve handles at 320, 430 and 1440 pixels; cancellation, offline/storage failure, drafts, stale saves and edits during saving also passed.
 - Chromium stress measurements used a 390×844 viewport on this desktop, with 30 or 200 objects (all but one were 300-point paths). Median frame gaps were approximately 16.7 ms in both cases. At 200 objects, moving the active object to its own layer reduced observed long tasks from 45 to 4; remaining gesture-boundary stalls reached approximately 100 ms. These are development-preview measurements, not a physical-phone performance certification.
-- A live browser → Next.js → database save flow, a real mobile keyboard, physical lower-powered phones and the full unrelated test suite were not tested. Legacy removal/default switching remains separate work.
+- A live browser → Next.js → database save flow, a real mobile keyboard, physical lower-powered phones and the full unrelated test suite were not tested.
 
 Direct manipulation was additionally checked at all seven viewport sizes: mouse dragging of existing equipment and arrows with placement tools active, touch dragging with the running tool active, and subsequent placement on empty pitch. Resize/curve handles and cancelled drags were also rechecked without first using Select at 320, 430 and 1440 pixels. Affected-file ESLint and type checking passed; the production build was not repeated for this interaction-only change.

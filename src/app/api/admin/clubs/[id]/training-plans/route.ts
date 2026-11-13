@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
+import { authorizeTraining, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/exercise/access";
 import {
   convertLegacy,
   EMPTY_EXERCISE,
@@ -9,6 +9,7 @@ import {
   layoutVersion,
   validateSavedLayout,
 } from "@/lib/exercise/model";
+import { isTrainingPlanCategoryAvailable } from "@/lib/exercise/categories";
 import { listTrainingPlans } from "@/lib/exercise/queries";
 import type { PlanLayout } from "@/lib/trainingPlans";
 import { DEFAULT_LAYOUT } from "@/lib/trainingPlans";
@@ -38,7 +39,10 @@ export async function GET(
   const cursor = request.nextUrl.searchParams.get("cursor");
   if (cursor && !UUID_RE.test(cursor))
     return NextResponse.json({ error: "Невалидна страница." }, { status: 400 });
-  return NextResponse.json(await listTrainingPlans(id, cursor));
+  const category = request.nextUrl.searchParams.get("category");
+  if (category && category !== "uncategorized" && !UUID_RE.test(category))
+    return NextResponse.json({ error: "Невалидна категория." }, { status: 400 });
+  return NextResponse.json(await listTrainingPlans(id, cursor, category || undefined));
 }
 
 export async function POST(
@@ -85,6 +89,13 @@ export async function POST(
     );
   }
 
+  let categoryId: string | null = null;
+  if (body.categoryId !== undefined && body.categoryId !== null) {
+    if (!(await isTrainingPlanCategoryAvailable(id, body.categoryId)))
+      return NextResponse.json({ error: "Невалидна категория." }, { status: 400 });
+    categoryId = body.categoryId as string;
+  }
+
   let layout = Object.hasOwn(body, "layout")
     ? body.layout
     : body.editorVersion === 2
@@ -101,13 +112,14 @@ export async function POST(
       );
     const source = await prisma.trainingPlan.findFirst({
       where: { id: body.sourcePlanId, clubId: id },
-      select: { layout: true },
+      select: { layout: true, categoryId: true },
     });
     if (!source)
       return NextResponse.json(
         { error: "Изходният план не е намерен." },
         { status: 404 },
       );
+    if (!Object.hasOwn(body, "categoryId")) categoryId = source.categoryId;
     const sourceError = validateSavedLayout(source.layout);
     if (sourceError)
       return NextResponse.json({ error: sourceError }, { status: 400 });
@@ -132,19 +144,30 @@ export async function POST(
   if (layoutError)
     return NextResponse.json({ error: layoutError }, { status: 400 });
 
+  const group = body.coachGroupId == null ? null
+    : await findTrainingPlanCoachGroup(id, body.coachGroupId);
+  if (body.coachGroupId != null && !group)
+    return NextResponse.json({ error: "Невалидна треньорска група." }, { status: 400 });
+
+  const userId = UUID_RE.test(session.sub) ? session.sub : null;
   const plan = await prisma.trainingPlan.create({
     data: {
       clubId: id,
       title,
       description,
+      categoryId,
       layout: layout as Prisma.InputJsonValue,
-      createdByUserId: session.sub,
-      updatedByUserId: session.sub,
+      createdByUserId: userId,
+      createdByCoachGroupId: group?.id ?? null,
+      creatorName: group ? group.name : "Администратор",
+      updatedByUserId: userId,
     },
     select: {
       id: true,
       title: true,
       description: true,
+      categoryId: true,
+      creatorName: true,
       updatedAt: true,
       createdAt: true,
       layout: true,

@@ -1,84 +1,96 @@
+import { ArrowLeft, Edit2 } from "lucide-react";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
-import { PlanLayout, validateLayout } from "@/lib/trainingPlans";
+import { prisma } from "@/lib/db";
 import { canAccessTrainingClub, UUID_RE } from "@/lib/exercise/access";
-import { isV2 } from "@/lib/exercise/model";
-import TrainingPlanEditorClient from "./page.client";
+import { isV2, validateExercise } from "@/lib/exercise/model";
+import { trainingPlanSearch } from "@/lib/exercise/planLocation";
+import ReviewPreview from "./ReviewPreview";
+import "../page.css";
 
-type TrainingPlanEditorSearchParams = {
-  clubId?: string | string[];
-};
-
-function firstParam(value: string | string[] | undefined) {
-  return (Array.isArray(value) ? value[0] : (value ?? "")).trim();
-}
-
-export default async function TrainingPlanEditorPage({
+export default async function TrainingPlanReview({
   params,
   searchParams,
 }: {
   params: Promise<{ planId: string }>;
-  searchParams: Promise<TrainingPlanEditorSearchParams>;
+  searchParams: Promise<{ clubId?: string | string[]; coachGroupId?: string }>;
 }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("admin_session")?.value;
-  if (!token) redirect("/admin/login");
-
-  const session = await verifyAdminToken(token);
+  const token = (await cookies()).get("admin_session")?.value;
+  const session = token ? await verifyAdminToken(token) : null;
   if (!session) redirect("/admin/login");
 
-  const { planId } = await params;
-  const resolvedSearchParams = await searchParams;
-  const clubId = firstParam(resolvedSearchParams.clubId);
-  if (
-    !clubId ||
-    !UUID_RE.test(clubId) ||
-    !UUID_RE.test(planId) ||
-    !canAccessTrainingClub(session, clubId)
-  )
+  const [{ planId }, { clubId, coachGroupId }] = await Promise.all([params, searchParams]);
+  const club = (Array.isArray(clubId) ? clubId[0] : clubId)?.trim() ?? "";
+  if (!UUID_RE.test(club) || !UUID_RE.test(planId) || !canAccessTrainingClub(session, club))
     notFound();
 
   const plan = await prisma.trainingPlan.findFirst({
-    where: { id: planId, clubId },
+    where: { id: planId, clubId: club },
     select: {
-      id: true,
-      clubId: true,
       title: true,
       description: true,
-      layout: true,
+      creatorName: true,
       updatedAt: true,
-      createdAt: true,
+      layout: true,
+      category: { select: { name: true, clubId: true } },
     },
   });
-
   if (!plan) notFound();
 
-  if (isV2(plan.layout))
-    redirect(`/admin/training-plans/${planId}/konva?clubId=${clubId}`);
-  if (validateLayout(plan.layout))
-    return (
-      <main>
-        <h1>Невалидно упражнение</h1>
-        <p>Запазеното съдържание не може да се отвори.</p>
-        <a href={`/admin/training-plans?clubId=${clubId}`}>Назад</a>
-      </main>
-    );
-  const layout = plan.layout as unknown as PlanLayout;
+  const drawing = isV2(plan.layout) ? plan.layout : null;
+  const layout = drawing && !validateExercise(drawing) ? drawing : null;
+  const category = plan.category && (plan.category.clubId === null || plan.category.clubId === club)
+    ? plan.category.name : "Без категория";
+  const updated = new Intl.DateTimeFormat("bg-BG", {
+    dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Sofia",
+  }).format(plan.updatedAt);
+  const search = trainingPlanSearch(club, UUID_RE.test(coachGroupId ?? "") ? coachGroupId : undefined);
+  const listHref = `/admin/training-plans?${search}`;
 
   return (
-    <TrainingPlanEditorClient
-      clubId={clubId}
-      plan={{
-        id: plan.id,
-        clubId: plan.clubId,
-        title: plan.title,
-        description: plan.description,
-        layout,
-        createdAt: plan.createdAt.toISOString(),
-        updatedAt: plan.updatedAt.toISOString(),
-      }}
-    />
+    <main className="tp-page">
+      <div className="tp-dot-grid" aria-hidden="true" />
+      <div className="tp-inner">
+        <nav className="tp-review-actions" aria-label="Действия за плана">
+          <Link className="tp-back-btn" href={listHref}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            Към плановете
+          </Link>
+          {layout && (
+            <Link className="tp-primary-btn" href={`/admin/training-plans/${planId}/konva?${search}`}>
+              <Edit2 size={16} aria-hidden="true" />
+              Редактирай
+            </Link>
+          )}
+        </nav>
+        <h1 className="tp-title tp-review-title">{plan.title}</h1>
+        <div className="tp-review-layout">
+          <section className="tp-card tp-review-details" aria-label="Детайли на плана">
+            <dl>
+              <dt>Категория</dt>
+              <dd>{category}</dd>
+              <dt>Описание</dt>
+              <dd className="tp-review-description">{plan.description || "Без описание"}</dd>
+              <dt>Създал</dt>
+              <dd>{plan.creatorName ?? "Няма записан автор"}</dd>
+              <dt>Обновен</dt>
+              <dd><time dateTime={plan.updatedAt.toISOString()}>{updated}</time></dd>
+            </dl>
+          </section>
+          {layout ? (
+            <section className="tp-card-preview tp-review-preview" aria-label="Преглед на запазеното игрище">
+              <ReviewPreview exercise={layout} />
+            </section>
+          ) : (
+            <p className="tp-card tp-review-details">
+              {drawing ? "Запазеното игрище не може да се покаже." :
+                "Планът е от стария редактор. Изберете „Копирай в Konva“ от списъка, за да прегледате и редактирате чертежа."}
+            </p>
+          )}
+        </div>
+      </div>
+    </main>
   );
 }

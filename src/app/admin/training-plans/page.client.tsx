@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   ClipboardList,
@@ -9,10 +11,14 @@ import {
   Edit2,
   Plus,
   Trash2,
-  X,
 } from "lucide-react";
 import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
+import { trainingPlanSearch } from "@/lib/exercise/planLocation";
+import type { Exercise } from "@/lib/exercise/model";
+import CategoryManager, { type CategoryOption } from "./CategoryManager";
 import "./page.css";
+
+const PlanPreview = dynamic(() => import("./PlanPreview"), { ssr: false });
 
 type ClubOption = {
   id: string;
@@ -23,47 +29,56 @@ type TrainingPlanSummary = {
   id: string;
   title: string;
   description: string | null;
+  categoryId: string | null;
+  creatorName?: string | null;
   createdAt: string;
   updatedAt: string;
   layoutVersion?: number;
 };
 
-type PlanModalMode = "create" | "edit";
-
 export default function TrainingPlansClient({
   clubs,
   defaultClubId,
   initialPlans,
+  initialCategories,
+  categoryFilter = "",
+  coachGroupId,
   initialCursor = null,
 }: {
   clubs: ClubOption[];
   defaultClubId: string;
   initialPlans: TrainingPlanSummary[];
+  initialCategories: readonly CategoryOption[];
+  categoryFilter?: string;
+  coachGroupId?: string;
   initialCursor?: string | null;
 }) {
   const router = useRouter();
   const selectedClubId = defaultClubId;
   const [plans, setPlans] = useState<TrainingPlanSummary[]>(initialPlans);
-  const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState(initialCategories);
+  const [serverPlans, setServerPlans] = useState(initialPlans);
+  const [isFiltering, startFiltering] = useTransition();
   const [nextCursor, setNextCursor] = useState(initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
-  const [modalMode, setModalMode] = useState<PlanModalMode | null>(null);
-  const [editingPlan, setEditingPlan] = useState<TrainingPlanSummary | null>(
-    null,
-  );
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [formTitle, setFormTitle] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formError, setFormError] = useState("");
-  const [createVersion, setCreateVersion] = useState(1);
   const [copying, setCopying] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const gridRef = useRef<HTMLElement>(null);
+  const [previews, setPreviews] = useState<Record<string, Exercise | null>>({});
 
+  if (serverPlans !== initialPlans) {
+    setServerPlans(initialPlans);
+    setPlans(initialPlans);
+    setNextCursor(initialCursor);
+    setCategories(initialCategories);
+  }
+
+  const canCloseDialog = useEffectEvent(() => !isDeleting);
   const dialogTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (!modalMode && !confirmDeleteId) return;
+    if (!confirmDeleteId) return;
     const dialog = document.querySelector<HTMLElement>(".tp-modal");
     if (!dialog) return;
     (
@@ -71,15 +86,14 @@ export default function TrainingPlansClient({
       dialog.querySelector<HTMLElement>("button")
     )?.focus();
     const handle = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isSaving && !isDeleting) {
+      if (event.key === "Escape" && canCloseDialog()) {
         event.preventDefault();
-        setModalMode(null);
         setConfirmDeleteId(null);
       }
       if (event.key !== "Tab") return;
       const elements = Array.from(
         dialog.querySelectorAll<HTMLElement>(
-          "button:not(:disabled), input, textarea, [tabindex='0']",
+          "button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex='0']",
         ),
       );
       const first = elements[0],
@@ -97,7 +111,7 @@ export default function TrainingPlansClient({
       document.removeEventListener("keydown", handle);
       dialogTrigger.current?.focus();
     };
-  }, [modalMode, confirmDeleteId, isSaving, isDeleting]);
+  }, [confirmDeleteId]);
 
   const selectedClub = useMemo(
     () => clubs.find((club) => club.id === selectedClubId) ?? null,
@@ -108,61 +122,85 @@ export default function TrainingPlansClient({
     [confirmDeleteId, plans],
   );
 
+  const categoryNames = new Map(categories.map(({ id, name }) => [id, name]));
+  const visiblePlans = plans.filter((plan) => matchesCategory(plan, categoryFilter));
+
   useEffect(() => {
-    if (!selectedClubId) {
-      setPlans([]);
-      return;
-    }
-
-    if (selectedClubId === defaultClubId) {
-      setPlans(initialPlans);
-      setNextCursor(initialCursor);
-      return;
-    }
-
-    let cancelled = false;
-    async function loadPlans() {
-      setIsLoading(true);
-      setError("");
-      try {
-        const res = await fetch(
-          `/api/admin/clubs/${selectedClubId}/training-plans`,
-          { cache: "no-store" },
-        );
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok)
-          throw new Error(
-            typeof payload.error === "string"
-              ? payload.error
-              : "Грешка при зареждане.",
-          );
-        if (!cancelled)
-          setPlans(Array.isArray(payload.plans) ? payload.plans : []);
-      } catch (err) {
-        if (!cancelled) {
-          setPlans([]);
-          setError(
-            err instanceof Error ? err.message : "Грешка при зареждане.",
-          );
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
+    const pending = gridRef.current?.querySelectorAll<HTMLElement>("[data-preview-id]");
+    if (!pending?.length) return;
+    const controller = new AbortController();
+    const observer = new IntersectionObserver((entries) => {
+      const targets = entries.filter(({ isIntersecting }) => isIntersecting)
+        .map(({ target }) => target as HTMLElement);
+      for (const target of targets) observer.unobserve(target);
+      for (let offset = 0; offset < targets.length; offset += 50) {
+        const batch = targets.slice(offset, offset + 50);
+        void loadPreviews(batch);
       }
+    }, { rootMargin: "160px" });
+    async function loadPreviews(batch: HTMLElement[]) {
+      const requested = batch.map(({ dataset }) => ({
+        id: dataset.previewId!,
+        key: dataset.previewKey!,
+      }));
+      const params = new URLSearchParams({ ids: requested.map(({ id }) => id).join(",") });
+      const layouts = new Map<string, Exercise>();
+      try {
+        const response = await fetch(`/api/admin/clubs/${selectedClubId}/training-plans/previews?${params}`, {
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const data: { previews: { id: string; layout: Exercise }[] } = await response.json();
+          for (const { id, layout } of data.previews) layouts.set(id, layout);
+        }
+      } catch {
+        // A preview failure leaves the plan card and its actions usable.
+      }
+      if (!controller.signal.aborted)
+        setPreviews((current) => ({
+          ...current,
+          ...Object.fromEntries(requested.map(({ id, key }) => [key, layouts.get(id) ?? null])),
+        }));
     }
-
-    void loadPlans();
+    pending.forEach((element) => observer.observe(element));
     return () => {
-      cancelled = true;
+      observer.disconnect();
+      controller.abort();
     };
-  }, [defaultClubId, initialPlans, initialCursor, selectedClubId]);
+  }, [plans, categoryFilter, selectedClubId, isFiltering]);
+
+  function changeFilter(category: string, replace = false) {
+    const params = trainingPlanSearch(selectedClubId, coachGroupId);
+    if (category) params.set("category", category);
+    startFiltering(() => {
+      const url = `/admin/training-plans?${params}`;
+      if (replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
+    });
+  }
+
+  function saveCategory(category: CategoryOption) {
+    setCategories((current) => [...current.filter(({ id }) => id !== category.id), category]
+      .sort((a, b) => a.name.localeCompare(b.name, "bg")));
+  }
+
+  function removeCategory(id: string) {
+    setCategories((current) => current.filter((category) => category.id !== id));
+    setPlans((current) => current.map((plan) =>
+      plan.categoryId === id ? { ...plan, categoryId: null } : plan));
+    if (categoryFilter === id) changeFilter("", true);
+    else if (categoryFilter === "uncategorized") startFiltering(() => router.refresh());
+  }
 
   async function loadMore() {
-    if (!nextCursor || loadingMore) return;
+    if (!nextCursor || loadingMore || isFiltering) return;
+    const params = new URLSearchParams({ cursor: nextCursor });
+    if (categoryFilter) params.set("category", categoryFilter);
     setLoadingMore(true);
     setError("");
     try {
       const res = await fetch(
-        `/api/admin/clubs/${selectedClubId}/training-plans?cursor=${encodeURIComponent(nextCursor)}`,
+        `/api/admin/clubs/${selectedClubId}/training-plans?${params}`,
         { cache: "no-store" },
       );
       const payload = await res.json();
@@ -182,98 +220,14 @@ export default function TrainingPlansClient({
     }
   }
 
-  function openCreateModal(version = 1) {
-    dialogTrigger.current = document.activeElement as HTMLElement;
-    setCreateVersion(version);
-    setModalMode("create");
-    setEditingPlan(null);
-    setFormTitle("");
-    setFormDescription("");
-    setFormError("");
+  function openNewEditor() {
+    const params = trainingPlanSearch(selectedClubId, coachGroupId);
+    if (categoryFilter && categoryFilter !== "uncategorized")
+      params.set("category", categoryFilter);
+    router.push(`/admin/training-plans/new?${params}`);
   }
 
-  function openEditModal(plan: TrainingPlanSummary) {
-    dialogTrigger.current = document.activeElement as HTMLElement;
-    setModalMode("edit");
-    setEditingPlan(plan);
-    setFormTitle(plan.title);
-    setFormDescription(plan.description ?? "");
-    setFormError("");
-  }
-
-  function closeModal() {
-    if (isSaving) return;
-    setModalMode(null);
-    setEditingPlan(null);
-    setFormError("");
-  }
-
-  async function savePlan(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedClubId) return;
-
-    const title = formTitle.trim();
-    const description = formDescription.trim();
-    if (!title) {
-      setFormError("Името е задължително.");
-      return;
-    }
-    if (title.length > 200) {
-      setFormError("Името е твърде дълго.");
-      return;
-    }
-    if (description.length > 1000) {
-      setFormError("Описанието е твърде дълго.");
-      return;
-    }
-
-    setIsSaving(true);
-    setFormError("");
-    try {
-      const isEdit = modalMode === "edit" && editingPlan;
-      const res = await fetch(
-        isEdit
-          ? `/api/admin/clubs/${selectedClubId}/training-plans/${editingPlan.id}`
-          : `/api/admin/clubs/${selectedClubId}/training-plans`,
-        {
-          method: isEdit ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title,
-            description,
-            ...(isEdit
-              ? { expectedUpdatedAt: editingPlan.updatedAt }
-              : { editorVersion: createVersion }),
-          }),
-        },
-      );
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok)
-        throw new Error(
-          typeof payload.error === "string"
-            ? payload.error
-            : "Грешка при запис.",
-        );
-      const nextPlan = payload.plan as TrainingPlanSummary | undefined;
-      if (!nextPlan) throw new Error("Невалиден отговор от сървъра.");
-      setPlans((prev) => {
-        if (isEdit) {
-          return prev.map((plan) =>
-            plan.id === nextPlan.id ? { ...plan, ...nextPlan } : plan,
-          );
-        }
-        return [nextPlan, ...prev];
-      });
-      setModalMode(null);
-      setEditingPlan(null);
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Грешка при запис.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function duplicatePlan(plan: TrainingPlanSummary, convert = false) {
+  async function duplicatePlan(plan: TrainingPlanSummary) {
     if (!selectedClubId || copying) return;
     setCopying(true);
     setError("");
@@ -287,7 +241,8 @@ export default function TrainingPlansClient({
             title: `${plan.title.slice(0, 185)} — копие`,
             description: plan.description ?? "",
             sourcePlanId: plan.id,
-            editorVersion: convert ? 2 : (plan.layoutVersion ?? 1),
+            coachGroupId,
+            editorVersion: 2,
           }),
         },
       );
@@ -330,7 +285,7 @@ export default function TrainingPlansClient({
 
   function openEditor(planId: string) {
     router.push(
-      `/admin/training-plans/${encodeURIComponent(planId)}${plans.find((p) => p.id === planId)?.layoutVersion === 2 ? "/konva" : ""}?clubId=${encodeURIComponent(selectedClubId)}`,
+      `/admin/training-plans/${encodeURIComponent(planId)}/konva?${trainingPlanSearch(selectedClubId, coachGroupId)}`,
     );
   }
 
@@ -344,7 +299,7 @@ export default function TrainingPlansClient({
             type="button"
             onClick={() =>
               router.push(
-                `/admin/members?clubId=${encodeURIComponent(selectedClubId)}`,
+                `/admin/members?${trainingPlanSearch(selectedClubId, coachGroupId)}`,
               )
             }
           >
@@ -361,113 +316,125 @@ export default function TrainingPlansClient({
         <section className="tp-actions">
           <div>
             <h2>{selectedClub?.name ?? "Няма избран отбор"}</h2>
-            <p>{plans.length === 1 ? "1 план" : `${plans.length} плана`}</p>
+            <p>{visiblePlans.length === 1 ? "1 план" : `${visiblePlans.length} плана`}</p>
           </div>
           <button
             className="tp-primary-btn"
             type="button"
-            onClick={() => openCreateModal()}
+            onClick={openNewEditor}
             disabled={!selectedClubId}
           >
             <Plus size={18} />
-            <span>Нов план</span>
-          </button>
-          <button
-            className="tp-primary-btn"
-            type="button"
-            onClick={() => openCreateModal(2)}
-            disabled={!selectedClubId}
-          >
-            Нов план — Konva
+            <span>Нов план — Konva</span>
           </button>
         </section>
+
+        {selectedClubId && (
+          <div className="tp-category-controls">
+            <label className="tp-field tp-category-filter">
+              <span>Филтър по категория</span>
+              <select
+                value={categoryFilter}
+                disabled={isFiltering}
+                onChange={(event) => changeFilter(event.target.value)}
+              >
+                <option value="">Всички категории</option>
+                <option value="uncategorized">Без категория</option>
+                {categories.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
+              </select>
+            </label>
+            <CategoryManager
+              categories={categories}
+              clubId={selectedClubId}
+              disabled={isFiltering || loadingMore || copying}
+              onSave={saveCategory}
+              onDelete={removeCategory}
+            />
+          </div>
+        )}
 
         {error && <p className="tp-error">{error}</p>}
 
-        <section className="tp-grid" aria-busy={isLoading}>
-          {isLoading ? (
+        <section className="tp-grid" aria-busy={isFiltering} ref={gridRef}>
+          {isFiltering ? (
             <FinanceSkeleton variant="form" />
-          ) : plans.length === 0 ? (
+          ) : visiblePlans.length === 0 ? (
             <div className="tp-empty">
               <ClipboardList size={28} />
-              <p>Все още няма планове за този отбор.</p>
+              <p>{categoryFilter ? "Няма планове в тази категория." : "Все още няма планове за този отбор."}</p>
             </div>
           ) : (
-            plans.map((plan) => (
-              <article className="tp-card" key={plan.id}>
-                <div
-                  className="tp-card-main"
-                  onClick={() => openEditor(plan.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openEditor(plan.id);
-                    }
-                  }}
-                >
-                  <h3>{plan.title}</h3>
-                  <span>
-                    {plan.layoutVersion === 2 ? "Konva" : "HTML/CSS — оригинал"}
-                  </span>
-                  <p>{plan.description || "Без описание"}</p>
-                  <span>Обновен: {formatDate(plan.updatedAt)}</span>
-                </div>
-                <div className="tp-card-actions">
-                  <button
-                    type="button"
-                    onClick={() => openEditor(plan.id)}
-                    title="Редактирай диаграмата"
+            visiblePlans.map((plan) => {
+              const previewKey = `${plan.id}:${plan.updatedAt}`;
+              const preview = previews[previewKey];
+              return (
+                <article className="tp-card" key={plan.id}>
+                  <Link
+                    className="tp-card-main"
+                    href={`/admin/training-plans/${encodeURIComponent(plan.id)}?${trainingPlanSearch(selectedClubId, coachGroupId)}`}
+                    prefetch={false}
                   >
-                    <Edit2 size={16} />
-                    <span>Редактирай</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(plan)}
-                    title="Редактирай име и описание"
-                    aria-label="Редактирай име и описание"
-                  >
-                    <ClipboardList size={16} />
-                    <span>Детайли</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={copying}
-                    onClick={() => void duplicatePlan(plan)}
-                    title="Дублирай"
-                  >
-                    <Copy size={16} />
-                    <span>Дублирай</span>
-                  </button>
-                  {plan.layoutVersion !== 2 && (
+                    {plan.layoutVersion === 2 && (
+                      <div
+                        className="tp-card-preview"
+                        aria-hidden="true"
+                        data-preview-id={preview === undefined ? plan.id : undefined}
+                        data-preview-key={previewKey}
+                      >
+                        {preview ? <PlanPreview exercise={preview} /> :
+                          preview === null ? <span>Няма преглед</span> : null}
+                      </div>
+                    )}
+                    <h3>{plan.title}</h3>
+                    <span>
+                      {plan.layoutVersion === 2 ? "Konva" : "HTML/CSS — оригинал"}
+                    </span>
+                    <span className="tp-category-label">
+                      {(plan.categoryId && categoryNames.get(plan.categoryId)) || "Без категория"}
+                    </span>
+                    <p>{plan.description || "Без описание"}</p>
+                    {plan.creatorName && <span className="tp-card-creator">Създал: {plan.creatorName}</span>}
+                    <span>Обновен: {formatDate(plan.updatedAt)}</span>
+                  </Link>
+                  <div className="tp-card-actions">
+                    {plan.layoutVersion === 2 && (
+                      <button
+                        type="button"
+                        onClick={() => openEditor(plan.id)}
+                        title="Редактирай диаграмата"
+                      >
+                        <Edit2 size={16} />
+                        <span>Редактирай</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={copying}
-                      onClick={() => void duplicatePlan(plan, true)}
+                      onClick={() => void duplicatePlan(plan)}
+                      title={plan.layoutVersion === 2 ? "Дублирай" : "Копирай в Konva"}
                     >
-                      Копирай в Konva
+                      <Copy size={16} />
+                      {plan.layoutVersion === 2 ? <span>Дублирай</span> : "Копирай в Konva"}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      dialogTrigger.current =
-                        document.activeElement as HTMLElement;
-                      setConfirmDeleteId(plan.id);
-                    }}
-                    title="Изтрий"
-                  >
-                    <Trash2 size={16} />
-                    <span>Изтрий</span>
-                  </button>
-                </div>
-              </article>
-            ))
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dialogTrigger.current =
+                          document.activeElement as HTMLElement;
+                        setConfirmDeleteId(plan.id);
+                      }}
+                      title="Изтрий"
+                    >
+                      <Trash2 size={16} />
+                      <span>Изтрий</span>
+                    </button>
+                  </div>
+                </article>
+              );
+            })
           )}
         </section>
-        {nextCursor && (
+        {nextCursor && !isFiltering && (
           <button
             type="button"
             className="tp-secondary-btn"
@@ -478,80 +445,6 @@ export default function TrainingPlansClient({
           </button>
         )}
       </div>
-
-      {modalMode && (
-        <div className="tp-overlay" onClick={closeModal}>
-          <form
-            className="tp-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={
-              modalMode === "create"
-                ? createVersion === 2
-                  ? "Нов план — Konva"
-                  : "Нов план — HTML/CSS"
-                : "Редакция на план"
-            }
-            onSubmit={savePlan}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="tp-modal-header">
-              <h2>
-                {modalMode === "create"
-                  ? createVersion === 2
-                    ? "Нов план — Konva"
-                    : "Нов план — HTML/CSS"
-                  : "Редакция на план"}
-              </h2>
-              <button
-                type="button"
-                className="tp-icon-btn"
-                onClick={closeModal}
-                disabled={isSaving}
-                aria-label="Затвори"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <label className="tp-field">
-              <span>Име</span>
-              <input
-                value={formTitle}
-                maxLength={200}
-                onChange={(event) => setFormTitle(event.target.value)}
-                autoFocus
-              />
-            </label>
-            <label className="tp-field">
-              <span>Описание</span>
-              <textarea
-                value={formDescription}
-                maxLength={1000}
-                rows={5}
-                onChange={(event) => setFormDescription(event.target.value)}
-              />
-            </label>
-            {formError && <p className="tp-error">{formError}</p>}
-            <div className="tp-modal-actions">
-              <button
-                type="button"
-                className="tp-secondary-btn"
-                onClick={closeModal}
-                disabled={isSaving}
-              >
-                Отказ
-              </button>
-              <button
-                type="submit"
-                className="tp-primary-btn"
-                disabled={isSaving}
-              >
-                {isSaving ? "Запазване..." : "Запази"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {confirmDeleteId && (
         <div
@@ -593,6 +486,11 @@ export default function TrainingPlansClient({
       )}
     </main>
   );
+}
+
+function matchesCategory(plan: TrainingPlanSummary, filter: string) {
+  if (!filter) return true;
+  return filter === "uncategorized" ? !plan.categoryId : plan.categoryId === filter;
 }
 
 function formatDate(value: string) {

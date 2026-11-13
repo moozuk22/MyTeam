@@ -88,9 +88,21 @@
   display: grid;
   gap: 10px;
 }
+.ke-plan-category {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.ke-plan-category > button {
+  justify-self: start;
+}
 .ke-page .ke-plan-details input,
+.ke-page .ke-plan-details select,
 .ke-page .ke-plan-details textarea {
   font-size: 16px;
+}
+.ke-plan-details select {
+  color-scheme: dark;
 }
 .ke-plan-details textarea {
   width: 100%;
@@ -112,7 +124,7 @@
 }
 @media (min-width: 768px) {
   .ke-plan-details {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr);
     align-items: start;
   }
 }

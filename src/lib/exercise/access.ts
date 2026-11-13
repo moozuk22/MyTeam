@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken, type AdminSessionPayload } from "@/lib/adminAuth";
 import { hasTrustedOrigin } from "@/lib/requestOrigin";
-export const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { TRAINING_UUID_PATTERN as UUID_RE } from "@/lib/trainingPlans";
+import { prisma } from "@/lib/db";
+
+export { UUID_RE };
+export function findTrainingPlanCoachGroup(clubId: string, coachGroupId: unknown) {
+  if (typeof coachGroupId !== "string" || !UUID_RE.test(coachGroupId)) return null;
+  return prisma.coachGroup.findFirst({
+    where: { id: coachGroupId, clubId },
+    select: { id: true, name: true },
+  });
+}
+
 export function canAccessTrainingClub(
   session: AdminSessionPayload,
   clubId: string,

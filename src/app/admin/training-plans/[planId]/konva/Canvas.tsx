@@ -14,13 +14,13 @@ import Konva from "konva";
 import { Circle, Group, Layer, Rect, Shape, Stage, Transformer } from "react-konva";
 import {
   HEIGHT,
-  PITCH_QUADRANT_BOUNDS,
   PITCH_QUADRANTS,
   WIDTH,
   createObject,
   getCustomTeamColors,
   getPitchQuadrants,
   isInPitchQuadrants,
+  isLineType,
   nextPlayerLabel,
   textFontSize,
   validateExercise,
@@ -42,10 +42,10 @@ import {
 } from "@/lib/exercise/geometry";
 import {
   ObjectVisual,
-  PITCH_ICON_FILES,
   Pitch,
-  type PitchIcons,
+  usePitchIcons,
 } from "./Visuals";
+import { pitchView, pitchViewport } from "./pitchView";
 import { measurePitchText, resizePitchText } from "./textLayout";
 
 const BOX_ANCHORS = [
@@ -86,6 +86,7 @@ export type CanvasProps = {
   customTeamNumber?: number;
   placementOnly: boolean;
   pathMode: "straight" | "curve" | "freehand";
+  lineArrowhead: boolean;
   objectActions: ReactNode;
   selectedLabel?: string;
   colorPreviewId?: string;
@@ -107,6 +108,7 @@ export default function Canvas({
   customTeamNumber,
   placementOnly,
   pathMode,
+  lineArrowhead,
   objectActions,
   selectedLabel,
   colorPreviewId,
@@ -143,7 +145,7 @@ export default function Canvas({
   const cancelling = useRef(false);
   const [width, setWidth] = useState(0),
     [preview, setPreview] = useState<ExerciseObject | null>(null);
-  const [icons, setIcons] = useState<PitchIcons>({});
+  const icons = usePitchIcons();
   const gesture = useRef<{
     tool: ExerciseTool;
     object: ExerciseObject;
@@ -158,30 +160,9 @@ export default function Canvas({
     latest.current = { exercise, onCommit, onError };
   });
   const quadrants = surfacePreview ? PITCH_QUADRANTS : getPitchQuadrants(exercise);
-  const viewport = useMemo(() => {
-    const origins = quadrants.map((part) => PITCH_QUADRANT_BOUNDS[part]);
-    const x = Math.min(...origins.map((origin) => origin.x));
-    const y = Math.min(...origins.map((origin) => origin.y));
-    const w = Math.max(...origins.map((origin) => origin.x)) - x + WIDTH / 2;
-    const h = Math.max(...origins.map((origin) => origin.y)) - y + HEIGHT / 2;
-    const clipFunc = w * h > origins.length * (WIDTH / 2) * (HEIGHT / 2)
-      ? (context: Konva.Context) => {
-        for (const origin of origins) context.rect(origin.x, origin.y, WIDTH / 2, HEIGHT / 2);
-      }
-      : undefined;
-    return { x, y, width: w, height: h, clipFunc };
-  }, [quadrants]);
+  const viewport = useMemo(() => pitchViewport(quadrants), [quadrants]);
   const pitchRotation = exercise.pitchRotation ?? 0;
-  const sideways = pitchRotation === 90 || pitchRotation === 270;
-  const viewWidth = sideways ? viewport.height : viewport.width;
-  const viewHeight = sideways ? viewport.width : viewport.height;
-  const scale = width / viewWidth;
-  const viewLayer = {
-    rotation: pitchRotation,
-    offsetX: viewport.x + (pitchRotation === 180 || pitchRotation === 270 ? viewport.width : 0),
-    offsetY: viewport.y + (pitchRotation === 90 || pitchRotation === 180 ? viewport.height : 0),
-    scaleX: scale, scaleY: scale, clipFunc: viewport.clipFunc,
-  };
+  const { viewWidth, viewHeight, scale, viewLayer } = pitchView(viewport, pitchRotation, width);
   function objectRotationOffset(kind: ExerciseObject["kind"]) {
     // Directions and marked areas follow the pitch. Symbols and text face the viewer.
     return kind === "movement" || kind === "zone" ? 0 : pitchRotation;
@@ -281,18 +262,6 @@ export default function Canvas({
   useLayoutEffect(() => {
     if (surfacePreview || gesture.current || selectionDrag.current || boxGesture.current) cancelFromEffect();
   }, [exercise, multiSelection, surfacePreview, tool, width]);
-
-  useEffect(() => {
-    const images = Object.entries(PITCH_ICON_FILES).map(([name, filename]) => {
-      const image = new window.Image();
-      image.onload = () => setIcons((current) => ({ ...current, [name]: image }));
-      image.src = `/icons/${filename}`;
-      return image;
-    });
-    return () => {
-      for (const image of images) image.onload = null;
-    };
-  }, []);
 
   useEffect(() => {
     const element = host.current;
@@ -497,6 +466,7 @@ export default function Canvas({
     const object = createObject(tool, p, crypto.randomUUID(), customTeam);
     if (object.kind === "movement") {
       object.path = pathMode;
+      if (lineArrowhead && isLineType(object.action)) object.arrowhead = true;
     }
     if (object.kind === "text") {
       // Keep the placement tap from focusing the pitch over the new input.
