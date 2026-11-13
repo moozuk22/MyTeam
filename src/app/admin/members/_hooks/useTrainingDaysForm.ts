@@ -600,15 +600,18 @@ export function useTrainingDaysForm({
     return merged;
   };
 
-  const isTrainingDaysScheduleUnchanged =
-    trainingDaysEditorMode !== "coachGroup" &&
-    trainingDaysEditorMode !== "createGroup" &&
+  const scheduleDetailsUnchanged =
     normalizedTrainingDaysSelection.join("|") === normalizedTrainingDaysInitial.join("|") &&
     normalizedTrainingDateTimesSelectionKey === normalizedTrainingDateTimesInitialKey &&
     normalizedTrainingDurationSelection === trainingDaysInitialDurationMinutes &&
-    normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey &&
-    (!schedule2CustomEdit ||
-      (trainingDayScheduleNotes[trainingDaysSingleEditDate!] ?? "").trim() === schedule2InitialNote.trim());
+    normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey;
+  const isSchedule2NoteOnlyEdit = schedule2CustomEdit && scheduleDetailsUnchanged &&
+    !hasMissingTrainingTime && !hasInvalidTrainingDuration &&
+    (trainingDayScheduleNotes[trainingDaysSingleEditDate!] ?? "").trim() !== schedule2InitialNote.trim();
+  const isTrainingDaysScheduleUnchanged =
+    trainingDaysEditorMode !== "coachGroup" &&
+    trainingDaysEditorMode !== "createGroup" &&
+    scheduleDetailsUnchanged && !isSchedule2NoteOnlyEdit;
 
   useEffect(() => {
     setTrainingDateTimes((prev) => {
@@ -905,6 +908,7 @@ export function useTrainingDaysForm({
     buildMergedTrainingDateTimes,
     buildMergedTrainingFieldSelections,
     isTrainingDaysScheduleUnchanged,
+    isSchedule2NoteOnlyEdit,
     handleTrainingTimeModeChange,
     handleTrainingAllTimeChange,
     handleTrainingDateTimeChange,

@@ -92,6 +92,7 @@ type TrainingDaysEditorDialogProps = {
     | "setTrainingDayScheduleNotes"
     | "trainingDaysEditorError"
     | "isTrainingDaysScheduleUnchanged"
+    | "isSchedule2NoteOnlyEdit"
     | "schedule2TrainingGroup"
     | "trainingDaysStartedFromScheduleCell"
     | "showTrainingStepBack"
@@ -179,6 +180,7 @@ export function TrainingDaysEditorDialog({
     missingTrainingFieldMessage,
     trainingDaysEditorError,
     isTrainingDaysScheduleUnchanged,
+    isSchedule2NoteOnlyEdit,
     schedule2TrainingGroup,
     trainingDaysStartedFromScheduleCell,
     showTrainingStepBack,
@@ -692,7 +694,7 @@ export function TrainingDaysEditorDialog({
                           trainingDaysEditorLoading ||
                           (trainingDaysEditorMode !== "createGroup" && isTrainingDaysScheduleUnchanged) ||
                           (trainingDaysEditorMode !== "createGroup" && hasMissingTrainingTime) ||
-                          hasMissingTrainingField ||
+                          (hasMissingTrainingField && !isSchedule2NoteOnlyEdit) ||
                           hasInvalidTrainingDuration
                         }
                       >

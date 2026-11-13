@@ -89,6 +89,7 @@ type Options = {
     | "isSchedulerLimitedSpotsValid"
     | "schedulerLimitedSpotsValue"
     | "trainingDayScheduleNotes"
+    | "isSchedule2NoteOnlyEdit"
     | "setTrainingDaysSuccessMessage"
     | "setTrainingDaysSuccessOpen"
     | "coachWizardGroupId"
@@ -243,6 +244,7 @@ export function createTrainingScheduleActions({
     isSchedulerLimitedSpotsValid,
     schedulerLimitedSpotsValue,
     trainingDayScheduleNotes,
+    isSchedule2NoteOnlyEdit,
     setTrainingDaysSuccessMessage,
     setTrainingDaysSuccessOpen,
     coachWizardGroupId,
@@ -851,7 +853,7 @@ export function createTrainingScheduleActions({
       if (trainingDaysEditorMode === "customGroup" && schedule2TrainingGroup) {
         if (hasMissingTrainingTime) throw new Error("Въведете валиден час на тренировка (HH:mm).");
         if (hasInvalidTrainingDuration) throw new Error("Въведете продължителност между 1 и 1440 минути.");
-        if (hasMissingTrainingField) throw new Error(missingTrainingFieldMessage);
+        if (hasMissingTrainingField && !isSchedule2NoteOnlyEdit) throw new Error(missingTrainingFieldMessage);
         const dates = trainingDaysSingleEditDate ? [trainingDaysSingleEditDate] : normalizedTrainingDaysSelection;
         const sessions = dates.map((date) => {
           const config = schedulerPerDayLimited
@@ -869,7 +871,9 @@ export function createTrainingScheduleActions({
         const response = await fetch(schedule2CustomSessionsUrl(clubId, schedule2TrainingGroup.id), {
           method: trainingDaysSingleEditDate ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: schedule2TrainingSessionId, sessions }),
+          body: JSON.stringify(isSchedule2NoteOnlyEdit && trainingDaysSingleEditDate
+            ? { sessionId: schedule2TrainingSessionId, date: trainingDaysSingleEditDate, note: trainingDayScheduleNotes[trainingDaysSingleEditDate] ?? "" }
+            : { sessionId: schedule2TrainingSessionId, sessions }),
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || "Неуспешно запазване на тренировката.");

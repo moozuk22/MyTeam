@@ -76,13 +76,18 @@ async function mutate(request: NextRequest, context: Context, operation: "create
     }
     const sessionId = typeof body.sessionId === "string" ? body.sessionId : null;
     const scopeKey = sessionId ? `${baseScope}:session:${sessionId}` : baseScope;
-    const items = operation === "delete" ? [] : body.sessions;
+    const noteOnly = operation === "edit" && body.sessions === undefined;
+    const note = noteOnly && typeof body.note === "string" ? body.note.trim() : "";
+    if (noteOnly && (typeof body.note !== "string" || note.length > 1000)) {
+      throw new ScheduleError("Описанието трябва да е до 1000 символа.");
+    }
+    const items = operation === "delete" || noteOnly ? [] : body.sessions;
     if (!Array.isArray(items) || items.length > TRAINING_SELECTION_WINDOW_DAYS ||
-        (operation === "create" && items.length === 0) || (operation === "edit" && items.length !== 1)) {
+        (operation === "create" && items.length === 0) || (operation === "edit" && !noteOnly && items.length !== 1)) {
       throw new ScheduleError("Изберете валидни дати за тренировки.");
     }
     const changes = items.map(parseSession);
-    const dates = operation === "delete" ? [getDate(body.date)] : changes.map((item) => item.date);
+    const dates = operation === "delete" || noteOnly ? [getDate(body.date)] : changes.map((item) => item.date);
     if (new Set(dates).size !== dates.length) throw new ScheduleError("Изберете всяка дата само веднъж.");
 
     const { before, after } = await prisma.$transaction(async (tx) => {
@@ -127,6 +132,27 @@ async function mutate(request: NextRequest, context: Context, operation: "create
         else if (existing) await tx.trainingSession.update({ where: { id: existing.id }, data: { status: "cancelled" } });
         else await tx.trainingSession.create({ data: { ...legacy, status: "cancelled" } });
         return { before: [previous], after };
+      }
+
+      const saveLegacyNote = (description: string) => description
+        ? tx.trainingNote.upsert({
+            where: { clubId_trainingDate_scopeKey: { clubId, trainingDate, scopeKey } },
+            create: { clubId, trainingDate, scopeKey, note: description },
+            update: { note: description },
+          })
+        : tx.trainingNote.deleteMany({ where: { clubId, scopeKey, trainingDate } });
+
+      if (noteOnly) {
+        if (existing) await tx.trainingSession.update({ where: { id: existing.id }, data: { note: note || null } });
+        if (!sessionId) {
+          const previousNote = await tx.trainingNote.findUnique({
+            where: { clubId_trainingDate_scopeKey: { clubId, trainingDate, scopeKey } },
+            select: { note: true },
+          });
+          previous.note = previousNote?.note ?? "";
+          await saveLegacyNote(note);
+        }
+        return { before: [previous], after: [{ ...previous, note }] };
       }
 
       const hasFields = await tx.field.count({ where: { clubId }, take: 1 }) > 0;
@@ -192,12 +218,7 @@ async function mutate(request: NextRequest, context: Context, operation: "create
               trainingDateTimes: { ...object(group.trainingDateTimes) as Record<string, string>, [change.date]: change.time },
               trainingFieldSelections: { ...object(group.trainingFieldSelections) as Record<string, typeof change.field>, [change.date]: change.field },
             } });
-            if (change.note) {
-              await tx.trainingNote.upsert({
-                where: { clubId_trainingDate_scopeKey: { clubId, trainingDate, scopeKey } },
-                create: { clubId, trainingDate, scopeKey, note: change.note }, update: { note: change.note },
-              });
-            } else await tx.trainingNote.deleteMany({ where: { clubId, trainingDate, scopeKey } });
+            await saveLegacyNote(change.note);
           }
           after.push({ ...previous, ...data, note: change.note });
           continue;

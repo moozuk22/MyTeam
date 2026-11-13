@@ -5,7 +5,7 @@ import { DELETE, PATCH, POST } from "./route";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(), group: vi.fn(), updateGroup: vi.fn(), transaction: vi.fn(), find: vi.fn(),
   create: vi.fn(), update: vi.fn(), remove: vi.fn(), deleteLimit: vi.fn(), createLimit: vi.fn(),
-  deleteNote: vi.fn(), roster: vi.fn(), publish: vi.fn(),
+  deleteNote: vi.fn(), upsertNote: vi.fn(), countFields: vi.fn(), roster: vi.fn(), publish: vi.fn(),
 }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.auth }));
 vi.mock("@/lib/db", () => ({ prisma: { $transaction: mocks.transaction } }));
@@ -44,13 +44,14 @@ describe("Schedule 2 custom-group occurrences", () => {
       trainingDateTimes: { "2026-11-13": "16:00" }, trainingFieldSelections: {}, club: { paymentWorkflow: "membership" },
     });
     mocks.roster.mockResolvedValue([{ id: "player", fullName: "Player", teamGroup: 2015 }]);
+    mocks.countFields.mockResolvedValue(0);
     mocks.transaction.mockImplementation(async (work) => work({
       $queryRaw: vi.fn(),
       clubCustomTrainingGroup: { findFirst: mocks.group, update: mocks.updateGroup },
-      field: { count: vi.fn().mockResolvedValue(0) },
+      field: { count: mocks.countFields },
       trainingSession: { findFirst: mocks.find, create: mocks.create, update: mocks.update },
       limitedTrainingEvent: { create: mocks.createLimit, deleteMany: mocks.deleteLimit },
-      trainingNote: { deleteMany: mocks.deleteNote },
+      trainingNote: { deleteMany: mocks.deleteNote, upsert: mocks.upsertNote, findUnique: vi.fn() },
       trainingOptOut: { findMany: vi.fn().mockResolvedValue([]) },
     }));
   });
@@ -104,6 +105,38 @@ describe("Schedule 2 custom-group occurrences", () => {
     expect(edit.data).not.toHaveProperty("trainingDates");
     expect(edit.data).not.toHaveProperty("trainingWeekdays");
     expect(edit.data.trainingDateTimes).toEqual({ [date]: session.time, "2026-11-13": "16:00" });
+  });
+
+  it.each([["  New description  ", "New description"], ["", null]])(
+    "saves the description %j without requiring a field on an existing session",
+    async (note, storedNote) => {
+      const sessionId = "7b9416cd-4604-4a31-b131-3503a6f10ba6";
+      mocks.countFields.mockResolvedValue(1);
+      mocks.find.mockResolvedValue({ id: sessionId, status: "scheduled", trainingFieldId: null });
+      expect((await PATCH(request("PATCH", { sessionId, date, note }), { params })).status).toBe(200);
+      expect(mocks.update).toHaveBeenCalledWith({ where: { id: sessionId }, data: { note: storedNote } });
+      expect(mocks.countFields).not.toHaveBeenCalled();
+      expect(mocks.updateGroup).not.toHaveBeenCalled();
+      expect(mocks.publish).toHaveBeenCalledWith(clubId, date);
+    },
+  );
+
+  it("updates a recurring occurrence description without creating a session", async () => {
+    mocks.countFields.mockResolvedValue(1);
+    expect((await PATCH(request("PATCH", { sessionId: null, date, note: "New description" }), { params })).status).toBe(200);
+    expect(mocks.upsertNote).toHaveBeenCalledWith(expect.objectContaining({
+      where: { clubId_trainingDate_scopeKey: { clubId, trainingDate: new Date(date), scopeKey: baseScope } },
+      update: { note: "New description" },
+    }));
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.updateGroup).not.toHaveBeenCalled();
+  });
+
+  it("still requires a field when editing a session time", async () => {
+    mocks.countFields.mockResolvedValue(1);
+    expect((await PATCH(request("PATCH", { sessionId: null, sessions: [{ ...session, time: "18:00" }] }), { params })).status).toBe(400);
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 
   it("rejects an omitted target and a removed occurrence without touching any data", async () => {
