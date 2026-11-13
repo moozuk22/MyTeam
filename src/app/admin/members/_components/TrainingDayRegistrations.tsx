@@ -370,8 +370,7 @@ export function TrainingDayRegistrations({
               const teamGroup = teamGroupMatch
                 ? parseInt(teamGroupMatch[1], 10)
                 : null;
-              const customGroupMatch = scopeKey.match(/^custom_group:(.+)$/);
-              const scopeId = customGroupMatch ? customGroupMatch[1] : null;
+              const scopeId = scopeKey.startsWith("custom_group:") ? scopeKey.split(":")[1] : null;
               setLimitedEventSaving(true);
               setLimitedEventError("");
               try {

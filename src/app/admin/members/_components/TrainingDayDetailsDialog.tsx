@@ -1,6 +1,7 @@
 "use client";
 import { TrainingDayRegistrations } from "./TrainingDayRegistrations";
 import { TrainingDayMatchContent } from "./TrainingDayMatchContent";
+import { SkeletonLine } from "./FinanceSkeleton";
 
 import { matchEventTypeLabel } from "@/lib/matchEventType";
 
@@ -25,6 +26,10 @@ import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceSta
 import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
 export type TrainingDayDetailsDialogProps = {
+  schedule2DayDetails: boolean;
+  dismissSchedule2Details: () => void;
+  matchEditCustomGroups: { id: string; name: string }[];
+  schedulerCalendarDateSet: Set<string>;
   trainingAttendanceState: Pick<
     TrainingAttendanceState,
     | "trainingDayDetailsOpen"
@@ -35,6 +40,7 @@ export type TrainingDayDetailsDialogProps = {
     | "trainingDayDetailsViewSnapshot"
     | "trainingDayDetailsTab"
     | "setTrainingDayDetailsTab"
+    | "trainingAttendanceError"
     | "trainingAttendanceDate"
     | "trainingDayTime"
     | "trainingAttendanceStats"
@@ -104,6 +110,10 @@ export type TrainingDayDetailsDialogProps = {
 };
 
 export function TrainingDayDetailsDialog({
+  schedule2DayDetails,
+  dismissSchedule2Details,
+  matchEditCustomGroups,
+  schedulerCalendarDateSet,
   trainingAttendanceState,
   matchEditorState,
   trainingGroups,
@@ -131,6 +141,7 @@ export function TrainingDayDetailsDialog({
     trainingDayDetailsViewSnapshot,
     trainingDayDetailsTab,
     setTrainingDayDetailsTab,
+    trainingAttendanceError,
     trainingAttendanceDate,
     trainingDayTime,
     trainingAttendanceStats,
@@ -173,21 +184,21 @@ export function TrainingDayDetailsDialog({
     dayDetailsMatchOriginalResult,
   } = matchEditorState;
   const { customTrainingGroups, isCustomTrainingGroupMode } = trainingGroups;
+  const schedule2ActionPending = schedule2DayDetails &&
+    (limitedEventSaving || trainingDayCancelLoading || dayDetailsMatchSaving);
+  const closeBlocked = trainingNoteSaving || trainingDayDetailsTabLoading ||
+    (!schedule2DayDetails && trainingDayDetailsOpening) || schedule2ActionPending;
+  const closeDetails = () => {
+    if (schedule2DayDetails) dismissSchedule2Details();
+    setTrainingDayDetailsOpen(false);
+    setTrainingAttendanceView(trainingDayDetailsViewSnapshot);
+  };
   return (
     <>
       {(trainingDayDetailsOpen || trainingDayDetailsOpening) && (
         <div
           className="amp-overlay amp-overlay--confirm"
-          onClick={() => {
-            if (
-              !trainingNoteSaving &&
-              !trainingDayDetailsTabLoading &&
-              !trainingDayDetailsOpening
-            ) {
-              setTrainingDayDetailsOpen(false);
-              setTrainingAttendanceView(trainingDayDetailsViewSnapshot);
-            }
-          }}
+          onClick={() => { if (!closeBlocked) closeDetails(); }}
         >
           <div
             className="amp-modal amp-modal--confirm amp-modal--training-day-details"
@@ -205,24 +216,27 @@ export function TrainingDayDetailsDialog({
               <button
                 className="amp-modal-close"
                 onClick={() => {
-                  setTrainingDayDetailsOpen(false);
+                  closeDetails();
                   setDayDetailsMatchEditOpen(false);
                   setDayDetailsMatchDeleteConfirm(false);
                   setDayDetailsMatchError("");
-                  setTrainingAttendanceView(trainingDayDetailsViewSnapshot);
                 }}
                 aria-label="Затвори"
-                disabled={
-                  trainingNoteSaving ||
-                  trainingDayDetailsTabLoading ||
-                  dayDetailsMatchSaving ||
-                  trainingDayDetailsOpening
-                }
+                disabled={closeBlocked || dayDetailsMatchSaving}
               >
                 <XIcon />
               </button>
             </h2>
-            {trainingDayDetailsOpening ? (
+            {trainingDayDetailsOpening ? schedule2DayDetails ? (
+              <div className="amp-modal-body" role="status" aria-label="Зареждане" aria-busy="true">
+                <div aria-hidden="true" style={{ display: "grid", gap: 12 }}>
+                  <SkeletonLine wide />
+                  <SkeletonLine />
+                  <SkeletonLine wide />
+                  <SkeletonLine wide />
+                </div>
+              </div>
+            ) : (
               <div className="amp-modal-body">
                 <div className="amp-loading">
                   <div className="amp-spinner" />
@@ -279,7 +293,7 @@ export function TrainingDayDetailsDialog({
                             }
                           }}
                           disabled={
-                            trainingDayDetailsTabLoading || trainingNoteSaving
+                            trainingDayDetailsTabLoading || trainingNoteSaving || schedule2ActionPending
                           }
                         >
                           <span className="amp-day-details-tab-type">
@@ -294,7 +308,7 @@ export function TrainingDayDetailsDialog({
                         </button>
                       );
                     })
-                  ) : (
+                  ) : !schedule2DayDetails && (
                     <button
                       type="button"
                       className={`amp-day-details-tab amp-day-details-tab--training${!dayDetailsIsMatchTab ? " amp-day-details-tab--active" : ""}`}
@@ -316,7 +330,7 @@ export function TrainingDayDetailsDialog({
                       customTrainingGroups.find(
                         (g) => g.id === match.customGroupId,
                       ) ?? null;
-                    const matchGroupName = matchGroup?.name ?? null;
+                    const matchGroupName = matchGroup?.name ?? matchEditCustomGroups.find((group) => group.id === match.customGroupId)?.name;
                     const matchAccent =
                       matchGroup?.color &&
                       isCustomTrainingGroupPaletteColor(matchGroup.color)
@@ -351,7 +365,7 @@ export function TrainingDayDetailsDialog({
                           setDayDetailsMatchError("");
                         }}
                         disabled={
-                          trainingDayDetailsTabLoading || trainingNoteSaving
+                          trainingDayDetailsTabLoading || trainingNoteSaving || schedule2ActionPending
                         }
                       >
                         <span className="amp-day-details-tab-type">
@@ -376,6 +390,8 @@ export function TrainingDayDetailsDialog({
                 {dayDetailsIsMatchTab && dayDetailsActiveMatch ? (
                   <TrainingDayMatchContent
                     customTrainingGroups={customTrainingGroups}
+                    matchEditCustomGroups={matchEditCustomGroups}
+                    schedule2DayDetails={schedule2DayDetails}
                     dayDetailsActiveMatch={dayDetailsActiveMatch}
                     dayDetailsMatchEditOpen={dayDetailsMatchEditOpen}
                     dayDetailsMatchEditForm={dayDetailsMatchEditForm}
@@ -400,6 +416,8 @@ export function TrainingDayDetailsDialog({
                       dayDetailsMatchOriginalResult
                     }
                   />
+                ) : schedule2DayDetails && (dayDetailsIsMatchTab || trainingAttendanceError) ? (
+                  <p className="amp-confirm-error" role="alert">{dayDetailsIsMatchTab ? "Събитието вече не е в графика." : trainingAttendanceError}</p>
                 ) : (
                   <>
                     <div className="amp-training-stats">
@@ -596,7 +614,7 @@ export function TrainingDayDetailsDialog({
                       )}
                     </div>
                     <div className="amp-modal-actions amp-modal-actions--end">
-                      <button
+                      {(!schedule2DayDetails || (trainingAttendanceDate && schedulerCalendarDateSet.has(trainingAttendanceDate))) && <button
                         className="amp-btn amp-btn--ghost"
                         onClick={() => {
                           if (!trainingAttendanceDate) return;
@@ -614,8 +632,8 @@ export function TrainingDayDetailsDialog({
                         }
                       >
                         Редактирай тренировка
-                      </button>
-                      {
+                      </button>}
+                      {(!schedule2DayDetails || schedulerCalendarDateSet.has(trainingAttendanceDate)) && (
                         <button
                           className="amp-btn amp-btn--danger"
                           onClick={() => setTrainingDayCancelConfirmOpen(true)}
@@ -631,7 +649,7 @@ export function TrainingDayDetailsDialog({
                             ? "..."
                             : "Изтрий тренировка"}
                         </button>
-                      }
+                      )}
                     </div>
                     {trainingDayCancelConfirmOpen && (
                       <div

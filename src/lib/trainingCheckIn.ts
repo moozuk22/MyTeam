@@ -31,6 +31,8 @@ export async function chargeTrainingCheckIn(tx: Pick<typeof prisma, "player" | "
   const charged = !row.creditChargedAt;
   const updated = charged ? await tx.player.update({ where: { id: playerId }, data: { remainingTrainingCredits: { decrement: 1 }, status: player.remainingTrainingCredits > 1 ? "paid" : "overdue" } }) : player;
   await tx.trainingSessionPlayer.update({ where: { id: row.id }, data: { present: true, attendanceRecorded: true, reasonCode: null, reasonText: null, ...(charged ? { creditChargedAt: new Date() } : {}) } });
-  if (row.trainingSession.scopeType !== "coachGroup") await tx.trainingOptOut.deleteMany({ where: { playerId, trainingDate: row.trainingSession.trainingDate } });
+  if (row.trainingSession.scopeType !== "coachGroup" && !row.trainingSession.occurrenceKey) {
+    await tx.trainingOptOut.deleteMany({ where: { playerId, trainingDate: row.trainingSession.trainingDate } });
+  }
   return { player: updated, training: row.trainingSession, charged, changed: true };
 }

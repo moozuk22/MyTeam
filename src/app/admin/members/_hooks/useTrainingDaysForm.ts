@@ -31,6 +31,8 @@ type TrainingDaysFormOptions = {
   setTrainingNoteTargetDates: React.Dispatch<React.SetStateAction<string[]>>;
 };
 
+import type { Schedule2Group } from "../_components/Schedule2";
+
 export function useTrainingDaysForm({
   clubId,
   selectedTrainingGroupId,
@@ -78,6 +80,7 @@ export function useTrainingDaysForm({
 
   const [trainingDaysEditorLoading, setTrainingDaysEditorLoading] = useState(false);
 
+  const trainingDaysEditorRequest = useRef<symbol | null>(null);
   const [trainingDaysEditorSaving, setTrainingDaysEditorSaving] = useState(false);
 
   const [trainingDaysEditorError, setTrainingDaysEditorError] = useState("");
@@ -115,6 +118,7 @@ export function useTrainingDaysForm({
   const [trainingDaysSuccessMessage, setTrainingDaysSuccessMessage] = useState("");
 
   const [trainingDayScheduleNotes, setTrainingDayScheduleNotes] = useState<Record<string, string>>({});
+  const [schedule2InitialNote, setSchedule2InitialNote] = useState("");
 
   const [trainingDaysEditorMode, setTrainingDaysEditorMode] = useState<
     "teamGroup" | "createGroup" | "trainingGroup" | "customGroup" | "coachGroup"
@@ -165,6 +169,10 @@ export function useTrainingDaysForm({
     signature: string;
   } | null>(null);
 
+  const [schedule2TrainingGroup, setSchedule2TrainingGroup] = useState<Schedule2Group | null>(null);
+  const [schedule2TrainingSessionId, setSchedule2TrainingSessionId] = useState<string | null>(null);
+  const [trainingDaysStartedFromScheduleCell, setTrainingDaysStartedFromScheduleCell] = useState(false);
+  const trainingEditorCustomGroupId = schedule2TrainingGroup?.id ?? selectedTrainingGroupId;
   const latestFieldConflictsParams = useRef<string | null>(null);
 
   const schedulerCalendarDates = getNextTrainingCalendarDates();
@@ -198,9 +206,10 @@ export function useTrainingDaysForm({
     if (trainingDaysEditorMode === "trainingGroup" && selectedTrainingGroupId) {
       params.set("excludeType", "trainingGroup");
       params.set("excludeId", selectedTrainingGroupId);
-    } else if (trainingDaysEditorMode === "customGroup" && selectedTrainingGroupId) {
+    } else if (trainingDaysEditorMode === "customGroup" && trainingEditorCustomGroupId && (!schedule2TrainingGroup || trainingDaysSingleEditDate)) {
       params.set("excludeType", "customGroup");
-      params.set("excludeId", selectedTrainingGroupId);
+      params.set("excludeId", trainingEditorCustomGroupId);
+      if (schedule2TrainingSessionId) params.set("excludeSessionId", schedule2TrainingSessionId);
     } else if (trainingDaysEditorMode === "coachGroup") {
       if (coachWizardSelection.startsWith("session:")) {
         params.set("excludeType", "coachGroup");
@@ -237,6 +246,10 @@ export function useTrainingDaysForm({
     trainingDateTimes,
     trainingTimeMode,
     selectedTrainingGroupId,
+    trainingEditorCustomGroupId,
+    schedule2TrainingGroup,
+    schedule2TrainingSessionId,
+    trainingDaysSingleEditDate,
     coachWizardSelection,
     coachWizardGroupId,
     coachWizardTrainings,
@@ -425,9 +438,10 @@ export function useTrainingDaysForm({
   const canShowTrainingDaysFieldStep =
     canShowTrainingDaysTimeStep && !hasMissingTrainingTime && !hasInvalidTrainingDuration;
 
+  const schedule2CustomEdit = Boolean(schedule2TrainingGroup && trainingDaysEditorMode === "customGroup" && trainingDaysSingleEditDate);
   const spotsStepSupportedByMode =
     trainingDaysEditorMode === "teamGroup" ||
-    trainingDaysEditorMode === "customGroup" ||
+    (trainingDaysEditorMode === "customGroup" && !schedule2CustomEdit) ||
     trainingDaysEditorMode === "coachGroup";
 
   const canShowTrainingDaysSpotsStep = canShowTrainingDaysFieldStep && spotsStepSupportedByMode;
@@ -526,7 +540,9 @@ export function useTrainingDaysForm({
     .find((selection) => selection?.trainingFieldId) ?? { trainingFieldId: null, trainingFieldPieceIds: [] };
 
   const showTrainingStepBack =
-    trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep !== "days";
+    trainingDaysEditorMode !== "createGroup" &&
+    effectiveTrainingDaysActiveStep !== "days" &&
+    !((trainingDaysStartedFromScheduleCell || schedule2CustomEdit) && effectiveTrainingDaysActiveStep === "time");
 
   const showTrainingStepNext =
     trainingDaysEditorMode !== "createGroup" && effectiveTrainingDaysActiveStep !== "notes";
@@ -584,13 +600,18 @@ export function useTrainingDaysForm({
     return merged;
   };
 
-  const isTrainingDaysScheduleUnchanged =
-    trainingDaysEditorMode !== "coachGroup" &&
-    trainingDaysEditorMode !== "createGroup" &&
+  const scheduleDetailsUnchanged =
     normalizedTrainingDaysSelection.join("|") === normalizedTrainingDaysInitial.join("|") &&
     normalizedTrainingDateTimesSelectionKey === normalizedTrainingDateTimesInitialKey &&
     normalizedTrainingDurationSelection === trainingDaysInitialDurationMinutes &&
     normalizedTrainingFieldSelectionsKey === normalizedTrainingFieldSelectionsInitialKey;
+  const isSchedule2NoteOnlyEdit = schedule2CustomEdit && scheduleDetailsUnchanged &&
+    !hasMissingTrainingTime && !hasInvalidTrainingDuration &&
+    (trainingDayScheduleNotes[trainingDaysSingleEditDate!] ?? "").trim() !== schedule2InitialNote.trim();
+  const isTrainingDaysScheduleUnchanged =
+    trainingDaysEditorMode !== "coachGroup" &&
+    trainingDaysEditorMode !== "createGroup" &&
+    scheduleDetailsUnchanged && !isSchedule2NoteOnlyEdit;
 
   useEffect(() => {
     setTrainingDateTimes((prev) => {
@@ -770,6 +791,14 @@ export function useTrainingDaysForm({
   };
 
   return {
+    trainingDaysEditorRequest,
+    schedule2TrainingGroup,
+    setSchedule2TrainingGroup,
+    schedule2TrainingSessionId,
+    setSchedule2TrainingSessionId,
+    trainingDaysStartedFromScheduleCell,
+    setTrainingDaysStartedFromScheduleCell,
+    trainingEditorCustomGroupId,
     schedulerForm,
     setSchedulerForm,
     trainingDateTimes,
@@ -814,6 +843,7 @@ export function useTrainingDaysForm({
     setTrainingDaysSuccessMessage,
     trainingDayScheduleNotes,
     setTrainingDayScheduleNotes,
+    setSchedule2InitialNote,
     trainingDaysEditorMode,
     setTrainingDaysEditorMode,
     coachWizardGroupId,
@@ -878,6 +908,7 @@ export function useTrainingDaysForm({
     buildMergedTrainingDateTimes,
     buildMergedTrainingFieldSelections,
     isTrainingDaysScheduleUnchanged,
+    isSchedule2NoteOnlyEdit,
     handleTrainingTimeModeChange,
     handleTrainingAllTimeChange,
     handleTrainingDateTimeChange,

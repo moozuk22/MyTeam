@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
+import { hasTrustedSchedule2Origin } from "@/lib/requestOrigin";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { sendPushToMember } from "@/lib/push/service";
 import { publishMemberUpdated } from "@/lib/memberEvents";
 import { publishTrainingAttendanceUpdated } from "@/lib/trainingAttendanceEvents";
-import { setLimitedSessionAttendance } from "@/lib/limitedTrainingSession";
+import { getLimitedTrainingSessionId, setLimitedSessionAttendance } from "@/lib/limitedTrainingSession";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,9 +21,9 @@ async function getPlayerIdsInScope(clubId: string, scopeKey: string): Promise<st
     return players.map((p) => p.id);
   }
   if (scopeKey.startsWith("custom_group:")) {
-    const groupId = scopeKey.slice("custom_group:".length);
+    const groupId = scopeKey.split(":")[1];
     const members = await prisma.clubCustomTrainingGroupPlayer.findMany({
-      where: { groupId },
+      where: { groupId, group: { clubId } },
       select: { playerId: true, player: { select: { isActive: true } } },
     });
     return members.filter((m) => m.player.isActive).map((m) => m.playerId);
@@ -74,6 +75,9 @@ export async function GET(
 
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (event.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(event.scopeKey) && !session.roles.includes("admin")) {
+      return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
 
     const registrations = event.registrations.map((r, idx) => ({
@@ -135,6 +139,10 @@ export async function PATCH(
     });
     if (!existing) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (existing.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(existing.scopeKey) &&
+        (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
+      return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
 
     const oldMaxSpots = existing.maxSpots;
@@ -251,6 +259,10 @@ export async function DELETE(
     });
     if (!existing) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (existing.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(existing.scopeKey) &&
+        (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
+      return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
 
     // Clean up auto-created opt-outs before deleting the event

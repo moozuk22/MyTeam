@@ -97,6 +97,7 @@ export function normalizeStoredTrainingFieldSelections(
 export async function verifyTrainingFieldSelection(
   clubId: string,
   selection: TrainingFieldSelection,
+  db: Pick<typeof prisma, "field"> = prisma,
 ): Promise<void> {
   if (!selection.trainingFieldId) {
     if (selection.trainingFieldPieceIds.length > 0) {
@@ -105,7 +106,7 @@ export async function verifyTrainingFieldSelection(
     return;
   }
 
-  const field = await prisma.field.findFirst({
+  const field = await db.field.findFirst({
     where: { id: selection.trainingFieldId, clubId },
     select: {
       id: true,

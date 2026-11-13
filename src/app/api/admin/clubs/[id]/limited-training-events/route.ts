@@ -4,11 +4,12 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { sendPushToMember } from "@/lib/push/service";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { getLimitedTrainingSessionId, setLimitedSessionAttendance } from "@/lib/limitedTrainingSession";
+import { hasTrustedSchedule2Origin } from "@/lib/requestOrigin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_SCOPE_KEY_RE = /^(team_group:\d+|custom_group:[0-9a-f-]{36}|coach_group:[0-9a-f-]{36}(?::session:[0-9a-f-]{36})?)$/i;
+const VALID_SCOPE_KEY_RE = /^(team_group:\d+|(?:custom|coach)_group:[0-9a-f-]{36}(?::session:[0-9a-f-]{36})?)$/i;
 
 function isIsoDate(v: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -24,9 +25,9 @@ async function getPlayerIdsInScope(clubId: string, scopeKey: string): Promise<st
     return players.map((p) => p.id);
   }
   if (scopeKey.startsWith("custom_group:")) {
-    const groupId = scopeKey.slice("custom_group:".length);
+    const groupId = scopeKey.split(":")[1];
     const members = await prisma.clubCustomTrainingGroupPlayer.findMany({
-      where: { groupId },
+      where: { groupId, group: { clubId } },
       select: { playerId: true, player: { select: { isActive: true } } },
     });
     return members.filter((m) => m.player.isActive).map((m) => m.playerId);
@@ -59,6 +60,9 @@ export async function GET(
   const date = request.nextUrl.searchParams.get("date")?.trim() ?? "";
 
   const where: Record<string, unknown> = { clubId: id };
+  if (!session.roles.includes("admin")) {
+    where.NOT = { scopeKey: { startsWith: "custom_group:", contains: ":session:" } };
+  }
 
   if (date && isIsoDate(date)) {
     where.trainingDate = new Date(date + "T00:00:00.000Z");
@@ -154,13 +158,17 @@ export async function POST(
 
     const trainingDateUtc = new Date(trainingDate + "T00:00:00.000Z");
     const trainingSessionId = getLimitedTrainingSessionId(scopeKey);
-    if (trainingSessionId && !await prisma.trainingSession.findFirst({ where: { id: trainingSessionId, clubId: id, scopeId: scopeKey.split(":")[1], scopeType: "coachGroup", status: "scheduled", trainingDate: trainingDateUtc }, select: { id: true } })) return NextResponse.json({ error: "Training not found" }, { status: 404 });
+    const customOccurrence = trainingSessionId && scopeKey.startsWith("custom_group:");
+    if (customOccurrence && (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
+      return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
+    }
+    if (trainingSessionId && !customOccurrence && !await prisma.trainingSession.findFirst({ where: { id: trainingSessionId, clubId: id, scopeId: scopeKey.split(":")[1], scopeType: "coachGroup", status: "scheduled", trainingDate: trainingDateUtc }, select: { id: true } })) return NextResponse.json({ error: "Training not found" }, { status: 404 });
 
-    const event = await prisma.limitedTrainingEvent.create({
+    const createEvent = (db: Pick<typeof prisma, "limitedTrainingEvent">) => db.limitedTrainingEvent.create({
       data: {
         clubId: id,
         scopeKey,
-        scopeId: scopeId || null,
+        scopeId: customOccurrence ? scopeKey.split(":")[1] : scopeId,
         teamGroup: teamGroup,
         trainingDate: trainingDateUtc,
         maxSpots,
@@ -175,6 +183,15 @@ export async function POST(
         createdAt: true,
       },
     });
+    const event = customOccurrence ? await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM training_sessions WHERE club_id = ${id}::uuid AND id = ${trainingSessionId}::uuid FOR UPDATE`;
+      const selected = await tx.trainingSession.findFirst({ where: {
+        id: trainingSessionId, clubId: id, scopeKey, scopeType: "customGroup", occurrenceKey: trainingSessionId,
+        status: "scheduled", removedFromSchedule: false, trainingDate: trainingDateUtc,
+      }, select: { id: true } });
+      return selected ? createEvent(tx) : null;
+    }) : await createEvent(prisma);
+    if (!event) return NextResponse.json({ error: "Тренировката не е намерена." }, { status: 404 });
 
     // Auto-opt-out all players in scope so attendance starts at zero.
     // Admin manually marks who actually showed up on the day.

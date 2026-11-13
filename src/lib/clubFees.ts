@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { parsePaymentAmount } from "@/lib/paymentAmount";
 import { resolveMemberFee } from "@/lib/memberFee";
+import { getTodayIsoDateInTimeZone } from "@/lib/training";
+import { removeFutureSchedule2Sessions } from "@/lib/trainingSessions";
 
 export type FeeConflict = { id: string; fullName: string; groups: { id: string; name: string; amount: string }[] };
 export class FeeSettingsError extends Error {
@@ -79,6 +81,15 @@ export async function updateClubFees(clubId: string, input: unknown) {
     });
     if (body.preview !== true) {
       if (conflicts.length) throw new FeeSettingsError("Изберете такса за състезателите в групи с различни такси.", 409, conflicts);
+      if (typeof deletedGroupId === "string") {
+        const linkedGroups = await tx.clubCustomTrainingGroup.findMany({
+          where: { clubId, coachGroupId: deletedGroupId },
+          select: { id: true },
+          orderBy: { id: "asc" },
+        });
+        const today = getTodayIsoDateInTimeZone("Europe/Sofia");
+        for (const { id } of linkedGroups) await removeFutureSchedule2Sessions(tx, clubId, id, today);
+      }
       if (body.paymentAmount !== undefined) await tx.club.update({ where: { id: clubId }, data: { defaultPaymentAmount: clubAmount } });
       for (const group of proposedGroups) if (Object.hasOwn(groupFees, group.id)) await tx.coachGroup.update({ where: { id: group.id }, data: { paymentAmount: group.paymentAmount } });
       for (const p of proposedPlayers) {

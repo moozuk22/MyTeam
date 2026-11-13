@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DEFAULT_TRAINING_DURATION_MINUTES, getTodayIsoDate } from "../_utils/members-page-utils";
 import {
   type TrainingAttendancePlayer,
   type TrainingUpcomingDateItem,
-  type TrainingWeekSessionItem,
   type LimitedEventDetail,
 } from "../_types/members-page-types";
+
+import type { Schedule2Group, Schedule2Session } from "../_components/Schedule2";
+import type { ClubMatch } from "../_types/members-page-types";
 
 export function useTrainingAttendanceState() {
   const [trainingAttendanceOpen, setTrainingAttendanceOpen] = useState(false);
@@ -38,7 +40,16 @@ export function useTrainingAttendanceState() {
 
   const [trainingUpcomingDates, setTrainingUpcomingDates] = useState<TrainingUpcomingDateItem[]>([]);
 
-  const [trainingWeekSessions, setTrainingWeekSessions] = useState<TrainingWeekSessionItem[]>([]);
+  const [schedule2Open, setSchedule2Open] = useState(false);
+  const [schedule2Week, setSchedule2Week] = useState(0);
+  const trainingWeekRequest = useRef(0);
+  const trainingWeekLoadingRequest = useRef<number | null>(null);
+  const trainingAttendanceOpenRequest = useRef(0);
+  const [schedule2Groups, setSchedule2Groups] = useState<Schedule2Group[]>([]);
+  const [schedule2Matches, setSchedule2Matches] = useState<ClubMatch[]>([]);
+  const [schedule2CanCreateTraining, setSchedule2CanCreateTraining] = useState(false);
+  const [schedule2Error, setSchedule2Error] = useState("");
+  const [trainingWeekSessions, setTrainingWeekSessions] = useState<Schedule2Session[]>([]);
 
   const [trainingWeekDates, setTrainingWeekDates] = useState<string[]>([]);
 
@@ -49,6 +60,7 @@ export function useTrainingAttendanceState() {
   const [trainingDayDetailsOpen, setTrainingDayDetailsOpen] = useState(false);
 
   const [trainingDayDetailsOpening, setTrainingDayDetailsOpening] = useState(false);
+  const trainingDayDetailsRequest = useRef(0);
 
   const [trainingDayDetailsViewSnapshot, setTrainingDayDetailsViewSnapshot] = useState<
     "teamGroup" | "trainingGroups" | "today"
@@ -94,6 +106,21 @@ export function useTrainingAttendanceState() {
   const [limitedEventError, setLimitedEventError] = useState("");
 
   return {
+    schedule2Open,
+    setSchedule2Open,
+    schedule2Week,
+    setSchedule2Week,
+    trainingWeekRequest,
+    trainingWeekLoadingRequest,
+    trainingAttendanceOpenRequest,
+    schedule2Groups,
+    setSchedule2Groups,
+    schedule2Matches,
+    setSchedule2Matches,
+    schedule2CanCreateTraining,
+    setSchedule2CanCreateTraining,
+    schedule2Error,
+    setSchedule2Error,
     trainingAttendanceOpen,
     setTrainingAttendanceOpen,
     trainingAttendanceHideTeamsTab,
@@ -128,6 +155,7 @@ export function useTrainingAttendanceState() {
     setTrainingDayDetailsOpen,
     trainingDayDetailsOpening,
     setTrainingDayDetailsOpening,
+    trainingDayDetailsRequest,
     trainingDayDetailsViewSnapshot,
     setTrainingDayDetailsViewSnapshot,
     trainingDayDurationMinutes,

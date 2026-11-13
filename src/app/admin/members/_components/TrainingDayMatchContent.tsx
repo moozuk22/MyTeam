@@ -13,6 +13,8 @@ import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColo
 
 import type { TrainingDayDetailsDialogProps } from "./TrainingDayDetailsDialog";
 type Props = {
+  schedule2DayDetails: boolean;
+  matchEditCustomGroups: TrainingDayDetailsDialogProps["matchEditCustomGroups"];
   customTrainingGroups: TrainingDayDetailsDialogProps["trainingGroups"]["customTrainingGroups"];
   dayDetailsActiveMatch: NonNullable<
     TrainingDayDetailsDialogProps["dayDetailsActiveMatch"]
@@ -38,6 +40,8 @@ type Props = {
 };
 export function TrainingDayMatchContent({
   customTrainingGroups,
+  matchEditCustomGroups,
+  schedule2DayDetails,
   dayDetailsActiveMatch,
   dayDetailsMatchEditOpen,
   dayDetailsMatchEditForm,
@@ -62,6 +66,7 @@ export function TrainingDayMatchContent({
     customTrainingGroups.find(
       (g) => g.id === dayDetailsActiveMatch.customGroupId,
     ) ?? null;
+  const matchGroupName = matchGroup?.name ?? matchEditCustomGroups.find(({ id }) => id === dayDetailsActiveMatch.customGroupId)?.name;
   const matchGroupColor =
     matchGroup?.color && isCustomTrainingGroupPaletteColor(matchGroup.color)
       ? matchGroup.color
@@ -178,7 +183,7 @@ export function TrainingDayMatchContent({
           disabled={dayDetailsMatchSaving}
         />
       </div>
-      {isCustomTrainingGroupMode && customTrainingGroups.length > 0 && (
+      {(schedule2DayDetails || isCustomTrainingGroupMode) && matchEditCustomGroups.length > 0 && (
         <div className="amp-edit-field">
           <span className="amp-lbl">Група</span>
           <select
@@ -192,8 +197,8 @@ export function TrainingDayMatchContent({
             }
             disabled={dayDetailsMatchSaving}
           >
-            <option value="">— без група —</option>
-            {customTrainingGroups.map((g) => (
+            <option value="" disabled={schedule2DayDetails && Boolean(dayDetailsActiveMatch.customGroupId)}>— без група —</option>
+            {matchEditCustomGroups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>
@@ -311,7 +316,7 @@ export function TrainingDayMatchContent({
         })}
       </p>
       <div className="amp-match-view-body">
-        {matchGroup && (
+        {matchGroupName && (
           <div className="amp-match-view-row">
             <span className="amp-match-view-label">Група</span>
             <span
@@ -329,7 +334,7 @@ export function TrainingDayMatchContent({
                   }}
                 />
               )}
-              {matchGroup.name}
+              {matchGroupName}
             </span>
           </div>
         )}

@@ -16,7 +16,17 @@ import { type TrainingGroups } from "../_hooks/useTrainingGroups";
 import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceState";
 import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
+import type { Schedule2Group } from "./Schedule2";
+
 type ScheduleEventDialogProps = {
+  schedule2EventTarget: { groupId: string; date?: string } | null;
+  schedule2EventGroup: Schedule2Group | undefined;
+  schedule2CanCreateTraining: boolean;
+  onSchedule2RestDay?: () => void;
+  openTrainingDaysEditor: (
+    mode: "customGroup", editDate: undefined, coachTarget: undefined,
+    customTarget: { group: Schedule2Group; date?: string },
+  ) => Promise<void>;
   matchEditorState: Pick<
     MatchEditorState,
     | "matchEditorSaving"
@@ -56,6 +66,11 @@ type ScheduleEventDialogProps = {
 };
 
 export function ScheduleEventDialog({
+  schedule2EventTarget,
+  schedule2EventGroup,
+  schedule2CanCreateTraining,
+  onSchedule2RestDay,
+  openTrainingDaysEditor,
   matchEditorState,
   trainingAttendanceState,
   trainingGroups,
@@ -93,6 +108,8 @@ export function ScheduleEventDialog({
   } = matchEditorState;
   const { trainingAttendanceView } = trainingAttendanceState;
   const { isCustomTrainingGroupMode } = trainingGroups;
+  const customTrainingUnavailable = Boolean(schedule2EventTarget &&
+    (!schedule2EventGroup || !schedule2CanCreateTraining));
   return (
     <>
       {scheduleEventModalOpen && (
@@ -132,13 +149,22 @@ export function ScheduleEventDialog({
             </h2>
             <div className="amp-modal-body">
               {scheduleEventStep === "type" ? (
-                <div className="amp-schedule-event-type-picker">
+                <div className={schedule2EventTarget ? "amp-schedule-event-type-picker amp-schedule-event-type-picker--schedule2" : "amp-schedule-event-type-picker"}>
                   <button
                     type="button"
                     className="amp-btn amp-schedule-event-type-btn"
+                    disabled={customTrainingUnavailable}
                     onClick={() => {
+                      if (customTrainingUnavailable) return;
                       setScheduleEventModalOpen(false);
-                      void openTrainingDaysEditorForCurrentScope();
+                      if (schedule2EventGroup) {
+                        void openTrainingDaysEditor("customGroup", undefined, undefined, {
+                          group: schedule2EventGroup,
+                          date: schedule2EventTarget?.date,
+                        });
+                      } else {
+                        void openTrainingDaysEditorForCurrentScope();
+                      }
                     }}
                   >
                     <span
@@ -147,6 +173,9 @@ export function ScheduleEventDialog({
                     />
                     Тренировка
                   </button>
+                  {schedule2EventTarget && !schedule2CanCreateTraining && (
+                    <p className="amp-lbl">Тренировки за персонализирани групи могат да се добавят в режим „Персонализирани групи“.</p>
+                  )}
                   <button
                     type="button"
                     className="amp-btn amp-schedule-event-type-btn amp-schedule-event-type-btn--match"
@@ -157,8 +186,14 @@ export function ScheduleEventDialog({
                           : selectedTeamGroup !== null
                             ? [selectedTeamGroup]
                             : [];
-                      setMatchTeamGroups(scopeTeamGroups);
-                      setMatchSelectedDates([]);
+                      setMatchTeamGroups(schedule2EventTarget ? [] : scopeTeamGroups);
+                      const date = schedule2EventTarget?.date;
+                      const selectedDate = date && matchCalendarDateSet.has(date) ? date : undefined;
+                      setMatchSelectedDates(selectedDate ? [selectedDate] : []);
+                      if (selectedDate) {
+                        const monthIndex = matchCalendarMonthsTrimmed.findIndex((month) => month.cells.includes(selectedDate));
+                        setMatchCalendarVisibleMonthIdx(Math.max(0, monthIndex));
+                      }
                       setMatchDetailsPerDay({});
                       setMatchExistingIdByDate({});
                       setMatchEventType(null);
@@ -171,6 +206,15 @@ export function ScheduleEventDialog({
                     />
                     Мач / Двубой / Състезание / Участие
                   </button>
+                  {schedule2EventTarget?.date && onSchedule2RestDay && (
+                    <button type="button" className="amp-btn amp-schedule-event-type-btn" onClick={onSchedule2RestDay}>
+                      <span
+                        className="amp-schedule-event-type-icon amp-schedule-event-type-icon--rest"
+                        aria-hidden="true"
+                      />
+                      Почивен ден
+                    </button>
+                  )}
                 </div>
               ) : scheduleEventStep === "match-type" ? (
                 <>
@@ -186,7 +230,7 @@ export function ScheduleEventDialog({
                           className="amp-btn amp-btn--primary"
                           onClick={() => {
                             setMatchEventType(value);
-                            setScheduleEventStep("match-days");
+                            setScheduleEventStep(schedule2EventTarget?.date ? "match-details" : "match-days");
                           }}
                         >
                           {label}
@@ -206,6 +250,7 @@ export function ScheduleEventDialog({
                 </>
               ) : (
                 <>
+                  {schedule2EventTarget ? <p className="amp-lbl">{schedule2EventGroup?.name}</p> : <>
                   <div
                     className="amp-training-days-editor-header"
                     style={{ flexDirection: "column", alignItems: "center", textAlign: "center" }}
@@ -267,6 +312,7 @@ export function ScheduleEventDialog({
                             : `Този мач ще се вижда от набор ${selectedTeamGroup}.`}
                     </span>
                   </div>
+                  </>}
                   <div className="amp-training-stepper" aria-label="Стъпки за мач">
                     <button
                       type="button"
@@ -278,7 +324,7 @@ export function ScheduleEventDialog({
                       disabled={matchEditorSaving}
                     >
                       <span className="amp-training-step-index">1</span>
-                      Дни
+                      {schedule2EventTarget?.date ? "Още дати" : "Дни"}
                     </button>
                     <button
                       type="button"
@@ -362,6 +408,7 @@ export function ScheduleEventDialog({
                                   const isSelected = matchSelectedDates.includes(date);
                                   const matchesForDate = (matchCalendarMatchesByDate.get(date) ?? []).filter(
                                     (m) => {
+                                      if (schedule2EventTarget) return m.customGroupId === schedule2EventGroup?.id;
                                       if (m.customGroupId !== null) {
                                         return (
                                           isCustomTrainingGroupMode &&
@@ -603,6 +650,7 @@ export function ScheduleEventDialog({
                           onClick={() => void handleSaveMatch()}
                           disabled={
                             matchEditorSaving ||
+                            Boolean(schedule2EventTarget && !schedule2EventGroup) ||
                             !matchSelectedDates.every((d) => {
                               const det = matchDetailsPerDay[d];
                               return det?.category && det?.location?.trim() && det?.time;

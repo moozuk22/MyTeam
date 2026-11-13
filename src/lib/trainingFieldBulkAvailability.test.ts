@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { getOccupiedFieldResources } from "./trainingFieldConflicts";
+import { assertNoTrainingFieldConflict, assertNoTrainingTimeConflict, getOccupiedFieldResources } from "./trainingFieldConflicts";
 import { applyTrainingFieldToDates } from "./trainingFieldPicker";
 
 const db = vi.hoisted(() => ({
@@ -31,4 +31,28 @@ it("allows back-to-back trainings but blocks overlap introduced by a longer dura
   const input = { clubId: "club", trainingDates: dates, trainingDateTimes: { [dates[0]]: "10:00", [dates[1]]: "17:00" }, trainingDurationMinutes: 60 };
   expect(await getOccupiedFieldResources(input)).toEqual([]);
   expect((await getOccupiedFieldResources({ ...input, trainingDurationMinutes: 90 })).map((resource) => resource.date)).toEqual([dates[1]]);
+});
+
+it.each([120, 30])("uses an edited recurring session duration of %i minutes only on its own date", async (duration) => {
+  db.clubCustomTrainingGroup.findMany.mockResolvedValue([{
+    id: "group", name: "Group", trainingDates: dates, trainingDateTimes: {}, trainingTime: "18:00",
+    trainingDurationMinutes: 60, trainingFieldId: "field", trainingFieldPieceIds: [],
+  }]);
+  db.trainingSession.findMany.mockImplementation(async ({ where }) => where.status === "scheduled"
+    && where.OR.some((scope: { scopeType: string; occurrenceKey?: string }) => scope.scopeType === "customGroup" && scope.occurrenceKey === undefined)
+    ? [{
+      scopeType: "customGroup", occurrenceKey: "", scopeKey: "custom_group:group",
+      trainingDate: new Date(`${dates[0]}T00:00:00Z`), trainingDurationMinutes: duration,
+    }]
+    : []);
+  const startTime = duration === 120 ? "19:30" : "18:45";
+  const input = { clubId: "club", trainingDates: dates, trainingDateTimes: { [dates[0]]: startTime, [dates[1]]: startTime },
+    trainingDurationMinutes: 30, trainingFieldId: "field", trainingFieldPieceIds: [] };
+  const conflictingDate = dates[duration === 120 ? 0 : 1];
+  const freeDate = dates[duration === 120 ? 1 : 0];
+  expect((await getOccupiedFieldResources(input)).map(({ date }) => date)).toEqual([conflictingDate]);
+  for (const check of [assertNoTrainingTimeConflict, assertNoTrainingFieldConflict]) {
+    await expect(check({ ...input, trainingDates: [conflictingDate] })).rejects.toThrow();
+    await expect(check({ ...input, trainingDates: [freeDate] })).resolves.toBeUndefined();
+  }
 });

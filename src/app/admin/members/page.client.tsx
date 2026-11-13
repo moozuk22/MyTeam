@@ -62,6 +62,7 @@ import { MemberBirthdaysDialog } from "./_components/MemberBirthdaysDialog";
 import { CoachGroupsDialog } from "./_components/CoachGroupsDialog";
 import { MatchPreviewDialog } from "./_components/MatchPreviewDialog";
 import { TrainingAttendanceDialog } from "./_components/TrainingAttendanceDialog";
+import { schedule2SessionBelongsToGroup } from "./_components/Schedule2";
 import { TeamGroupWarningDialog } from "./_components/TeamGroupWarningDialog";
 import { PostScheduleSaveDialog } from "./_components/PostScheduleSaveDialog";
 import { TrainingGroupEditorDialog } from "./_components/TrainingGroupEditorDialog";
@@ -86,7 +87,7 @@ import { createClubMatchActions } from "./_actions/createClubMatchActions";
 import { createTrainingNoteActions } from "./_actions/createTrainingNoteActions";
 import { createReminderSettingsActions } from "./_actions/createReminderSettingsActions";
 
-function AdminMembersPageContent() {
+function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean }) {
   const router = useRouter();
 
   const searchParams = useSearchParams();
@@ -180,6 +181,8 @@ function AdminMembersPageContent() {
 
   const [trainingNoteComparisonLoading, setTrainingNoteComparisonLoading] = useState(false);
 
+  const [schedule2EventTarget, setSchedule2EventTarget] = useState<{ groupId: string; date?: string } | null>(null);
+  const [schedule2RestDays, setSchedule2RestDays] = useState<Record<string, string[]>>({});
   const [scheduleEventModalOpen, setScheduleEventModalOpen] = useState(false);
 
   const [scheduleEventStep, setScheduleEventStep] = useState<
@@ -272,6 +275,10 @@ function AdminMembersPageContent() {
     trainingDayDetailsOpen,
     setTrainingDayDetailsOpen,
     trainingDayDetailsTab,
+    schedule2Open,
+    schedule2Week,
+    schedule2Groups,
+    schedule2Matches,
   } = trainingAttendanceState;
 
   const matchEditorState = useMatchEditorState();
@@ -812,6 +819,8 @@ function AdminMembersPageContent() {
     trainingAttendanceMatchesByDate.set(match.matchDate, matchesForDate);
   }
 
+  const schedule2DayDetails = schedule2Open && trainingAttendanceOpen && !matchEditTarget;
+  const matchEditCustomGroups = schedule2DayDetails ? schedule2Groups : customTrainingGroups;
   const dayDetailsDate = trainingDayDetailsOpen ? (trainingAttendanceDate ?? "") : "";
 
   const dayDetailsSessions = dayDetailsDate
@@ -819,10 +828,12 @@ function AdminMembersPageContent() {
     : [];
 
   const dayDetailsMatchesAll: ClubMatch[] = dayDetailsDate
-    ? clubMatches.filter((m) => m.matchDate === dayDetailsDate)
+    ? (schedule2DayDetails ? schedule2Matches : clubMatches).filter((m) => m.matchDate === dayDetailsDate)
     : [];
 
-  const dayDetailsHasTabs = dayDetailsSessions.length > 1 || dayDetailsMatchesAll.length > 0;
+  const dayDetailsHasTabs = schedule2DayDetails
+    ? dayDetailsSessions.length + dayDetailsMatchesAll.length > 1
+    : dayDetailsSessions.length > 1 || dayDetailsMatchesAll.length > 0;
 
   const dayDetailsIsMatchTab = trainingDayDetailsTab.startsWith("match-");
 
@@ -1037,7 +1048,7 @@ function AdminMembersPageContent() {
   ]);
 
   useEffect(() => {
-    if (!trainingAttendanceOpen || !clubId || !trainingAttendanceDate || trainingAttendanceView === "today") {
+    if (!trainingAttendanceOpen || schedule2Open || !clubId || !trainingAttendanceDate || trainingAttendanceView === "today") {
       return;
     }
 
@@ -1074,6 +1085,7 @@ function AdminMembersPageContent() {
     };
   }, [
     trainingAttendanceOpen,
+    schedule2Open,
     clubId,
     trainingAttendanceDate,
     trainingAttendanceMonth,
@@ -1083,7 +1095,7 @@ function AdminMembersPageContent() {
   ]);
 
   useEffect(() => {
-    if (!trainingAttendanceOpen || !clubId || trainingAttendanceView !== "today") {
+    if (!trainingAttendanceOpen || !clubId || (!schedule2Open && trainingAttendanceView !== "today")) {
       return;
     }
     const streamUrl = `/api/admin/clubs/${encodeURIComponent(clubId)}/training-attendance/stream`;
@@ -1096,10 +1108,10 @@ function AdminMembersPageContent() {
       source.removeEventListener("attendance-update", handleUpdate);
       source.close();
     };
-  }, [trainingAttendanceOpen, clubId, trainingAttendanceView]);
+  }, [trainingAttendanceOpen, clubId, trainingAttendanceView, schedule2Open, schedule2Week, canUseSchedule2]);
 
   useEffect(() => {
-    if (!trainingAttendanceOpen || !clubId || trainingAttendanceView !== "today") {
+    if (!trainingAttendanceOpen || !clubId || (!schedule2Open && trainingAttendanceView !== "today")) {
       return;
     }
     const interval = window.setInterval(() => {
@@ -1108,10 +1120,10 @@ function AdminMembersPageContent() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [trainingAttendanceOpen, clubId, trainingAttendanceView]);
+  }, [trainingAttendanceOpen, clubId, trainingAttendanceView, schedule2Open, schedule2Week, canUseSchedule2]);
 
   useEffect(() => {
-    if (!trainingAttendanceOpen || !clubId || trainingAttendanceView !== "today") {
+    if (!trainingAttendanceOpen || !clubId || (!schedule2Open && trainingAttendanceView !== "today")) {
       return;
     }
     const handleVisibility = () => {
@@ -1123,9 +1135,12 @@ function AdminMembersPageContent() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [trainingAttendanceOpen, clubId, trainingAttendanceView]);
+  }, [trainingAttendanceOpen, clubId, trainingAttendanceView, schedule2Open, schedule2Week, canUseSchedule2]);
 
   const trainingScheduleActions = createTrainingScheduleActions({
+    schedulerCalendarMonthsTrimmed,
+    setSchedulerCalendarVisibleMonthIdx,
+    setSchedule2Error: trainingAttendanceState.setSchedule2Error,
     trainingDaysForm,
     trainingGroups,
     trainingAttendanceState,
@@ -1178,6 +1193,7 @@ function AdminMembersPageContent() {
     trainingFieldActions;
 
   const trainingAttendanceActions = createTrainingAttendanceActions({
+    canUseSchedule2,
     trainingAttendanceState,
     trainingGroups,
     trainingDaysForm,
@@ -1198,11 +1214,29 @@ function AdminMembersPageContent() {
     resolvedTrainingGroupScope,
     openTrainingDaysEditor: (...args) => openTrainingDaysEditor(...args),
     trainingUpcomingByDate,
+    onSchedule2WeekLoaded: (groups, sessions) => {
+      setSchedule2RestDays((previous) => {
+        let next = previous;
+        for (const group of groups) {
+          const dates = previous[group.id];
+          if (!dates?.length) continue;
+          const remaining = dates.filter((date) => !sessions.some((session) =>
+            session.date === date && schedule2SessionBelongsToGroup(session, group),
+          ));
+          if (remaining.length === dates.length) continue;
+          if (next === previous) next = { ...previous };
+          if (remaining.length) next[group.id] = remaining;
+          else delete next[group.id];
+        }
+        return next;
+      });
+    },
   });
   const {
     fetchTrainingAttendance,
     fetchTrainingWeekSessions,
     openTrainingAttendance,
+    closeTrainingAttendance,
     handleTrainingAttendanceViewChange,
     handleTrainingAttendanceMonthChange,
     handleUnifiedGroupChange,
@@ -1210,11 +1244,39 @@ function AdminMembersPageContent() {
     openSingleTrainingDayEditForCurrentScope,
     fetchLimitedEventForSession,
     openTrainingDayDetails,
+    dismissSchedule2Details,
     loadDayDetailsSessionAttendance,
     handleDeleteTrainingDay,
   } = trainingAttendanceActions;
 
+  const schedule2EventGroup = schedule2Groups.find((group) => group.id === schedule2EventTarget?.groupId);
+  const schedule2EventDate = schedule2EventTarget?.date;
+  const markSchedule2RestDay = schedule2EventGroup && schedule2EventDate && !trainingWeekSessions.some((session) =>
+    session.date === schedule2EventDate && schedule2SessionBelongsToGroup(session, schedule2EventGroup),
+  ) ? () => {
+    const groupId = schedule2EventGroup.id;
+    setSchedule2RestDays((previous) => {
+      const dates = previous[groupId] ?? [];
+      return dates.includes(schedule2EventDate) ? previous : { ...previous, [groupId]: [...dates, schedule2EventDate] };
+    });
+    setScheduleEventModalOpen(false);
+  } : undefined;
+  const openScheduleEvent = (target?: { groupId: string; date?: string }) => {
+    if (target && trainingDaysForm.trainingDaysEditorRequest.current !== null) return;
+    setSchedule2EventTarget(target ?? null);
+    setScheduleEventStep("type");
+    matchEditorState.setMatchSelectedDates([]);
+    matchEditorState.setMatchDetailsPerDay({});
+    matchEditorState.setMatchExistingIdByDate({});
+    matchEditorState.setMatchEditorError("");
+    matchEditorState.setMatchCalendarVisibleMonthIdx(0);
+    setScheduleEventModalOpen(true);
+    void fetchClubMatches();
+  };
+
   const clubMatchActions = createClubMatchActions({
+    schedule2EventTarget,
+    schedule2EventGroup,
     matchEditorState,
     trainingGroups,
     trainingAttendanceState,
@@ -1278,6 +1340,7 @@ function AdminMembersPageContent() {
       <div className="amp-dot-grid" aria-hidden="true" />
 
       <MembersOverview
+        canUseSchedule2={canUseSchedule2}
         clubNotificationsController={clubNotificationsController}
         memberManagement={memberManagement}
         trainingGroups={trainingGroups}
@@ -1519,6 +1582,11 @@ function AdminMembersPageContent() {
         clubId={clubId}
       />
       <TrainingAttendanceDialog
+        canUseSchedule2={canUseSchedule2}
+        closeTrainingAttendance={closeTrainingAttendance}
+        openScheduleEvent={openScheduleEvent}
+        schedule2RestDays={schedule2RestDays}
+        fetchTrainingWeekSessions={fetchTrainingWeekSessions}
         trainingAttendanceState={trainingAttendanceState}
         trainingDaysForm={trainingDaysForm}
         trainingGroups={trainingGroups}
@@ -1546,9 +1614,6 @@ function AdminMembersPageContent() {
         setTrainingNoteTargetDates={setTrainingNoteTargetDates}
         trainingNote={trainingNote}
         setTrainingNote={setTrainingNote}
-        setScheduleEventModalOpen={setScheduleEventModalOpen}
-        setScheduleEventStep={setScheduleEventStep}
-        fetchClubMatches={fetchClubMatches}
       />
       <TeamGroupWarningDialog
         trainingDaysForm={trainingDaysForm}
@@ -1577,6 +1642,11 @@ function AdminMembersPageContent() {
         groupOptions={groupOptions}
       />
       <ScheduleEventDialog
+        schedule2EventTarget={schedule2EventTarget}
+        schedule2EventGroup={schedule2EventGroup}
+        schedule2CanCreateTraining={trainingAttendanceState.schedule2CanCreateTraining}
+        onSchedule2RestDay={markSchedule2RestDay}
+        openTrainingDaysEditor={openTrainingDaysEditor}
         matchEditorState={matchEditorState}
         trainingAttendanceState={trainingAttendanceState}
         trainingGroups={trainingGroups}
@@ -1633,6 +1703,10 @@ function AdminMembersPageContent() {
       />
       <TrainingScheduleSuccessDialog trainingDaysForm={trainingDaysForm} />
       <TrainingDayDetailsDialog
+        schedule2DayDetails={schedule2DayDetails}
+        dismissSchedule2Details={dismissSchedule2Details}
+        matchEditCustomGroups={matchEditCustomGroups}
+        schedulerCalendarDateSet={trainingDaysForm.schedulerCalendarDateSet}
         trainingAttendanceState={trainingAttendanceState}
         matchEditorState={matchEditorState}
         trainingGroups={trainingGroups}
@@ -1804,10 +1878,10 @@ function AdminMembersPageContent() {
   );
 }
 
-export default function AdminMembersPage() {
+export default function AdminMembersPage({ canUseSchedule2 = false }: { canUseSchedule2?: boolean }) {
   return (
     <Suspense fallback={<main className="amp-page" />}>
-      <AdminMembersPageContent />
+      <AdminMembersPageContent canUseSchedule2={canUseSchedule2} />
     </Suspense>
   );
 }

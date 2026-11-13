@@ -11,6 +11,7 @@ import { type TrainingDaysForm } from "../_hooks/useTrainingDaysForm";
 type Props = {
   form: Pick<
     TrainingDaysForm,
+    | "schedule2TrainingGroup"
     | "trainingDaysEditorMode"
     | "canShowTrainingDaysTimeStep"
     | "effectiveTrainingDaysActiveStep"
@@ -30,6 +31,7 @@ type Props = {
 
 export function TrainingTimeStep({ form }: Props) {
   const {
+    schedule2TrainingGroup,
     trainingDaysEditorMode,
     canShowTrainingDaysTimeStep,
     effectiveTrainingDaysActiveStep,
@@ -105,7 +107,9 @@ export function TrainingTimeStep({ form }: Props) {
         effectiveTrainingDaysActiveStep === "time" && (
           <label className="amp-edit-field" style={{ marginTop: "8px", textAlign: "center", order: 2 }}>
             <span className="amp-lbl" style={{ textAlign: "center" }}>
-              Продължителност на тренировката (минути)
+              {schedule2TrainingGroup
+                ? "Продължителност на тренировките за групата (минути)"
+                : "Продължителност на тренировката (минути)"}
             </span>
             <input
               style={{ textAlign: "center" }}

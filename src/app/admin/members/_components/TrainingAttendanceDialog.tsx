@@ -15,21 +15,32 @@ import { type TrainingDaysForm } from "../_hooks/useTrainingDaysForm";
 import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceState";
 import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
+import Schedule2 from "./Schedule2";
+import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
+
 type TrainingAttendanceDialogProps = {
+  canUseSchedule2: boolean;
+  closeTrainingAttendance: () => void;
+  openScheduleEvent: (target?: { groupId: string; date?: string }) => void;
+  schedule2RestDays: Record<string, string[]>;
+  fetchTrainingWeekSessions: (options?: { week?: number }) => Promise<unknown>;
   trainingAttendanceState: Pick<
     TrainingAttendanceState,
     | "trainingAttendanceOpen"
-    | "setTrainingAttendanceOpen"
-    | "setTrainingAttendanceHideTeamsTab"
-    | "setTrainingDayDetailsOpen"
     | "trainingAttendanceView"
     | "trainingAttendanceHideTeamsTab"
     | "trainingAttendanceLoading"
     | "trainingWeekLoading"
     | "weekColorFilter"
     | "setWeekColorFilter"
+    | "schedule2Open"
+    | "schedule2Week"
+    | "setSchedule2Week"
+    | "schedule2Groups"
+    | "schedule2Error"
     | "trainingWeekSessions"
     | "trainingWeekDates"
+    | "trainingDayDetailsOpen"
     | "trainingDayDetailsOpening"
     | "trainingAttendanceMonth"
     | "trainingAttendanceDate"
@@ -60,11 +71,6 @@ type TrainingAttendanceDialogProps = {
     MatchEditorState,
     | "setMatchViewMatch"
     | "setMatchViewPopupOpen"
-    | "setMatchSelectedDates"
-    | "setMatchDetailsPerDay"
-    | "setMatchExistingIdByDate"
-    | "setMatchEditorError"
-    | "setMatchCalendarVisibleMonthIdx"
   >;
   trainingNoteSaving: boolean;
   handleTrainingAttendanceViewChange: (nextView: "teamGroup" | "trainingGroups" | "today") => Promise<void>;
@@ -124,14 +130,15 @@ type TrainingAttendanceDialogProps = {
   setTrainingNoteTargetDates: React.Dispatch<React.SetStateAction<string[]>>;
   trainingNote: string;
   setTrainingNote: React.Dispatch<React.SetStateAction<string>>;
-  setScheduleEventModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setScheduleEventStep: React.Dispatch<
-    React.SetStateAction<"type" | "match-type" | "match-days" | "match-details">
-  >;
-  fetchClubMatches: () => Promise<void>;
+
 };
 
 export function TrainingAttendanceDialog({
+  canUseSchedule2,
+  closeTrainingAttendance,
+  openScheduleEvent,
+  schedule2RestDays,
+  fetchTrainingWeekSessions,
   trainingAttendanceState,
   trainingDaysForm,
   trainingGroups,
@@ -159,23 +166,23 @@ export function TrainingAttendanceDialog({
   setTrainingNoteTargetDates,
   trainingNote,
   setTrainingNote,
-  setScheduleEventModalOpen,
-  setScheduleEventStep,
-  fetchClubMatches,
 }: TrainingAttendanceDialogProps) {
   const {
     trainingAttendanceOpen,
-    setTrainingAttendanceOpen,
-    setTrainingAttendanceHideTeamsTab,
-    setTrainingDayDetailsOpen,
     trainingAttendanceView,
     trainingAttendanceHideTeamsTab,
     trainingAttendanceLoading,
     trainingWeekLoading,
     weekColorFilter,
     setWeekColorFilter,
+    schedule2Open,
+    schedule2Week,
+    setSchedule2Week,
+    schedule2Groups,
+    schedule2Error,
     trainingWeekSessions,
     trainingWeekDates,
+    trainingDayDetailsOpen,
     trainingDayDetailsOpening,
     trainingAttendanceMonth,
     trainingAttendanceDate,
@@ -203,11 +210,6 @@ export function TrainingAttendanceDialog({
   const {
     setMatchViewMatch,
     setMatchViewPopupOpen,
-    setMatchSelectedDates,
-    setMatchDetailsPerDay,
-    setMatchExistingIdByDate,
-    setMatchEditorError,
-    setMatchCalendarVisibleMonthIdx,
   } = matchEditorState;
   return (
     <>
@@ -215,29 +217,19 @@ export function TrainingAttendanceDialog({
         <div
           className="amp-overlay"
           onClick={() => {
-            if (!trainingNoteSaving) {
-              setTrainingAttendanceOpen(false);
-              setTrainingAttendanceHideTeamsTab(false);
-              setTrainingDayDetailsOpen(false);
-              setTrainingDaysEditorOpen(false);
-            }
+            if (!trainingNoteSaving) closeTrainingAttendance();
           }}
         >
           <div
-            className={`amp-modal amp-modal--confirm amp-modal--training-attendance${trainingAttendanceView === "today" ? " amp-modal--week-view" : ""}`}
+            className={`amp-modal amp-modal--confirm amp-modal--training-attendance${trainingAttendanceView === "today" ? " amp-modal--week-view" : ""}${schedule2Open ? " amp-modal--schedule2" : ""}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">Текущ график</span>
+              <span className="amp-modal-title-gradient">{schedule2Open ? "График 2" : "Текущ график"}</span>
               <button
                 className="amp-modal-close"
-                onClick={() => {
-                  setTrainingAttendanceOpen(false);
-                  setTrainingAttendanceHideTeamsTab(false);
-                  setTrainingDayDetailsOpen(false);
-                  setTrainingDaysEditorOpen(false);
-                }}
+                onClick={closeTrainingAttendance}
                 aria-label="Затвори"
                 disabled={trainingNoteSaving}
               >
@@ -245,7 +237,7 @@ export function TrainingAttendanceDialog({
               </button>
             </h2>
             <div className="amp-modal-body">
-              {trainingAttendanceHideTeamsTab ? (
+              {schedule2Open ? null : trainingAttendanceHideTeamsTab ? (
                 <div
                   className="amp-training-view-switch amp-training-view-switch--single"
                   role="presentation"
@@ -277,7 +269,28 @@ export function TrainingAttendanceDialog({
                   </button>
                 </div>
               )}
-              {trainingAttendanceView === "today" ? (
+              {schedule2Open && canUseSchedule2 ? (
+                <Schedule2
+                  dates={trainingWeekDates}
+                  sessions={trainingWeekSessions}
+                  loading={trainingWeekLoading}
+                  openingEditor={trainingDaysEditorLoading}
+                  detailsActive={trainingDayDetailsOpening || trainingDayDetailsOpen}
+                  error={schedule2Error}
+                  today={todayIsoDate}
+                  week={schedule2Week}
+                  lastWeek={Math.floor((TRAINING_SELECTION_WINDOW_DAYS - 1 + (new Date(todayIsoDate + "T00:00:00Z").getUTCDay() + 6) % 7) / 7)}
+                  canScheduleDate={(date) => schedulerCalendarDateSet.has(date)}
+                  onWeekChange={(week) => {
+                    setSchedule2Week(week);
+                    void fetchTrainingWeekSessions({ week });
+                  }}
+                  customGroups={schedule2Groups}
+                  restDays={schedule2RestDays}
+                  onOpen={(session) => void openTrainingDayDetails(session.date, session.id)}
+                  onCreate={(groupId, date) => openScheduleEvent({ groupId, date })}
+                />
+              ) : trainingAttendanceView === "today" ? (
                 <div className="amp-training-week-panel">
                   {trainingWeekLoading ? (
                     <p className="amp-empty amp-empty--modal">Зареждане...</p>
@@ -751,16 +764,7 @@ export function TrainingAttendanceDialog({
                     <div className="amp-modal-actions amp-modal-actions--end">
                       <button
                         className="amp-btn amp-btn--ghost"
-                        onClick={() => {
-                          setScheduleEventModalOpen(true);
-                          setScheduleEventStep("type");
-                          setMatchSelectedDates([]);
-                          setMatchDetailsPerDay({});
-                          setMatchExistingIdByDate({});
-                          setMatchEditorError("");
-                          setMatchCalendarVisibleMonthIdx(0);
-                          void fetchClubMatches();
-                        }}
+                        onClick={() => openScheduleEvent()}
                         disabled={trainingNoteSaving || trainingDaysEditorSaving}
                       >
                         Насрочи график

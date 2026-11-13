@@ -153,6 +153,34 @@ export async function GET(
   }
   const coachGroupId = coachGroupIdRaw || null;
   try {
+    const schedule2GroupId = request.nextUrl.searchParams.get("schedule2GroupId");
+    if (schedule2GroupId !== null) {
+      if (!session.roles.includes("admin")) {
+        return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
+      }
+      if (!UUID_REGEX.test(schedule2GroupId)) {
+        return NextResponse.json({ error: "Невалидна персонализирана група." }, { status: 400 });
+      }
+      const group = await prisma.clubCustomTrainingGroup.findFirst({
+        where: { id: schedule2GroupId, clubId: id, coachGroupId },
+        select: {
+          id: true, name: true, coachGroupId: true, trainingDates: true, trainingWeekdays: true,
+          trainingTime: true, trainingDateTimes: true, trainingDurationMinutes: true,
+          trainingFieldId: true, trainingFieldPieceIds: true, trainingFieldSelections: true,
+        },
+      });
+      if (!group) return NextResponse.json([]);
+      const trainingDates = await filterCancelledTrainingDatesForScope({
+        clubId: id,
+        scope: { type: "customGroup", id: group.id },
+        trainingDates: group.trainingDates,
+      });
+      return NextResponse.json([{
+        ...group,
+        trainingDates,
+        hasWeekdayRecurrence: group.trainingDates.length === 0 && group.trainingWeekdays.length > 0,
+      }]);
+    }
     if (request.nextUrl.searchParams.get("colorsOnly") === "true") {
       const colors = await prisma.clubCustomTrainingGroup.findMany({
         where: { clubId: id },

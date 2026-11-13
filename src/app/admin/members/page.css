@@ -2636,6 +2636,10 @@
   transition: background 0.15s, border-color 0.15s;
 }
 
+.amp-schedule-event-type-picker--schedule2 .amp-schedule-event-type-btn {
+  min-height: 44px;
+}
+
 .amp-schedule-event-type-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.09);
   border-color: rgba(255, 255, 255, 0.25);
@@ -2666,6 +2670,10 @@
 
 .amp-schedule-event-type-icon--match {
   background: rgba(249, 115, 22, 0.75);
+}
+
+.amp-schedule-event-type-icon--rest {
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .amp-training-date-btn--match.amp-training-date-btn--active:not(.amp-training-date-btn--today) {

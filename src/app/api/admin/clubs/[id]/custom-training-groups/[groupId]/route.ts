@@ -25,7 +25,7 @@ import {
   parseTrainingFieldSelectionsByDate,
   verifyTrainingFieldSelectionsByDate,
 } from "@/lib/trainingFields";
-import { deleteFutureTrainingSessionsForScope, syncFutureTrainingSessions } from "@/lib/trainingSessions";
+import { deleteFutureTrainingSessionsForScope, removeFutureSchedule2Sessions, syncFutureTrainingSessions } from "@/lib/trainingSessions";
 import { parseCustomTrainingGroupColorFromBody } from "@/lib/customTrainingGroupColors";
 import { isCustomTrainingGroupColorTakenInScope } from "@/lib/customTrainingGroupColorScope";
 
@@ -148,6 +148,7 @@ export async function DELETE(
   try {
     const todayIso = getTodayIsoDateInTimeZone(FIXED_TIME_ZONE);
     const deleted = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM clubs WHERE id = ${clubId}::uuid FOR UPDATE`;
       const result = await tx.clubCustomTrainingGroup.deleteMany({ where: { id: groupId, clubId } });
       if (result.count > 0) {
         await deleteFutureTrainingSessionsForScope({
@@ -156,6 +157,7 @@ export async function DELETE(
           scope: { type: "customGroup", id: groupId },
           todayIso,
         });
+        await removeFutureSchedule2Sessions(tx, clubId, groupId, todayIso);
       }
       return result;
     });

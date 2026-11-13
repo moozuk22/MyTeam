@@ -9,6 +9,8 @@ import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceSta
 import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
 type Options = {
+  schedule2EventTarget: { groupId: string; date?: string } | null;
+  schedule2EventGroup: { id: string } | undefined;
   matchEditorState: Pick<
     MatchEditorState,
     | "setMatchSelectedDates"
@@ -55,6 +57,8 @@ export function createClubMatchActions({
   setScheduleEventModalOpen,
   fetchTrainingWeekSessions,
   dayDetailsActiveMatch,
+  schedule2EventTarget,
+  schedule2EventGroup,
 }: Options) {
   const {
     setMatchSelectedDates,
@@ -101,6 +105,19 @@ export function createClubMatchActions({
 
   const handleSaveMatch = async () => {
     if (!clubId || !matchEventType || matchSelectedDates.length === 0) return;
+    if (schedule2EventTarget && !schedule2EventGroup) return;
+    const audience = schedule2EventGroup
+      ? { teamGroups: [], customGroupId: schedule2EventGroup.id }
+      : {
+          teamGroups: matchTeamGroups,
+          customGroupId: isCustomTrainingGroupMode
+            ? (selectedCustomGroup?.id ??
+              (weekColorFilter
+                ? (customTrainingGroups.find((g) => g.color === weekColorFilter)?.id ?? null)
+                : null) ??
+              (customTrainingGroups.length === 1 ? customTrainingGroups[0].id : null))
+            : null,
+        };
     setMatchEditorSaving(true);
     setMatchEditorError("");
     const warnings: string[] = [];
@@ -131,14 +148,7 @@ export function createClubMatchActions({
             matchTime: details.time,
             durationMinutes,
             isHome: details.isHome,
-            teamGroups: matchTeamGroups,
-            customGroupId: isCustomTrainingGroupMode
-              ? (selectedCustomGroup?.id ??
-                (weekColorFilter
-                  ? (customTrainingGroups.find((g) => g.color === weekColorFilter)?.id ?? null)
-                  : null) ??
-                (customTrainingGroups.length === 1 ? customTrainingGroups[0].id : null))
-              : null,
+            ...audience,
           }),
         });
         const data = (await res.json()) as { error?: string; warning?: string };

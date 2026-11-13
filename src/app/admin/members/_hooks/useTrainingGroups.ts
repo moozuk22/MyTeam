@@ -54,6 +54,8 @@ type TrainingGroupsOptions = {
   setTrainingNoteTargetDates: React.Dispatch<React.SetStateAction<string[]>>;
 };
 
+import type { Schedule2Group } from "../_components/Schedule2";
+
 export function useTrainingGroups({
   coachGroupId,
   clubId,
@@ -234,12 +236,14 @@ export function useTrainingGroups({
     }
   };
 
-  const loadCustomTrainingGroups = useCallback(async (): Promise<CustomTrainingGroup[]> => {
+  const loadCustomTrainingGroups = useCallback(async (target?: Schedule2Group): Promise<CustomTrainingGroup[]> => {
     if (!clubId) return [];
-    setTrainingScheduleGroupsLoading(true);
+    if (!target) setTrainingScheduleGroupsLoading(true);
     try {
       const search = new URLSearchParams();
-      if (coachGroupId) search.set("coachGroupId", coachGroupId);
+      const scope = target ? target.coachGroupId : coachGroupId;
+      if (scope) search.set("coachGroupId", scope);
+      if (target) search.set("schedule2GroupId", target.id);
       const response = await fetch(
         `/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups${search.size ? `?${search.toString()}` : ""}`,
         {
@@ -249,12 +253,6 @@ export function useTrainingGroups({
       if (!response.ok) {
         throw new Error("Failed to load custom training groups.");
       }
-      const colorsResponse = await fetch(
-        `/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups?colorsOnly=true`,
-        { cache: "no-store" },
-      );
-      if (!colorsResponse.ok) throw new Error("Failed to load custom training group colors.");
-      setCustomTrainingGroupColors(await colorsResponse.json());
       const payload: unknown = await response.json();
       const groups = Array.isArray(payload)
         ? payload
@@ -275,6 +273,7 @@ export function useTrainingGroups({
                 coachGroupId: normalizeOptionalId(raw.coachGroupId),
                 playerIds,
                 trainingDates,
+                ...(target ? { hasWeekdayRecurrence: raw.hasWeekdayRecurrence === true } : {}),
                 trainingTime:
                   typeof raw.trainingTime === "string" && TRAINING_TIME_REGEX.test(raw.trainingTime.trim())
                     ? raw.trainingTime.trim()
@@ -308,6 +307,10 @@ export function useTrainingGroups({
             .filter((group) => group.id && group.name)
         : [];
       const sortedGroups = sortByName(groups);
+      if (target) return sortedGroups;
+      const colorsResponse = await fetch(`/api/admin/clubs/${encodeURIComponent(clubId)}/custom-training-groups?colorsOnly=true`, { cache: "no-store" });
+      if (!colorsResponse.ok) throw new Error("Failed to load custom training group colors.");
+      setCustomTrainingGroupColors(await colorsResponse.json());
       setCustomTrainingGroups(sortedGroups);
       setSelectedTrainingGroupId((prev) => {
         if (prev && sortedGroups.some((group) => group.id === prev)) {
@@ -316,12 +319,13 @@ export function useTrainingGroups({
         return sortedGroups[0]?.id ?? "";
       });
       return sortedGroups;
-    } catch {
+    } catch (error) {
+      if (target) throw error;
       setCustomTrainingGroups([]);
       setSelectedTrainingGroupId("");
       return [];
     } finally {
-      setTrainingScheduleGroupsLoading(false);
+      if (!target) setTrainingScheduleGroupsLoading(false);
     }
   }, [clubId, coachGroupId]);
 

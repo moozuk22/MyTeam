@@ -92,6 +92,9 @@ type TrainingDaysEditorDialogProps = {
     | "setTrainingDayScheduleNotes"
     | "trainingDaysEditorError"
     | "isTrainingDaysScheduleUnchanged"
+    | "isSchedule2NoteOnlyEdit"
+    | "schedule2TrainingGroup"
+    | "trainingDaysStartedFromScheduleCell"
     | "showTrainingStepBack"
     | "showTrainingStepNext"
     | "isTrainingStepNextDisabled"
@@ -177,6 +180,9 @@ export function TrainingDaysEditorDialog({
     missingTrainingFieldMessage,
     trainingDaysEditorError,
     isTrainingDaysScheduleUnchanged,
+    isSchedule2NoteOnlyEdit,
+    schedule2TrainingGroup,
+    trainingDaysStartedFromScheduleCell,
     showTrainingStepBack,
     showTrainingStepNext,
     isTrainingStepNextDisabled,
@@ -330,7 +336,7 @@ export function TrainingDaysEditorDialog({
                       {trainingDaysEditorMode === "trainingGroup"
                         ? `Сборен отбор: ${selectedTrainingGroup?.name ?? "-"}`
                         : trainingDaysEditorMode === "customGroup"
-                          ? `Персонализирана група: ${selectedCustomGroup?.name ?? "-"}`
+                          ? `Персонализирана група: ${schedule2TrainingGroup?.name ?? selectedCustomGroup?.name ?? "-"}`
                           : trainingDaysEditorMode === "coachGroup"
                             ? `Треньорска група: ${coachGroups.find((g) => g.id === (coachWizardGroupId || coachGroupId))?.name ?? ""}`
                             : selectedTeamGroup === null
@@ -341,7 +347,7 @@ export function TrainingDaysEditorDialog({
                       {trainingDaysEditorMode === "trainingGroup"
                         ? `Тези промени ще се запазят за сборен отбор ${selectedTrainingGroup?.name ?? "-"}.`
                         : trainingDaysEditorMode === "customGroup"
-                          ? `Тези промени ще се запазят за персонализирана група ${selectedCustomGroup?.name ?? "-"}.`
+                          ? `Тези промени ще се запазят за персонализирана група ${schedule2TrainingGroup?.name ?? selectedCustomGroup?.name ?? "-"}.`
                           : trainingDaysEditorMode === "coachGroup"
                             ? `Тези промени ще се запазят за треньорска група ${coachGroups.find((g) => g.id === (coachWizardGroupId || coachGroupId))?.name ?? ""}.`
                             : selectedTeamGroup === null
@@ -359,10 +365,10 @@ export function TrainingDaysEditorDialog({
                         type="button"
                         className={`amp-training-step${effectiveTrainingDaysActiveStep === "days" ? " is-active" : " is-complete"}`}
                         onClick={() => setTrainingDaysActiveStep("days")}
-                        disabled={trainingDaysEditorSaving}
+                        disabled={trainingDaysEditorSaving || Boolean(schedule2TrainingGroup && trainingDaysEditorMode === "customGroup" && trainingDaysSingleEditDate)}
                       >
                         <span className="amp-training-step-index">1</span>
-                        Дни
+                        {trainingDaysStartedFromScheduleCell ? "Още дати" : "Дни"}
                       </button>
                       <button
                         type="button"
@@ -688,7 +694,7 @@ export function TrainingDaysEditorDialog({
                           trainingDaysEditorLoading ||
                           (trainingDaysEditorMode !== "createGroup" && isTrainingDaysScheduleUnchanged) ||
                           (trainingDaysEditorMode !== "createGroup" && hasMissingTrainingTime) ||
-                          hasMissingTrainingField ||
+                          (hasMissingTrainingField && !isSchedule2NoteOnlyEdit) ||
                           hasInvalidTrainingDuration
                         }
                       >

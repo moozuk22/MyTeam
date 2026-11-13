@@ -35,7 +35,8 @@ export function isEligibleForMembership(player: AttendancePlayer, date: string, 
   if (!scopeKey.startsWith("coach_group:") && !scopeKey.startsWith("custom_group:")) return true;
   // undefined supports pre-history fixtures; an empty real relation means not enrolled.
   if (!player.attendanceMemberships) return true;
-  return player.attendanceMemberships.some((period) => period.scopeKey === scopeKey
+  const membershipScope = scopeKey.startsWith("custom_group:") ? scopeKey.split(":session:")[0] : scopeKey;
+  return player.attendanceMemberships.some((period) => period.scopeKey === membershipScope
     && isEligibleForTraining(period.joinedAt ?? undefined, date, time)
     && (!period.leftAt || !isEligibleForTraining(period.leftAt, date, time)));
 }
