@@ -39,6 +39,8 @@ import { type CoachGroupAssignments } from "../_hooks/useCoachGroupAssignments";
 import { type MemberNotifications } from "../_hooks/useMemberNotifications";
 import { type MemberBirthdays } from "../_hooks/useMemberBirthdays";
 
+const STOYCHO_STOEV_ACADEMY_CLUB_ID = "7d453063-7ef4-4004-a59a-c20ae89f4cda";
+
 type MembersOverviewProps = {
   clubNotificationsController: Pick<
     ClubNotifications,
@@ -222,11 +224,13 @@ export function MembersOverview({
   } = memberNotifications;
   const { setGuideStep, setGuideOpen } = membersGuide;
   const { openBulkCoachGroupModal } = coachGroupAssignments;
+  const showBackButton = isAdmin || (isCoach && Boolean(coachGroupId) && clubId === STOYCHO_STOEV_ACADEMY_CLUB_ID);
+
   return (
     <>
       <div className="amp-inner">
         <div style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
-          {isAdmin && (
+          {showBackButton && (
             <button
               className="amp-back-btn amp-btn--compact"
               onClick={() => {
