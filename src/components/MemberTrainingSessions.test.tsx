@@ -29,6 +29,42 @@ it("sends a scope target for an unstored session in a mixed day", async () => {
 
 it("shows the custom-group name for a single training", () => {
   const html = renderToStaticMarkup(<MemberTrainingSessions sessions={[{ id: "one", groupName: "Група 1", trainingTime: "18:00", trainingDurationMinutes: 90 }]} cardCode="CARD" onUpdated={async () => {}} />);
-  expect(html).toContain("Група 1 — ");
+  expect(html).toContain("<h3>Група 1</h3>");
   expect(html).toContain("18:00");
+  expect(html).toContain("90 мин.");
+});
+
+it("shows the sport and highlights the reserved part of a stored training's field", () => {
+  const html = renderToStaticMarkup(
+    <MemberTrainingSessions
+      sessions={[{
+        id: "stored",
+        trainingFieldName: "Волейболна зала",
+        trainingFieldType: "volleyball",
+        trainingFieldPieces: ["Сектор А", "Сектор Б"],
+        trainingFieldPieceNames: ["Сектор Б"],
+      }]}
+      cardCode="CARD"
+      onUpdated={async () => {}}
+    />,
+  );
+
+  expect(html).toContain("Волейболна зала");
+  expect(html).toContain("member-training-field-pitch--volleyball");
+  expect(html).toContain('class="member-training-field-piece"><span>Сектор А</span>');
+  expect(html).toContain('class="member-training-field-piece member-training-field-piece--selected"><span>Сектор Б</span>');
+});
+
+it("shows the whole pitch for a field without sections and skips sessions without a field", () => {
+  const html = renderToStaticMarkup(
+    <MemberTrainingSessions
+      sessions={[{ id: "with-field", trainingFieldName: "Футболно игрище" }, { id: "no-field" }]}
+      cardCode="CARD"
+      onUpdated={async () => {}}
+    />,
+  );
+
+  expect(html.match(/member-training-field-visual/g)).toHaveLength(1);
+  expect(html).toContain("member-training-field-pitch--football");
+  expect(html).toContain('class="member-training-field-piece member-training-field-piece--selected"><span>Цял терен</span>');
 });

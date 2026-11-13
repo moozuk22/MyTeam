@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import { buildMemberTrainingAttendanceRequest } from "@/lib/memberTrainingAttendance";
+import type { TrainingSessionItem } from "@/app/member/[cardCode]/_types/member-types";
+import { MemberTrainingFieldPreview } from "./MemberTrainingFieldPreview";
 
-type Session = { id?: string; groupName?: string; scopeKey?: string; trainingTime?: string; trainingDurationMinutes?: number; trainingFieldName?: string | null; trainingFieldPieceNames?: string[]; note?: string; optedOut?: boolean; optOutReasonCode?: string | null; optOutReasonText?: string | null; limitedEvent?: { id: string; isRegistered: boolean; isConfirmed: boolean; waitlistPosition: number | null; spotsRemaining: number } | null };
+type Session = Omit<TrainingSessionItem, "scopeKey"> & { scopeKey?: string };
 export default function MemberTrainingSessions({ sessions, date, cardCode, onUpdated, attendanceEnabled = true }: { sessions: Session[]; date?: string; cardCode: string; onUpdated: () => Promise<unknown>; attendanceEnabled?: boolean }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -31,10 +33,20 @@ export default function MemberTrainingSessions({ sessions, date, cardCode, onUpd
     finally { setSaving(null); }
   }
   return <div>
-    {date && <h3>{new Date(`${date}T12:00:00Z`).toLocaleDateString("bg-BG", { weekday: "long", day: "2-digit", month: "long", timeZone: "Europe/Sofia" })}</h3>}
+    {date && <p className="member-training-session-date">{new Date(`${date}T12:00:00Z`).toLocaleDateString("bg-BG", { weekday: "long", day: "2-digit", month: "long", timeZone: "Europe/Sofia" })}</p>}
     {sessions.map((session) => <section key={session.id ?? session.scopeKey} className="training-attendance-info-card">
-      <h3 style={{ overflowWrap: "anywhere" }}>{session.groupName ? `${session.groupName} — ` : ""}{session.trainingTime} · {session.trainingDurationMinutes} мин.</h3>
-      {session.trainingFieldName && <p>{session.trainingFieldName}{session.trainingFieldPieceNames?.length ? ` · ${session.trainingFieldPieceNames.join(", ")}` : " · Цял терен"}</p>}
+      {(session.groupName || session.trainingTime || session.trainingDurationMinutes != null) && (
+        <header className="member-training-session-header">
+          {session.groupName && <h3>{session.groupName}</h3>}
+          {(session.trainingTime || session.trainingDurationMinutes != null) && (
+            <div className="member-training-session-time">
+              {session.trainingTime && <span>{session.trainingTime}</span>}
+              {session.trainingDurationMinutes != null && <span>{session.trainingDurationMinutes} мин.</span>}
+            </div>
+          )}
+        </header>
+      )}
+      <MemberTrainingFieldPreview field={session} />
       {session.note && <p style={{ whiteSpace: "pre-wrap" }}>{session.note}</p>}
       {session.limitedEvent ? <div className="training-attendance-buttons" style={{ flexDirection: "column" }}>
         <p>{session.limitedEvent.isRegistered ? session.limitedEvent.isConfirmed ? "Записан за тренировката" : `Чакалня · позиция ${session.limitedEvent.waitlistPosition}` : `${session.limitedEvent.spotsRemaining} свободни места`}</p>
