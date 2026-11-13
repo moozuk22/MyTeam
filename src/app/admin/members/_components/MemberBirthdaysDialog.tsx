@@ -95,7 +95,7 @@ export function MemberBirthdaysDialog({
                 {coachGroupId ? currentCoachGroupName : clubName} ·{" "}
                 {birthdayDate.split("-").reverse().join(".")}
               </p>
-              {(isAdmin || isCoach) && (
+              {/* {(isAdmin || isCoach) && (
                 <p>
                   <a
                     className="amp-btn amp-btn--ghost"
@@ -104,7 +104,7 @@ export function MemberBirthdaysDialog({
                     Facebook страница на клуба
                   </a>
                 </p>
-              )}
+              )} */}
               <h3>Рожденици днес</h3>
               {birthdayMembers.length === 0 ? (
                 <p className="amp-empty amp-empty--modal">
