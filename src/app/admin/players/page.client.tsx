@@ -215,7 +215,7 @@ export default function AdminPlayersPage() {
           Изпрати имейл
         </button>
 
-        <DemoNotificationPanel clubs={clubs} clubsLoading={clubsLoading} />
+        {/* <DemoNotificationPanel clubs={clubs} clubsLoading={clubsLoading} /> */}
 
         <CoachNotificationPanel clubs={clubs} clubsLoading={clubsLoading} />
 
