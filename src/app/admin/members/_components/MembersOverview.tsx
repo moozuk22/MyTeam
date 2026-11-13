@@ -39,7 +39,7 @@ import { type CoachGroupAssignments } from "../_hooks/useCoachGroupAssignments";
 import { type MemberNotifications } from "../_hooks/useMemberNotifications";
 import { type MemberBirthdays } from "../_hooks/useMemberBirthdays";
 
-const STOYCHO_STOEV_ACADEMY_CLUB_ID = "7d453063-7ef4-4004-a59a-c20ae89f4cda";
+const STOYCHO_STOEV_ACADEMY_CLUB_ID = "a484e11d-71fc-4472-a61e-22cf14e73fa4";
 
 type MembersOverviewProps = {
   clubNotificationsController: Pick<
