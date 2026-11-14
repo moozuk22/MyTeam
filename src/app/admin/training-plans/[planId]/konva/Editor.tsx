@@ -7,7 +7,9 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   ArrowDown,
@@ -32,6 +34,7 @@ import {
   Redo2,
   RotateCw,
   Save,
+  ScanLine,
   SquareDashed,
   Trash2,
   Type,
@@ -67,6 +70,7 @@ import {
   type ExerciseTool,
   type PitchQuadrant,
 } from "@/lib/exercise/model";
+import { createExerciseObjectId } from "@/lib/exercise/objectId";
 import {
   arrowheadPoints,
   commit,
@@ -103,6 +107,22 @@ const QUICK_TOOLS = [
   ["text", Type, "Текст"],
   ["team1-player-1", Users, "Състезател"],
 ] as const;
+const COMPACT_EDITOR = "(max-width: 899px), (max-height: 479px)";
+
+function subscribeToCompactEditor(callback: () => void) {
+  const query = window.matchMedia(COMPACT_EDITOR);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+
+function isCompactEditor() {
+  return window.matchMedia(COMPACT_EDITOR).matches;
+}
+
+function isCompactEditorOnServer() {
+  return false;
+}
+
 const TEXT_CATEGORY = TOOLBAR_GROUPS.findIndex((group) => group.types[0] === "text");
 const TEAM_COLOR_SUGGESTIONS = ["#facc15", "#a855f7", "#fb923c", "#22d3ee", "#f472b6", "#a3e635"];
 // Original quadrant indices in screen order after rotation.
@@ -495,6 +515,12 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const router = useRouter();
   const [planId, setPlanId] = useState(plan.id);
   const [showDetails, setShowDetails] = useState(!plan.id);
+  const compact = useSyncExternalStore(subscribeToCompactEditor, isCompactEditor, isCompactEditorOnServer);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsDialog = useRef<HTMLDialogElement>(null);
+  const toolsDrag = useRef<{ pointerId: number; startY: number } | null>(null);
+  const toolsTrigger = useRef<HTMLButtonElement>(null);
+  const toolsHeadingId = useId();
   const pageRef = useRef<HTMLElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(100);
@@ -729,6 +755,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   }
   function openPitchPicker(trigger: HTMLButtonElement) {
     cancelPlacement();
+    setToolsOpen(false);
     pitchPickerTrigger.current = trigger;
     setPitchSelection((current) => current ?? quadrants);
     requestAnimationFrame(() => {
@@ -763,7 +790,11 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
     setPitchSelection(null);
     cancelPlacement();
-    pitchPickerTrigger.current?.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      const trigger = pitchPickerTrigger.current;
+      if (trigger?.getClientRects().length) trigger.focus({ preventScroll: true });
+      else toolsTrigger.current?.focus({ preventScroll: true });
+    });
   }
   function applyPitchSelection() {
     if (!pitchSelection) return;
@@ -824,7 +855,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   function duplicate() {
     if (multiActive) {
       if (!canDuplicateBatch) return;
-      const shifted = duplicateObjects(batch, () => crypto.randomUUID());
+      const shifted = duplicateObjects(batch, createExerciseObjectId);
       const copies = shifted.every((copy) => isInPitchQuadrants(copy, quadrants))
         ? shifted
         : shifted.map((copy, index) => ({ ...copy, x: batch[index].x, y: batch[index].y }));
@@ -833,7 +864,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       return;
     }
     if (!object) return;
-    const copy = duplicateObject(object, crypto.randomUUID());
+    const copy = duplicateObject(object, createExerciseObjectId());
     if (!isInPitchQuadrants(copy, quadrants)) {
       copy.x = object.x;
       copy.y = object.y;
@@ -935,7 +966,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   // Install shortcuts using current render values; typing never edits canvas objects.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (recovery || conflictDialog.current?.open || leaveDialog.current?.open || warningDialog.current?.open) return;
+      if (recovery || conflictDialog.current?.open || leaveDialog.current?.open ||
+        warningDialog.current?.open || toolsDialog.current?.open) return;
       if (
         (e.target as Element).closest(
           "input,textarea,select,[contenteditable=true]",
@@ -1230,6 +1262,126 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     if (defaultPath) setPathMode(defaultPath);
   }
 
+  const showToolsSheet = compact && toolsOpen && !showDetails && !pitchSelection && !recovery && !showConflict && !leavePath;
+  useEffect(() => {
+    const dialog = toolsDialog.current;
+    if (!dialog) return;
+    if (showToolsSheet && !dialog.open) dialog.showModal();
+    if (!showToolsSheet && dialog.open) dialog.close();
+  }, [compact, showToolsSheet]);
+
+  function startToolsDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.button !== 0 || toolsDrag.current) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    toolsDrag.current = { pointerId: event.pointerId, startY: event.clientY };
+    toolsDialog.current?.setAttribute("data-dragging", "");
+  }
+
+  function moveToolsDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = toolsDrag.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    toolsDialog.current?.style.setProperty("--ke-tools-offset", `${Math.max(0, event.clientY - drag.startY)}px`);
+  }
+
+  function finishToolsDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = toolsDrag.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    toolsDrag.current = null;
+    const dialog = toolsDialog.current;
+    if (event.type === "pointerup" && event.clientY - drag.startY >= 72) {
+      dialog?.close();
+      setToolsOpen(false);
+    }
+    dialog?.removeAttribute("data-dragging");
+    dialog?.style.removeProperty("--ke-tools-offset");
+  }
+
+  function selectQuickTool(next: (typeof QUICK_TOOLS)[number][0]) {
+    setShowDetails(false);
+    setAddingTeam(false);
+    if (next === "balls-and-goals") {
+      cancelPlacement();
+      setCategory(BALLS_AND_GOALS_CATEGORY);
+      setBrowsingBallsAndGoals(true);
+      requestAnimationFrame(() => toolsRef.current?.querySelector("button")?.focus());
+    } else {
+      setCategory(TOOLBAR_GROUPS.findIndex(({ types }) => types.includes(next)));
+      selectTool(next);
+    }
+  }
+
+  const selectionControls = (
+    <>
+      <button type="button" aria-label="Избор на обект" title="Избор на обект"
+        aria-pressed={tool === "select" && !multiActive && !ballsAndGoalsActive && !teamsOpen}
+        onClick={() => {
+          cancelPlacement();
+          if (teamsOpen) setCategory(0);
+          setAddingTeam(false);
+          setToolsOpen(false);
+        }}>
+        <MousePointer2 size={19} aria-hidden="true" />
+        <span>Избор</span>
+      </button>
+      <button type="button" title="Избери всички"
+        disabled={batch.length === visibleObjects.length} onClick={() => {
+          selectAllVisibleObjects();
+          setToolsOpen(false);
+        }}>
+        <SquareDashed size={19} aria-hidden="true" />
+        <span>Избери всички</span>
+      </button>
+    </>
+  );
+
+  const ToolsPanel = compact ? "dialog" : "div";
+  const pitchOptions = (
+    <fieldset className="ke-pitch-options">
+      <legend>Игрище</legend>
+      {FOOTBALL.surfaces.map(({ id, label }) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={(pitchSelection ? "full" : layout.surface) === id}
+          onClick={id === "blank" ? selectBlankField : (event) => openPitchPicker(event.currentTarget)}
+        >
+          {label}
+        </button>
+      ))}
+      {layout.surface === "full" && (
+        <button className="ke-pitch-parts-button" type="button"
+          onClick={(event) => openPitchPicker(event.currentTarget)}>
+          Избери части от игрището
+        </button>
+      )}
+      {layout.surface === "half" && (
+        <p className="ke-pitch-legacy">Запазено половин игрище</p>
+      )}
+    </fieldset>
+  );
+  const panels = (
+    <div className="ke-panel-switch" role="group" aria-label="Панел на редактора" inert={!!pitchSelection}>
+      <button type="button" ref={toolsTrigger} aria-controls={toolsId}
+        aria-expanded={compact ? showToolsSheet : undefined}
+        aria-pressed={!showDetails}
+        onClick={(event) => {
+          if (compact) {
+            event.currentTarget.focus({ preventScroll: true });
+            setToolsOpen(true);
+          }
+          setShowDetails(false);
+        }}>
+        <Waypoints size={17} aria-hidden="true" /> Инструменти
+      </button>
+      <button type="button" aria-pressed={showDetails} aria-controls={detailsId} onClick={() => {
+        setToolsOpen(false);
+        setShowDetails(true);
+      }}>
+        <NotebookText size={17} aria-hidden="true" /> Детайли
+      </button>
+    </div>
+  );
+
   function changeZoom(value: number) {
     setZoom(value);
     if (value === 100) setPanning(false);
@@ -1250,6 +1402,14 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     <button type="button" aria-label={fullscreenLabel} title={fullscreenLabel} onClick={() => void toggleFullscreen()}>
       {fullscreen ? <Minimize2 size={17} aria-hidden="true" /> : <Maximize2 size={17} aria-hidden="true" />}
     </button>
+  );
+  const historyControls = (
+    <div className="ke-quick-history" role="group" aria-label="История">
+      <button type="button" aria-label="Отмени последната промяна" title="Отмени"
+        disabled={!history.past.length} onClick={() => setHistory(undo)}><Undo2 size={18} aria-hidden="true" /></button>
+      <button type="button" aria-label="Повтори последната промяна" title="Повтори"
+        disabled={!history.future.length} onClick={() => setHistory(redo)}><Redo2 size={18} aria-hidden="true" /></button>
+    </div>
   );
 
   const multiActions = multiActive && (
@@ -1308,10 +1468,11 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
             <button
               type="button"
               className="ke-back"
+              aria-label="Към плановете"
               onClick={() => navigateAway(`/admin/training-plans?${search}`)}
             >
               <ArrowLeft size={18} />
-              Към плановете
+              <span>Към плановете</span>
             </button>
             <h1><Waypoints size={24} aria-hidden="true" />{planId ? "Редактор на план" : "Нов план"}</h1>
             <button
@@ -1489,56 +1650,27 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         <fieldset disabled={!!recovery} className="ke-workspace">
           <legend className="ke-sr">Инструменти за упражнението</legend>
           <div className="ke-layout">
+            {compact && panels}
             <div
               className={pitchSelection ? "ke-pitch-area ke-pitch-area--picker" : "ke-pitch-area"}
               ref={pitchPicker}
+              hidden={compact && showDetails && !pitchSelection}
             >
-              <div className="ke-canvas-toolbar" inert={!!pitchSelection}>
+              {!compact && <div className="ke-canvas-toolbar" inert={!!pitchSelection}>
                 <div className="ke-quick-tools" role="group" aria-label="Бързи инструменти">
-                  <button type="button" aria-label="Избор на обект" title="Избор на обект"
-                    aria-pressed={tool === "select" && !multiActive && !ballsAndGoalsActive && !teamsOpen}
-                    onClick={() => {
-                      cancelPlacement();
-                      if (teamsOpen) setCategory(0);
-                      setAddingTeam(false);
-                    }}>
-                    <MousePointer2 size={19} aria-hidden="true" />
-                    <span>Избор</span>
-                  </button>
-                  <button type="button" title="Избери всички"
-                    disabled={batch.length === visibleObjects.length} onClick={selectAllVisibleObjects}>
-                    <SquareDashed size={19} aria-hidden="true" />
-                    <span>Избери всички</span>
-                  </button>
+                  {selectionControls}
                   {QUICK_TOOLS.map(([next, Icon, label]) => (
                     <button key={next} type="button" aria-label={label} title={label}
                       aria-pressed={next === "balls-and-goals" ? ballsAndGoalsActive : tool === next ||
                         (next === "team1-player-1" && teamsOpen && !multiActive)}
-                      onClick={() => {
-                        setShowDetails(false);
-                        setAddingTeam(false);
-                        if (next === "balls-and-goals") {
-                          cancelPlacement();
-                          setCategory(BALLS_AND_GOALS_CATEGORY);
-                          setBrowsingBallsAndGoals(true);
-                          requestAnimationFrame(() => toolsRef.current?.querySelector("button")?.focus());
-                          return;
-                        }
-                        setCategory(TOOLBAR_GROUPS.findIndex(({ types }) => types.includes(next)));
-                        selectTool(next);
-                      }}>
+                      onClick={() => selectQuickTool(next)}>
                       <Icon size={19} aria-hidden="true" />
                       <span>{label}</span>
                     </button>
                   ))}
                 </div>
                 <div className="ke-canvas-actions">
-                  <div className="ke-quick-history" role="group" aria-label="История">
-                    <button type="button" aria-label="Отмени последната промяна" title="Отмени"
-                      disabled={!history.past.length} onClick={() => setHistory(undo)}><Undo2 size={18} aria-hidden="true" /></button>
-                    <button type="button" aria-label="Повтори последната промяна" title="Повтори"
-                      disabled={!history.future.length} onClick={() => setHistory(redo)}><Redo2 size={18} aria-hidden="true" /></button>
-                  </div>
+                  {historyControls}
                   <button type="button" aria-label="Изчисти игрището" title="Изчисти игрището"
                     disabled={visibleObjects.length === 0} onClick={clearPitch}><Trash2 size={18} aria-hidden="true" /></button>
                   <button type="button" aria-label="Завърти игрището на 90°" title="Завърти игрището на 90°"
@@ -1552,7 +1684,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                   )}
                   {fullscreenButton}
                 </div>
-              </div>
+              </div>}
               {pitchSelection && (
                 <div className="ke-pitch-picker-actions">
                   <p>Изберете части директно върху игрището.</p>
@@ -1631,17 +1763,31 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                   />
                 </div>
               </div>
+              {compact && !pitchSelection && (
+                <div className="ke-mobile-pitch-controls">
+                  <div className="ke-mobile-pitch-actions" role="group" aria-label="Действия с игрището">
+                    <button type="button" aria-label="Завърти игрището на 90°" onClick={rotatePitch}>
+                      <RotateCw size={17} aria-hidden="true" />
+                    </button>
+                    <button type="button" aria-label="Изчисти игрището" disabled={!visibleObjects.length} onClick={clearPitch}>
+                      <Trash2 size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="ke-canvas-actions">
+                    {historyControls}
+                    {zoomControls}
+                  </div>
+                  {zoom > 100 && (
+                    <button type="button" className="ke-mobile-pan" aria-pressed={panning} onClick={() => setPanning(!panning)}>
+                      <Hand size={17} aria-hidden="true" /> Премести изгледа
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="ke-sidebar">
-              <div className="ke-panel-switch" role="group" aria-label="Панел на редактора" inert={!!pitchSelection}>
-                <button type="button" aria-pressed={!showDetails} aria-controls={toolsId} onClick={() => setShowDetails(false)}>
-                  <Waypoints size={17} aria-hidden="true" /> Инструменти
-                </button>
-                <button type="button" aria-pressed={showDetails} aria-controls={detailsId} onClick={() => setShowDetails(true)}>
-                  <NotebookText size={17} aria-hidden="true" /> Детайли
-                </button>
-              </div>
-              <div className="ke-plan-details" id={detailsId} hidden={!showDetails}>
+            <div className="ke-sidebar" data-details={showDetails && !pitchSelection}>
+              {!compact && panels}
+              <div className="ke-plan-details" id={detailsId} hidden={!showDetails || (compact && !!pitchSelection)}>
                 <div>
                   <label>
                     <span>Име на плана <span aria-hidden="true">*</span></span>
@@ -1685,9 +1831,9 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                     </select>
                   </label>
                   {newCategoryName === null ? (
-                    <button type="button" className="ke-add-category" aria-label="Нова категория" title="Нова категория"
+                    <button type="button" className="ke-add-category"
                       disabled={saving || !!recovery} onClick={() => setNewCategoryName("")}>
-                      <Plus size={18} aria-hidden="true" />
+                      <Plus size={18} aria-hidden="true" /> Нова категория
                     </button>
                   ) : (
                     <form className="ke-plan-category" onSubmit={(event) => { event.preventDefault(); void addCategory(); }}>
@@ -1726,32 +1872,62 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                     />
                   </span>
                 </label>
+                {compact && pitchOptions}
               </div>
-              <div id={toolsId} hidden={showDetails}>
-                <fieldset className="ke-pitch-options">
-                  <legend>Игрище</legend>
-                  {FOOTBALL.surfaces.map(({ id, label }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={(pitchSelection ? "full" : layout.surface) === id}
-                      onClick={id === "blank" ? selectBlankField : (event) => openPitchPicker(event.currentTarget)}
-                    >
-                      {label}
+              <ToolsPanel id={toolsId} ref={(element: HTMLDialogElement | HTMLDivElement | null) => {
+                toolsDialog.current = element instanceof HTMLDialogElement ? element : null;
+              }}
+                className={compact ? "ke-tools-sheet" : undefined}
+                hidden={!compact && showDetails}
+                aria-labelledby={compact ? toolsHeadingId : undefined}
+                onCancel={compact ? () => setToolsOpen(false) : undefined}
+                onClick={compact ? (event) => {
+                  if (event.target === event.currentTarget) setToolsOpen(false);
+                } : undefined}>
+                {compact ? (
+                  <>
+                    <div className="ke-tools-grip" aria-hidden="true"
+                      onPointerDown={startToolsDrag}
+                      onPointerMove={moveToolsDrag}
+                      onPointerUp={finishToolsDrag}
+                      onPointerCancel={finishToolsDrag}
+                      onLostPointerCapture={finishToolsDrag}
+                    />
+                    <div className="ke-tools-sheet-header">
+                      <h2 id={toolsHeadingId}><Waypoints size={19} aria-hidden="true" /> Инструменти</h2>
+                      <button type="button" autoFocus onClick={() => setToolsOpen(false)}>Към игрището</button>
+                    </div>
+                  </>
+                ) : pitchOptions}
+                {compact && (
+                  <div className="ke-sheet-categories" role="group" aria-label="Категории инструменти">
+                    {selectionControls}
+                    <button type="button" onClick={() => {
+                      setToolsOpen(false);
+                      setShowDetails(true);
+                      requestAnimationFrame(() => pageRef.current?.querySelector<HTMLButtonElement>(".ke-pitch-options button")?.focus());
+                    }}>
+                      <ScanLine size={19} aria-hidden="true" /> Игрище
                     </button>
-                  ))}
-                  {layout.surface === "full" && (
-                    <button
-                      className="ke-pitch-parts-button"
-                      type="button"
-                      onClick={(event) => openPitchPicker(event.currentTarget)}
-                    >
-                      Избери части от игрището
-                    </button>
-                  )}
-                </fieldset>
-                {layout.surface === "half" && (
-                  <p className="ke-pitch-legacy">Запазено половин игрище</p>
+                    {QUICK_TOOLS.map(([next, Icon, label]) => {
+                      const groupIndex = TOOLBAR_GROUPS.findIndex(({ types }) => types.includes(next === "balls-and-goals" ? "ball" : next));
+                      const active = next === "team1-player-1" ? teamsOpen : activeCategory === groupIndex;
+                      return (
+                        <button key={next} type="button" aria-pressed={active} onClick={() => {
+                          if (next === "text") {
+                            selectQuickTool(next);
+                            setToolsOpen(false);
+                          } else if (activeCategory !== groupIndex && !active) {
+                            cancelPlacement();
+                            setCategory(groupIndex);
+                            setAddingTeam(false);
+                          }
+                        }}>
+                          <Icon size={19} aria-hidden="true" /> {next === "team1-player-1" ? label : TOOLBAR_GROUPS[groupIndex].title}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 {teamsOpen && (
                   <>
@@ -1865,7 +2041,10 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                             aria-label={
                               count === undefined ? undefined : `${label}, брой на игрището: ${count}`
                             }
-                            onClick={() => selectTool(t)}
+                            onClick={() => {
+                              selectTool(t);
+                              if (compact && !isMovementType(t)) setToolsOpen(false);
+                            }}
                           >
                             {isMovementType(t) ? (
                               <MovementPreview type={t} arrowhead={lineArrowhead && isLineType(t)} />
@@ -1889,7 +2068,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                   </>
                 )}
                 <div className="ke-mode" hidden={!!pitchSelection} onKeyDown={(e) => {
-                  if (tool !== "select" && e.key === "Escape") {
+                  if (!compact && tool !== "select" && e.key === "Escape") {
                     e.preventDefault();
                     cancelPlacementFromControls();
                   }
@@ -1933,7 +2112,9 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                           : drawingArrow
                             ? "Плъзнете по игрището, за да нарисувате стрелка."
                             : "Плъзнете по игрището, за да нарисувате линия или фигура."}
-                      {" За да спрете рисуването или поставянето, натиснете Esc или бутона „Избор“."}
+                      {compact
+                        ? " За да спрете рисуването или поставянето, отворете „Инструменти“ и натиснете „Избор“."
+                        : " За да спрете рисуването или поставянето, натиснете Esc или бутона „Избор“."}
                     </span>
                   </p>
                 </div>
@@ -1943,7 +2124,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                     Изтрий отбор
                   </button>
                 )}
-              </div>
+              </ToolsPanel>
             </div>
           </div>
         </fieldset>

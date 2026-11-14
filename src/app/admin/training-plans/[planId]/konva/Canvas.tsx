@@ -29,6 +29,7 @@ import {
   type ExerciseTool,
   type Point,
 } from "@/lib/exercise/model";
+import { createExerciseObjectId } from "@/lib/exercise/objectId";
 import { MAX_ITEMS } from "@/lib/trainingPlans";
 import {
   clamp,
@@ -463,7 +464,7 @@ export default function Canvas({
       if (!color) return;
       customTeam = { number: customTeamNumber, color };
     }
-    const object = createObject(tool, p, crypto.randomUUID(), customTeam);
+    const object = createObject(tool, p, createExerciseObjectId(), customTeam);
     if (object.kind === "movement") {
       object.path = pathMode;
       if (lineArrowhead && isLineType(object.action)) object.arrowhead = true;

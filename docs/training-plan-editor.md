@@ -55,7 +55,7 @@ Selecting **Дрибъл** defaults to **Свободна ръка**. Selecting 
 
 While drawing a freehand movement, the preview shows the stroke. After release, its arrowhead points along the short, straight finish at the tip. The dribbling wave fades into the centerline under the arrowhead.
 
-The pitch toolbar provides shortcuts for selection, drawing, undo and redo, and deleting selected objects. Use the zoom controls to enlarge the pitch and **Премести изгледа** to scroll around it while zoomed in. **Цял екран** expands the editor when the browser supports it. On desktop, the full tool panel sits beside the pitch. On narrower screens, it sits below the pitch. Placement and drawing options appear directly below the pitch on both layouts.
+The pitch toolbar provides shortcuts for selection and drawing. On desktop, the full tool panel sits beside the pitch, and **Цял екран** expands the editor when the browser supports it. On narrower screens, **Инструменти** opens a bottom sheet with drawing categories and options, including **Избор** and **Избери всички**. **Детайли** contains the plan fields and pitch setup. Mobile pitch actions below the canvas include rotation, clearing, history, and zoom. Use **Премести изгледа** to scroll around a zoomed pitch.
 
 ## Data and rendering
 
