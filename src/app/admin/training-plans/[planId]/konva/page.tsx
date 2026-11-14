@@ -43,7 +43,7 @@ export default async function KonvaPage({
   const layout = isV2(plan.layout) ? plan.layout : null;
   const error = layout
     ? validateExercise(layout)
-    : "Планът е създаден със стария редактор. Изберете „Копирай в Konva“ от списъка с планове, за да редактирате копието.";
+    : "Планът е създаден със стария редактор. Изберете „Копирай в новия редактор“ от списъка с планове, за да редактирате копието.";
   if (!layout || error)
     return (
       <main>

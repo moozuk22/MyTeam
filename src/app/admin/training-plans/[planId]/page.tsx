@@ -51,7 +51,6 @@ export default async function TrainingPlanReview({
 
   return (
     <main className="tp-page">
-      <div className="tp-dot-grid" aria-hidden="true" />
       <div className="tp-inner">
         <nav className="tp-review-actions" aria-label="Действия за плана">
           <Link className="tp-back-btn" href={listHref}>
@@ -65,30 +64,31 @@ export default async function TrainingPlanReview({
             </Link>
           )}
         </nav>
-        <h1 className="tp-title tp-review-title">{plan.title}</h1>
+        <header className="tp-review-heading">
+          <h1 className="tp-title">{plan.title}</h1>
+          <span className="tp-category-label">{category}</span>
+        </header>
         <div className="tp-review-layout">
-          <section className="tp-card tp-review-details" aria-label="Детайли на плана">
+          {layout ? (
+            <section className="tp-card-preview tp-review-preview" aria-label="Преглед на запазеното игрище">
+              <ReviewPreview exercise={layout} />
+            </section>
+          ) : (
+            <p className="tp-review-fallback">
+              {drawing ? "Запазеното игрище не може да се покаже." :
+                "Планът е от стария редактор. Изберете „Копирай в новия редактор“ от списъка, за да отворите чертежа."}
+            </p>
+          )}
+          <section className="tp-review-details" aria-label="Детайли на плана">
+            <h2>Описание</h2>
+            <p className="tp-review-description">{plan.description || "Без описание"}</p>
             <dl>
-              <dt>Категория</dt>
-              <dd>{category}</dd>
-              <dt>Описание</dt>
-              <dd className="tp-review-description">{plan.description || "Без описание"}</dd>
               <dt>Създал</dt>
               <dd>{plan.creatorName ?? "Няма записан автор"}</dd>
               <dt>Обновен</dt>
               <dd><time dateTime={plan.updatedAt.toISOString()}>{updated}</time></dd>
             </dl>
           </section>
-          {layout ? (
-            <section className="tp-card-preview tp-review-preview" aria-label="Преглед на запазеното игрище">
-              <ReviewPreview exercise={layout} />
-            </section>
-          ) : (
-            <p className="tp-card tp-review-details">
-              {drawing ? "Запазеното игрище не може да се покаже." :
-                "Планът е от стария редактор. Изберете „Копирай в Konva“ от списъка, за да прегледате и редактирате чертежа."}
-            </p>
-          )}
         </div>
       </div>
     </main>

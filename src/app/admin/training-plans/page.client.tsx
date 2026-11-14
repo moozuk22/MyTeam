@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Copy,
   Edit2,
+  ScanLine,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -291,7 +292,6 @@ export default function TrainingPlansClient({
 
   return (
     <main className="tp-page">
-      <div className="tp-dot-grid" aria-hidden="true" />
       <div className="tp-inner">
         <header className="tp-header">
           <button
@@ -306,17 +306,9 @@ export default function TrainingPlansClient({
             <ArrowLeft size={16} />
             <span>Назад</span>
           </button>
-          <div>
-            <p className="tp-kicker">Шаблони</p>
+          <div className="tp-heading">
             <h1 className="tp-title">Планове за тренировки</h1>
-            <div className="tp-title-line" />
-          </div>
-        </header>
-
-        <section className="tp-actions">
-          <div>
-            <h2>{selectedClub?.name ?? "Няма избран отбор"}</h2>
-            <p>{visiblePlans.length === 1 ? "1 план" : `${visiblePlans.length} плана`}</p>
+            <p>{selectedClub?.name ?? "Няма избран отбор"}</p>
           </div>
           <button
             className="tp-primary-btn"
@@ -324,10 +316,10 @@ export default function TrainingPlansClient({
             onClick={openNewEditor}
             disabled={!selectedClubId}
           >
-            <Plus size={18} />
-            <span>Нов план — Konva</span>
+            <Plus size={18} aria-hidden="true" />
+            Нов план
           </button>
-        </section>
+        </header>
 
         {selectedClubId && (
           <div className="tp-category-controls">
@@ -353,11 +345,14 @@ export default function TrainingPlansClient({
           </div>
         )}
 
-        {error && <p className="tp-error">{error}</p>}
+        {error && !confirmDeleteId && <p className="tp-error" role="alert">{error}</p>}
+        {!isFiltering && visiblePlans.length > 0 && (
+          <p className="tp-result-count">{visiblePlans.length === 1 ? "1 план" : `${visiblePlans.length} плана`}</p>
+        )}
 
         <section className="tp-grid" aria-busy={isFiltering} ref={gridRef}>
           {isFiltering ? (
-            <FinanceSkeleton variant="form" />
+            <div className="tp-grid-loading"><FinanceSkeleton variant="form" /></div>
           ) : visiblePlans.length === 0 ? (
             <div className="tp-empty">
               <ClipboardList size={28} />
@@ -374,34 +369,39 @@ export default function TrainingPlansClient({
                     href={`/admin/training-plans/${encodeURIComponent(plan.id)}?${trainingPlanSearch(selectedClubId, coachGroupId)}`}
                     prefetch={false}
                   >
-                    {plan.layoutVersion === 2 && (
-                      <div
-                        className="tp-card-preview"
-                        aria-hidden="true"
-                        data-preview-id={preview === undefined ? plan.id : undefined}
-                        data-preview-key={previewKey}
-                      >
-                        {preview ? <PlanPreview exercise={preview} /> :
-                          preview === null ? <span>Няма преглед</span> : null}
+                    <div
+                      className="tp-card-preview"
+                      aria-hidden="true"
+                      data-preview-id={plan.layoutVersion === 2 && preview === undefined ? plan.id : undefined}
+                      data-preview-key={previewKey}
+                    >
+                      {preview ? <PlanPreview exercise={preview} /> :
+                        plan.layoutVersion !== 2 || preview === null ? (
+                          <div className="tp-preview-placeholder">
+                            <ScanLine size={26} />
+                            <span>{plan.layoutVersion !== 2 ? "Стар формат" : "Няма преглед"}</span>
+                          </div>
+                        ) : <div className="tp-preview-skeleton" />}
+                    </div>
+                    <div className="tp-card-info">
+                      <span className="tp-category-label">
+                        {(plan.categoryId && categoryNames.get(plan.categoryId)) || "Без категория"}
+                      </span>
+                      <h2>{plan.title}</h2>
+                      {plan.description && <p>{plan.description}</p>}
+                      <div className="tp-card-meta">
+                        {plan.creatorName && <span>Създал: {plan.creatorName}</span>}
+                        <time dateTime={plan.updatedAt}>Обновен: {formatDate(plan.updatedAt)}</time>
                       </div>
-                    )}
-                    <h3>{plan.title}</h3>
-                    <span>
-                      {plan.layoutVersion === 2 ? "Konva" : "HTML/CSS — оригинал"}
-                    </span>
-                    <span className="tp-category-label">
-                      {(plan.categoryId && categoryNames.get(plan.categoryId)) || "Без категория"}
-                    </span>
-                    <p>{plan.description || "Без описание"}</p>
-                    {plan.creatorName && <span className="tp-card-creator">Създал: {plan.creatorName}</span>}
-                    <span>Обновен: {formatDate(plan.updatedAt)}</span>
+                    </div>
                   </Link>
                   <div className="tp-card-actions">
                     {plan.layoutVersion === 2 && (
                       <button
                         type="button"
                         onClick={() => openEditor(plan.id)}
-                        title="Редактирай диаграмата"
+                        title="Редактирай плана"
+                        aria-label="Редактирай плана"
                       >
                         <Edit2 size={16} />
                         <span>Редактирай</span>
@@ -411,10 +411,11 @@ export default function TrainingPlansClient({
                       type="button"
                       disabled={copying}
                       onClick={() => void duplicatePlan(plan)}
-                      title={plan.layoutVersion === 2 ? "Дублирай" : "Копирай в Konva"}
+                      title={plan.layoutVersion === 2 ? "Дублирай" : "Копирай в новия редактор"}
+                      aria-label={plan.layoutVersion === 2 ? "Дублирай" : "Копирай в новия редактор"}
                     >
                       <Copy size={16} />
-                      {plan.layoutVersion === 2 ? <span>Дублирай</span> : "Копирай в Konva"}
+                      {plan.layoutVersion === 2 ? <span>Дублирай</span> : "Копирай в новия редактор"}
                     </button>
                     <button
                       type="button"
@@ -424,6 +425,7 @@ export default function TrainingPlansClient({
                         setConfirmDeleteId(plan.id);
                       }}
                       title="Изтрий"
+                      aria-label="Изтрий"
                     >
                       <Trash2 size={16} />
                       <span>Изтрий</span>
@@ -437,7 +439,7 @@ export default function TrainingPlansClient({
         {nextCursor && !isFiltering && (
           <button
             type="button"
-            className="tp-secondary-btn"
+            className="tp-secondary-btn tp-load-more"
             disabled={loadingMore}
             onClick={() => void loadMore()}
           >
@@ -463,6 +465,7 @@ export default function TrainingPlansClient({
               Сигурни ли сте, че искате да изтриете “
               {planToDelete?.title ?? "този план"}”?
             </p>
+            {error && <p className="tp-error" role="alert">{error}</p>}
             <div className="tp-modal-actions">
               <button
                 className="tp-secondary-btn"

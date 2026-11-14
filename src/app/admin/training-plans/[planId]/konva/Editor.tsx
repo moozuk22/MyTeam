@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import {
   ArrowDown,
@@ -14,9 +15,18 @@ import {
   ArrowRight,
   ArrowUp,
   Check,
+  Cone,
   Copy,
+  Goal as GoalIcon,
+  Hand,
+  Home,
+  Info,
+  LayoutGrid,
   Maximize2,
   Minimize2,
+  Minus,
+  MousePointer2,
+  NotebookText,
   Pencil,
   Plus,
   Redo2,
@@ -24,6 +34,9 @@ import {
   Save,
   SquareDashed,
   Trash2,
+  Type,
+  Users,
+  Waypoints,
   Undo2,
   X,
 } from "lucide-react";
@@ -75,10 +88,21 @@ import {
 import { MAX_ITEMS, MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_TITLE_LENGTH } from "@/lib/trainingPlans";
 import Canvas from "./Canvas";
 import { EquipmentPreview } from "./Visuals";
+import { pitchView, pitchViewport } from "./pitchView";
 import { measurePitchText } from "./textLayout";
 
 const EQUIPMENT_LABELS = FOOTBALL.labels;
 const TOOLBAR_GROUPS = FOOTBALL.tools;
+const BALLS_AND_GOALS_CATEGORY = TOOLBAR_GROUPS.findIndex(({ types }) => types.includes("ball"));
+const FIRST_TEAM_CATEGORY = TOOLBAR_GROUPS.findIndex(({ types }) => types.includes("team1-player-1"));
+const QUICK_TOOLS = [
+  ["run", ArrowRight, "Бягане"],
+  ["balls-and-goals", GoalIcon, TOOLBAR_GROUPS[BALLS_AND_GOALS_CATEGORY].title],
+  ["cone", Cone, "Конус"],
+  ["line", Pencil, "Линия"],
+  ["text", Type, "Текст"],
+  ["team1-player-1", Users, "Състезател"],
+] as const;
 const TEXT_CATEGORY = TOOLBAR_GROUPS.findIndex((group) => group.types[0] === "text");
 const TEAM_COLOR_SUGGESTIONS = ["#facc15", "#a855f7", "#fb923c", "#22d3ee", "#f472b6", "#a3e635"];
 // Original quadrant indices in screen order after rotation.
@@ -470,7 +494,17 @@ function MovementPreview({ type, arrowhead }: { type: ExerciseTool; arrowhead: b
 export default function Editor({ plan, categories = [], clubId, userId, coachGroupId }: EditorProps) {
   const router = useRouter();
   const [planId, setPlanId] = useState(plan.id);
+  const [showDetails, setShowDetails] = useState(!plan.id);
+  const pageRef = useRef<HTMLElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [panning, setPanning] = useState(false);
+  const [browsingBallsAndGoals, setBrowsingBallsAndGoals] = useState(false);
   const titleInput = useRef<HTMLInputElement>(null);
+  const titleErrorId = useId();
+  const detailsId = useId();
+  const toolsId = useId();
+  const teamsHeadingId = useId();
   const [history, setHistory] = useState<History>({
     past: [],
     present: plan.layout,
@@ -490,7 +524,6 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       return id ? { id, editLabel: false } : null;
     });
   }
-  const [placementCount, setPlacementCount] = useState("1");
   const toolsRef = useRef<HTMLDivElement>(null);
   const addTeamButtonRef = useRef<HTMLButtonElement>(null);
   const [addingTeam, setAddingTeam] = useState(false);
@@ -507,6 +540,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const [revision, setRevision] = useState(plan.updatedAt),
     [saved, setSaved] = useState(plan.layout);
   const [title, setTitle] = useState(plan.title);
+  const [titleRequired, setTitleRequired] = useState(false);
+  const titleInvalid = titleRequired && !title.trim();
   const [savedTitle, setSavedTitle] = useState(plan.title);
   const initialCategoryId = plan.categoryId ?? null;
   const [categoryId, setCategoryId] = useState(initialCategoryId);
@@ -521,6 +556,24 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const [savedDescription, setSavedDescription] = useState(initialDescription);
   const [recovery, setRecovery] = useState<RecoveryDraft | null>(null),
     [draftReady, setDraftReady] = useState(false);
+  const recoveryDialog = useRef<HTMLDialogElement>(null);
+  const conflictDialog = useRef<HTMLDialogElement>(null);
+  const leaveDialog = useRef<HTMLDialogElement>(null);
+  const leaveTitleId = useId();
+  const leaveDescriptionId = useId();
+  const [leavePath, setLeavePath] = useState<string | null>(null);
+  const warningDialog = useRef<HTMLDialogElement>(null);
+  const warningTitleId = useId();
+  const warningDescriptionId = useId();
+  const [confirmReload, setConfirmReload] = useState(false);
+  const reloadCancelButton = useRef<HTMLButtonElement>(null);
+  const reloadButton = useRef<HTMLButtonElement>(null);
+  const [remainingPitchObjects, setRemainingPitchObjects] = useState<ExerciseObject[] | null>(null);
+  const conflictTitleId = useId();
+  const conflictDescriptionId = useId();
+  const [showConflict, setShowConflict] = useState(false);
+  const recoveryTitleId = useId();
+  const recoveryDescriptionId = useId();
   const [storageError, setStorageError] = useState(false);
   const [colorPreview, setColorPreview] = useState<{
     id: string;
@@ -538,10 +591,16 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const customTeamIndex = category - firstCustomCategory;
   const customTeamNumber = customTeamColors[customTeamIndex] ? customTeamIndex + 3 : undefined;
   const activeCategory =
-    category < firstCustomCategory || customTeamNumber !== undefined ? category : 0;
+    category < firstCustomCategory || customTeamNumber !== undefined ? category : FIRST_TEAM_CATEGORY;
+  const teamsOpen = activeCategory >= FIRST_TEAM_CATEGORY;
   const toolGroup = toolGroups[activeCategory] ?? TOOLBAR_GROUPS[0];
   const quadrants = getPitchQuadrants(layout);
   const pitchRotation = layout.pitchRotation ?? 0;
+  const { viewWidth, viewHeight } = pitchView(
+    pitchViewport(pitchSelection ? PITCH_QUADRANTS : quadrants),
+    pitchRotation,
+    1,
+  );
   const visibleObjects = useMemo(
     () => quadrants.length === PITCH_QUADRANTS.length
       ? layout.objects
@@ -556,6 +615,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     customTeamNumber === undefined && selectedTool.startsWith("custom-team-")
       ? "select"
       : selectedTool;
+  const ballsAndGoalsActive = (tool !== "select" && TOOLBAR_GROUPS[BALLS_AND_GOALS_CATEGORY].types.includes(tool)) ||
+    (browsingBallsAndGoals && activeCategory === BALLS_AND_GOALS_CATEGORY);
   const validTeamColor = isCustomTeamColor(teamColor);
   const layoutDirty = useMemo(() => !sameExercise(layout, saved), [layout, saved]);
   const dirty = layoutDirty ||
@@ -575,11 +636,6 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const drawingArrow = drawingMovement && (!drawingLine || lineArrowhead);
   const placing =
     tool !== "select" && !drawingMovement && !isZoneType(tool);
-  const usesQuantity = tool !== "select" && tool !== "text";
-  const placementCapacity = MAX_ITEMS - layout.objects.length;
-  const quantity = Number(placementCount);
-  const validQuantity =
-    Number.isInteger(quantity) && quantity >= 1 && quantity <= placementCapacity;
   const newDraftId = coachGroupId ? `new:${coachGroupId}` : "new";
   const initialDraftKey = draftKey(userId, clubId, plan.id ?? newDraftId);
   const key = draftKey(userId, clubId, planId ?? newDraftId);
@@ -665,10 +721,11 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     if (multiActive) setMultiSelection(new Set());
   }
   function cancelPlacement() {
+    setBrowsingBallsAndGoals(false);
     setSelected(null);
     setMultiSelection(null);
     setTool("select");
-    setPlacementCount("1");
+    setPanning(false);
   }
   function openPitchPicker(trigger: HTMLButtonElement) {
     cancelPlacement();
@@ -700,27 +757,27 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       );
     });
   }
-  function closePitchPicker(apply: boolean) {
-    if (apply && pitchSelection) {
-      const objects = pitchSelection.length === PITCH_QUADRANTS.length
-        ? layout.objects
-        : layout.objects.filter((object) => isInPitchQuadrants(object, pitchSelection));
-      if (
-        objects.length < layout.objects.length &&
-        !window.confirm(
-          "Обектите в неизбраните части на игрището ще бъдат премахнати. Искате ли да продължите?",
-        )
-      ) return;
+  function closePitchPicker(objects?: ExerciseObject[]) {
+    if (objects && pitchSelection) {
       change({ ...layout, surface: "full", quadrants: [...pitchSelection], objects });
     }
     setPitchSelection(null);
     cancelPlacement();
     pitchPickerTrigger.current?.focus({ preventScroll: true });
   }
-  function toggleMultiSelect() {
-    cancelPlacement();
-    if (multiActive) return;
-    setMultiSelection(new Set(selected ? [selected] : []));
+  function applyPitchSelection() {
+    if (!pitchSelection) return;
+    const objects = pitchSelection.length === PITCH_QUADRANTS.length
+      ? layout.objects
+      : layout.objects.filter((object) => isInPitchQuadrants(object, pitchSelection));
+    if (objects.length < layout.objects.length) setRemainingPitchObjects(objects);
+    else closePitchPicker(objects);
+  }
+  function selectAllVisibleObjects() {
+    if (!multiActive) cancelPlacement();
+    setMultiSelection((current) =>
+      new Set([...(current ?? []), ...visibleObjects.map((object) => object.id)]),
+    );
   }
   function selectOnPitch(id: string | null) {
     if (!multiActive) {
@@ -748,28 +805,15 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     if (customTeamNumber === undefined) return;
     change(removeCustomTeam(layout, customTeamNumber));
     cancelPlacement();
+    setCategory(FIRST_TEAM_CATEGORY);
     addTeamButtonRef.current?.focus();
-  }
-  function selectCategory(index: number) {
-    setCategory(index);
-    if (index === TEXT_CATEGORY) {
-      cancelPlacement();
-      if (tool !== "text") setTool("text");
-      return;
-    }
-    if (
-      tool === "text" ||
-      (index !== activeCategory &&
-        (index >= firstCustomCategory || customTeamNumber !== undefined))
-    ) {
-      cancelPlacement();
-    }
   }
   function cancelPlacementFromControls() {
     const tools = toolsRef.current;
     const button =
       tools?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]') ??
-      tools?.querySelector("button");
+      tools?.querySelector("button") ??
+      pageRef.current?.querySelector<HTMLButtonElement>(".ke-quick-tools button");
     button?.focus();
     cancelPlacement();
   }
@@ -804,12 +848,6 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       return;
     }
     setSelected(null);
-    if (quantity <= 1) {
-      setTool("select");
-      setPlacementCount("1");
-    } else {
-      setPlacementCount(String(quantity - 1));
-    }
   }
   useEffect(() => {
     try {
@@ -820,6 +858,21 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
     setDraftReady(true);
   }, [initialDraftKey, plan.layout, plan.title, initialDescription, initialCategoryId]);
+  useEffect(() => {
+    if (recovery) recoveryDialog.current?.showModal();
+  }, [recovery]);
+  useEffect(() => {
+    if (showConflict) conflictDialog.current?.showModal();
+  }, [showConflict]);
+  useEffect(() => {
+    if (leavePath) leaveDialog.current?.showModal();
+  }, [leavePath]);
+  useEffect(() => {
+    if (remainingPitchObjects) warningDialog.current?.showModal();
+  }, [remainingPitchObjects]);
+  useEffect(() => {
+    if (confirmReload) reloadCancelButton.current?.focus();
+  }, [confirmReload]);
   useEffect(() => {
     if (!draftReady || recovery) return;
     const timer = setTimeout(() => {
@@ -847,71 +900,42 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }, 600);
     return () => clearTimeout(timer);
   }, [layout, title, description, categoryId, dirty, revision, saved, savedTitle, savedDescription, savedCategoryId, key, draftReady, recovery]);
+  const persistDraft = useCallback(() => {
+    const current = state.current;
+    if (!current.dirty || recovery) return;
+    try {
+      const draft = JSON.stringify({
+        baseRevision: current.revision,
+        layout: current.layout,
+        title: current.title,
+        description: current.description,
+        categoryId: current.categoryId,
+        savedAt: Date.now(),
+      } satisfies RecoveryDraft);
+      localStorage.setItem(key, draft);
+      lastWrittenDraft.current = draft;
+    } catch {
+      setStorageError(true);
+    }
+  }, [key, recovery]);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       if (!state.current.dirty && !recovery) return;
-      if (!recovery) {
-        try {
-          localStorage.setItem(
-            key,
-            JSON.stringify({
-              baseRevision: state.current.revision,
-              layout: state.current.layout,
-              title: state.current.title,
-              description: state.current.description,
-              categoryId: state.current.categoryId,
-              savedAt: Date.now(),
-            }),
-          );
-        } catch {
-          /* Browser navigation must still show its warning. */
-        }
-      }
+      persistDraft();
       event.preventDefault();
       event.returnValue = "";
     };
-    const persist = () => {
-      if (state.current.dirty && !recovery) {
-        try {
-          localStorage.setItem(
-            key,
-            JSON.stringify({
-              baseRevision: state.current.revision,
-              layout: state.current.layout,
-              title: state.current.title,
-              description: state.current.description,
-              categoryId: state.current.categoryId,
-              savedAt: Date.now(),
-            }),
-          );
-        } catch {
-          setStorageError(true);
-        }
-      }
-    };
-    const links = (e: MouseEvent) => {
-      const anchor = (e.target as Element).closest("a[href]");
-      if (
-        anchor &&
-        (state.current.dirty || recovery) &&
-        !window.confirm("Има незапазени промени. Да напуснете ли редактора?")
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
     window.addEventListener("beforeunload", warn);
-    window.addEventListener("pagehide", persist);
-    document.addEventListener("click", links, true);
+    window.addEventListener("pagehide", persistDraft);
     return () => {
       window.removeEventListener("beforeunload", warn);
-      window.removeEventListener("pagehide", persist);
-      document.removeEventListener("click", links, true);
+      window.removeEventListener("pagehide", persistDraft);
     };
-  }, [key, recovery]);
+  }, [persistDraft, recovery]);
   // Install shortcuts using current render values; typing never edits canvas objects.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (recovery || conflictDialog.current?.open || leaveDialog.current?.open || warningDialog.current?.open) return;
       if (
         (e.target as Element).closest(
           "input,textarea,select,[contenteditable=true]",
@@ -921,7 +945,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       if (pitchSelection) {
         if (e.key === "Escape") {
           e.preventDefault();
-          closePitchPicker(false);
+          closePitchPicker();
         }
         return;
       }
@@ -929,7 +953,6 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         if (!e.defaultPrevented) cancelPlacement();
         return;
       }
-      if (recovery) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         setHistory((h) => (e.shiftKey ? redo(h) : undo(h)));
@@ -1013,8 +1036,11 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     if (savingRef.current || recovery || pitchSelection || addingCategory) return;
     const snapshotTitle = state.current.title.trim();
     if (!snapshotTitle) {
-      setError("Името е задължително.");
-      titleInput.current?.focus();
+      closeConflict();
+      setError("");
+      setTitleRequired(true);
+      setShowDetails(true);
+      requestAnimationFrame(() => titleInput.current?.focus());
       return;
     }
     savingRef.current = true;
@@ -1042,14 +1068,16 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         },
       );
       const payload = await res.json();
-      if (res.status === 409) {
+      if (res.status === 409 && !asCopy && !creating) {
         setConflict(true);
-        throw new Error(payload.error);
+        setShowConflict(true);
+        return;
       }
       if (!res.ok) throw new Error(payload.error || "Грешка при запис.");
       if (asCopy) {
         setStatus("Копието е запазено. Текущият план остава отворен.");
         setCopyId(payload.plan.id);
+        closeConflict();
       } else {
         if (creating) {
           setPlanId(payload.plan.id);
@@ -1087,13 +1115,16 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
   }
   const [copyId, setCopyId] = useState<string | null>(null);
+  function closeConflict() {
+    conflictDialog.current?.close();
+    setShowConflict(false);
+    setConfirmReload(false);
+  }
+  function cancelReload() {
+    setConfirmReload(false);
+    requestAnimationFrame(() => reloadButton.current?.focus());
+  }
   async function reload() {
-    if (
-      !window.confirm(
-        "Да заменим текущите промени с последния запис от сървъра?",
-      )
-    )
-      return;
     if (savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
@@ -1108,11 +1139,13 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       setCategoryId(data.plan.categoryId ?? null);
       setSavedCategoryId(data.plan.categoryId ?? null);
       setTitle(data.plan.title);
+      setTitleRequired(false);
       setSavedTitle(data.plan.title);
       setDescription(data.plan.description ?? "");
       setSavedDescription(data.plan.description ?? "");
       setRevision(data.plan.updatedAt);
       setConflict(false);
+      closeConflict();
       setSelected(null);
       setPitchSelection(null);
       try {
@@ -1127,19 +1160,27 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       setSaving(false);
     }
   }
+  function closeWarning() {
+    warningDialog.current?.close();
+    setRemainingPitchObjects(null);
+  }
   function restoreDraft(restore: boolean) {
     if (restore && recovery) {
       change(recovery.layout);
       if (recovery.title !== undefined) setTitle(recovery.title);
       if (recovery.description !== undefined) setDescription(recovery.description);
       if (recovery.categoryId !== undefined) setCategoryId(recovery.categoryId);
-      if (planId && recovery.baseRevision !== revision) setConflict(true);
+      if (planId && recovery.baseRevision !== revision) {
+        setConflict(true);
+        setShowConflict(true);
+      }
     }
     try {
       if (!restore) localStorage.removeItem(key);
     } catch {
       setStorageError(true);
     }
+    recoveryDialog.current?.close();
     setRecovery(null);
   }
   function reorder(delta: number) {
@@ -1156,6 +1197,61 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     next.splice(to, 0, object);
     change({ ...layout, objects: next });
   }
+  useEffect(() => {
+    const updateFullscreen = () => setFullscreen(document.fullscreenElement === pageRef.current);
+    document.addEventListener("fullscreenchange", updateFullscreen);
+    return () => document.removeEventListener("fullscreenchange", updateFullscreen);
+  }, []);
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement === pageRef.current) await document.exitFullscreen();
+      else await pageRef.current?.requestFullscreen();
+    } catch {
+      setError("Неуспешно отваряне на цял екран.");
+    }
+  }
+
+  function navigateAway(path: string) {
+    if (dirty || recovery) setLeavePath(path);
+    else router.push(path);
+  }
+
+  function closeLeaveDialog() {
+    leaveDialog.current?.close();
+    setLeavePath(null);
+  }
+
+  function selectTool(next: ExerciseTool) {
+    cancelPlacement();
+    if (tool === next) return;
+    setTool(next);
+    const defaultPath = FOOTBALL.defaultPaths[next];
+    if (defaultPath) setPathMode(defaultPath);
+  }
+
+  function changeZoom(value: number) {
+    setZoom(value);
+    if (value === 100) setPanning(false);
+  }
+
+  const zoomControls = (
+    <div className="ke-zoom" role="group" aria-label="Мащаб на игрището">
+      <button type="button" aria-label="Намали мащаба" title="Намали мащаба" disabled={zoom === 100}
+        onClick={() => changeZoom(zoom - 25)}><Minus size={17} aria-hidden="true" /></button>
+      <button type="button" aria-label={`Мащаб ${zoom}%, възстанови размера`} title="Възстанови размера"
+        onClick={() => changeZoom(100)}>{zoom}%</button>
+      <button type="button" aria-label="Увеличи мащаба" title="Увеличи мащаба" disabled={zoom === 200}
+        onClick={() => changeZoom(zoom + 25)}><Plus size={17} aria-hidden="true" /></button>
+    </div>
+  );
+  const fullscreenLabel = fullscreen ? "Изход от цял екран" : "Цял екран";
+  const fullscreenButton = (
+    <button type="button" aria-label={fullscreenLabel} title={fullscreenLabel} onClick={() => void toggleFullscreen()}>
+      {fullscreen ? <Minimize2 size={17} aria-hidden="true" /> : <Maximize2 size={17} aria-hidden="true" />}
+    </button>
+  );
+
   const multiActions = multiActive && (
     <div className="ke-multi-actions" role="group" aria-label="Действия за множествен избор">
       <p role="status">
@@ -1164,9 +1260,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       <button
         type="button"
         disabled={batch.length === visibleObjects.length}
-        onClick={() => setMultiSelection((current) =>
-          new Set([...(current ?? []), ...visibleObjects.map((o) => o.id)]),
-        )}
+        onClick={selectAllVisibleObjects}
       >
         Избери всички
       </button>
@@ -1197,540 +1291,658 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   );
 
   return (
-    <main className="ke-page">
+    <main className="ke-page" ref={pageRef}>
+      <nav className="ke-rail" aria-label="Навигация на редактора">
+        <span className="ke-brand" role="img" aria-label="MyTeam" />
+        <button type="button" aria-label="Към клуба" title="Към клуба"
+          onClick={() => navigateAway(`/admin/members?${search}`)}><Home size={20} aria-hidden="true" /></button>
+        <button type="button" aria-label="Планове за тренировки" title="Планове за тренировки"
+          onClick={() => navigateAway(`/admin/training-plans?${search}`)}><LayoutGrid size={20} aria-hidden="true" /></button>
+        <span className="ke-rail-current" aria-current="page" aria-label="Редактор на план">
+          <Waypoints size={21} aria-hidden="true" />
+        </span>
+      </nav>
       <div className="ke-inner">
         <header className="ke-header">
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                (!dirty && !recovery) ||
-                window.confirm(
-                  "Има незапазени промени. Да напуснете ли редактора?",
-                )
-              )
-                router.push(`/admin/training-plans?${search}`);
-            }}
-          >
-            <ArrowLeft size={18} />
-            Назад
-          </button>
-          <div className="ke-plan-details">
-            <h1 className="ke-sr">{savedTitle || "Нов план"}</h1>
-            <label>
-              Име на плана
-              <input
-                ref={titleInput}
-                type="text"
-                value={title}
-                maxLength={MAX_PLAN_TITLE_LENGTH}
-                required
-                disabled={saving || !!recovery}
-                onChange={(event) => {
-                  setTitle(event.currentTarget.value);
-                  setStatus("");
-                  if (error === "Името е задължително.") setError("");
-                }}
-              />
-            </label>
-            <div className="ke-plan-category">
-              <label>
-                Категория
-                <select
-                  ref={categorySelect}
-                  value={categoryId ?? ""}
-                  disabled={saving || !!recovery || addingCategory}
-                  onChange={(event) => {
-                    setCategoryId(event.currentTarget.value || null);
-                    setStatus("");
-                  }}
-                >
-                  <option value="">Без категория</option>
-                  {categoryId && !categoryOptions.some(({ id }) => id === categoryId) && (
-                    <option value={categoryId}>Текуща категория</option>
-                  )}
-                  {categoryOptions.map(({ id, name }) => (
-                    <option key={id} value={id}>{name}</option>
-                  ))}
-                </select>
-              </label>
-              {newCategoryName === null ? (
-                <button type="button" disabled={saving || !!recovery} onClick={() => setNewCategoryName("")}>
-                  <Plus size={16} aria-hidden="true" /> Нова категория
-                </button>
-              ) : (
-                <form className="ke-plan-category" onSubmit={(event) => { event.preventDefault(); void addCategory(); }}>
-                  <label>
-                    Име на категорията
-                    <input autoFocus maxLength={60} value={newCategoryName} readOnly={addingCategory}
-                      onChange={(event) => setNewCategoryName(event.target.value)} />
-                  </label>
-                  {categoryError && <span className="ke-error" role="alert">{categoryError}</span>}
-                  <div className="ke-toolbar">
-                    <button type="submit" disabled={saving || addingCategory || !newCategoryName.trim()}>
-                      {addingCategory ? "Добавяне…" : "Добави"}
-                    </button>
-                    <button type="button" disabled={addingCategory} onClick={() => {
-                      setNewCategoryName(null);
-                      setCategoryError("");
-                      categorySelect.current?.focus();
-                    }}>Отказ</button>
-                  </div>
-                </form>
-              )}
-            </div>
-            <label>
-              Описание
-              <textarea
-                value={description}
-                maxLength={MAX_PLAN_DESCRIPTION_LENGTH}
-                rows={2}
-                disabled={saving || !!recovery}
-                onChange={(event) => {
-                  setDescription(event.currentTarget.value);
-                  setStatus("");
-                }}
-              />
-            </label>
+          <div className="ke-header-bar">
+            <button
+              type="button"
+              className="ke-back"
+              onClick={() => navigateAway(`/admin/training-plans?${search}`)}
+            >
+              <ArrowLeft size={18} />
+              Към плановете
+            </button>
+            <h1><Waypoints size={24} aria-hidden="true" />{planId ? "Редактор на план" : "Нов план"}</h1>
+            <button
+              type="button"
+              className="ke-primary"
+              disabled={saving || (!dirty && !conflict) || !!recovery || !!pitchSelection || addingCategory}
+              onClick={() => {
+                if (conflict && title.trim()) setShowConflict(true);
+                else void save();
+              }}
+            >
+              <Save size={18} />
+              {saving ? "Записване…" : "Запази"}
+            </button>
+            <span className="ke-save-status" role="status">
+              {!dirty && planId && <Check size={17} aria-hidden="true" />}
+              {dirty ? "Незапазени промени" : status || (planId ? "Промените са запазени" : "Незаписан план")}
+            </span>
           </div>
-          <button
-            type="button"
-            className="ke-primary"
-            disabled={saving || !dirty || !!recovery || conflict || !!pitchSelection || addingCategory}
-            onClick={() => void save()}
-          >
-            <Save size={18} />
-            {saving ? "Записване…" : "Запази"}
-          </button>
         </header>
-        <div className="ke-feedback" aria-live="polite">
-          <span>
-            {dirty ? "Незапазени промени" : planId ? "Всички промени са запазени" : "Нов план"} ·{" "}
-            {layout.objects.length}/{MAX_ITEMS}
-          </span>
-          {status && <p>{status}</p>}
-          {copyId && (
-            <a href={`/admin/training-plans/${copyId}/konva?${search}`}>
-              Отвори запазеното копие
-            </a>
-          )}
-          {error && (
-            <p role="alert" className="ke-error">
-              {error}
-            </p>
-          )}
-          {storageError && (
-            <p className="ke-error">
-              Локалното възстановяване не е налично. Запазвайте чрез бутона
-              „Запази“.
-            </p>
-          )}
-        </div>
+        {(copyId || (error && !showConflict) || storageError) && (
+          <div className="ke-feedback" aria-live="polite">
+            {copyId && (
+              <a
+                href={`/admin/training-plans/${copyId}/konva?${search}`}
+                onClick={(event) => {
+                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  navigateAway(event.currentTarget.pathname + event.currentTarget.search);
+                }}
+              >
+                Отвори запазеното копие
+              </a>
+            )}
+            {error && !showConflict && (
+              <p role="alert" className="ke-error">
+                {error}
+              </p>
+            )}
+            {storageError && (
+              <p className="ke-error">
+                Локалното възстановяване не е налично. Запазвайте чрез бутона
+                „Запази“.
+              </p>
+            )}
+          </div>
+        )}
+        <dialog
+          ref={leaveDialog}
+          className="ke-dialog"
+          aria-labelledby={leaveTitleId}
+          aria-describedby={leaveDescriptionId}
+          onCancel={(event) => {
+            event.preventDefault();
+            closeLeaveDialog();
+          }}
+        >
+          <h2 id={leaveTitleId}>Има незапазени промени</h2>
+          <p id={leaveDescriptionId}>Да напуснете ли редактора?</p>
+          <div className="ke-dialog-actions">
+            <button type="button" className="ke-primary" onClick={closeLeaveDialog}>
+              Продължи редактирането
+            </button>
+            <button type="button" onClick={() => {
+              if (!leavePath) return;
+              persistDraft();
+              closeLeaveDialog();
+              router.push(leavePath);
+            }}>
+              Напусни
+            </button>
+          </div>
+        </dialog>
         {recovery && (
-          <section className="ke-notice" aria-label="Локално възстановяване">
-            <h2>Открити са незапазени промени</h2>
-            <p>
+          <dialog
+            ref={recoveryDialog}
+            className="ke-dialog"
+            aria-labelledby={recoveryTitleId}
+            aria-describedby={recoveryDescriptionId}
+            onCancel={(event) => event.preventDefault()}
+          >
+            <h2 id={recoveryTitleId}>Открити са незапазени промени</h2>
+            <p id={recoveryDescriptionId}>
               {planId && recovery.baseRevision !== revision
                 ? "Записът на сървъра е променен. Възстановете промените и запазете копие или ги отхвърлете."
                 : "Да възстановим ли локалните промени?"}
             </p>
-            <button type="button" onClick={() => restoreDraft(true)}>
-              Възстанови
-            </button>
-            <button type="button" onClick={() => restoreDraft(false)}>
-              Отхвърли
-            </button>
-          </section>
+            <div className="ke-dialog-actions">
+              <button type="button" className="ke-primary" onClick={() => restoreDraft(true)}>
+                Възстанови
+              </button>
+              <button type="button" onClick={() => restoreDraft(false)}>
+                Отхвърли
+              </button>
+            </div>
+          </dialog>
         )}
-        {conflict && (
-          <section className="ke-notice">
-            <p>Има по-нов запис. Текущите промени остават в редактора.</p>
-            <button
-              type="button"
-              disabled={saving || !!recovery || !!pitchSelection}
-              onClick={() => void save(true)}
-            >
-              Запази като нов план
-            </button>
-            <button
-              type="button"
-              disabled={saving || !!recovery}
-              onClick={() => void reload()}
-            >
-              Зареди от сървъра
-            </button>
-          </section>
+        {showConflict && (
+          <dialog
+            ref={conflictDialog}
+            className="ke-dialog"
+            aria-labelledby={conflictTitleId}
+            aria-describedby={conflictDescriptionId}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && confirmReload) {
+                event.preventDefault();
+                if (!savingRef.current) cancelReload();
+              }
+            }}
+            onCancel={(event) => {
+              event.preventDefault();
+              if (savingRef.current) return;
+              if (confirmReload) cancelReload();
+              else closeConflict();
+            }}
+          >
+            <h2 id={conflictTitleId}>{confirmReload ? "Зареждане от сървъра" : "Има по-нов запис"}</h2>
+            <p id={conflictDescriptionId}>
+              {confirmReload
+                ? "Да заменим текущите промени с последния запис от сървъра?"
+                : "Текущите промени остават в редактора. Можете да ги запазите като нов план или да заредите последния запис от сървъра."}
+            </p>
+            {error && <p className="ke-error" role="alert">{error}</p>}
+            <div className="ke-dialog-actions">
+              {confirmReload ? (
+                <>
+                  <button ref={reloadCancelButton} type="button" className="ke-primary"
+                    disabled={saving} onClick={cancelReload}>Отказ</button>
+                  <button type="button" disabled={saving} onClick={() => void reload()}>
+                    {saving ? "Зареждане…" : "Замени промените"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="ke-primary"
+                    disabled={saving || !!pitchSelection} onClick={() => void save(true)}>
+                    Запази като нов план
+                  </button>
+                  <button ref={reloadButton} type="button" disabled={saving} onClick={() => {
+                    setError("");
+                    setConfirmReload(true);
+                  }}>
+                    Зареди от сървъра
+                  </button>
+                  <button type="button" disabled={saving} onClick={closeConflict}>Отказ</button>
+                </>
+              )}
+            </div>
+          </dialog>
+        )}
+        {remainingPitchObjects && (
+          <dialog
+            ref={warningDialog}
+            className="ke-dialog"
+            aria-labelledby={warningTitleId}
+            aria-describedby={warningDescriptionId}
+            onCancel={(event) => {
+              event.preventDefault();
+              closeWarning();
+            }}
+          >
+            <h2 id={warningTitleId}>Премахване на обекти</h2>
+            <p id={warningDescriptionId}>Обектите в неизбраните части на игрището ще бъдат премахнати.</p>
+            <div className="ke-dialog-actions">
+              <button type="button" className="ke-primary" onClick={closeWarning}>Отказ</button>
+              <button type="button" onClick={() => {
+                closeWarning();
+                closePitchPicker(remainingPitchObjects);
+              }}>
+                Приложи и премахни
+              </button>
+            </div>
+          </dialog>
         )}
         <fieldset disabled={!!recovery} className="ke-workspace">
           <legend className="ke-sr">Инструменти за упражнението</legend>
           <div className="ke-layout">
-            <div className="ke-sidebar">
-              <div className="ke-toolbar" inert={!!pitchSelection}>
-                <button
-                  type="button"
-                  aria-label="Отмени"
-                  disabled={!history.past.length}
-                  onClick={() => setHistory(undo)}
-                >
-                  <Undo2 size={18} />
-                  Отмени
-                </button>
-                <button
-                  type="button"
-                  aria-label="Повтори"
-                  disabled={!history.future.length}
-                  onClick={() => setHistory(redo)}
-                >
-                  <Redo2 size={18} />
-                  Повтори
-                </button>
-                <button type="button" onClick={rotatePitch}>
-                  <RotateCw size={18} aria-hidden="true" />
-                  Завърти игрището на 90°
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={multiActive}
-                  onClick={toggleMultiSelect}
-                >
-                  <SquareDashed size={18} aria-hidden="true" />
-                  Множествен избор
-                </button>
-                <button
-                  type="button"
-                  disabled={visibleObjects.length === 0}
-                  onClick={clearPitch}
-                >
-                  <Trash2 size={18} aria-hidden="true" />
-                  Изчисти игрището
-                </button>
-              </div>
-              <fieldset className="ke-pitch-options">
-                <legend>Игрище</legend>
-                {FOOTBALL.surfaces.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    aria-pressed={(pitchSelection ? "full" : layout.surface) === id}
-                    onClick={id === "blank" ? selectBlankField : (event) => openPitchPicker(event.currentTarget)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </fieldset>
-              {layout.surface === "half" ? (
-                <p className="ke-pitch-legacy">Запазено половин игрище</p>
-              ) : layout.surface === "full" && (
-                <button
-                  className="ke-pitch-parts-button"
-                  type="button"
-                  aria-expanded={!!pitchSelection}
-                  onClick={(event) => openPitchPicker(event.currentTarget)}
-                >
-                  Избери части от игрището
-                </button>
-              )}
-              <div
-                className="ke-categories"
-                inert={!!pitchSelection}
-                role="group"
-                aria-label="Категории инструменти"
-              >
-                {toolGroups.map((g, i) => g && (
-                  <button
-                    type="button"
-                    key={g.title}
-                    aria-pressed={i === TEXT_CATEGORY ? tool === "text" : activeCategory === i}
-                    onClick={() => selectCategory(i)}
-                  >
-                    {g.color && (
-                      <span
-                        className="ke-team-swatch"
-                        style={{ backgroundColor: g.color }}
-                        aria-hidden="true"
-                      />
-                    )}
-                    {g.title}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  ref={addTeamButtonRef}
-                  aria-expanded={addingTeam}
-                  onClick={() => {
-                    if (!addingTeam) {
-                      cancelPlacement();
-                      const suggestion = TEAM_COLOR_SUGGESTIONS.find(
-                        (color) => !customTeamColors.includes(color),
-                      );
-                      setTeamColor(suggestion ?? TEAM_COLOR_SUGGESTIONS[0]);
-                    }
-                    setAddingTeam(!addingTeam);
-                  }}
-                >
-                  <Plus size={16} aria-hidden="true" /> Добави отбор
-                </button>
-              </div>
-              {addingTeam && (
-                <div className="ke-team-setup">
-                  <label>
-                    Цвят на отбор {customTeamColors.length + 3}
-                    <input
-                      type="color"
-                      value={teamColor}
-                      onChange={(e) => setTeamColor(e.currentTarget.value)}
-                      aria-invalid={!validTeamColor}
-                      aria-describedby={validTeamColor ? undefined : "ke-team-color-error"}
-                    />
-                  </label>
-                  {!validTeamColor && (
-                    <p id="ke-team-color-error" className="ke-error" role="alert">
-                      {CUSTOM_TEAM_COLOR_ERROR}
-                    </p>
-                  )}
-                  <div className="ke-toolbar">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddingTeam(false);
-                        addTeamButtonRef.current?.focus();
-                      }}
-                    >
-                      Отказ
-                    </button>
-                    <button
-                      type="button"
-                      className="ke-primary"
-                      disabled={!validTeamColor}
-                      onClick={createTeam}
-                    >
-                      Създай отбор
-                    </button>
-                  </div>
-                </div>
-              )}
-              {activeCategory !== TEXT_CATEGORY && (
-                <div
-                  className="ke-tools"
-                  inert={!!pitchSelection}
-                  ref={toolsRef}
-                  role="group"
-                  aria-label={toolGroup.title}
-                >
-                  {toolGroup.types.map((t) => {
-                    const label = EQUIPMENT_LABELS[t];
-                    const count = equipmentCounts ? equipmentCounts[t] ?? 0 : undefined;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        aria-pressed={tool === t}
-                        aria-label={
-                          count === undefined ? undefined : `${label}, брой на игрището: ${count}`
-                        }
-                        onClick={() => {
-                          if (tool === t) {
-                            cancelPlacement();
-                            return;
-                          }
-                          cancelPlacement();
-                          setTool(t);
-                          const defaultPath = FOOTBALL.defaultPaths[t];
-                          if (defaultPath) setPathMode(defaultPath);
-                        }}
-                      >
-                        {isMovementType(t) ? (
-                          <MovementPreview type={t} arrowhead={lineArrowhead && isLineType(t)} />
-                        ) : isZoneType(t) ? (
-                          <ZonePreview type={t} />
-                        ) : (
-                          <EquipmentPreview type={t} />
-                        )}
-                        <span>
-                          {label}
-                          {count !== undefined && (
-                            <span className="ke-equipment-count" aria-hidden="true">
-                              {count}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <div
-                className="ke-mode"
-                hidden={tool === "select" && customTeamNumber === undefined}
-              >
-                {customTeamNumber !== undefined && (
-                  <button type="button" onClick={deleteTeam}>
-                    <Trash2 size={16} aria-hidden="true" />
-                    Изтрий отбор
-                  </button>
-                )}
-                {usesQuantity && (
-                  <div
-                    className="ke-placement-count"
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        cancelPlacementFromControls();
-                      }
-                    }}
-                  >
-                    <label>
-                      Брой обекти за поставяне
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={Math.max(1, placementCapacity)}
-                        step={1}
-                        value={placementCount}
-                        disabled={placementCapacity === 0}
-                        aria-invalid={placementCapacity > 0 && !validQuantity}
-                        aria-describedby={
-                          !validQuantity ? "ke-placement-limit" : undefined
-                        }
-                        onChange={(e) => setPlacementCount(e.target.value)}
-                      />
-                    </label>
-                    {!validQuantity && (
-                      <p id="ke-placement-limit" className="ke-error">
-                        {placementCapacity === 0
-                          ? "Достигнахте максималния брой обекти."
-                          : `Въведете цяло число от 1 до ${placementCapacity}.`}
-                      </p>
-                    )}
-                    <button type="button" onClick={cancelPlacementFromControls}>
-                      Откажи поставянето
-                    </button>
-                    <p>Или натиснете <kbd>Esc</kbd>.</p>
-                  </div>
-                )}
-                {drawingMovement && (
-                  <fieldset
-                    className="ke-path-modes"
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        cancelPlacementFromControls();
-                      }
-                    }}
-                  >
-                    <legend>Начин на рисуване</legend>
-                    {DRAWING_MODES.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        aria-pressed={pathMode === value}
-                        onClick={() => setPathMode(value)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                    {drawingLine && (
-                      <button
-                        type="button"
-                        aria-pressed={lineArrowhead}
-                        onClick={() => setLineArrowhead(!lineArrowhead)}
-                      >
-                        Връх на стрелка
-                      </button>
-                    )}
-                  </fieldset>
-                )}
-                {tool !== "select" && (
-                  <p>
-                    {tool === "text"
-                      ? "Изберете място на игрището за текста. Esc отменя."
-                      : placing
-                        ? "Изберете място за всеки обект."
-                        : drawingArrow
-                          ? "Плъзнете по игрището, за да нарисувате стрелка."
-                          : "Плъзнете по игрището, за да нарисувате линия или фигура."}
-                  </p>
-                )}
-              </div>
-            </div>
             <div
               className={pitchSelection ? "ke-pitch-area ke-pitch-area--picker" : "ke-pitch-area"}
               ref={pitchPicker}
             >
+              <div className="ke-canvas-toolbar" inert={!!pitchSelection}>
+                <div className="ke-quick-tools" role="group" aria-label="Бързи инструменти">
+                  <button type="button" aria-label="Избор на обект" title="Избор на обект"
+                    aria-pressed={tool === "select" && !multiActive && !ballsAndGoalsActive && !teamsOpen}
+                    onClick={() => {
+                      cancelPlacement();
+                      if (teamsOpen) setCategory(0);
+                      setAddingTeam(false);
+                    }}>
+                    <MousePointer2 size={19} aria-hidden="true" />
+                    <span>Избор</span>
+                  </button>
+                  <button type="button" title="Избери всички"
+                    disabled={batch.length === visibleObjects.length} onClick={selectAllVisibleObjects}>
+                    <SquareDashed size={19} aria-hidden="true" />
+                    <span>Избери всички</span>
+                  </button>
+                  {QUICK_TOOLS.map(([next, Icon, label]) => (
+                    <button key={next} type="button" aria-label={label} title={label}
+                      aria-pressed={next === "balls-and-goals" ? ballsAndGoalsActive : tool === next ||
+                        (next === "team1-player-1" && teamsOpen && !multiActive)}
+                      onClick={() => {
+                        setShowDetails(false);
+                        setAddingTeam(false);
+                        if (next === "balls-and-goals") {
+                          cancelPlacement();
+                          setCategory(BALLS_AND_GOALS_CATEGORY);
+                          setBrowsingBallsAndGoals(true);
+                          requestAnimationFrame(() => toolsRef.current?.querySelector("button")?.focus());
+                          return;
+                        }
+                        setCategory(TOOLBAR_GROUPS.findIndex(({ types }) => types.includes(next)));
+                        selectTool(next);
+                      }}>
+                      <Icon size={19} aria-hidden="true" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="ke-canvas-actions">
+                  <div className="ke-quick-history" role="group" aria-label="История">
+                    <button type="button" aria-label="Отмени последната промяна" title="Отмени"
+                      disabled={!history.past.length} onClick={() => setHistory(undo)}><Undo2 size={18} aria-hidden="true" /></button>
+                    <button type="button" aria-label="Повтори последната промяна" title="Повтори"
+                      disabled={!history.future.length} onClick={() => setHistory(redo)}><Redo2 size={18} aria-hidden="true" /></button>
+                  </div>
+                  <button type="button" aria-label="Изчисти игрището" title="Изчисти игрището"
+                    disabled={visibleObjects.length === 0} onClick={clearPitch}><Trash2 size={18} aria-hidden="true" /></button>
+                  <button type="button" aria-label="Завърти игрището на 90°" title="Завърти игрището на 90°"
+                    onClick={rotatePitch}><RotateCw size={18} aria-hidden="true" /></button>
+                  {zoomControls}
+                  {zoom > 100 && (
+                    <button type="button" aria-label="Премести изгледа" title="Премести изгледа"
+                      aria-pressed={panning} onClick={() => setPanning(!panning)}>
+                      <Hand size={17} aria-hidden="true" />
+                    </button>
+                  )}
+                  {fullscreenButton}
+                </div>
+              </div>
               {pitchSelection && (
                 <div className="ke-pitch-picker-actions">
                   <p>Изберете части директно върху игрището.</p>
-                  <button type="button" className="ke-primary" onClick={() => closePitchPicker(true)}>Приложи</button>
-                  <button type="button" onClick={() => closePitchPicker(false)}>Отказ</button>
+                  <button type="button" className="ke-primary" onClick={applyPitchSelection}>Приложи</button>
+                  <button type="button" onClick={() => closePitchPicker()}>Отказ</button>
                 </div>
               )}
-              <div className="ke-pitch-frame">
-                <Canvas
-                  exercise={layout}
-                  visibleObjects={pitchSelection ? layout.objects : visibleObjects}
-                  surfacePreview={pitchSelection ? "full" : undefined}
-                  pitchOverlay={pitchSelection && (
-                    <div className="ke-pitch-quadrants" role="group" aria-label="Части от игрището">
-                      {PITCH_QUADRANT_ORDER[pitchRotation].map((index, screenIndex) => {
-                        const quadrant = PITCH_QUADRANTS[index];
-                        const enabled = pitchSelection.includes(quadrant);
+              <div className="ke-pitch-frame"
+                data-zoomed={!pitchSelection && zoom > 100}
+                style={{ "--ke-zoom": zoom / 100, "--ke-pitch-ratio": viewWidth / viewHeight } as CSSProperties}
+                tabIndex={!pitchSelection && zoom > 100 ? 0 : undefined}
+                role="region" aria-label="Изглед на игрището">
+                <div className="ke-pitch-scroll" inert={panning && !pitchSelection}>
+                  <Canvas
+                    exercise={layout}
+                    visibleObjects={pitchSelection ? layout.objects : visibleObjects}
+                    surfacePreview={pitchSelection ? "full" : undefined}
+                    pitchOverlay={pitchSelection && (
+                      <div className="ke-pitch-quadrants" role="group" aria-label="Части от игрището">
+                        {PITCH_QUADRANT_ORDER[pitchRotation].map((index, screenIndex) => {
+                          const quadrant = PITCH_QUADRANTS[index];
+                          const enabled = pitchSelection.includes(quadrant);
+                          return (
+                            <button
+                              key={quadrant}
+                              type="button"
+                              aria-label={FOOTBALL.quadrantLabels[PITCH_QUADRANTS[screenIndex]]}
+                              aria-pressed={enabled}
+                              disabled={enabled && pitchSelection.length === 1}
+                              onClick={() => toggleQuadrant(quadrant)}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                    selected={selected}
+                    multiSelection={multiActive ? batchIds : null}
+                    multiAnchorId={multiAnchorId ?? undefined}
+                    tool={recovery ? "select" : tool}
+                    placementOnly={tool !== "select"}
+                    customTeamNumber={customTeamNumber}
+                    pathMode={pathMode}
+                    lineArrowhead={lineArrowhead}
+                    colorPreviewId={
+                      colorPreview?.group === history.group &&
+                      colorPreview?.id === selected
+                        ? colorPreview.id
+                        : undefined
+                    }
+                    selectedLabel={object ? objectLabel(object) : undefined}
+                    objectActions={multiActive ? multiActions : object && (
+                      <ObjectActions
+                        key={object.id}
+                        object={object}
+                        editLabelOnMount={selection?.editLabel ?? false}
+                        onColorChange={(color, group, preview) =>
+                          updateObjectColor(object.id, color, group, preview)
+                        }
+                        onLabelChange={updateLabel}
+                        onToggleArrowhead={() => patch({ arrowhead: object.arrowhead ? undefined : true })}
+                        onDuplicate={duplicate}
+                        onRemove={remove}
+                        onReorder={reorder}
+                        canDuplicate={layout.objects.length < MAX_ITEMS}
+                        canMoveBack={layout.objects[0].id !== object.id}
+                        canMoveForward={layout.objects.at(-1)!.id !== object.id}
+                      />
+                    )}
+                    onSelect={selectOnPitch}
+                    onSelectArea={(ids) => setMultiSelection((current) =>
+                      current && (ids.length || current.size) ? new Set(ids) : current,
+                    )}
+                    onCommit={change}
+                    onPlaced={onPlaced}
+                    onError={setError}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="ke-sidebar">
+              <div className="ke-panel-switch" role="group" aria-label="Панел на редактора" inert={!!pitchSelection}>
+                <button type="button" aria-pressed={!showDetails} aria-controls={toolsId} onClick={() => setShowDetails(false)}>
+                  <Waypoints size={17} aria-hidden="true" /> Инструменти
+                </button>
+                <button type="button" aria-pressed={showDetails} aria-controls={detailsId} onClick={() => setShowDetails(true)}>
+                  <NotebookText size={17} aria-hidden="true" /> Детайли
+                </button>
+              </div>
+              <div className="ke-plan-details" id={detailsId} hidden={!showDetails}>
+                <div>
+                  <label>
+                    <span>Име на плана <span aria-hidden="true">*</span></span>
+                    <input
+                      ref={titleInput}
+                      type="text"
+                      value={title}
+                      maxLength={MAX_PLAN_TITLE_LENGTH}
+                      required
+                      aria-invalid={titleInvalid || undefined}
+                      aria-describedby={titleInvalid ? titleErrorId : undefined}
+                      disabled={saving || !!recovery}
+                      onChange={(event) => {
+                        setTitle(event.currentTarget.value);
+                        setStatus("");
+                        if (event.currentTarget.value.trim()) setTitleRequired(false);
+                      }}
+                    />
+                  </label>
+                  {titleInvalid && <span id={titleErrorId} className="ke-error ke-plan-title-error" role="alert">Името е задължително.</span>}
+                </div>
+                <div className="ke-plan-category">
+                  <label>
+                    Категория
+                    <select
+                      ref={categorySelect}
+                      value={categoryId ?? ""}
+                      disabled={saving || !!recovery || addingCategory}
+                      onChange={(event) => {
+                        setCategoryId(event.currentTarget.value || null);
+                        setStatus("");
+                      }}
+                    >
+                      <option value="">Без категория</option>
+                      {categoryId && !categoryOptions.some(({ id }) => id === categoryId) && (
+                        <option value={categoryId}>Текуща категория</option>
+                      )}
+                      {categoryOptions.map(({ id, name }) => (
+                        <option key={id} value={id}>{name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {newCategoryName === null ? (
+                    <button type="button" className="ke-add-category" aria-label="Нова категория" title="Нова категория"
+                      disabled={saving || !!recovery} onClick={() => setNewCategoryName("")}>
+                      <Plus size={18} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <form className="ke-plan-category" onSubmit={(event) => { event.preventDefault(); void addCategory(); }}>
+                      <label>
+                        Име на категорията
+                        <input autoFocus maxLength={60} value={newCategoryName} readOnly={addingCategory}
+                          onChange={(event) => setNewCategoryName(event.target.value)} />
+                      </label>
+                      {categoryError && <span className="ke-error" role="alert">{categoryError}</span>}
+                      <div className="ke-toolbar">
+                        <button type="submit" disabled={saving || addingCategory || !newCategoryName.trim()}>
+                          {addingCategory ? "Добавяне…" : "Добави"}
+                        </button>
+                        <button type="button" disabled={addingCategory} onClick={() => {
+                          setNewCategoryName(null);
+                          setCategoryError("");
+                          categorySelect.current?.focus();
+                        }}>Отказ</button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+                <label className="ke-plan-description">
+                  Описание
+                  <span className="ke-field-icon">
+                    <NotebookText size={17} aria-hidden="true" />
+                    <textarea
+                      value={description}
+                      maxLength={MAX_PLAN_DESCRIPTION_LENGTH}
+                      rows={6}
+                      disabled={saving || !!recovery}
+                      onChange={(event) => {
+                        setDescription(event.currentTarget.value);
+                        setStatus("");
+                      }}
+                    />
+                  </span>
+                </label>
+              </div>
+              <div id={toolsId} hidden={showDetails}>
+                <fieldset className="ke-pitch-options">
+                  <legend>Игрище</legend>
+                  {FOOTBALL.surfaces.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={(pitchSelection ? "full" : layout.surface) === id}
+                      onClick={id === "blank" ? selectBlankField : (event) => openPitchPicker(event.currentTarget)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  {layout.surface === "full" && (
+                    <button
+                      className="ke-pitch-parts-button"
+                      type="button"
+                      onClick={(event) => openPitchPicker(event.currentTarget)}
+                    >
+                      Избери части от игрището
+                    </button>
+                  )}
+                </fieldset>
+                {layout.surface === "half" && (
+                  <p className="ke-pitch-legacy">Запазено половин игрище</p>
+                )}
+                {teamsOpen && (
+                  <>
+                    <h2 id={teamsHeadingId} className="ke-tool-heading">Отбори</h2>
+                    <div
+                      className="ke-categories"
+                      inert={!!pitchSelection}
+                      role="group"
+                      aria-labelledby={teamsHeadingId}
+                    >
+                      {toolGroups.map((g, i) => {
+                        if (!g || i < FIRST_TEAM_CATEGORY) return null;
                         return (
                           <button
-                            key={quadrant}
                             type="button"
-                            aria-label={FOOTBALL.quadrantLabels[PITCH_QUADRANTS[screenIndex]]}
-                            aria-pressed={enabled}
-                            disabled={enabled && pitchSelection.length === 1}
-                            onClick={() => toggleQuadrant(quadrant)}
-                          />
+                            key={g.title}
+                            aria-pressed={activeCategory === i}
+                            onClick={() => {
+                              if (i !== activeCategory) cancelPlacement();
+                              setCategory(i);
+                              setAddingTeam(false);
+                            }}
+                          >
+                            {g.color && (
+                              <span
+                                className="ke-team-swatch"
+                                style={{ backgroundColor: g.color }}
+                                aria-hidden="true"
+                              />
+                            )}
+                            {g.title}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        ref={addTeamButtonRef}
+                        aria-expanded={addingTeam}
+                        onClick={() => {
+                          if (!addingTeam) {
+                            cancelPlacement();
+                            const suggestion = TEAM_COLOR_SUGGESTIONS.find(
+                              (color) => !customTeamColors.includes(color),
+                            );
+                            setTeamColor(suggestion ?? TEAM_COLOR_SUGGESTIONS[0]);
+                          }
+                          setAddingTeam(!addingTeam);
+                        }}
+                      >
+                        <Plus size={16} aria-hidden="true" /> Добави отбор
+                      </button>
+                    </div>
+                  </>
+                )}
+                {teamsOpen && addingTeam && (
+                  <div className="ke-team-setup">
+                    <label>
+                      Цвят на отбор {customTeamColors.length + 3}
+                      <input
+                        type="color"
+                        value={teamColor}
+                        onChange={(e) => setTeamColor(e.currentTarget.value)}
+                        aria-invalid={!validTeamColor}
+                        aria-describedby={validTeamColor ? undefined : "ke-team-color-error"}
+                      />
+                    </label>
+                    {!validTeamColor && (
+                      <p id="ke-team-color-error" className="ke-error" role="alert">
+                        {CUSTOM_TEAM_COLOR_ERROR}
+                      </p>
+                    )}
+                    <div className="ke-toolbar">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingTeam(false);
+                          addTeamButtonRef.current?.focus();
+                        }}
+                      >
+                        Отказ
+                      </button>
+                      <button
+                        type="button"
+                        className="ke-primary"
+                        disabled={!validTeamColor}
+                        onClick={createTeam}
+                      >
+                        Създай отбор
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {activeCategory !== TEXT_CATEGORY && (
+                  <>
+                    <h2 className="ke-tool-heading">{toolGroup.title}</h2>
+                    <div
+                      className={activeCategory === 0 ? "ke-tools ke-tools--movement" : "ke-tools"}
+                      inert={!!pitchSelection}
+                      ref={toolsRef}
+                      role="group"
+                      aria-label={toolGroup.title}
+                    >
+                      {toolGroup.types.map((t) => {
+                        const label = EQUIPMENT_LABELS[t];
+                        const count = equipmentCounts ? equipmentCounts[t] ?? 0 : undefined;
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            aria-pressed={tool === t}
+                            aria-label={
+                              count === undefined ? undefined : `${label}, брой на игрището: ${count}`
+                            }
+                            onClick={() => selectTool(t)}
+                          >
+                            {isMovementType(t) ? (
+                              <MovementPreview type={t} arrowhead={lineArrowhead && isLineType(t)} />
+                            ) : isZoneType(t) ? (
+                              <ZonePreview type={t} />
+                            ) : (
+                              <EquipmentPreview type={t} />
+                            )}
+                            <span>
+                              {label}
+                              {count !== undefined && (
+                                <span className="ke-equipment-count" aria-hidden="true">
+                                  {count}
+                                </span>
+                              )}
+                            </span>
+                          </button>
                         );
                       })}
                     </div>
-                  )}
-                  selected={selected}
-                  multiSelection={multiActive ? batchIds : null}
-                  multiAnchorId={multiAnchorId ?? undefined}
-                  tool={
-                    recovery || (usesQuantity && !validQuantity) ? "select" : tool
+                  </>
+                )}
+                <div className="ke-mode" hidden={!!pitchSelection} onKeyDown={(e) => {
+                  if (tool !== "select" && e.key === "Escape") {
+                    e.preventDefault();
+                    cancelPlacementFromControls();
                   }
-                  placementOnly={tool !== "select"}
-                  customTeamNumber={customTeamNumber}
-                  pathMode={pathMode}
-                  lineArrowhead={lineArrowhead}
-                  colorPreviewId={
-                    colorPreview?.group === history.group &&
-                    colorPreview?.id === selected
-                      ? colorPreview.id
-                      : undefined
-                  }
-                  selectedLabel={object ? objectLabel(object) : undefined}
-                  objectActions={multiActive ? multiActions : object && (
-                    <ObjectActions
-                      key={object.id}
-                      object={object}
-                      editLabelOnMount={selection?.editLabel ?? false}
-                      onColorChange={(color, group, preview) =>
-                        updateObjectColor(object.id, color, group, preview)
-                      }
-                      onLabelChange={updateLabel}
-                      onToggleArrowhead={() => patch({ arrowhead: object.arrowhead ? undefined : true })}
-                      onDuplicate={duplicate}
-                      onRemove={remove}
-                      onReorder={reorder}
-                      canDuplicate={layout.objects.length < MAX_ITEMS}
-                      canMoveBack={layout.objects[0].id !== object.id}
-                      canMoveForward={layout.objects.at(-1)!.id !== object.id}
-                    />
+                }}>
+                  {drawingMovement && (
+                    <div className="ke-path-modes" role="group" aria-label="Начин на рисуване">
+                      {DRAWING_MODES.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={pathMode === value}
+                          onClick={() => setPathMode(value)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   )}
-                  onSelect={selectOnPitch}
-                  onSelectArea={(ids) => setMultiSelection((current) =>
-                    current && (ids.length || current.size) ? new Set(ids) : current,
+                  {drawingLine && (
+                    <button
+                      type="button"
+                      className="ke-arrowhead-toggle"
+                      aria-pressed={lineArrowhead}
+                      onClick={() => setLineArrowhead(!lineArrowhead)}
+                    >
+                      <ArrowRight size={16} aria-hidden="true" />
+                      Връх на стрелка
+                    </button>
                   )}
-                  onCommit={change}
-                  onPlaced={onPlaced}
-                  onError={setError}
-                />
+                  <p className="ke-drawing-hint">
+                    <Info size={15} aria-hidden="true" />
+                    <span>
+                      {panning
+                        ? "Превъртете, за да преместите изгледа."
+                        : tool === "select"
+                        ? multiActive ? "Изберете обекти или очертайте област." : "Изберете инструмент или обект на игрището."
+                        : tool === "text"
+                        ? "Изберете място на игрището за текста."
+                        : placing
+                          ? "Изберете място за всеки обект."
+                          : drawingArrow
+                            ? "Плъзнете по игрището, за да нарисувате стрелка."
+                            : "Плъзнете по игрището, за да нарисувате линия или фигура."}
+                      {" За да спрете рисуването или поставянето, натиснете Esc или бутона „Избор“."}
+                    </span>
+                  </p>
+                </div>
+                {customTeamNumber !== undefined && (
+                  <button type="button" className="ke-delete-team" onClick={deleteTeam}>
+                    <Trash2 size={16} aria-hidden="true" />
+                    Изтрий отбор
+                  </button>
+                )}
               </div>
             </div>
           </div>

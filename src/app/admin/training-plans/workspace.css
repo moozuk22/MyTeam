@@ -1,0 +1,31 @@
+.tp-page,
+.ke-page {
+  --plan-bg: linear-gradient(135deg, #0d0d0d 0%, #0a0a0a 50%, #0d0d0d 100%);
+  --plan-panel: #1a1a1a;
+  --plan-card: linear-gradient(135deg, #1a1a1a, #151515);
+  --plan-field: #151515;
+  --plan-border: rgba(255, 255, 255, 0.15);
+  --plan-text: #fff;
+  --plan-muted: #bfbfbf;
+  --plan-accent: #9cff9c;
+  --plan-accent-border: rgba(50, 205, 50, 0.5);
+  --plan-selected: rgba(50, 205, 50, 0.16);
+  --plan-title: linear-gradient(90deg, #32cd32, #7fff00);
+  color-scheme: dark;
+  background: var(--plan-bg);
+  color: var(--plan-text);
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.tp-page :focus-visible,
+.ke-page :focus-visible {
+  outline: 2px solid var(--plan-accent);
+  outline-offset: 3px;
+}
+
+.tp-title,
+.ke-header-bar h1 {
+  background: var(--plan-title);
+  background-clip: text;
+  color: transparent;
+}

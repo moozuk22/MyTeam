@@ -379,7 +379,7 @@ export const Pitch = memo(function Pitch({
       <Rect
         width={WIDTH}
         height={HEIGHT}
-        fill={surface === "blank" ? "#203c30" : "#275f3d"}
+        fill={surface === "blank" ? "#203c30" : "#175226"}
       />
       {surface !== "blank" && (
         <>
@@ -390,8 +390,8 @@ export const Pitch = memo(function Pitch({
               y={0}
               width={105}
               height={HEIGHT}
-              fill={i % 2 ? "#ffffff" : "#000000"}
-              opacity={0.035}
+              fill={i % 2 ? "#5aba55" : "#031d0d"}
+              opacity={0.12}
             />
           ))}
           <Rect
@@ -417,6 +417,22 @@ export const Pitch = memo(function Pitch({
                 strokeWidth={2}
               />
               <Circle x={525} y={350} radius={3} fill="#d9e5d7" />
+              {[25, 1025].flatMap((x) => [25, 675].map((y) => (
+                <Shape
+                  key={`${x}-${y}`}
+                  x={x}
+                  y={y}
+                  scaleX={x === 25 ? 1 : -1}
+                  scaleY={y === 25 ? 1 : -1}
+                  stroke="#d9e5d7"
+                  strokeWidth={2}
+                  sceneFunc={(context, shape) => {
+                    context.beginPath();
+                    context.arc(0, 0, 12, 0, Math.PI / 2);
+                    context.strokeShape(shape);
+                  }}
+                />
+              )))}
               {[false, true].map((right) => (
                 <Group
                   key={String(right)}

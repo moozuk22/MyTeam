@@ -2,9 +2,11 @@
 
 Konva is the training plan editor at `/admin/training-plans/[planId]/konva`. Selecting a plan card opens a read-only review at `/admin/training-plans/[planId]` with its saved pitch, category, description, and last update. **Редактирай** opens the editor from either the card or the review. Opening a plan requires the club ID in the query string and server-side club access. Invalid drawings display an error.
 
-**Нов план — Konva** opens a blank drawing editor. Enter a name in the editor and choose **Запази** to create the plan and its drawing together. Plans from the original HTML/CSS editor remain in the list with **Копирай в Konva** to create an editable copy. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error.
+**Нов план** opens a blank drawing editor. Enter a name in the editor and choose **Запази** to create the plan and its drawing together. Plans from the original HTML/CSS editor remain in the list with **Копирай в новия редактор** to create an editable copy. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error.
 
-Edit **Име на плана** and **Описание** in the Konva editor, then choose **Запази**. Local draft recovery includes unsaved changes to both fields.
+Open the sidebar’s **Детайли** tab to edit **Име на плана**, **Категория** and **Описание**, then choose **Запази**. New plans open on **Детайли** and saved plans open on **Инструменти**. Local draft recovery includes unsaved changes to these fields.
+
+If a newer version exists, the editor opens a dialog. Save your changes as a separate plan, load the latest saved version after confirming, or dismiss the dialog to keep editing. **Запази** reopens the dialog while the conflict is unresolved.
 
 Konva plan cards show a read-only preview of the saved pitch and drawing. Previews load in batches as cards approach the visible part of the list.
 
@@ -19,7 +21,7 @@ The tool buttons in **Топки и врати** and **Пособия** show how
 
 **Завърти игрището на 90°** turns the pitch clockwise. Arrows and zones turn with the markings. Players, equipment, and text move with the pitch and keep their individual orientation on screen. Rotation works on blank and cropped pitches and is saved with the plan. Use **Отмени** to restore the previous orientation.
 
-For equipment, players, arrows, lines and zones, **Брой обекти за поставяне** defaults to one and counts down after each successful placement or completed drawing. While one of these tools is active, you can place items or start drawings directly over existing items. Once the requested number is reached, the editor returns to selection mode with no object selected. Choose **Откажи поставянето**, tap the active tool again, or press Esc to cancel early and reset the count to one. In selection mode, click or drag existing items directly and use their handles to resize, rotate or reshape them.
+For equipment, players, arrows, lines and zones, the tool stays active between placements. While it is active, you can place items or start drawings directly over existing items. Choose **Избор**, tap the active tool again, or press Esc to return to selection mode. In selection mode, click or drag existing items directly and use their handles to resize, rotate or reshape them.
 
 Selecting an object opens a toolbar on the pitch to change its color, duplicate it, delete it, or move it one layer forward or back. For players and text objects, the pencil button edits the number or text. To select objects with the keyboard, focus the pitch and use Page Up or Page Down. Color updates as the picker moves, and one undo restores the color before that adjustment. The toolbar moves below the object when there is insufficient room above it.
 
@@ -53,7 +55,7 @@ Selecting **Дрибъл** defaults to **Свободна ръка**. Selecting 
 
 While drawing a freehand movement, the preview shows the stroke. After release, its arrowhead points along the short, straight finish at the tip. The dribbling wave fades into the centerline under the arrowhead.
 
-On desktop, drawing tools sit in a scrollable side panel. The pitch scales to fit the available viewport height and keeps its aspect ratio. On narrower screens, the pitch sits below the tools.
+The pitch toolbar provides shortcuts for selection, drawing, undo and redo, and deleting selected objects. Use the zoom controls to enlarge the pitch and **Премести изгледа** to scroll around it while zoomed in. **Цял екран** expands the editor when the browser supports it. On desktop, the full tool panel sits beside the pitch. On narrower screens, it sits below the pitch. Placement and drawing options appear directly below the pitch on both layouts.
 
 ## Data and rendering
 
@@ -69,9 +71,9 @@ The existing club training-plan endpoints accept both layout versions. Creation 
 
 Every version-2 PUT, including metadata edits, requires `expectedUpdatedAt` from the last loaded/saved record. An atomic conditional update inside a short transaction returns HTTP 409 if that revision is stale. Existing version-1 save requests remain compatible. A plan cannot change format through PUT.
 
-The editor keeps editing enabled while a save is pending. Only the submitted snapshot becomes saved; later edits remain dirty. Conflicts preserve current work and offer reloading the server drawing or saving a new copy. Saving a copy keeps the current editor open and provides a link to the copy.
+The editor keeps editing enabled while a save is pending. Only the submitted snapshot becomes saved; later edits remain dirty. Conflicts preserve current work and offer reloading the server drawing or saving a new copy. Reloading requires confirmation in an editor dialog before replacing the current work. Saving a copy keeps the current editor open and provides a link to the copy. Applying a pitch selection that removes objects also requires confirmation.
 
-Recovery drafts are debounced in browser storage and scoped by user, club and exercise, with their base revision stored in the draft. Reopening offers restore/discard. Stale drafts require saving a copy or reloading the server. Storage failure does not block editing or explicit saves. Matching saved drafts are cleared after successful saves; leaving with unsaved work displays a warning.
+Recovery drafts are debounced in browser storage and scoped by user, club and exercise, with their base revision stored in the draft. Reopening offers restore/discard. Stale drafts require saving a copy or reloading the server. Storage failure does not block editing or explicit saves. Matching saved drafts are cleared after successful saves. Editor navigation with unsaved work opens a confirmation dialog and writes the draft before leaving. Refreshing or closing the tab uses the browser's warning.
 
 Pages and all affected endpoints follow the existing admin/coach club policy: scoped coaches stay within their default club; admins and unscoped sessions retain their existing club-wide access. Mutations check trusted origin. In development, a matching request origin is also accepted when `APP_BASE_URL` points to production; production continues to require the configured public origin. Server-side validation rejects malformed layouts, duplicate IDs, unsupported object data, non-finite values and degenerate geometry.
 
