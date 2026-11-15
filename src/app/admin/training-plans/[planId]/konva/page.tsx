@@ -13,13 +13,13 @@ export default async function KonvaPage({
   searchParams,
 }: {
   params: Promise<{ planId: string }>;
-  searchParams: Promise<{ clubId?: string; coachGroupId?: string }>;
+  searchParams: Promise<{ clubId?: string; coachGroupId?: string; panel?: string }>;
 }) {
   const token = (await cookies()).get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
   if (!session) redirect("/admin/login");
   const { planId } = await params;
-  const { clubId, coachGroupId } = await searchParams;
+  const { clubId, coachGroupId, panel } = await searchParams;
   if (
     !clubId ||
     !UUID_RE.test(clubId) ||
@@ -65,6 +65,7 @@ export default async function KonvaPage({
       clubId={clubId}
       coachGroupId={groupContext}
       userId={session.sub}
+      initialPanel={panel === "description" || panel === "equipment" ? panel : undefined}
     />
   );
 }

@@ -10,9 +10,17 @@ If a newer version exists, the editor opens a dialog. Save your changes as a sep
 
 Konva plan cards show a read-only preview of the saved pitch and drawing. Previews load in batches as cards approach the visible part of the list.
 
-Opening **Планове за тренировки** from a coach group carries that group through the list, editor, and back navigation. New plans and copies record the group's name at creation and the signed-in account when available. Creation from the club's main page displays **Администратор**. Older plans without recorded attribution display **Няма записан автор** in the review.
+The plan review supports zoom and an expanded view of the saved pitch. **Детайли** brings the description, information, and equipment cards into focus. **Пособия** shows the total and a breakdown by type for items visible on the saved pitch. The description and equipment shortcuts open the corresponding panel in the editor.
+
+Admins and coaches can open **Планове за тренировки** from the club or a coach group. Opening it from a coach group carries that group through the list, editor, and back navigation. New plans and copies record the group's name at creation and the signed-in account when available. Creation from the club's main page displays **Администратор**. Older plans without recorded attribution display **Няма записан автор** in the review.
 
 Choose **Категория** in the editor. In Konva, **Запази** saves the category alongside the drawing, and local recovery preserves unsaved category changes. Every club starts with **Атака**, **Защита**, **Преход атака в защита**, **Преход защита в атака**, and **Статични положения**. Plans using a retired default keep that category as a club category. In the editor, **Нова категория** adds a category for the current club and selects it in the form. A plan can have one category or remain uncategorized. The list can filter by category, including **Без категория**, and copies retain their category. Plans without a category stay uncategorized.
+
+In the training plans list, **Моите** shows plans created by the signed-in account. **Клуб** shows all plans for the selected club, including older plans without a recorded creator. Both buttons work with the category filter. Under **Клуб**, **Филтър по треньор** lists coach groups with attributed plans in the selected club.
+
+The scope buttons and coach options show totals for the selected club across all categories and pages.
+The list supports grid and list views and can sort by most or least recently updated. The selected order applies to every page of results.
+
 From the training plans list, **Управление на категориите** adds, renames, and deletes club categories. Shared defaults are available to every club. Renaming preserves plan assignments, and deleting moves affected plans to **Без категория**.
 
 Choose **Празно поле** to open the whole blank field immediately. For **Футболно игрище**, click the quadrants directly on the full-pitch preview and choose **Приложи**. Reopen the preview with **Избери части от игрището**. All four parts start selected. The editor crops to the selected parts and leaves gaps when they do not form a rectangle. If any objects are outside the selected parts, the editor asks for confirmation before removing them. Cancel to return to the preview or use **Отмени** after confirming to restore the objects and the previous pitch. **Избери всички**, **Изчисти игрището** and the equipment counts apply to the visible parts. Existing half-pitch plans keep their original view until you choose a different pitch type.

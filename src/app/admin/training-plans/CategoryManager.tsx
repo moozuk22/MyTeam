@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useId, useRef, useState } from "react";
-import { Edit2, Plus, Trash2, X } from "lucide-react";
+import { Edit2, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
 
 export type CategoryOption = { id: string; name: string; clubId?: string | null };
 
@@ -80,7 +80,8 @@ export default function CategoryManager({
 
   return (
     <>
-      <button type="button" className="tp-secondary-btn" disabled={disabled} onClick={() => dialog.current?.showModal()}>
+      <button type="button" className="tp-secondary-btn tp-manage-categories" disabled={disabled} onClick={() => dialog.current?.showModal()}>
+        <SlidersHorizontal size={18} aria-hidden="true" />
         Управление на категориите
       </button>
       <dialog

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { SignJWT } from "jose";
+import { middleware } from "@/middleware";
 import { DEFAULT_LAYOUT } from "@/lib/trainingPlans";
 import { createObject, EMPTY_EXERCISE } from "./model";
 const mocks = vi.hoisted(() => ({
@@ -379,6 +381,58 @@ describe("training plan access and persistence", () => {
     expect(query.text).toContain("LIMIT 51");
     expect(query.text).toContain("layout->>'version'");
     expect(query.values).toContain(club);
+  });
+  it("lets a coach reach the list, review, and editor through middleware", async () => {
+    const secret = "training-plans-middleware-test";
+    vi.stubEnv("ADMIN_SESSION_SECRET", secret);
+    const token = await new SignJWT({ roles: ["coach"], defaultClubId: club })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject(id)
+      .sign(new TextEncoder().encode(secret));
+    const coachRequest = (path: string) => new NextRequest(
+      `http://localhost:3000/admin/${path}?clubId=${club}`,
+      { headers: { cookie: `admin_session=${token}` } },
+    );
+    for (const path of ["training-plans", "training-plans/new", `training-plans/${id}`, `training-plans/${id}/konva`]) {
+      expect((await middleware(coachRequest(path))).status).toBe(200);
+    }
+    expect((await middleware(coachRequest("training-plans-settings"))).status).toBe(307);
+  });
+  it("uses the session author for Mine and preserves the club-wide default", async () => {
+    const url = new URL(request("GET").url);
+    const headers = { cookie: "admin_session=test" };
+    url.searchParams.set("scope", "mine");
+    url.searchParams.set("creatorUserId", otherClub);
+    expect((await list(new NextRequest(url, { headers }), params)).status).toBe(200);
+    expect(mocks.queryRaw.mock.calls[0][0].text).toContain("created_by_user_id =");
+    expect(mocks.queryRaw.mock.calls[0][0].values).toEqual([club, id]);
+
+    url.searchParams.set("scope", "club");
+    expect((await list(new NextRequest(url, { headers }), params)).status).toBe(200);
+    expect(mocks.queryRaw.mock.calls[1][0].text).not.toContain("created_by_user_id");
+
+    url.searchParams.set("scope", "invalid");
+    expect((await list(new NextRequest(url, { headers }), params)).status).toBe(400);
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(2);
+  });
+  it("applies the club coach filter and keeps Mine tied to the session account", async () => {
+    const url = new URL(request("GET").url);
+    const headers = { cookie: "admin_session=test" };
+    url.searchParams.set("coachId", otherClub);
+    url.searchParams.set("category", "uncategorized");
+    url.searchParams.set("cursor", id);
+    expect((await list(new NextRequest(url, { headers }), params)).status).toBe(200);
+    expect(mocks.queryRaw.mock.calls[0][0].text).toContain("created_by_coach_group_id =");
+    expect(mocks.queryRaw.mock.calls[0][0].text).toContain("category_id IS NULL");
+    expect(mocks.queryRaw.mock.calls[0][0].values).toEqual([club, otherClub, id, club]);
+
+    url.searchParams.set("scope", "mine");
+    expect((await list(new NextRequest(url, { headers }), params)).status).toBe(200);
+    expect(mocks.queryRaw.mock.calls[1][0].text).not.toContain("created_by_coach_group_id");
+    expect(mocks.queryRaw.mock.calls[1][0].values).toEqual([club, id, id, club]);
+
+    url.searchParams.set("coachId", "invalid");
+    expect((await list(new NextRequest(url, { headers }), params)).status).toBe(400);
   });
   it("preserves legacy saves and refuses changing an existing plan's format", async () => {
     mocks.findUnique.mockResolvedValue({ ...row, layout: DEFAULT_LAYOUT });

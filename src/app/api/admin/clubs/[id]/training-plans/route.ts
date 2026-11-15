@@ -42,7 +42,22 @@ export async function GET(
   const category = request.nextUrl.searchParams.get("category");
   if (category && category !== "uncategorized" && !UUID_RE.test(category))
     return NextResponse.json({ error: "Невалидна категория." }, { status: 400 });
-  return NextResponse.json(await listTrainingPlans(id, cursor, category || undefined));
+  const scope = request.nextUrl.searchParams.get("scope");
+  if (scope !== null && scope !== "mine" && scope !== "club")
+    return NextResponse.json({ error: "Невалиден филтър за планове." }, { status: 400 });
+  const coach = request.nextUrl.searchParams.get("coachId");
+  if (coach && !UUID_RE.test(coach))
+    return NextResponse.json({ error: "Невалиден треньор." }, { status: 400 });
+  return NextResponse.json(
+    await listTrainingPlans(
+      id,
+      cursor,
+      category || undefined,
+      scope === "mine" ? session.sub : undefined,
+      scope === "mine" ? undefined : coach || undefined,
+      request.nextUrl.searchParams.get("sort") === "oldest",
+    ),
+  );
 }
 
 export async function POST(

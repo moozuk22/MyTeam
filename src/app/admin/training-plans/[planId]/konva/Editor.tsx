@@ -420,6 +420,7 @@ export type EditorProps = {
   clubId: string;
   userId: string;
   coachGroupId?: string;
+  initialPanel?: "description" | "equipment";
 };
 function objectLabel(o: ExerciseObject) {
   return o.kind === "player"
@@ -512,12 +513,12 @@ function MovementPreview({ type, arrowhead }: { type: ExerciseTool; arrowhead: b
     </svg>
   );
 }
-export default function Editor({ plan, categories = [], clubId, userId, coachGroupId }: EditorProps) {
+export default function Editor({ plan, categories = [], clubId, userId, coachGroupId, initialPanel }: EditorProps) {
   const router = useRouter();
   const [planId, setPlanId] = useState(plan.id);
-  const [showDetails, setShowDetails] = useState(!plan.id);
+  const [showDetails, setShowDetails] = useState(!plan.id || initialPanel === "description");
   const compact = useSyncExternalStore(subscribeToCompactEditor, isCompactEditor, isCompactEditorOnServer);
-  const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(initialPanel === "equipment");
   const [showPitchOptions, setShowPitchOptions] = useState(false);
   const toolsDialog = useRef<HTMLDialogElement>(null);
   const toolsDrag = useRef<{ pointerId: number; startY: number } | null>(null);
@@ -529,7 +530,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [panning, setPanning] = useState(false);
-  const [browsingTools, setBrowsingTools] = useState(false);
+  const [browsingTools, setBrowsingTools] = useState(initialPanel === "equipment");
   const titleInput = useRef<HTMLInputElement>(null);
   const titleErrorId = useId();
   const detailsId = useId();
@@ -562,7 +563,9 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     "straight",
   );
   const [lineArrowhead, setLineArrowhead] = useState(false);
-  const [category, setCategory] = useState(0),
+  const [category, setCategory] = useState(
+    initialPanel === "equipment" ? TOOLBAR_GROUPS.findIndex(({ types }) => types.includes("cone")) : 0,
+  ),
     [error, setError] = useState(""),
     [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false),

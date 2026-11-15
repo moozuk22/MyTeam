@@ -2,9 +2,15 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import type { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock("@/lib/db", () => ({ prisma: { $queryRaw: mocks.query } }));
-import { listTrainingPlans } from "./queries";
+const mocks = vi.hoisted(() => ({ query: vi.fn(), count: vi.fn(), findCoaches: vi.fn() }));
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $queryRaw: mocks.query,
+    trainingPlan: { count: mocks.count },
+    coachGroup: { findMany: mocks.findCoaches },
+  },
+}));
+import { countTrainingPlansByScope, listTrainingPlanCoaches, listTrainingPlans } from "./queries";
 const club = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";
 const db = new PGlite();
@@ -12,14 +18,14 @@ beforeAll(async () => {
   await db.exec(
     `CREATE TABLE clubs (id uuid PRIMARY KEY);
     CREATE TABLE coach_groups (id uuid PRIMARY KEY);
-    CREATE TABLE training_plans (id uuid PRIMARY KEY, club_id uuid, title text, description text, created_at timestamptz, updated_at timestamptz, layout jsonb);`,
+    CREATE TABLE training_plans (id uuid PRIMARY KEY, club_id uuid, title text, description text, created_by_user_id uuid, created_at timestamptz, updated_at timestamptz, layout jsonb);`,
   );
   await db.query(
-    `INSERT INTO training_plans SELECT ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid, $1::uuid, 'План ' || i, null, '2026-11-10T10:00:00Z', '2026-11-10T10:00:00Z', jsonb_build_object('version', CASE WHEN i % 2 = 0 THEN 2 ELSE 1 END, 'objects', jsonb_build_array(jsonb_build_object('label',repeat('x',1000)))) FROM generate_series(1,52) i`,
+    `INSERT INTO training_plans SELECT ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid, $1::uuid, 'План ' || i, null, null, '2026-11-10T10:00:00Z', '2026-11-10T10:00:00Z', jsonb_build_object('version', CASE WHEN i % 2 = 0 THEN 2 ELSE 1 END, 'objects', jsonb_build_array(jsonb_build_object('label',repeat('x',1000)))) FROM generate_series(1,52) i`,
     [club],
   );
   await db.query(
-    `INSERT INTO training_plans VALUES ('99999999-9999-4999-8999-999999999999',$1::uuid,'Друг клуб',null,now(),now(),'{"version":"future"}')`,
+    `INSERT INTO training_plans VALUES ('99999999-9999-4999-8999-999999999999',$1::uuid,'Друг клуб',null,null,now(),now(),'{"version":"future"}')`,
     [other],
   );
   await db.query("INSERT INTO clubs VALUES ($1), ($2)", [club, other]);
@@ -47,6 +53,32 @@ beforeAll(async () => {
   );
 });
 afterAll(() => db.close());
+
+it("counts all club plans and only the signed-in user's plans within that club", async () => {
+  mocks.count.mockResolvedValueOnce(52).mockResolvedValueOnce(3);
+  expect(await countTrainingPlansByScope(club, other)).toEqual({ club: 52, mine: 3 });
+  expect(mocks.count.mock.calls).toEqual([
+    [{ where: { clubId: club } }],
+    [{ where: { clubId: club, createdByUserId: other } }],
+  ]);
+
+  mocks.count.mockClear().mockResolvedValueOnce(52);
+  expect(await countTrainingPlansByScope(club, "env-admin")).toEqual({ club: 52, mine: 0 });
+  expect(mocks.count.mock.calls).toEqual([[{ where: { clubId: club } }]]);
+});
+
+it("scopes both the coach options and their plan counts to the selected club", async () => {
+  await listTrainingPlanCoaches(club);
+  expect(mocks.findCoaches).toHaveBeenCalledWith({
+    where: { clubId: club, trainingPlans: { some: { clubId: club } } },
+    select: {
+      id: true,
+      name: true,
+      _count: { select: { trainingPlans: { where: { clubId: club } } } },
+    },
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+  });
+});
 it("keeps the saved author name when a coach group is removed", async () => {
   const planId = "00000000-0000-4000-8000-000000000052";
   await db.query("INSERT INTO coach_groups VALUES ($1)", [club]);
@@ -84,6 +116,22 @@ it("does not use a foreign-club cursor and handles unknown JSON versions without
   expect((await listTrainingPlans(other)).plans[0].layoutVersion).toBe(1);
 });
 
+it("sorts oldest first across pages, using the same order for timestamp ties and cursors", async () => {
+  await db.exec("BEGIN");
+  try {
+    await db.query("UPDATE training_plans SET updated_at = '2026-11-10T10:00:00Z' WHERE club_id = $1", [club]);
+    const first = await listTrainingPlans(club, null, undefined, undefined, undefined, true);
+    const second = await listTrainingPlans(club, first.nextCursor, undefined, undefined, undefined, true);
+    expect(first.plans.map(({ title }) => title)).toEqual(
+      Array.from({ length: 50 }, (_, index) => `План ${index + 1}`),
+    );
+    expect(second.plans.map(({ title }) => title)).toEqual(["План 51", "План 52"]);
+    expect(second.nextCursor).toBeNull();
+  } finally {
+    await db.exec("ROLLBACK");
+  }
+});
+
 it("applies the category migration to existing plans and paginates category filters", async () => {
   const { rows: defaults } = await db.query<{ id: string; name: string }>(
     "SELECT id, name FROM training_plan_categories WHERE club_id IS NULL ORDER BY name",
@@ -112,4 +160,51 @@ it("applies the category migration to existing plans and paginates category filt
   expect((await listTrainingPlans(club, first.nextCursor, category)).plans).toHaveLength(1);
   expect((await listTrainingPlans(club, null, "uncategorized")).plans).toHaveLength(0);
   expect((await listTrainingPlans(other, null, category)).plans).toHaveLength(0);
+});
+
+
+it("combines the signed-in creator and category filters before pagination", async () => {
+  await db.exec("BEGIN");
+  try {
+    const { rows: [category] } = await db.query<{ id: string }>(
+      "SELECT id FROM training_plan_categories WHERE club_id IS NULL AND name_key = 'атака'",
+    );
+    await db.query(
+      "UPDATE training_plans SET created_by_user_id = $1, category_id = $2",
+      [club, category.id],
+    );
+    await db.exec("UPDATE training_plans SET created_by_user_id = NULL WHERE title = 'План 52'");
+    const first = await listTrainingPlans(club, null, category.id, club);
+    expect(first.plans).toHaveLength(50);
+    expect(first.plans.some(({ title }) => title === "План 52")).toBe(false);
+    expect(first.nextCursor).toBe(first.plans.at(-1)?.id);
+    const second = await listTrainingPlans(club, first.nextCursor, category.id, club);
+    expect(second.plans).toHaveLength(1);
+    const ids = new Set([...first.plans, ...second.plans].map(({ id }) => id));
+    expect(ids.size).toBe(51);
+    expect(second.nextCursor).toBeNull();
+    expect((await listTrainingPlans(club, null, "uncategorized", club)).plans).toEqual([]);
+    expect((await listTrainingPlans(club, null, category.id, "env-admin")).plans).toEqual([]);
+  } finally {
+    await db.exec("ROLLBACK");
+  }
+});
+
+it("filters by coach across pages while keeping unattributed plans in the club list", async () => {
+  await db.exec("BEGIN");
+  try {
+    await db.query("INSERT INTO coach_groups VALUES ($1), ($2)", [club, other]);
+    await db.query("UPDATE training_plans SET created_by_coach_group_id = $1 WHERE club_id = $1", [club]);
+    await db.query("UPDATE training_plans SET created_by_coach_group_id = $1 WHERE title = 'План 52'", [other]);
+    const first = await listTrainingPlans(club, null, undefined, undefined, club);
+    const second = await listTrainingPlans(club, first.nextCursor, undefined, undefined, club);
+    expect(first.plans).toHaveLength(50);
+    expect(second.plans).toHaveLength(1);
+    expect([...first.plans, ...second.plans].some(({ title }) => title === "План 52")).toBe(false);
+    expect((await listTrainingPlans(club, null, undefined, undefined, other)).plans.map(({ title }) => title)).toEqual(["План 52"]);
+    expect((await listTrainingPlans(other, null, undefined, undefined, club)).plans).toEqual([]);
+    expect((await listTrainingPlans(other)).plans).toHaveLength(1);
+  } finally {
+    await db.exec("ROLLBACK");
+  }
 });

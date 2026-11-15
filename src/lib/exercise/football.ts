@@ -55,6 +55,15 @@ export const FOOTBALL_LABELS: Record<ExerciseTool, string> = {
   "custom-team-goalkeeper": "Вратар",
   "custom-team-player": "Състезател",
 };
+export const FOOTBALL_EQUIPMENT = {
+  title: "Пособия",
+  showCounts: true,
+  types: [
+    "cone", "ladder", "flag", "pole", "hurdle", "ring",
+    "mannequin", "wall", "marker",
+  ] satisfies ExerciseTool[],
+};
+
 export const FOOTBALL_TOOLS: {
   title: string;
   types: ExerciseTool[];
@@ -78,21 +87,7 @@ export const FOOTBALL_TOOLS: {
       "goal-1m",
     ],
   },
-  {
-    title: "Пособия",
-    showCounts: true,
-    types: [
-      "cone",
-      "ladder",
-      "flag",
-      "pole",
-      "hurdle",
-      "ring",
-      "mannequin",
-      "wall",
-      "marker",
-    ],
-  },
+  FOOTBALL_EQUIPMENT,
   {
     title: "Линии и полета",
     types: [

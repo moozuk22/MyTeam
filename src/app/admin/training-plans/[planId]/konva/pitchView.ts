@@ -30,3 +30,16 @@ export function pitchView(viewport: ReturnType<typeof pitchViewport>, rotation: 
   };
   return { viewWidth, viewHeight, scale, viewLayer };
 }
+
+export function fitPitchPreview(
+  viewport: ReturnType<typeof pitchViewport>,
+  rotation: PitchRotation,
+  bounds: { width: number; height: number },
+) {
+  const { viewWidth, viewHeight } = pitchView(viewport, rotation, 1);
+  const availableHeight = Math.floor(bounds.height);
+  const width = Math.floor(Math.min(bounds.width, availableHeight * viewWidth / viewHeight));
+  const { viewLayer } = pitchView(viewport, rotation, width);
+  const height = Math.min(availableHeight, Math.ceil(width * viewHeight / viewWidth));
+  return { width, height, viewLayer };
+}

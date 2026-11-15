@@ -2,29 +2,44 @@
 
 import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   ClipboardList,
   Copy,
   Edit2,
+  Ellipsis,
+  Layers,
+  LayoutGrid,
+  List,
+  RefreshCw,
   ScanLine,
   Plus,
   Trash2,
+  UserRound,
+  Waypoints,
 } from "lucide-react";
 import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
 import type { Exercise } from "@/lib/exercise/model";
 import CategoryManager, { type CategoryOption } from "./CategoryManager";
+import TrainingPlanRail from "./TrainingPlanRail";
 import "./page.css";
 
-const PlanPreview = dynamic(() => import("./PlanPreview"), { ssr: false });
+const PlanPreview = dynamic(() => import("./PlanPreview"), {
+  ssr: false,
+  loading: () => <div className="tp-preview-skeleton" />,
+});
 
 type ClubOption = {
   id: string;
   name: string;
 };
+
+function labelWithCount(label: string, count?: number) {
+  return count === undefined ? label : `${label} (${count})`;
+}
 
 type TrainingPlanSummary = {
   id: string;
@@ -43,7 +58,13 @@ export default function TrainingPlansClient({
   initialPlans,
   initialCategories,
   categoryFilter = "",
+  scope,
+  scopeCounts,
+  coaches,
+  coachFilter,
   coachGroupId,
+  oldestFirst = false,
+  isAdmin = false,
   initialCursor = null,
 }: {
   clubs: ClubOption[];
@@ -51,11 +72,18 @@ export default function TrainingPlansClient({
   initialPlans: TrainingPlanSummary[];
   initialCategories: readonly CategoryOption[];
   categoryFilter?: string;
+  scope: "mine" | "club";
+  scopeCounts?: { mine: number; club: number };
+  coaches: readonly (ClubOption & { _count?: { trainingPlans: number } })[];
+  coachFilter: string;
   coachGroupId?: string;
+  oldestFirst?: boolean;
+  isAdmin?: boolean;
   initialCursor?: string | null;
 }) {
   const router = useRouter();
   const selectedClubId = defaultClubId;
+  const listView = useSearchParams().get("view") === "list";
   const [plans, setPlans] = useState<TrainingPlanSummary[]>(initialPlans);
   const [categories, setCategories] = useState(initialCategories);
   const [serverPlans, setServerPlans] = useState(initialPlans);
@@ -170,14 +198,28 @@ export default function TrainingPlansClient({
     };
   }, [plans, categoryFilter, selectedClubId, isFiltering]);
 
-  function changeFilter(category: string, replace = false) {
+  function changeFilter(
+    { category = categoryFilter, nextScope = scope, coach = coachFilter, oldest = oldestFirst } = {},
+    replace = false,
+  ) {
     const params = trainingPlanSearch(selectedClubId, coachGroupId);
     if (category) params.set("category", category);
+    if (nextScope === "mine") params.set("scope", nextScope);
+    else if (coach) params.set("coachId", coach);
+    if (oldest) params.set("sort", "oldest");
+    if (listView) params.set("view", "list");
     startFiltering(() => {
       const url = `/admin/training-plans?${params}`;
       if (replace) router.replace(url, { scroll: false });
       else router.push(url, { scroll: false });
     });
+  }
+
+  function changeView(list: boolean) {
+    const url = new URL(window.location.href);
+    if (list) url.searchParams.set("view", "list");
+    else url.searchParams.delete("view");
+    window.history.replaceState(null, "", url);
   }
 
   function saveCategory(category: CategoryOption) {
@@ -189,14 +231,17 @@ export default function TrainingPlansClient({
     setCategories((current) => current.filter((category) => category.id !== id));
     setPlans((current) => current.map((plan) =>
       plan.categoryId === id ? { ...plan, categoryId: null } : plan));
-    if (categoryFilter === id) changeFilter("", true);
+    if (categoryFilter === id) changeFilter({ category: "" }, true);
     else if (categoryFilter === "uncategorized") startFiltering(() => router.refresh());
   }
 
   async function loadMore() {
     if (!nextCursor || loadingMore || isFiltering) return;
     const params = new URLSearchParams({ cursor: nextCursor });
+    if (scope === "mine") params.set("scope", scope);
+    else if (coachFilter) params.set("coachId", coachFilter);
     if (categoryFilter) params.set("category", categoryFilter);
+    if (oldestFirst) params.set("sort", "oldest");
     setLoadingMore(true);
     setError("");
     try {
@@ -249,7 +294,10 @@ export default function TrainingPlansClient({
       );
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || "Грешка при копиране.");
-      setPlans((prev) => [payload.plan, ...prev]);
+      if (!oldestFirst && (!coachFilter || coachFilter === coachGroupId)) {
+        setPlans((prev) => [payload.plan, ...prev]);
+      }
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Грешка при копиране.");
     } finally {
@@ -277,6 +325,7 @@ export default function TrainingPlansClient({
         );
       setPlans((prev) => prev.filter((plan) => plan.id !== confirmDeleteId));
       setConfirmDeleteId(null);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Грешка при изтриване.");
     } finally {
@@ -290,24 +339,20 @@ export default function TrainingPlansClient({
     );
   }
 
+  const location = trainingPlanSearch(selectedClubId, coachGroupId);
+  const membersHref = `/admin/members?${location}`;
+
   return (
-    <main className="tp-page">
+    <main className="tp-page tp-library">
+      <TrainingPlanRail search={location.toString()} isAdmin={isAdmin} />
       <div className="tp-inner">
         <header className="tp-header">
-          <button
-            className="tp-back-btn"
-            type="button"
-            onClick={() =>
-              router.push(
-                `/admin/members?${trainingPlanSearch(selectedClubId, coachGroupId)}`,
-              )
-            }
-          >
+          <Link className="tp-back-btn" href={membersHref}>
             <ArrowLeft size={16} />
             <span>Назад</span>
-          </button>
+          </Link>
           <div className="tp-heading">
-            <h1 className="tp-title">Планове за тренировки</h1>
+            <h1 className="tp-title"><Waypoints aria-hidden="true" />Планове за тренировки</h1>
             <p>{selectedClub?.name ?? "Няма избран отбор"}</p>
           </div>
           <button
@@ -323,18 +368,52 @@ export default function TrainingPlansClient({
 
         {selectedClubId && (
           <div className="tp-category-controls">
+            <div className="tp-scope-controls" role="group" aria-label="Автор на плана">
+              {(["mine", "club"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={scope === option ? "tp-primary-btn" : "tp-secondary-btn"}
+                  aria-pressed={scope === option}
+                  disabled={isFiltering}
+                  onClick={() => {
+                    if (scope !== option) changeFilter({ nextScope: option });
+                  }}
+                >
+                  {option === "club" && <Waypoints size={20} aria-hidden="true" />}
+                  <span>{option === "mine" ? "Моите" : "Клуб"}
+                    {scopeCounts?.[option] !== undefined && <span className="tp-scope-count"> ({scopeCounts[option]})</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
             <label className="tp-field tp-category-filter">
-              <span>Филтър по категория</span>
+              <span><Layers size={17} aria-hidden="true" />Категория</span>
               <select
                 value={categoryFilter}
                 disabled={isFiltering}
-                onChange={(event) => changeFilter(event.target.value)}
+                onChange={(event) => changeFilter({ category: event.target.value })}
               >
                 <option value="">Всички категории</option>
                 <option value="uncategorized">Без категория</option>
                 {categories.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
               </select>
             </label>
+            {scope === "club" && coaches.length > 0 && (
+              <label className="tp-field tp-category-filter tp-coach-filter">
+                <span><UserRound size={17} aria-hidden="true" />Треньор</span>
+                <select
+                  value={coachFilter}
+                  disabled={isFiltering}
+                  onChange={(event) => changeFilter({ coach: event.target.value })}
+                >
+                  <option value="">{labelWithCount("Всички треньори", scopeCounts?.club)}</option>
+                  {coaches.map(({ id, name, _count }) => (
+                    <option key={id} value={id}>{labelWithCount(name, _count?.trainingPlans)}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <CategoryManager
               categories={categories}
               clubId={selectedClubId}
@@ -346,27 +425,46 @@ export default function TrainingPlansClient({
         )}
 
         {error && !confirmDeleteId && <p className="tp-error" role="alert">{error}</p>}
-        {!isFiltering && visiblePlans.length > 0 && (
-          <p className="tp-result-count">{visiblePlans.length === 1 ? "1 план" : `${visiblePlans.length} плана`}</p>
+        {selectedClubId && (
+          <div className="tp-results-bar">
+            <p className="tp-result-count" aria-live="polite">
+              {!isFiltering && `${nextCursor ? "Показани " : ""}${visiblePlans.length} ${visiblePlans.length === 1 ? "план" : "плана"}`}
+            </p>
+            <div className="tp-view-controls" role="group" aria-label="Изглед">
+              <button type="button" aria-label="Мрежа" aria-pressed={!listView} onClick={() => changeView(false)}><LayoutGrid size={18} /></button>
+              <button type="button" aria-label="Списък" aria-pressed={listView} onClick={() => changeView(true)}><List size={20} /></button>
+            </div>
+            <select className="tp-sort" aria-label="Подредба" disabled={isFiltering}
+              value={oldestFirst ? "oldest" : "latest"}
+              onChange={(event) => changeFilter({ oldest: event.target.value === "oldest" })}
+            >
+              <option value="latest">Последно обновени</option>
+              <option value="oldest">Най-отдавна обновени</option>
+            </select>
+          </div>
         )}
 
-        <section className="tp-grid" aria-busy={isFiltering} ref={gridRef}>
+        <section className={listView ? "tp-grid tp-grid--list" : "tp-grid"} aria-busy={isFiltering} ref={gridRef}>
           {isFiltering ? (
             <div className="tp-grid-loading"><FinanceSkeleton variant="form" /></div>
           ) : visiblePlans.length === 0 ? (
             <div className="tp-empty">
               <ClipboardList size={28} />
-              <p>{categoryFilter ? "Няма планове в тази категория." : "Все още няма планове за този отбор."}</p>
+              <p>{scope === "mine"
+                ? categoryFilter ? "Нямате планове в тази категория." : "Все още нямате създадени планове."
+                : coachFilter ? "Няма планове на този треньор за избрания филтър."
+                : categoryFilter ? "Няма планове в тази категория." : "Все още няма планове за този отбор."}</p>
             </div>
           ) : (
             visiblePlans.map((plan) => {
               const previewKey = `${plan.id}:${plan.updatedAt}`;
               const preview = previews[previewKey];
+              const reviewHref = `/admin/training-plans/${encodeURIComponent(plan.id)}?${location}`;
               return (
                 <article className="tp-card" key={plan.id}>
                   <Link
                     className="tp-card-main"
-                    href={`/admin/training-plans/${encodeURIComponent(plan.id)}?${trainingPlanSearch(selectedClubId, coachGroupId)}`}
+                    href={reviewHref}
                     prefetch={false}
                   >
                     <div
@@ -385,20 +483,32 @@ export default function TrainingPlansClient({
                     </div>
                     <div className="tp-card-info">
                       <span className="tp-category-label">
+                        <Layers size={15} aria-hidden="true" />
                         {(plan.categoryId && categoryNames.get(plan.categoryId)) || "Без категория"}
                       </span>
                       <h2>{plan.title}</h2>
                       {plan.description && <p>{plan.description}</p>}
                       <div className="tp-card-meta">
-                        {plan.creatorName && <span>Създал: {plan.creatorName}</span>}
-                        <time dateTime={plan.updatedAt}>Обновен: {formatDate(plan.updatedAt)}</time>
+                        {plan.creatorName && <span><UserRound size={16} aria-hidden="true" />Създал: {plan.creatorName}</span>}
+                        <time dateTime={plan.updatedAt}><RefreshCw size={15} aria-hidden="true" />Обновен: {formatDate(plan.updatedAt)}</time>
                       </div>
                     </div>
                   </Link>
+                  <details className="tp-card-menu" name="training-plan-actions" onKeyDown={(event) => {
+                    if (event.key !== "Escape" || !event.currentTarget.open) return;
+                    event.currentTarget.open = false;
+                    event.currentTarget.querySelector("summary")?.focus();
+                  }} onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+                  }}>
+                    <summary title="Още действия" aria-label={`Още действия за ${plan.title}`}><Ellipsis size={19} /></summary>
+                    <Link href={reviewHref} prefetch={false}>Преглед на плана</Link>
+                  </details>
                   <div className="tp-card-actions">
                     {plan.layoutVersion === 2 && (
                       <button
                         type="button"
+                        className="tp-card-edit"
                         onClick={() => openEditor(plan.id)}
                         title="Редактирай плана"
                         aria-label="Редактирай плана"
@@ -500,6 +610,7 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("bg-BG", {
+    timeZone: "Europe/Sofia",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
