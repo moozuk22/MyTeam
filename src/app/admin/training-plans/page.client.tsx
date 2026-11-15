@@ -102,15 +102,13 @@ export default function TrainingPlansClient({
   }
 
   const canCloseDialog = useEffectEvent(() => !isDeleting);
-  const dialogTrigger = useRef<HTMLElement | null>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const dialogTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!confirmDeleteId) return;
-    const dialog = document.querySelector<HTMLElement>(".tp-modal");
+    const dialog = deleteDialogRef.current;
     if (!dialog) return;
-    (
-      dialog.querySelector<HTMLElement>("input") ??
-      dialog.querySelector<HTMLElement>("button")
-    )?.focus();
+    dialog.querySelector<HTMLButtonElement>("button")?.focus();
     const handle = (event: KeyboardEvent) => {
       if (event.key === "Escape" && canCloseDialog()) {
         event.preventDefault();
@@ -525,9 +523,8 @@ export default function TrainingPlansClient({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        dialogTrigger.current =
-                          document.activeElement as HTMLElement;
+                      onClick={(event) => {
+                        dialogTrigger.current = event.currentTarget;
                         setConfirmDeleteId(plan.id);
                       }}
                       title="Изтрий"
@@ -560,6 +557,7 @@ export default function TrainingPlansClient({
           onClick={() => !isDeleting && setConfirmDeleteId(null)}
         >
           <div
+            ref={deleteDialogRef}
             role="dialog"
             aria-modal="true"
             aria-label="Изтриване на план"
