@@ -22,9 +22,6 @@
 .ke-page [hidden] {
   display: none !important;
 }
-.ke-rail {
-  display: none;
-}
 .ke-page * {
   box-sizing: border-box;
 }
@@ -829,43 +826,8 @@ body:has(:is(.ke-dialog, .ke-tools-sheet)[open]) {
 
 @media (min-width: 900px) and (min-height: 480px) {
   .ke-page {
-    display: grid;
-    grid-template-columns: 58px minmax(0, 1fr);
     height: max(100dvh, 640px);
     padding: 0;
-  }
-  .ke-rail {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 9px;
-    padding: 8px 5px;
-    background: #0e1616;
-    border-inline-end: 1px solid var(--plan-border);
-  }
-  .ke-page .ke-rail button,
-  .ke-rail-current {
-    width: 44px;
-    min-height: 44px;
-    padding: 0;
-    border: 1px solid transparent;
-    background: transparent;
-    color: var(--plan-muted);
-  }
-  .ke-brand {
-    width: 44px;
-    height: 44px;
-    flex: none;
-    margin-bottom: 8px;
-    background: center / 36px no-repeat url("/myteam-logo.webp");
-  }
-  .ke-rail-current {
-    display: grid;
-    place-items: center;
-    border-radius: 9px;
-    border-color: var(--plan-accent-border);
-    color: var(--plan-accent);
-    background: var(--plan-selected);
   }
   .ke-inner {
     display: flex;

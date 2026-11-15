@@ -768,10 +768,6 @@ body:has(.tp-overlay, .tp-category-manager[open]) {
   white-space: nowrap;
 }
 
-.tp-rail {
-  display: none;
-}
-
 @media (min-width: 640px) {
   .tp-library .tp-category-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -830,54 +826,7 @@ body:has(.tp-overlay, .tp-category-manager[open]) {
 
 @media (min-width: 960px) {
   .tp-page.tp-library {
-    padding: 23px clamp(24px, 2vw, 44px) 48px clamp(99px, 7.3vw, 132px);
-  }
-
-  .tp-rail {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 11px;
-    position: fixed;
-    inset: 0 auto 0 0;
-    width: clamp(64px, 4.7vw, 84px);
-    overflow: auto;
-    padding: 13px 7px;
-    border-inline-end: 1px solid #22342f;
-    background: #0c1815;
-  }
-
-  .tp-rail a {
-    display: grid;
-    place-items: center;
-    width: min(100%, 56px);
-    min-height: 50px;
-    border: 1px solid transparent;
-    border-radius: 12px;
-    color: var(--plan-muted);
-  }
-
-  .tp-rail a:hover {
-    background: var(--plan-card);
-    color: var(--plan-text);
-  }
-
-  .tp-rail [aria-current="page"] {
-    border-color: var(--plan-accent-border);
-    background: #10421c;
-    color: var(--plan-accent);
-  }
-
-  .tp-rail-logo {
-    margin-bottom: 7px;
-  }
-
-  .tp-rail-logo img {
-    object-fit: contain;
-  }
-
-  .tp-library .tp-back-btn {
-    display: none;
+    padding: 23px clamp(24px, 2vw, 44px) 48px;
   }
 
   .tp-library .tp-header {
@@ -1206,7 +1155,7 @@ body:has(.tp-review-dialog[open]) {
 
 @media (min-width: 960px) {
   .tp-page.tp-review {
-    padding: 18px clamp(24px, 3.6vw, 65px) 30px clamp(104px, 8.9vw, 160px);
+    padding: 18px clamp(24px, 3.6vw, 65px) 30px;
   }
 
   .tp-review-heading {

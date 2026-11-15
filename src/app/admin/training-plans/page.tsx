@@ -97,7 +97,6 @@ export default async function TrainingPlansPage({
       coachFilter={coachFilter}
       scope={scope}
       oldestFirst={oldestFirst}
-      isAdmin={session.roles.includes("admin")}
       scopeCounts={scopeCounts}
       coachGroupId={coachGroup?.id}
       clubs={clubs}

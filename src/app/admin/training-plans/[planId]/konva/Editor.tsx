@@ -22,10 +22,8 @@ import {
   Copy,
   Goal as GoalIcon,
   Hand,
-  Home,
   ImagePlus,
   Info,
-  LayoutGrid,
   Maximize2,
   Minimize2,
   Minus,
@@ -1557,16 +1555,6 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
 
   return (
     <main className="ke-page" ref={pageRef}>
-      <nav className="ke-rail" aria-label="Навигация на редактора">
-        <span className="ke-brand" role="img" aria-label="MyTeam" />
-        <button type="button" aria-label="Към клуба" title="Към клуба"
-          onClick={() => navigateAway(`/admin/members?${search}`)}><Home size={20} aria-hidden="true" /></button>
-        <button type="button" aria-label="Планове за тренировки" title="Планове за тренировки"
-          onClick={() => navigateAway(`/admin/training-plans?${search}`)}><LayoutGrid size={20} aria-hidden="true" /></button>
-        <span className="ke-rail-current" aria-current="page" aria-label="Редактор на план">
-          <Waypoints size={21} aria-hidden="true" />
-        </span>
-      </nav>
       <div className="ke-inner">
         <header className="ke-header">
           <div className="ke-header-bar">

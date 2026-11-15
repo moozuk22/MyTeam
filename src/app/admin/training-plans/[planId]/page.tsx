@@ -8,7 +8,6 @@ import { canAccessTrainingClub, UUID_RE } from "@/lib/exercise/access";
 import { getPitchQuadrants, isInPitchQuadrants, isV2, validateExercise } from "@/lib/exercise/model";
 import { countEquipment, FOOTBALL_EQUIPMENT, FOOTBALL_LABELS } from "@/lib/exercise/football";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
-import TrainingPlanRail from "../TrainingPlanRail";
 import ReviewPreview from "./ReviewPreview";
 import "../page.css";
 
@@ -110,7 +109,6 @@ export default async function TrainingPlanReview({
 
   return (
     <main className="tp-page tp-review">
-      <TrainingPlanRail search={search.toString()} isAdmin={session.roles.includes("admin")} />
       <div className="tp-inner">
         <Link className="tp-back-btn" href={listHref}>
           <ArrowLeft size={16} aria-hidden="true" /> Към плановете

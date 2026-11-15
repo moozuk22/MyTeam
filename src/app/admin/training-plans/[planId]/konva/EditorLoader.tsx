@@ -7,9 +7,6 @@ import "./konva.css";
 function EditorSkeleton() {
   return (
     <main className="ke-page">
-      <div className="ke-rail" aria-hidden="true">
-        <span className="ke-brand" />
-      </div>
       <div
         className="ke-inner"
         role="status"

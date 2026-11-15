@@ -24,7 +24,6 @@ import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
 import type { Exercise } from "@/lib/exercise/model";
 import CategoryManager, { type CategoryOption } from "./CategoryManager";
-import TrainingPlanRail from "./TrainingPlanRail";
 import "./page.css";
 
 const PlanPreview = dynamic(() => import("./PlanPreview"), {
@@ -64,7 +63,6 @@ export default function TrainingPlansClient({
   coachFilter,
   coachGroupId,
   oldestFirst = false,
-  isAdmin = false,
   initialCursor = null,
 }: {
   clubs: ClubOption[];
@@ -78,7 +76,6 @@ export default function TrainingPlansClient({
   coachFilter: string;
   coachGroupId?: string;
   oldestFirst?: boolean;
-  isAdmin?: boolean;
   initialCursor?: string | null;
 }) {
   const router = useRouter();
@@ -344,7 +341,6 @@ export default function TrainingPlansClient({
 
   return (
     <main className="tp-page tp-library">
-      <TrainingPlanRail search={location.toString()} isAdmin={isAdmin} />
       <div className="tp-inner">
         <header className="tp-header">
           <Link className="tp-back-btn" href={membersHref}>
