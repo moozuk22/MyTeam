@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ChangeEvent,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -22,6 +23,7 @@ import {
   Goal as GoalIcon,
   Hand,
   Home,
+  ImagePlus,
   Info,
   LayoutGrid,
   Maximize2,
@@ -93,6 +95,7 @@ import { MAX_ITEMS, MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_TITLE_LENGTH } from "@
 import Canvas from "./Canvas";
 import { EquipmentPreview } from "./Visuals";
 import { pitchView, pitchViewport } from "./pitchView";
+import { BACKGROUND_IMAGE_TYPES, placeBackgroundImage, readBackgroundImage } from "./backgroundImage";
 import { measurePitchText } from "./textLayout";
 
 const EQUIPMENT_LABELS = FOOTBALL.labels;
@@ -524,6 +527,10 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const toolsDrag = useRef<{ pointerId: number; startY: number } | null>(null);
   const toolsTrigger = useRef<HTMLButtonElement>(null);
   const toolsHeadingId = useId();
+  const importImageButton = useRef<HTMLButtonElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const [importingImage, setImportingImage] = useState(false);
+  const [imageError, setImageError] = useState("");
   const pitchOptionsId = useId();
   const pitchOptionsRef = useRef<HTMLFieldSetElement>(null);
   const pageRef = useRef<HTMLElement>(null);
@@ -1077,7 +1084,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
   }
   async function save(asCopy = false) {
-    if (savingRef.current || recovery || pitchSelection || addingCategory) return;
+    if (savingRef.current || importingImage || recovery || pitchSelection || addingCategory) return;
     const snapshotTitle = state.current.title.trim();
     if (!snapshotTitle) {
       closeConflict();
@@ -1323,6 +1330,36 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
   }
 
+  async function importBackground(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+
+    setImportingImage(true);
+    setImageError("");
+    try {
+      const image = await readBackgroundImage(file);
+      const current = state.current.layout;
+      change({ ...current, background: placeBackgroundImage(image, current) });
+      selectQuickTool("line");
+      setToolsOpen(false);
+      setPathMode("freehand");
+      setLineArrowhead(false);
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : "Изображението не може да бъде отворено.");
+    } finally {
+      setImportingImage(false);
+    }
+  }
+
+  function removeBackground() {
+    const next = { ...layout };
+    delete next.background;
+    change(next);
+    setImageError("");
+    importImageButton.current?.focus();
+  }
+
   function togglePitchOptions() {
     if (!pitchOptionsVisible) {
       cancelPlacement();
@@ -1333,6 +1370,26 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
     setShowPitchOptions(!pitchOptionsVisible);
   }
+
+  const imageControls = (
+    <div className="ke-image-controls" role="group" aria-label="Фоново изображение">
+      <button ref={importImageButton} type="button" disabled={importingImage || saving}
+        onClick={() => imageInput.current?.click()}>
+        <ImagePlus size={18} aria-hidden="true" />
+        {layout.background ? "Смени изображението" : "Внеси изображение"}
+      </button>
+      <input ref={imageInput} type="file" hidden accept={BACKGROUND_IMAGE_TYPES.join(",")}
+        aria-label="Избери изображение" onChange={importBackground} />
+      {layout.background && (
+        <button type="button" disabled={importingImage || saving}
+          title="Премахни изображението" aria-label="Премахни изображението" onClick={removeBackground}>
+          <Trash2 size={18} aria-hidden="true" />
+        </button>
+      )}
+      {importingImage && <span role="status">Обработка на изображението…</span>}
+      {imageError && <p className="ke-error" role="alert">{imageError}</p>}
+    </div>
+  );
 
   const selectionControls = (
     <>
@@ -1526,7 +1583,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
             <button
               type="button"
               className="ke-primary"
-              disabled={saving || (!dirty && !conflict) || !!recovery || !!pitchSelection || addingCategory}
+              disabled={saving || importingImage || (!dirty && !conflict) || !!recovery || !!pitchSelection || addingCategory}
               onClick={() => {
                 if (conflict && title.trim()) setShowConflict(true);
                 else void save();
@@ -1699,6 +1756,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
           <legend className="ke-sr">Инструменти за упражнението</legend>
           <div className="ke-layout">
             {compact && panels}
+            {compact && !pitchSelection && imageControls}
             <div
               className={pitchSelection ? "ke-pitch-area ke-pitch-area--picker" : "ke-pitch-area"}
               ref={pitchPicker}
@@ -1745,6 +1803,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                   <button type="button" onClick={() => closePitchPicker()}>Отказ</button>
                 </div>
               )}
+              {!compact && !pitchSelection && imageControls}
               <div className="ke-pitch-frame"
                 data-zoomed={!pitchSelection && zoom > 100}
                 style={{ "--ke-zoom": zoom / 100, "--ke-pitch-ratio": viewWidth / viewHeight } as CSSProperties}

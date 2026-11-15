@@ -9,6 +9,7 @@ import {
   addCustomTeam,
   createObject,
   EMPTY_EXERCISE,
+  MAX_BACKGROUND_IMAGE_LENGTH,
   getCustomTeamColors,
   getPitchQuadrants,
   nextPlayerLabel,
@@ -600,6 +601,33 @@ describe("history and recovery", () => {
     expect(validateExercise(blank)).toBeNull();
     expect(getPitchQuadrants(blank)).toEqual(getPitchQuadrants(exercise));
     expect(getPitchQuadrants(cropped)).toEqual(quadrants);
+  });
+  it("validates the saved image and includes it in history and draft recovery", () => {
+    const background = {
+      src: "data:image/jpeg;base64,/9j/2Q==",
+      x: 525, y: 350, width: 700, height: 1050, rotation: 270,
+    } as const;
+    const imported = { ...exercise, background };
+    expect(validateSavedLayout(imported)).toBeNull();
+    expect(sameExercise(imported, exercise)).toBe(false);
+    expect(sameExercise(imported, { ...imported, background: { ...background } })).toBe(true);
+    expect(sameExercise(imported, { ...imported, background: { ...background, width: 600 } })).toBe(false);
+
+    const history = commit({ past: [], present: exercise, future: [] }, imported);
+    expect(undo(history).present).toBe(exercise);
+    expect(redo(undo(history)).present).toBe(imported);
+
+    const draft = { baseRevision: "2026-11-15T10:00:00Z", layout: imported, savedAt: 1 };
+    expect(readDraft(JSON.stringify(draft))).toEqual(draft);
+    for (const invalid of [
+      { src: "https://example.com/image.jpg" },
+      { src: "data:image/svg+xml;base64,PHN2Zz4=" },
+      { src: "data:image/jpeg;base64,/9j/invalid!" },
+      { src: background.src + "A".repeat(MAX_BACKGROUND_IMAGE_LENGTH) },
+      { width: 0 }, { height: Infinity }, { rotation: 45 }, { x: 0 },
+    ]) {
+      expect(validateExercise({ ...imported, background: { ...background, ...invalid } })).toBeTruthy();
+    }
   });
   it("validates quarter-turn pitch rotations and treats zero as the default", () => {
     for (const pitchRotation of [0, 90, 180, 270] as const) {

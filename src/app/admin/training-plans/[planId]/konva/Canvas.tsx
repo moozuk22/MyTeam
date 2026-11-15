@@ -43,7 +43,7 @@ import {
 } from "@/lib/exercise/geometry";
 import {
   ObjectVisual,
-  Pitch,
+  PitchBackground,
   usePitchIcons,
 } from "./Visuals";
 import { pitchView, pitchViewport } from "./pitchView";
@@ -467,6 +467,7 @@ export default function Canvas({
     const object = createObject(tool, p, createExerciseObjectId(), customTeam);
     if (object.kind === "movement") {
       object.path = pathMode;
+      if (exercise.background && isLineType(object.action)) object.color = "#2563eb";
       if (lineArrowhead && isLineType(object.action)) object.arrowhead = true;
     }
     if (object.kind === "text") {
@@ -822,7 +823,7 @@ export default function Canvas({
           onPointerUp={up}
         >
           <Layer {...viewLayer} listening={false}>
-            <Pitch surface={surfacePreview ?? exercise.surface} />
+            <PitchBackground surface={surfacePreview ?? exercise.surface} background={exercise.background} />
           </Layer>
           <Layer {...viewLayer}>
             {(colorPreviewIndex < 0

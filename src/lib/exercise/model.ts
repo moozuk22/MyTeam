@@ -82,11 +82,23 @@ export function textFontSize(object: ExerciseObject): number {
   return object.fontSize ?? object.height * 0.7;
 }
 
+export const MAX_BACKGROUND_IMAGE_LENGTH = 256 * 1024;
+
+export type ExerciseBackground = {
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: PitchRotation;
+};
+
 export type Exercise = {
   version: 2;
   sport: "football";
   surface: "full" | "half" | "blank";
   pitchRotation?: PitchRotation;
+  background?: ExerciseBackground;
   quadrants?: PitchQuadrant[];
   customTeamColors?: (string | null)[];
   thirdTeamColor?: string;
@@ -152,6 +164,30 @@ export const isEquipmentType = (type: string) =>
     !type.startsWith("team") &&
     type !== "text");
 
+function validBackground(value: unknown): value is ExerciseBackground {
+  if (
+    !record(value) ||
+    Object.keys(value).length !== 6 ||
+    typeof value.src !== "string" ||
+    value.src.length > MAX_BACKGROUND_IMAGE_LENGTH ||
+    !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(value.src) ||
+    (value.src.length - "data:image/jpeg;base64,".length) % 4 !== 0 ||
+    !PITCH_ROTATIONS.includes(value.rotation as PitchRotation)
+  ) return false;
+  const { x, y, width, height, rotation } = value;
+  if (
+    typeof x !== "number" || !Number.isFinite(x) ||
+    typeof y !== "number" || !Number.isFinite(y) ||
+    typeof width !== "number" || !Number.isFinite(width) || width <= 0 ||
+    typeof height !== "number" || !Number.isFinite(height) || height <= 0
+  ) return false;
+  const sideways = rotation === 90 || rotation === 270;
+  const halfWidth = (sideways ? height : width) / 2;
+  const halfHeight = (sideways ? width : height) / 2;
+  return x - halfWidth >= 0 && x + halfWidth <= WIDTH &&
+    y - halfHeight >= 0 && y + halfHeight <= HEIGHT;
+}
+
 export function validateExercise(raw: unknown): string | null {
   if (
     !record(raw) ||
@@ -165,12 +201,14 @@ export function validateExercise(raw: unknown): string | null {
   if (
     Object.keys(raw).some(
       (key) =>
-        !["version", "sport", "surface", "pitchRotation", "quadrants", "objects", "customTeamColors", "thirdTeamColor"].includes(key),
+        !["version", "sport", "surface", "pitchRotation", "background", "quadrants", "objects", "customTeamColors", "thirdTeamColor"].includes(key),
     )
   )
     return "Непознато поле във формата на упражнението.";
   if (raw.pitchRotation !== undefined && !PITCH_ROTATIONS.includes(raw.pitchRotation as PitchRotation))
     return "Изберете валидно завъртане на игрището.";
+  if (raw.background !== undefined && !validBackground(raw.background))
+    return "Невалидно изображение за упражнението.";
   if (raw.quadrants !== undefined &&
     (raw.surface === "half" ||
       !Array.isArray(raw.quadrants) ||
@@ -542,6 +580,8 @@ export function convertLegacy(layout: PlanLayout): Exercise {
 
 export function sameExercise(a: Exercise, b: Exercise): boolean {
   if (a === b) return true;
+  const backgroundA = a.background;
+  const backgroundB = b.background;
   const teamsA = getCustomTeamColors(a);
   const teamsB = getCustomTeamColors(b);
   const quadrantsA = a.quadrants ?? PITCH_QUADRANTS;
@@ -551,6 +591,12 @@ export function sameExercise(a: Exercise, b: Exercise): boolean {
     a.sport === b.sport &&
     a.surface === b.surface &&
     (a.pitchRotation ?? 0) === (b.pitchRotation ?? 0) &&
+    (backgroundA === backgroundB || (
+      backgroundA !== undefined && backgroundB !== undefined &&
+      backgroundA.src === backgroundB.src && backgroundA.x === backgroundB.x &&
+      backgroundA.y === backgroundB.y && backgroundA.width === backgroundB.width &&
+      backgroundA.height === backgroundB.height && backgroundA.rotation === backgroundB.rotation
+    )) &&
     (quadrantsA === quadrantsB ||
       (quadrantsA.length === quadrantsB.length && quadrantsA.every((part) => quadrantsB.includes(part)))) &&
     (teamsA === teamsB ||

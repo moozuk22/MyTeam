@@ -6,6 +6,8 @@ Konva is the training plan editor at `/admin/training-plans/[planId]/konva`. Sel
 
 Open the sidebar’s **Детайли** tab to edit **Име на плана**, **Категория** and **Описание**, then choose **Запази**. New plans open on **Детайли** and saved plans open on **Инструменти**. Local draft recovery includes unsaved changes to these fields.
 
+Choose **Внеси изображение** to use a JPG, PNG, or WebP file up to 9 MB as the drawing background. The editor fits the image to the current board and activates **Свободна ръка** for **Линия**. The other drawing tools also work over the image. **Смени изображението** and **Премахни изображението** keep the markings, and **Отмени** can restore the previous background. Saving includes the background in the editor, review, and plan list previews.
+
 If a newer version exists, the editor opens a dialog. Save your changes as a separate plan, load the latest saved version after confirming, or dismiss the dialog to keep editing. **Запази** reopens the dialog while the conflict is unresolved.
 
 Konva plan cards show a read-only preview of the saved pitch and drawing. Previews load in batches as cards approach the visible part of the list.
@@ -68,6 +70,8 @@ The pitch toolbar provides shortcuts for selection and drawing. On desktop, the 
 ## Data and rendering
 
 The existing `TrainingPlan.layout` JSON column stores both drawing versions independently of the plan category. Version 2 stores `sport`, `surface` and an ordered `objects` array. Array order determines stacking. Objects carry semantic kinds (`player`, `equipment`, `movement`, `zone`, `text`), stable IDs, logical coordinates, dimensions, rotation and appearance. Players store team, role and label. Movements store action, path type and local control points. Text objects may store an explicit font size. Older text uses its saved box height to determine the original font size. This is application data, independent of Konva node serialization.
+
+Version 2 can store one optional background with its board coordinates and quarter-turn rotation. The browser converts it to a bounded JPEG before saving. The same layout field stores the image for saves, copies, and draft recovery.
 
 The football registry owns toolbar labels, equipment choices, surfaces and movement styles. Football is the only registered sport. Selection, transformations, history, geometry, recovery and saves are shared editor operations. Future sports can add definitions and rendering; future 3D previews can consume semantic data without interpreting canvas pixels. Neither additional sports nor 3D rendering is implemented here.
 

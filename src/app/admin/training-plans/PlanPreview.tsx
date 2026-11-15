@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Group, Layer, Stage } from "react-konva";
 import { getPitchQuadrants, isInPitchQuadrants, type Exercise } from "@/lib/exercise/model";
-import { ObjectVisual, Pitch, usePitchIcons } from "./[planId]/konva/Visuals";
+import { ObjectVisual, PitchBackground, usePitchIcons } from "./[planId]/konva/Visuals";
 import { fitPitchPreview, pitchViewport } from "./[planId]/konva/pitchView";
 
 export default function PlanPreview({ exercise }: { exercise: Exercise }) {
@@ -28,7 +28,7 @@ export default function PlanPreview({ exercise }: { exercise: Exercise }) {
       {width > 0 && height > 0 ? (
         <Stage width={width} height={height} listening={false}>
           <Layer {...viewLayer} listening={false}>
-            <Pitch surface={exercise.surface} />
+            <PitchBackground surface={exercise.surface} background={exercise.background} />
             {exercise.objects.filter((object) => isInPitchQuadrants(object, quadrants)).map((object) => (
               <Group key={object.id} x={object.x} y={object.y}
                 rotation={object.kind === "movement" || object.kind === "zone" ? object.rotation : object.rotation - rotation}>

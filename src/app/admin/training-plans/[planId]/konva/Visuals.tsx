@@ -369,6 +369,32 @@ function PitchArc({
   );
 }
 
+export function PitchBackground({ surface, background }: Pick<Exercise, "surface" | "background">) {
+  const src = background?.src;
+  const [loaded, setLoaded] = useState<HTMLImageElement>();
+  useEffect(() => {
+    if (!src) return;
+    const image = new window.Image();
+    image.onload = () => setLoaded(image);
+    image.src = src;
+    return () => { image.onload = null; };
+  }, [src]);
+
+  if (!background) return <Pitch surface={surface} />;
+
+  return (
+    <>
+      <Rect width={WIDTH} height={HEIGHT} fill="#16221e" />
+      {loaded && loaded.src === src && (
+        <KonvaImage image={loaded} x={background.x} y={background.y}
+          width={background.width} height={background.height}
+          offsetX={background.width / 2} offsetY={background.height / 2}
+          rotation={background.rotation} />
+      )}
+    </>
+  );
+}
+
 export const Pitch = memo(function Pitch({
   surface,
 }: {
