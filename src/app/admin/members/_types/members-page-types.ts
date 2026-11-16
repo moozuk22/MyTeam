@@ -18,6 +18,8 @@ interface ReportPlayer {
   paymentLogs: ReportPaymentLog[];
   paymentWaivers: Array<{ waivedFor: string }>;
   isActive?: boolean;
+  isDeleted?: boolean;
+  reportActivity?: unknown;
 }
 
 type PlayerStatus = "paid" | "warning" | "overdue" | "paused";

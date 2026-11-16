@@ -1,3 +1,5 @@
+import { getPlayerPaymentReports } from "@/lib/playerPaymentReports";
+import { canAccessTrainingClub } from "@/lib/exercise/access";
 import { calculatePlayerAge, optionalPlayerUpdates, PlayerFieldError } from "@/lib/playerFields";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma, withPrismaPoolRetry } from "@/lib/db";
@@ -297,7 +299,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const token = request.cookies.get("admin_session")?.value;
 
-  if (!token || !(await verifyAdminToken(token))) {
+  const session = token ? await verifyAdminToken(token) : null;
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -338,6 +341,12 @@ export async function GET(request: NextRequest) {
     const customGroupId = request.nextUrl.searchParams.get("customGroupId")?.trim() ?? "";
     if (customGroupId && !uuidRegex.test(customGroupId)) {
       return NextResponse.json({ error: "Custom group not found" }, { status: 404 });
+    }
+
+    if (request.nextUrl.searchParams.get("forReport") === "true") {
+      if (!clubId) return NextResponse.json({ error: "Изберете клуб." }, { status: 400 });
+      if (!canAccessTrainingClub(session, clubId)) return NextResponse.json({ error: "Нямате достъп до този клуб." }, { status: 403 });
+      return NextResponse.json(await getPlayerPaymentReports(clubId, coachGroupId, customGroupId));
     }
 
     const now = new Date();

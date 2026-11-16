@@ -1,5 +1,6 @@
 "use client";
 
+import { isReportMonthActive } from "@/lib/paymentReportActivity";
 import { useEffect, useState } from "react";
 import { buildYearlyPaymentReport, formatRecordedPaymentAmounts } from "@/lib/yearlyPaymentReport";
 import { type ReportKind, type ReportPlayer } from "../_types/members-page-types";
@@ -110,7 +111,7 @@ export function ReportsDialog({
         if (filterCustomGroupId) {
           search.set("customGroupId", filterCustomGroupId);
         }
-        search.set("includeAllPaymentWaivers", "true");
+        search.set("forReport", "true");
         const endpoint = search.size ? `/api/admin/members?${search.toString()}` : "/api/admin/members";
         const response = await fetch(endpoint, { cache: "no-store" });
         if (cancelled) return;
@@ -142,7 +143,9 @@ export function ReportsDialog({
               teamGroup: typeof raw.teamGroup === "number" ? raw.teamGroup : null,
               paymentAmount: raw.paymentAmount === null || raw.paymentAmount === undefined ? null : String(raw.paymentAmount),
               firstBillingMonth: raw.firstBillingMonth ? String(raw.firstBillingMonth) : null,
-              paymentWorkflow: typeof raw.club === "object" && raw.club !== null
+              reportActivity: raw.reportActivity,
+              isDeleted: raw.isDeleted === true,
+              paymentWorkflow: typeof raw.paymentWorkflow === "string" ? raw.paymentWorkflow : typeof raw.club === "object" && raw.club !== null
                 ? String((raw.club as Record<string, unknown>).paymentWorkflow ?? "calendar_month")
                 : "calendar_month",
               paymentLogs,
@@ -213,6 +216,7 @@ export function ReportsDialog({
   );
 
   const monthlyPlayers = reportPlayers.filter((player) =>
+    isReportMonthActive(player, selectedYear, selectedMonthIdx) &&
     !player.paymentWaivers.some(({ waivedFor }) => {
       const waivedDate = new Date(waivedFor);
       return waivedDate.getUTCMonth() === selectedMonthIdx &&
@@ -224,7 +228,7 @@ export function ReportsDialog({
     const paidDate = getPaymentDateForMonth(player);
     return {
       id: player.id,
-      name: player.fullName,
+      name: `${player.fullName}${player.isDeleted ? " (изтрит)" : ""}`,
       group: player.teamGroup,
       amount: formatRecordedPaymentAmounts(player.paymentLogs.filter((log) => {
         const period = new Date(log.paidFor);
@@ -238,10 +242,13 @@ export function ReportsDialog({
     };
   });
 
-  const rowsYearly = reportPlayers.map((player) => {
+  const rowsYearly = reportPlayers.filter((player) =>
+    Array.from({ length: 12 }, (_, month) => month).some((month) => isReportMonthActive(player, selectedYear, month)) ||
+    player.paymentLogs.some((log) => new Date(log.paidFor).getUTCFullYear() === selectedYear),
+  ).map((player) => {
     return {
       id: player.id,
-      name: player.fullName,
+      name: `${player.fullName}${player.isDeleted ? " (изтрит)" : ""}`,
       isActive: player.isActive !== false,
       ...buildYearlyPaymentReport(player, selectedYear, now),
     };
@@ -340,7 +347,7 @@ export function ReportsDialog({
   <p style="margin:0 0 14px;color:#6b7280;font-size:13px;">Период: ${escapeHtml(periodTitle)}</p>
   ${scopeTitle ? `<p style="margin:0 0 14px;color:#6b7280;font-size:13px;">${escapeHtml(scopeTitle)}</p>` : ""}
   ${yearly ? `<p style="font-size:12px;">Към ${escapeHtml(now.toLocaleDateString("bg-BG", { timeZone: "Europe/Sofia" }))}. Платени / дължими месечни такси; бъдещите месеци, освобождаванията и месеците преди началото на таксуване не участват в събираемостта. Предплатените месеци са показани, но участват в събираемостта, когато станат дължими. Филтър: ${statusFilter === "all" ? "Всички" : statusFilter === "paid" ? "Всички дължими такси са платени" : "Има неплатени такси"}. Обобщението обхваща всички избрани играчи преди филтъра за статус.</p>
-  <p style="font-size:12px;">Сумите са записаните при плащане стойности, а не текущата такса на играча. Старите плащания без записана сума са обозначени като неизвестни и не се приемат за нула. Общите суми обхващат показаната година по платения период, включително предплатените месеци. За таксуване извън календарни месеци се показва само платежна активност, без оценка на задълженията. Историческите промени в членството и групите не са налични; използват се текущите играчи и групи.</p>` : ""}
+  <p style="font-size:12px;">Сумите са записаните при плащане стойности, а не текущата такса на играча. Старите плащания без записана сума са обозначени като неизвестни и не се приемат за нула. Общите суми обхващат показаната година по платения период, включително предплатените месеци. За таксуване извън календарни месеци се показва само платежна активност, без оценка на задълженията. Неактивните месеци не се включват в дължимите такси. За състезателите без запазена история на активността се показват само платените месеци. Изтритите профили запазват платежната си история. Използват се текущите групи, а за изтритите профили — групите при изтриване.</p>` : ""}
   <div style="display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap;">
     <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">${yearly ? "Платени / дължими такси" : "Платили"}: <strong>${paid}</strong> / ${totalRows}</div>
     <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:13px;min-width:140px;">Събираемост: <strong>${yearly && totalRows === 0 ? "—" : `${percent}%`}</strong></div>
@@ -457,7 +464,7 @@ export function ReportsDialog({
                       setPlayerSearch(player.fullName);
                       setPlayerMenuOpen(false);
                     }}
-                  >{player.fullName}</div>
+                  >{player.fullName}{player.isDeleted ? " (изтрит)" : ""}</div>
                 ))}
                 {matchingPlayers.length === 0 && (
                   <div className="rd-player-no-results">Няма играчи с това име.</div>
