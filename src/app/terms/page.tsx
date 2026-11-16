@@ -5,7 +5,9 @@ import Link from "next/link";
 import "../legal.css";
 
 export default function TermsOfService() {
-    useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, []);
+    useEffect(() => {
+        if (!window.location.hash) window.scrollTo({ top: 0, behavior: "instant" });
+    }, []);
     return (
         <div className="legal-container fade-in">
             <div className="legal-header">
@@ -93,6 +95,48 @@ export default function TermsOfService() {
                 <section>
                     <h2>10. ПРИЛОЖИМО ПРАВО</h2>
                     <p>За всички неуредени от настоящите Общи условия въпроси се прилага действащото българско законодателство. Всички спорове ще се решават по пътя на преговорите, а при невъзможност – от компетентния български съд.</p>
+                </section>
+
+                <section id="credits">
+                    <h2>Авторство</h2>
+                    <p>
+                        Икона „Ball“ от Icuk Yulianti,{" "}
+                        <a href="https://thenounproject.com/browse/icons/term/ball/">Noun Project</a>{" "}
+                        (<a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>).
+                    </p>
+                    <p>
+                        Икона „Football goal“ от Mark Caron, оцветена в редактора,{" "}
+                        <a href="https://thenounproject.com/icon/football-goal-2451562/">Noun Project</a>{" "}
+                        (<a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>).
+                    </p>
+                    <p>
+                        Икона „Flag“ от NAPISAH, оцветена в редактора,{" "}
+                        <a href="https://thenounproject.com/icon/flag-6452452/">Noun Project</a>{" "}
+                        (<a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>).
+                    </p>
+                    <p>
+                        Икона „Hula Hoop“ от omeneko, оцветена в редактора,{" "}
+                        <a href="https://thenounproject.com/icon/hula-hoop-3437627/">Noun Project</a>{" "}
+                        (<a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>).
+                    </p>
+                    <p>
+                        <a href="https://www.flaticon.com/free-icon/barrier_1540543">Barrier icon designed by Magnific from Flaticon</a>.
+                        {" "}Иконата се използва за „Стена“ и е изрязана до една фигура за „Манекен“.
+                    </p>
+                    <p>
+                        <a href="https://www.flaticon.com/free-icon/cone_1505455">Cone icon designed by Smashicons from Flaticon</a>.
+                    </p>
+                    <p>
+                        <a href="https://www.flaticon.com/free-icon/stairs_4212592">Stairs icon designed by Magnific from Flaticon</a>.
+                    </p>
+                    <p>
+                        <a href="https://www.flaticon.com/free-icon/hurdle_11798797">Hurdle icon designed by Rudy_wae from Flaticon</a>.
+                        {" "}Иконата е изрязана до едно препятствие.
+                    </p>
+                    <p>
+                        <a href="https://www.flaticon.com/free-icon/sport_17228453">Sport icon designed by ICs Icons from Flaticon</a>.
+                        {" "}Иконата е оцветена в редактора за „Шапка“.
+                    </p>
                 </section>
             </div>
         </div>

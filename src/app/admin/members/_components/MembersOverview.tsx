@@ -1,5 +1,6 @@
 "use client";
 
+import { trainingPlanSearch } from "@/lib/exercise/planLocation";
 import type * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
@@ -488,16 +489,14 @@ export function MembersOverview({
                 <CalendarIcon />
                 <span>История на мачовете</span>
               </button>
-              {isAdmin && (
-                <button
-                  className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
-                  onClick={() => router.push(`/admin/training-plans?clubId=${encodeURIComponent(clubId)}`)}
-                  type="button"
-                >
-                  <ClipboardListIcon />
-                  <span>Планове за тренировки</span>
-                </button>
-              )}
+              <button
+                className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
+                onClick={() => router.push(`/admin/training-plans?${trainingPlanSearch(clubId, coachGroupId)}`)}
+                type="button"
+              >
+                <ClipboardListIcon />
+                <span>Планове за тренировки</span>
+              </button>
               {isAdmin && (
                 <button
                   className="amp-download-links-btn amp-btn--compact"

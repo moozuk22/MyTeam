@@ -87,6 +87,7 @@ model Club {
   discountConfigs         TeamDiscountConfig[]
   matches                    ClubMatch[]
   trainingPlans              TrainingPlan[]
+  trainingPlanCategories     TrainingPlanCategory[]
   limitedTrainingEvents      LimitedTrainingEvent[]
 
   @@map("clubs")
@@ -207,6 +208,7 @@ model CoachGroup {
   customTrainingGroups    ClubCustomTrainingGroup[]
   adminPushSubscriptions  AdminPushSubscription[]
   adminNotifications      AdminNotification[]
+  trainingPlans           TrainingPlan[]
 
   @@index([clubId])
   @@map("coach_groups")
@@ -450,16 +452,37 @@ model TrainingPlan {
   clubId          String   @map("club_id") @db.Uuid
   title           String
   description     String?
+  categoryId      String?  @map("category_id") @db.Uuid
   layout          Json
   createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdByCoachGroupId String? @map("created_by_coach_group_id") @db.Uuid
+  creatorName     String?  @map("creator_name")
   updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  club     Club                  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  category TrainingPlanCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdByCoachGroup CoachGroup? @relation(fields: [createdByCoachGroupId], references: [id], onDelete: SetNull)
 
   @@index([clubId])
+  @@index([clubId, categoryId, updatedAt, id])
+  @@index([categoryId])
+  @@index([createdByCoachGroupId])
   @@map("training_plans")
+}
+
+model TrainingPlanCategory {
+  id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId  String? @map("club_id") @db.Uuid
+  name    String
+  nameKey String  @map("name_key")
+
+  club  Club?          @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  plans TrainingPlan[]
+
+  @@unique([clubId, nameKey])
+  @@map("training_plan_categories")
 }
 
 model Image {

@@ -108,6 +108,9 @@ export async function middleware(request: NextRequest) {
         // Calculator scope follows the last club visited in this browser.
         const financeClubId = /^\/admin\/clubs\/([0-9a-f-]{36})\/finance$/.exec(pathname)?.[1];
         if (financeClubId && canReadClubCalculator(roles, lastClubIdRaw, financeClubId)) return NextResponse.next();
+        if (pathname === "/admin/training-plans" || pathname.startsWith("/admin/training-plans/")) {
+          return NextResponse.next();
+        }
         if (COACH_ALLOWED_ADMIN_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
           const response = NextResponse.next();
           const clubId = request.nextUrl.searchParams.get("clubId");
