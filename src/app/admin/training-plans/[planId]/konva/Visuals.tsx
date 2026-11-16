@@ -300,16 +300,18 @@ export function EquipmentPreview({ type }: { type: ExerciseTool }) {
 function ColorEquipmentIcon({
   image,
   object,
+  color,
   crop,
 }: {
   image: HTMLImageElement;
   object: ExerciseObject;
+  color: string;
   crop: IconCrop;
 }) {
   const scale = Math.min(object.width / crop.width, object.height / crop.height);
   const width = crop.width * scale;
   const height = crop.height * scale;
-  if (object.color === "#f59e0b")
+  if (color === "#f59e0b")
     return (
       <KonvaImage
         image={image}
@@ -329,7 +331,7 @@ function ColorEquipmentIcon({
       height={height}
       listening={false}
       sceneFunc={(context) => {
-        const tinted = tintedIcon(image, object.color, "artwork") ?? image;
+        const tinted = tintedIcon(image, color, "artwork") ?? image;
         context.drawImage(
           tinted,
           crop.x,
@@ -683,7 +685,7 @@ export const ObjectVisual = memo(function ObjectVisual({
   const colorIcon = COLOR_ICONS[isMarker ? "marker" : type];
   const colorImage = colorIcon && icons[colorIcon.name];
   if (colorIcon && colorImage)
-    return <ColorEquipmentIcon image={colorImage} object={o} crop={colorIcon.crop} />;
+    return <ColorEquipmentIcon image={colorImage} object={o} color={c} crop={colorIcon.crop} />;
   const iconName = type.startsWith("goal")
     ? "goal"
     : type === "flag" || type === "ring" ? type : null;
