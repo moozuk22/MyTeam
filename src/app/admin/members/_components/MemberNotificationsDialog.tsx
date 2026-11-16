@@ -2,6 +2,7 @@
 
 import type * as React from "react";
 import { NotificationImageAttachment } from "@/components/NotificationImageAttachment";
+import { SkeletonLine } from "./FinanceSkeleton";
 import { XIcon, BellIcon } from "./members-page-icons";
 import { type CoachGroups } from "../_hooks/useCoachGroups";
 import { type TrainingGroups } from "../_hooks/useTrainingGroups";
@@ -11,6 +12,10 @@ type MemberNotificationsDialogProps = {
   memberNotifications: Pick<
     MemberNotifications,
     | "notifyPanelOpen"
+    | "notifyCustomGroups"
+    | "notifyGroupsLoading"
+    | "notifyGroupsError"
+    | "retryNotifyGroups"
     | "notifyBusy"
     | "setNotifyPanelOpen"
     | "notifyCoachGroupFilter"
@@ -58,6 +63,10 @@ export function MemberNotificationsDialog({
 }: MemberNotificationsDialogProps) {
   const {
     notifyPanelOpen,
+    notifyCustomGroups,
+    notifyGroupsLoading,
+    notifyGroupsError,
+    retryNotifyGroups,
     notifyBusy,
     setNotifyPanelOpen,
     notifyCoachGroupFilter,
@@ -78,7 +87,7 @@ export function MemberNotificationsDialog({
     handleSendNotify,
   } = memberNotifications;
   const { loadCoachGroups, coachGroups } = coachGroupManagement;
-  const { isCustomTrainingGroupMode, customTrainingGroups, trainingScheduleGroups } = trainingGroups;
+  const { isCustomTrainingGroupMode, trainingScheduleGroups } = trainingGroups;
   return (
     <>
       {notifyPanelOpen && !coachMessageOpen && (
@@ -142,7 +151,20 @@ export function MemberNotificationsDialog({
                   </select>
                 </label>
               )}
-              {groupOptions.length > 0 && (
+              {isCustomTrainingGroupMode && notifyGroupsLoading && (
+                <div role="status" aria-label="Зареждане" aria-busy="true" style={{ marginBottom: 12 }}>
+                  <SkeletonLine wide />
+                </div>
+              )}
+              {isCustomTrainingGroupMode && notifyGroupsError && (
+                <div style={{ marginBottom: 12 }}>
+                  <p className="amp-confirm-error" role="alert">{notifyGroupsError}</p>
+                  <button type="button" className="amp-btn amp-btn--ghost amp-btn--compact" onClick={retryNotifyGroups} disabled={notifyBusy}>Опитай отново</button>
+                </div>
+              )}
+              {(isCustomTrainingGroupMode
+                ? !notifyGroupsLoading && !notifyGroupsError && notifyCustomGroups.length > 0
+                : trainingScheduleGroups.length > 0 || groupOptions.length > 0) && (
                 <label className="amp-edit-field" style={{ marginBottom: "12px" }}>
                   <span className="amp-lbl">Отбор / група</span>
                   <select
@@ -156,7 +178,7 @@ export function MemberNotificationsDialog({
                   >
                     <option value="all">Всички</option>
                     {isCustomTrainingGroupMode ? (
-                      customTrainingGroups.map((g) => (
+                      notifyCustomGroups.map((g) => (
                         <option key={g.id} value={g.id}>
                           {g.name}
                         </option>
