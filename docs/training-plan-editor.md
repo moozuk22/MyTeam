@@ -109,9 +109,9 @@ Direct manipulation was additionally checked at all seven viewport sizes: mouse 
 
 ## План-конспект
 
-Open **План-конспекти** from the drawing library. Documents are private to the signed-in account within the selected club. Open **Нов план-конспект** to edit the session details and the five exercise sections directly on the plan. Choose **Подредба на долния ред** to give two neighboring sections a shared diagram area. Splitting the sections again keeps their individual fields and drawings.
+Open **План-конспекти** from the drawing library. Documents are private to the signed-in account within the selected club. Open **Нов план-конспект** to edit the session details and the five exercise sections directly on the plan. Use **Подредба на долния ред** directly above the lower row to give two neighboring sections a shared diagram area. Splitting the sections again keeps their individual fields and drawings.
 
-Use **Добави рисунка** to pick a saved Konva drawing from the club library. Saving the document captures a copy of that drawing. Subsequent library edits and deletions leave the document’s copy available. Use **Смени рисунката** to attach a newer version.
+Use **Добави рисунка** to select a saved Konva drawing. The selection area opens with **Мои** active each time. **Мои** shows drawings from the signed-in account in this club. **Клубни** shows all drawings in this club. Use **Търсене по заглавие** to find titles in the active filter. Search ignores letter case and applies before pagination. The search text stays when you change the filter. Closing the selection area clears the filter and search text. Saving the document captures a copy of that drawing. Subsequent library edits and deletions leave the document’s copy available. Use **Смени рисунката** to attach a newer version.
 
 Choose **Преглед за печат** to check the A4 landscape layout, then **Към редакцията** to return to the editable plan. A taller pitch view turns 90° clockwise on this sheet. Players, equipment, and text keep their individual orientation while the background, arrows, and zones rotate with the pitch. The drawing editor and library keep their saved orientation. **Печат** opens the browser print dialog for one A4 landscape sheet or **Save as PDF**. The preview reduces the sheet’s scale if the entered content would otherwise exceed the page.
 

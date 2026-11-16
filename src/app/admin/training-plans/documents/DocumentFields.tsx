@@ -90,7 +90,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
             </div>;
           })}
         </div>
-        {activePicker !== undefined && indices.includes(activePicker) && <DrawingPicker endpoint={drawingEndpoint} location={location}
+        {activePicker !== undefined && indices.includes(activePicker) && <DrawingPicker key={activePicker} endpoint={drawingEndpoint} location={location}
           onPick={(drawing) => { onDrawing(activePicker, drawing); closePicker(activePicker); }} onClose={() => closePicker(activePicker)} />}
       </div>
       <div className="td-edit-split td-edit-footer">
@@ -119,17 +119,17 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
           <div className="td-fields">{sessionFields.slice(3).map((field) => sessionField(field))}</div>
         </section>
       </div>
+      <div className="td-field td-layout-control">
+        <label htmlFor="td-merge-placement">Подредба на долния ред</label>
+        <select id="td-merge-placement" value={content.merge} onChange={(event) => onMerge(event.target.value as Merge)}>
+          <option value="none">Отделни секции</option>
+          <option value="left">Обща зона за фази №2 и №3</option>
+          <option value="right">Обща зона за фаза №3 и игровата форма</option>
+        </select>
+      </div>
       <div className="td-edit-row td-edit-bottom">
         {documentBottomGroups(content.merge).map(exerciseGroup)}
       </div>
-    </div>
-    <div className="td-field td-layout-control">
-      <label htmlFor="td-merge-placement">Подредба на долния ред</label>
-      <select id="td-merge-placement" value={content.merge} onChange={(event) => onMerge(event.target.value as Merge)}>
-        <option value="none">Отделни секции</option>
-        <option value="left">Обща зона за фази №2 и №3</option>
-        <option value="right">Обща зона за фаза №3 и игровата форма</option>
-      </select>
     </div>
   </fieldset>;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { DrawingSnapshot } from "@/lib/exercise/document";
@@ -15,6 +15,9 @@ type DrawingPage = { plans: DrawingSummary[]; nextCursor: string | null };
 export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
   endpoint: string; location: string; onPick: (drawing: DrawingSnapshot) => void; onClose: () => void;
 }) {
+  const searchId = useId();
+  const [scope, setScope] = useState<"mine" | "club">("mine");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState<DrawingPage>();
   const [cursor, setCursor] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -25,13 +28,13 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
 
   useEffect(() => {
     const abort = new AbortController();
-    const query = new URLSearchParams({ scope: "club" });
+    const query = new URLSearchParams({ scope, search: search.trim() });
     if (cursor) query.set("cursor", cursor);
     void documentRequest<DrawingPage>(`${endpoint}?${query}`, "Рисунките не могат да се заредят.", { signal: abort.signal })
-      .then(setPage)
+      .then((result) => { if (!abort.signal.aborted) setPage(result); })
       .catch((error: Error) => { if (!abort.signal.aborted) setListError(error.message); });
     return () => abort.abort();
-  }, [endpoint, cursor, attempt]);
+  }, [endpoint, cursor, attempt, scope, search]);
 
   useEffect(() => {
     if (!selection) return;
@@ -39,6 +42,7 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
     void documentRequest<{ plan: { id: string; title: string; layout: Exercise } }>(
       `${endpoint}/${selection}`, "Рисунката не може да се зареди.", { signal: abort.signal },
     ).then(({ plan }) => {
+      if (abort.signal.aborted) return;
       if (plan.layout?.version !== 2) throw new Error("Първо копирайте рисунката в новия редактор.");
       setPreview({ sourceId: plan.id, title: plan.title, layout: plan.layout });
     }).catch((error: Error) => { if (!abort.signal.aborted) setPreviewError(error.message); });
@@ -52,16 +56,39 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
     setAttempt((value) => value + 1);
   }
 
+  function changeFilter(nextScope: "mine" | "club", nextSearch: string) {
+    setScope(nextScope);
+    setSearch(nextSearch);
+    resetPage(null);
+    setSelection(undefined);
+    setPreview(undefined);
+    setPreviewError("");
+  }
+
   return <section className="td-picker" aria-label="Избор на рисунка">
     <div className="td-actions">
-      <h3>Рисунки на клуба</h3>
+      <h3>Избор на рисунка</h3>
       <button type="button" className="tp-secondary-btn" onClick={onClose}>Затвори избора</button>
+    </div>
+    <div className="td-picker-filters">
+      <div className="td-actions" role="group" aria-label="Филтър за рисунки">
+        {(["mine", "club"] as const).map((option) => <button key={option} type="button"
+          className="tp-secondary-btn" aria-pressed={scope === option}
+          onClick={() => changeFilter(option, search)}>
+          {option === "mine" ? "Мои" : "Клубни"}
+        </button>)}
+      </div>
+      <div className="td-field">
+        <label htmlFor={searchId}>Търсене по заглавие</label>
+        <input id={searchId} type="search" maxLength={200} value={search}
+          placeholder="Търси рисунка" onChange={(event) => changeFilter(scope, event.target.value)} />
+      </div>
     </div>
     {listError && <div role="alert" className="td-feedback">
       {listError} <button type="button" className="tp-secondary-btn" onClick={() => resetPage(cursor)}>Опитай отново</button>
     </div>}
     {!page && !listError && <FinanceSkeleton variant="form" />}
-    {page?.plans.length === 0 && <p className="td-muted">Няма запазени рисунки на тази страница.</p>}
+    {page?.plans.length === 0 && <p className="td-muted">{search.trim() ? "Няма рисунки, които отговарят на търсенето." : "Няма запазени рисунки в избрания филтър."}</p>}
     {page && <ul className="td-drawing-list">
       {page.plans.map((drawing) => <li key={drawing.id}>
         {drawing.layoutVersion === 2

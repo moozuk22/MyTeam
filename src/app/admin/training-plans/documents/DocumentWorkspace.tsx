@@ -105,7 +105,7 @@ export default function DocumentWorkspace({ clubId, clubName, groupName, locatio
   }, [selected, endpoint, attempt]);
 
   const context = groupName ? `${clubName} · ${groupName}` : clubName;
-  return <main className="tp-page td-page">
+  return <main className={`tp-page td-page${!selected ? " td-library" : ""}`}>
     <div className="tp-inner td-inner">
       {!selected && <DocumentList endpoint={endpoint} listHref={listHref} libraryHref={libraryHref} context={context} />}
       {selected && selected !== "new" && !loaded && <section aria-label="План-конспект">
