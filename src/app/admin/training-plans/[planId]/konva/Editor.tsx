@@ -1223,6 +1223,9 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         setConflict(true);
         setShowConflict(true);
       }
+      // The recovered content still belongs to its original server revision.
+      // Keep that base for draft persistence and optimistic save checks.
+      setRevision(recovery.baseRevision);
     }
     try {
       if (!restore) localStorage.removeItem(key);
