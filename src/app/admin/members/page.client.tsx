@@ -393,7 +393,6 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
     members,
     coachGroupId,
     isCustomTrainingGroupMode,
-    customTrainingGroups,
     trainingScheduleGroups,
   });
 
