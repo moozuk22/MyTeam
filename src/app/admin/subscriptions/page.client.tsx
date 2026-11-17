@@ -1,5 +1,7 @@
 "use client";
 
+import TrainingPlanSubscription, { SharedTrainingPlanPrices, type TrainingPlanClub } from "./TrainingPlanSubscription";
+
 import Link from "next/link";
 import { Building2, Calculator, RefreshCw, Wallet, Search } from "lucide-react";
 import CalculatorSubscription, { SharedCalculatorPrices, type CalculatorClub } from "./CalculatorSubscription";
@@ -30,9 +32,11 @@ function endOfMonth(month: string): string {
 }
 
 export default function SubscriptionsPageClient() {
+  const [trainingPlanRevision, setTrainingPlanRevision] = useState(0);
+  const [sharedTrainingPlanPrices, setSharedTrainingPlanPrices] = useState<CalculatorPrice[]>();
   const [calculatorRevision, setCalculatorRevision] = useState(0);
   const [sharedCalculatorPrices, setSharedCalculatorPrices] = useState<CalculatorPrice[]>();
-  const [clubs, setClubs] = useState<CalculatorClub[]>([]);
+  const [clubs, setClubs] = useState<(CalculatorClub & TrainingPlanClub)[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -93,6 +97,7 @@ export default function SubscriptionsPageClient() {
         <div><Wallet size={20} aria-hidden="true" /><span>Платени абонаменти<strong>{loading ? '—' : clubs.filter(c => c.summary.status === 'active').length}</strong></span></div>
         <div><Calculator size={20} aria-hidden="true" /><span>Нуждаят се от внимание<strong>{loading ? '—' : clubs.filter(c => ['unpaid', 'trial_expired'].includes(c.summary.status)).length}</strong></span></div>
       </div>
+      <SharedTrainingPlanPrices onLoaded={setSharedTrainingPlanPrices} onSaved={() => setTrainingPlanRevision(v => v+1)} />
       <SharedCalculatorPrices onLoaded={setSharedCalculatorPrices} onSaved={() => setCalculatorRevision(v => v+1)} />
       <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>АБОНАМЕНТИ</span><h2>Клубове <span>{loading ? "—" : visible.length}</span></h2></div></div>
       <div className={styles.filters}>
@@ -134,6 +139,7 @@ export default function SubscriptionsPageClient() {
             {club.billingStatus === "active" && <Link href={`/admin/members?clubId=${club.id}`}>Отвори клуба ↗</Link>}
           </div>
           {club.billingStatus === "active" && club.subscription && <details className={styles.calculatorSettings}><summary><Calculator size={18} aria-hidden="true" />Финансов калкулатор<span>Настройки и плащания</span></summary><CalculatorSubscription club={club} revision={calculatorRevision} sharedPrices={sharedCalculatorPrices} onSaved={() => { void load().catch(e => setError(e.message)); }} /></details>}
+          <details className={styles.calculatorSettings}><summary>Планове за тренировки<span>Настройки и плащания</span></summary><TrainingPlanSubscription club={club} revision={trainingPlanRevision} sharedPrices={sharedTrainingPlanPrices} onSaved={() => { void load().catch(e => setError(e.message)); }} /></details>
           {editor?.clubId === club.id && (club.subscription || editor.action === "configure") && <section className={styles.editor}>
             <div className={styles.editorHeader}><h3>{({ configure: "Вид и настройки на абонамента", trial: "Редакция на пробен период", start_paid: "Платен абонамент", fee: "Промяна на месечната такса", payment: "Запис на плащане", history: "История и такси" })[editor.action]}</h3><button type="button" disabled={busy} onClick={() => setEditor(null)}>Затвори</button></div>
             <SubscriptionEditor key={`${club.id}-${club.subscription?.version ?? 0}-${editor.action}`} club={club} action={editor.action} busy={busy} save={(body) => save(club, body)} onCalculatorSaved={() => { void load().catch(e => setError(e.message)); }} />
@@ -187,8 +193,8 @@ function SubscriptionEditor({ club, action, busy, save, onCalculatorSaved }: { c
 
 function SubscriptionPaymentSelector({club,busy,save,onCalculatorSaved}:{club:ClubSubscriptionView;busy:boolean;save:Save;onCalculatorSaved:()=>void}) {
   const [target,setTarget]=useState('platform');
-  return <><label>Абонамент<select disabled={busy} value={target} onChange={e=>setTarget(e.target.value)}><option value="platform">MyTeam</option><option value="calculator">Финансов калкулатор</option></select></label>
-    {target==='calculator'?<CalculatorSubscription club={club} paymentOnly onSaved={onCalculatorSaved}/>:<PaymentForm club={club} busy={busy} save={save}/>}</>;
+  return <><label>Абонамент<select disabled={busy} value={target} onChange={e=>setTarget(e.target.value)}><option value="platform">MyTeam</option><option value="calculator">Финансов калкулатор</option><option value="training-plans">Планове за тренировки</option></select></label>
+    {target==='training-plans'?<TrainingPlanSubscription club={club} paymentOnly onSaved={onCalculatorSaved}/>:target==='calculator'?<CalculatorSubscription club={club} paymentOnly onSaved={onCalculatorSaved}/>:<PaymentForm club={club} busy={busy} save={save}/>}</>;
 }
 
 function PaymentForm({ club, busy, save }: { club: ClubSubscriptionView; busy: boolean; save: Save }) {

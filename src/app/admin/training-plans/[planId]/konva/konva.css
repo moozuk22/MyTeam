@@ -1175,3 +1175,11 @@ fieldset:disabled .ke-canvas {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* Keep the drawing surface usable below subscription and action messages. */
+@media (max-width: 899px), (max-height: 479px) {
+  .ke-inner:has(.ke-subscription-notice) .ke-workspace:has(.ke-pitch-area:not([hidden])) {
+    min-height: 500px;
+    flex-shrink: 0;
+  }
+}

@@ -1,3 +1,5 @@
+import { trainingPlanCapabilities } from "@/lib/trainingPlanSubscriptions";
+vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { blankDocument } from "./document";
@@ -52,10 +54,34 @@ function request(method: string, body?: unknown, path = "", origin = "http://loc
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.session.mockResolvedValue({ sub: ownerId, roles: ["coach"], defaultClubId: clubId });
+  vi.mocked(trainingPlanCapabilities).mockResolvedValue({enabled:true,canSave:true,canPrint:true});
   mocks.club.mockResolvedValue({ id: clubId });
 });
 
 describe("training plan documents", () => {
+  it.each([`/${documentId}`, `/%32${documentId.slice(1)}`, `/${documentId}/`])("blocks an unpaid document update at %s before reads or writes", async path => {
+    vi.mocked(trainingPlanCapabilities).mockResolvedValue({ enabled: false, canSave: false, canPrint: false });
+    const content = blankDocument();
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1 });
+    mocks.update.mockResolvedValue({ count: 1 });
+    const response = await PUT(request("PUT", { content, revision: 1 }, path), detail);
+    expect(response.status).toBe(403);
+    expect(mocks.find).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it.each(["coach", "admin"])("keeps encoded document updates available to an authorized %s", async role => {
+    mocks.session.mockResolvedValue({ sub: ownerId, roles: [role], defaultClubId: clubId });
+    vi.mocked(trainingPlanCapabilities).mockResolvedValue({ enabled: role === "coach", canSave: true, canPrint: true });
+    const content = blankDocument();
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1 });
+    mocks.update.mockResolvedValue({ count: 1 });
+    const response = await PUT(request("PUT", { content, revision: 1 }, `/%32${documentId.slice(1)}`), detail);
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ where: { ...scope, revision: 1 } }));
+    expect(vi.mocked(trainingPlanCapabilities)).toHaveBeenCalledWith(clubId, [role]);
+  });
+
   it("scopes list and detail to the authenticated owner even for administrator accounts", async () => {
     mocks.session.mockResolvedValue({ sub: ownerId, roles: ["admin"] });
     mocks.list.mockResolvedValue([]);

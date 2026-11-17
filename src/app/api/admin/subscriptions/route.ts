@@ -1,3 +1,4 @@
+import { listTrainingPlanSubscriptions } from "@/lib/trainingPlanSubscriptions";
 import { NextRequest, NextResponse } from "next/server";
 import { listCalculatorSubscriptions } from "@/lib/calculatorSubscriptions";
 import { listClubSubscriptions } from "@/lib/clubSubscriptions";
@@ -12,8 +13,8 @@ export async function GET(request: NextRequest) {
   try {
     const clubs = await listClubSubscriptions();
     if (!clubs.length) return NextResponse.json(clubs);
-    const calculators = await listCalculatorSubscriptions(clubs.map(c => c.id));
-    return NextResponse.json(clubs.map(c => ({...c,calculator:calculators.get(c.id)})));
+    const [calculators, trainingPlans] = await Promise.all([listCalculatorSubscriptions(clubs.map(c => c.id)), listTrainingPlanSubscriptions(clubs.map(c => c.id))]);
+    return NextResponse.json(clubs.map(c => ({...c,calculator:calculators.get(c.id),trainingPlan:trainingPlans.get(c.id)})));
   }
   catch (error) { return subscriptionApiError(error); }
 }

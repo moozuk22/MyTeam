@@ -1,3 +1,5 @@
+import { trainingPlanCapabilities } from "@/lib/trainingPlanSubscriptions";
+vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: vi.fn() }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { SignJWT } from "jose";
@@ -70,9 +72,10 @@ function request(
   method: string,
   body?: unknown,
   origin = "http://localhost:3000",
+  pathId = id,
 ) {
   return new NextRequest(
-    `http://localhost:3000/api/admin/clubs/${club}/training-plans/${id}`,
+    `http://localhost:3000/api/admin/clubs/${club}/training-plans/${pathId}`,
     {
       method,
       headers: {
@@ -92,6 +95,7 @@ beforeEach(() => {
     roles: ["admin"],
     defaultClubId: null,
   });
+  vi.mocked(trainingPlanCapabilities).mockResolvedValue({enabled:true,canSave:true,canPrint:true});
   mocks.club.mockResolvedValue({ id: club });
   mocks.findUnique.mockResolvedValue(row);
   mocks.findMany.mockResolvedValue([row]);
@@ -157,6 +161,29 @@ describe("training plan previews", () => {
 });
 
 describe("training plan access and persistence", () => {
+  it.each([id, `%33${id.slice(1)}`, `${id}/`])("blocks an unpaid drawing update at %s before reads or writes", async pathId => {
+    mocks.verify.mockResolvedValue({ sub: id, roles: ["coach"], defaultClubId: club });
+    vi.mocked(trainingPlanCapabilities).mockResolvedValue({ enabled: false, canSave: false, canPrint: false });
+    const response = await PUT(request("PUT", {
+      title: "Променен план", layout: EMPTY_EXERCISE, expectedUpdatedAt: revision,
+    }, "http://localhost:3000", pathId), params);
+    expect(response.status).toBe(403);
+    expect(mocks.findUnique).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(["coach", "admin"])("keeps encoded drawing updates available to an authorized %s", async role => {
+    mocks.verify.mockResolvedValue({ sub: id, roles: [role], defaultClubId: club });
+    vi.mocked(trainingPlanCapabilities).mockResolvedValue({ enabled: role === "coach", canSave: true, canPrint: true });
+    const response = await PUT(request("PUT", {
+      title: "Променен план", expectedUpdatedAt: revision,
+    }, "http://localhost:3000", `%33${id.slice(1)}`), params);
+    expect(response.status).toBe(200);
+    expect(mocks.updateMany).toHaveBeenCalledOnce();
+    expect(vi.mocked(trainingPlanCapabilities)).toHaveBeenCalledWith(club, [role]);
+  });
+
   it("records the coach group name and signed-in account when creating a plan from a group", async () => {
     mocks.coachGroup.mockResolvedValue({ id: otherClub, name: "Треньор Иванов" });
     const response = await POST(request("POST", { title: "Тест", coachGroupId: otherClub }), params);

@@ -1,3 +1,4 @@
+vi.mock("@/lib/exercise/useTrainingPlanAccess", () => ({ useTrainingPlanAccess: () => ({ access: {canSave:true,canPrint:true}, error: "" }), trainingSubscriptionMessage: "Subscription required", trainingSubscriptionInactiveMessage: "Inactive subscription" }));
 import { afterEach, expect, it, vi } from "vitest";
 import { type ReactElement, type ReactNode } from "react";
 import { EMPTY_EXERCISE } from "@/lib/exercise/model";

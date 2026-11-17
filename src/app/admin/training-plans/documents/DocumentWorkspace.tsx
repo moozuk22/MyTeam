@@ -121,7 +121,7 @@ export default function DocumentWorkspace({ clubId, clubName, groupName, locatio
               onClick={() => { setError(""); setAttempt((value) => value + 1); }}>Опитай отново</button></div>
           : <FinanceSkeleton variant="form" />}
       </section>}
-      {(loaded || selected === "new") && <DocumentEditor initial={loaded} groupName={groupName} context={context} endpoint={endpoint}
+      {(loaded || selected === "new") && <DocumentEditor clubId={clubId} initial={loaded} groupName={groupName} context={context} endpoint={endpoint}
         drawingEndpoint={drawingEndpoint} location={location} listHref={listHref} />}
     </div>
   </main>;

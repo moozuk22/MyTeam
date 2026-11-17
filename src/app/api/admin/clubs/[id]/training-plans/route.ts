@@ -66,7 +66,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const session = await authorizeTraining(request, id);
+  const session = await authorizeTraining(request, id, "save");
   if (session instanceof NextResponse) return session;
   if (!UUID_RE.test(id))
     return NextResponse.json({ error: "Невалиден клуб." }, { status: 400 });
