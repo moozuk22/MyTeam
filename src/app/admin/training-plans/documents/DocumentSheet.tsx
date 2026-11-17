@@ -3,18 +3,19 @@
 import { trainingSubscriptionMessage } from "@/lib/exercise/useTrainingPlanAccess";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { documentBottomGroups, sessionFields, type DocumentSection, type PlanContent } from "@/lib/exercise/document";
+import { documentBottomGroups, type DocumentSection, type PlanContent } from "@/lib/exercise/document";
 import type { Exercise } from "@/lib/exercise/model";
 import PrintDrawing, { type DrawingReport, type DrawingStatus } from "./PrintDrawing";
 
 const WIDTH = 1060;
 const HEIGHT = 730;
+const SINGLE_PAGE_MIN_SCALE = 0.82;
 
 function fitSheet(sheet: HTMLDivElement) {
   sheet.style.minHeight = "";
   sheet.style.width = `${WIDTH}px`;
   const naturalHeight = sheet.offsetHeight;
-  if (naturalHeight <= HEIGHT) return 1;
+  if (naturalHeight <= HEIGHT) return { scale: 1, multiPage: false };
 
   let fits = HEIGHT / (naturalHeight + 1);
   let exceeds = 1;
@@ -25,9 +26,14 @@ function fitSheet(sheet: HTMLDivElement) {
     if ((sheet.offsetHeight + 1) * scale <= HEIGHT) fits = scale;
     else exceeds = scale;
   }
+  if (fits < SINGLE_PAGE_MIN_SCALE) {
+    sheet.style.width = `${WIDTH}px`;
+    sheet.style.minHeight = "";
+    return { scale: 1, multiPage: true };
+  }
   sheet.style.width = `${WIDTH / fits}px`;
   sheet.style.minHeight = `${HEIGHT / fits}px`;
-  return fits;
+  return { scale: fits, multiPage: false };
 }
 
 function PrintedValue({ label, value }: { label: string; value: string }) {
@@ -42,11 +48,10 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
   return <section className="td-printed-section" style={{ gridColumn: `span ${indices.length}` }}>
     <div className="td-printed-split">
       {indices.map((index) => <div key={index}>
-        <h3>{sections[index].title}</h3>
+        <h3 className={index === 3 ? "td-printed-section-heading-long" : undefined}>{sections[index].title}</h3>
         <div className="td-printed-text">
           <PrintedValue label="Организация" value={sections[index].organization} />
           <PrintedValue label="Цели / Насоки" value={sections[index].coaching} />
-          {sections[index].description && <div className="td-printed-description">{sections[index].description}</div>}
         </div>
       </div>)}
     </div>
@@ -65,8 +70,51 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
   </section>;
 }
 
-export default function DocumentSheet({ content, pending, canPrint = false, checkPrint }: {
-  content: PlanContent; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>;
+function PrintedHeader({ content }: { content: PlanContent }) {
+  return <header className="td-printed-header">
+    <h2>{content.session.title}</h2>
+    <div>{[content.session.season, content.session.halfSeason].filter(Boolean).join(" · ") || "Спортно-състезателен сезон"}</div>
+  </header>;
+}
+
+function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: {
+  content: PlanContent; clubLogoUrl?: string; monochrome: boolean; onReport: DrawingReport; attempt: number;
+}) {
+  return <div className="td-printed-row" key={`top:${attempt}:${monochrome}`}>
+    <PrintedSections indices={[0]} sections={content.sections} monochrome={monochrome} onReport={onReport} />
+    <PrintedSections indices={[1]} sections={content.sections} monochrome={monochrome} onReport={onReport} />
+    <section className="td-printed-section td-printed-session">
+      <h3>Данни за тренировката</h3>
+      <div className="td-printed-session-period">
+        <div className="td-printed-text">
+          {([["period", "Период"], ["microcycle", "Микроцикъл"], ["sessionNumber", "Тренировка №"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
+        </div>
+        <div className="td-printed-session-logo">{clubLogoUrl && <img src={clubLogoUrl} alt="" />}</div>
+      </div>
+      <div className="td-printed-session-pair">
+        <div className="td-printed-text">{([["gameMoment", "Момент от играта"], ["objective", "Цел на тренировката"], ["tasks", "Задачи"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+        <div className="td-printed-text">{([["date", "Дата"], ["day", "Ден"], ["time", "Час"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={key === "date" ? content.session.date.split("-").reverse().join(".") : content.session[key]} />)}</div>
+      </div>
+      <div className="td-printed-session-pair td-printed-session-pair-fill">
+        <div className="td-printed-text">{([["playerCount", "Състезатели"], ["duration", "Времетраене (мин.)"], ["equipment", "Необходими пособия"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+        <div className="td-printed-text">{([["absences", "Отсъстващи"], ["injuries", "Контузени"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+      </div>
+      <div className="td-printed-text td-printed-session-coach">{([["coach", "Треньор"], ["group", "Група"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+    </section>
+  </div>;
+}
+
+function PrintedBottomRow({ content, monochrome, onReport, attempt }: {
+  content: PlanContent; monochrome: boolean; onReport: DrawingReport; attempt: number;
+}) {
+  const bottom = documentBottomGroups(content.merge);
+  return <div className="td-printed-row td-printed-row-bottom" key={`bottom:${attempt}:${monochrome}`}>
+    {bottom.map((indices) => <PrintedSections key={indices.join(":")} indices={indices} sections={content.sections} monochrome={monochrome} onReport={onReport} />)}
+  </div>;
+}
+
+export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint = false, checkPrint }: {
+  content: PlanContent; clubLogoUrl?: string; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>;
 }) {
   const [printError, setPrintError] = useState("");
   const [checkingPrint, setCheckingPrint] = useState(false);
@@ -127,6 +175,7 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
   const preview = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
+  const [multiPage, setMultiPage] = useState(false);
   const [screen, setScreen] = useState(1);
   const [fonts, setFonts] = useState(false);
   const [monochrome, setMonochrome] = useState(false);
@@ -143,7 +192,12 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
   }, []);
 
   useLayoutEffect(() => {
-    if (sheet.current) setScale(fitSheet(sheet.current));
+    if (sheet.current) {
+      const fit = fitSheet(sheet.current);
+      setScale(fit.scale);
+      setMultiPage(fit.multiPage);
+      if (fit.multiPage) setDrawings({});
+    }
   }, [content, fonts]);
 
   useEffect(() => {
@@ -151,7 +205,7 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
     void document.fonts.ready.then(() => { if (active) setFonts(true); });
     const visible = preview.current;
     if (!visible) return;
-    const observer = new ResizeObserver(([entry]) => setScreen(Math.min(1, entry.contentRect.width / WIDTH)));
+    const observer = new ResizeObserver(([entry]) => setScreen(entry.contentRect.width / WIDTH));
     observer.observe(visible);
     return () => { active = false; observer.disconnect(); };
   }, []);
@@ -163,12 +217,23 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
     if (!drawing) return [];
     return [asset?.layout === drawing.layout && asset.placement === indices.join(":") ? asset.status : undefined];
   }));
+  // Fit again after Konva has drawn all pitch images. Their final canvas size
+  // can change the section's measured height after the initial layout pass.
+  const drawingsReady = assetStates.length > 0 && assetStates.every((status) => status === "ready");
+  useLayoutEffect(() => {
+    if (!drawingsReady || !sheet.current) return;
+    const fit = fitSheet(sheet.current);
+    setScale(fit.scale);
+    setMultiPage(fit.multiPage);
+    if (fit.multiPage) setDrawings({});
+  }, [drawingsReady]);
   const failed = assetStates.includes("failed");
   const ready = !pending && fonts && scale > 0 && assetStates.every((status) => status === "ready");
+  const previewHeight = multiPage ? HEIGHT * 2 + 12 : HEIGHT;
   const style = {
     "--td-fit": scale || 1,
     "--td-screen": screen,
-    "--td-preview-height": `${HEIGHT * screen}px`,
+    "--td-preview-height": `${previewHeight * screen}px`,
   } as CSSProperties;
 
   return <section className="td-print-area" id="td-print-preview" aria-label="Преглед за печат">
@@ -198,29 +263,29 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
       <button type="button" className="tp-secondary-btn" onClick={() => { setDrawings({}); setAttempt((value) => value + 1); }}>Опитай отново</button>
     </div>}
     {!failed && !ready && <div className="td-print-loading" role="status" aria-label="Зареждане" aria-busy="true"><span aria-hidden="true" /></div>}
-    {scale > 0 && scale < 0.82 && <p className="td-muted">Листът е смален, за да се побере на една страница.</p>}
-    <div className="td-preview" ref={preview} style={style} data-print-ready={ready}>
-      <div className={monochrome ? "td-paper td-paper-monochrome" : "td-paper"}>
-        <div className="td-printed-sheet" ref={sheet}>
-          <header className="td-printed-header">
-            <h2>{content.session.title}</h2>
-            <div>{[content.session.season, content.session.halfSeason].filter(Boolean).join(" · ") || "Спортно-състезателен сезон"}</div>
-          </header>
-          <div className="td-printed-row" key={`top:${attempt}:${monochrome}`}>
-            <PrintedSections indices={[0]} sections={content.sections} monochrome={monochrome} onReport={report} />
-            <PrintedSections indices={[1]} sections={content.sections} monochrome={monochrome} onReport={report} />
-            <section className="td-printed-section td-printed-session">
-              <h3>Данни за тренировката</h3>
-              <div className="td-printed-text">
-                {sessionFields.slice(3).map(([key, label]) => <PrintedValue key={key} label={label}
-                  value={key === "date" ? content.session.date.split("-").reverse().join(".") : content.session[key]} />)}
+    {multiPage && <p className="td-muted">Планът ще се отпечата на две страници, за да остане четим.</p>}
+    <div className={`td-preview${multiPage ? " td-preview-multipage" : ""}`} ref={preview} style={style} data-print-ready={ready}>
+      <div className={`${monochrome ? "td-paper td-paper-monochrome" : "td-paper"}${multiPage ? " td-paper-multipage" : ""}`}>
+        {!multiPage
+          ? <div className="td-printed-sheet" ref={sheet}>
+              <PrintedHeader content={content} />
+              <PrintedTopRow content={content} clubLogoUrl={clubLogoUrl} monochrome={monochrome} onReport={report} attempt={attempt} />
+              <PrintedBottomRow content={content} monochrome={monochrome} onReport={report} attempt={attempt} />
+            </div>
+          : <>
+              <div className="td-print-page">
+                <div className="td-printed-sheet td-print-page-sheet">
+                  <PrintedHeader content={content} />
+                  <PrintedTopRow content={content} clubLogoUrl={clubLogoUrl} monochrome={monochrome} onReport={report} attempt={attempt} />
+                </div>
               </div>
-            </section>
-          </div>
-          <div className="td-printed-row" key={`bottom:${attempt}:${monochrome}`}>
-            {bottom.map((indices) => <PrintedSections key={indices.join(":")} indices={indices} sections={content.sections} monochrome={monochrome} onReport={report} />)}
-          </div>
-        </div>
+              <div className="td-print-page">
+                <div className="td-printed-sheet td-print-page-sheet">
+                  <PrintedHeader content={content} />
+                  <PrintedBottomRow content={content} monochrome={monochrome} onReport={report} attempt={attempt} />
+                </div>
+              </div>
+            </>}
       </div>
     </div>
   </section>;

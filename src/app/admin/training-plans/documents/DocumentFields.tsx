@@ -60,7 +60,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
             <Field heading wrapHeading label={`Заглавие на секцията · ${sectionTitles[index]}`} max={120} value={section.title}
               onChange={(value) => onSection(index, { title: value })} />
             <div className="td-fields">
-              {exerciseFields.slice(1, 4).map(([key, label, max]) => <Field key={key} label={label} max={max}
+              {exerciseFields.slice(1, 3).map(([key, label, max]) => <Field key={key} label={label} max={max}
                 value={section[key]} onChange={(value) => onSection(index, { [key]: value })} />)}
             </div>
           </section>;
@@ -96,7 +96,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
       <div className="td-edit-split td-edit-footer">
         {indices.map((index) => <div key={index} className="td-fields">
           {indices.length === 2 && <span className="td-shared-label">{content.sections[index].title || sectionTitles[index]}</span>}
-          {exerciseFields.slice(4).map(([key, label, max]) => <Field key={key} label={label} max={max}
+          {exerciseFields.slice(3).map(([key, label, max]) => <Field key={key} label={label} max={max}
             value={content.sections[index][key]} onChange={(value) => onSection(index, { [key]: value })} />)}
         </div>)}
       </div>

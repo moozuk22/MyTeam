@@ -5,7 +5,7 @@ import type Konva from "konva";
 import { Group, Layer, Stage } from "react-konva";
 import { getPitchQuadrants, isInPitchQuadrants, type Exercise } from "@/lib/exercise/model";
 import { loadPitchIcons, ObjectVisual, PitchScene, type PitchIcons } from "../[planId]/konva/Visuals";
-import { fitPitchPreview, landscapePitchRotation, pitchObjectRotation, pitchViewport } from "../[planId]/konva/pitchView";
+import { fillPitchArea, landscapePitchRotation, pitchObjectRotation, pitchViewport } from "../[planId]/konva/pitchView";
 
 export type DrawingStatus = "ready" | "failed";
 export type DrawingReport = (slot: number, placement: string, layout: Exercise, status: DrawingStatus) => void;
@@ -69,7 +69,7 @@ export default memo(function PrintDrawing({ layout, title, index, placement, mon
   const quadrants = getPitchQuadrants(layout);
   const viewport = pitchViewport(quadrants);
   const rotation = landscapePitchRotation(viewport, layout.pitchRotation ?? 0);
-  const { width, height, viewLayer } = fitPitchPreview(viewport, rotation, size);
+  const { width, height, viewLayer } = fillPitchArea(viewport, rotation, size);
   return <div className="td-drawing" ref={host} role="img" aria-label={title}>
     {assets?.layout === layout && width > 0 && height > 0 &&
       <Stage width={width} height={height} listening={false}>

@@ -44,6 +44,22 @@ export function fitPitchPreview(
   return { width, height, viewLayer };
 }
 
+export function fillPitchArea(
+  viewport: ReturnType<typeof pitchViewport>,
+  rotation: PitchRotation,
+  bounds: { width: number; height: number },
+) {
+  const width = Math.floor(bounds.width);
+  const height = Math.floor(bounds.height);
+  const { viewHeight } = pitchView(viewport, rotation, 1);
+  const { viewLayer } = pitchView(viewport, rotation, width);
+  return {
+    width,
+    height,
+    viewLayer: { ...viewLayer, scaleY: height / viewHeight },
+  };
+}
+
 export function landscapePitchRotation(
   viewport: ReturnType<typeof pitchViewport>, rotation: PitchRotation,
 ): PitchRotation {
