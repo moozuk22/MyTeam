@@ -117,3 +117,33 @@ it.each(["debounce", "pagehide"])("keeps a stale draft conflicted after %s persi
   expect(text(tree)).toContain("Зареди от сървъра");
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it("opens pitch options from desktop quick tools after another tool or details", () => {
+  function render() {
+    hooks.cursor = 0;
+    return Editor({
+      plan: { id: "plan", title: "Plan", layout: EMPTY_EXERCISE, updatedAt: "2026-11-15T10:00:00.000Z" },
+      clubId: "club", userId: "user", categories: [],
+    });
+  }
+  let tree = render();
+  function click(label: string) {
+    const button = nodes(tree).find((node) => node.type === "button" && text(node.props.children as ReactNode).trim() === label);
+    expect(button, label).toBeDefined();
+    (button!.props.onClick as () => void)();
+    tree = render();
+  }
+  for (const previous of ["Конус", "Детайли"]) {
+    click(previous);
+    const quickTools = nodes(tree).find((node) => node.props.className === "ke-quick-tools")!;
+    const pitchButton = nodes(quickTools).find((node) => node.type === "button" && text(node.props.children as ReactNode).trim() === "Игрище");
+    expect(pitchButton).toBeDefined();
+    click("Игрище");
+    const panel = nodes(tree).find((node) => node.props.id === pitchButton!.props["aria-controls"]);
+    expect(panel?.props.hidden).toBe(false);
+    const toolsSwitch = nodes(tree).find((node) => node.type === "button" && text(node.props.children as ReactNode).trim() === "Инструменти")!;
+    expect(nodes(tree).find((node) => node.props.id === toolsSwitch.props["aria-controls"])?.props.hidden).toBe(false);
+    click("Игрище");
+    expect(nodes(tree).find((node) => node.props.id === pitchButton!.props["aria-controls"])?.props.hidden).toBe(true);
+  }
+});

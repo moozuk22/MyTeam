@@ -393,10 +393,6 @@
   font-size: 14px;
   font-weight: 700;
 }
-.ke-page .ke-pitch-options-toggle {
-  width: 100%;
-  margin-block: 6px;
-}
 .ke-page :is(.ke-pitch-options, .ke-categories) button {
   padding-inline: 6px;
   font-size: 13px;
