@@ -56,7 +56,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; planId: string }> },
 ) {
   const { id, planId } = await params;
-  const session = await authorizeTraining(request, id);
+  const session = await authorizeTraining(request, id, "save");
   if (session instanceof NextResponse) return session;
   if (!UUID_RE.test(id) || !UUID_RE.test(planId)) {
     return NextResponse.json(

@@ -18,8 +18,8 @@ beforeEach(() => {
   mocks.access.mockResolvedValue({ enabled: false, canSave: false, canPrint: false });
 });
 describe("training subscription enforcement", () => {
-  it.each([["POST", ""], ["PUT", `/${id}`], ["POST", "/documents"], ["PUT", `/documents/${id}`]])("blocks unpaid %s %s before writes", async (method, suffix) => {
-    const result = await authorizeTraining(request(method, suffix), club);
+  it.each([["POST", ""], ["PUT", `/${id}`], ["PUT", `/%32${id.slice(1)}`], ["POST", "/documents"], ["PUT", `/documents/${id}`], ["PUT", `/documents/%32${id.slice(1)}`]])("blocks unpaid %s %s before writes", async (method, suffix) => {
+    const result = await authorizeTraining(request(method, suffix), club, "save");
     expect(result).toBeInstanceOf(NextResponse);
     expect((result as NextResponse).status).toBe(403);
     expect(mocks.access).toHaveBeenCalledWith(club, ["coach"]);
@@ -28,12 +28,16 @@ describe("training subscription enforcement", () => {
     expect(await authorizeTraining(request(method, `/${id}`), club)).not.toBeInstanceOf(NextResponse);
     expect(mocks.access).not.toHaveBeenCalled();
   });
+  it("does not require save access for category changes", async () => {
+    expect(await authorizeTraining(request("POST", "/categories"), club)).not.toBeInstanceOf(NextResponse);
+    expect(mocks.access).not.toHaveBeenCalled();
+  });
   it("allows subscribed saves and admin saves", async () => {
     mocks.access.mockResolvedValue({ enabled: true, canSave: true, canPrint: true });
-    expect(await authorizeTraining(request("POST"), club)).not.toBeInstanceOf(NextResponse);
+    expect(await authorizeTraining(request("POST"), club, "save")).not.toBeInstanceOf(NextResponse);
     mocks.verify.mockResolvedValue({ sub: "admin", roles: ["admin"] });
     mocks.access.mockResolvedValue({ enabled: false, canSave: true, canPrint: true });
-    expect(await authorizeTraining(request("POST"), club)).not.toBeInstanceOf(NextResponse);
+    expect(await authorizeTraining(request("POST"), club, "save")).not.toBeInstanceOf(NextResponse);
   });
   it("rejects cross-club access before the subscription check", async () => {
     mocks.verify.mockResolvedValue({ sub: "coach", roles: ["coach"], defaultClubId: id });

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: clubId } = await params;
-  const session = await authorizeTraining(request, clubId);
+  const session = await authorizeTraining(request, clubId, "save");
   if (session instanceof NextResponse) return session;
 
   const body = await request.json().catch(() => null);

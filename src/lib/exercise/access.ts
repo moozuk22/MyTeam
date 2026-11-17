@@ -24,7 +24,11 @@ export function canAccessTrainingClub(
       (!session.defaultClubId || session.defaultClubId === clubId))
   );
 }
-export async function authorizeTraining(request: NextRequest, clubId: string) {
+export async function authorizeTraining(
+  request: NextRequest,
+  clubId: string,
+  requiredAccess: "read" | "save" = "read",
+) {
   const token = request.cookies.get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
   if (!session)
@@ -41,8 +45,7 @@ export async function authorizeTraining(request: NextRequest, clubId: string) {
       { error: "Невалиден източник на заявката." },
       { status: 403 },
     );
-  if (["POST", "PUT"].includes(request.method) &&
-      /\/training-plans(?:\/documents)?(?:\/[0-9a-f-]+)?$/i.test(request.nextUrl.pathname)) {
+  if (requiredAccess === "save") {
     const access = await trainingPlanCapabilities(clubId, session.roles);
     if (!access.canSave) return NextResponse.json(
       { error: "За запазване е необходим активен абонамент за планове за тренировки." },

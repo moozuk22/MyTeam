@@ -6,9 +6,9 @@ import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage
 
 type Context = { params: Promise<{ id: string; documentId: string }> };
 
-async function documentScope(request: NextRequest, { params }: Context) {
+async function documentScope(request: NextRequest, { params }: Context, requiredAccess: "read" | "save" = "read") {
   const { id: clubId, documentId } = await params;
-  const session = await authorizeTraining(request, clubId);
+  const session = await authorizeTraining(request, clubId, requiredAccess);
   if (session instanceof NextResponse) return session;
   if (!UUID_RE.test(documentId))
     return NextResponse.json({ error: "Невалиден план-конспект." }, { status: 400 });
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, context: Context) {
 }
 
 export async function PUT(request: NextRequest, context: Context) {
-  const where = await documentScope(request, context);
+  const where = await documentScope(request, context, "save");
   if (where instanceof NextResponse) return where;
   const body = await request.json().catch(() => null);
   const input = readDocumentInput(body?.content);
