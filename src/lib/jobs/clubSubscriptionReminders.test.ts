@@ -58,3 +58,58 @@ describe("persisted subscription reminders", () => {
     expect(await runClubSubscriptionReminders(new Date("2026-10-24T10:00:00Z"))).toMatchObject({ reminders: 0 });
   });
 });
+
+function storedPaid(months = ["2026-10"]) {
+  return { mode: "paid", trialEndDate: null, firstBillingMonth: "2026-10",
+    fees: [{ effectiveMonth: "2026-10", amount: new Prisma.Decimal(10) }], reminders,
+    payments: [{ id: "paid", total: new Prisma.Decimal(10), createdAt: new Date("2026-10-01"), voidedAt: null,
+      months: months.map((month) => ({ month, amount: new Prisma.Decimal(10) })) }],
+  };
+}
+
+describe("paid reminder delivery", () => {
+  it("saves each stage once and uses Sofia midnight for expiry", async () => {
+    mocks.clubSubscription.findUnique.mockImplementation(async () => storedPaid());
+    for (const instant of ["2026-10-24T10:00:00Z", "2026-10-30T10:00:00Z", "2026-10-31T22:00:00Z"]) {
+      expect(await runClubSubscriptionReminders(new Date(instant))).toMatchObject({ success: true, reminders: 1 });
+      expect(await runClubSubscriptionReminders(new Date(instant))).toMatchObject({ reminders: 0 });
+    }
+    expect(reminders.map((r) => r.key)).toEqual(["paid:2026-10-31:7", "paid:2026-10-31:1", "paid:2026-10-31:expired"]);
+    expect(mocks.adminNotification.create).toHaveBeenCalledTimes(3);
+    expect(mocks.push).toHaveBeenLastCalledWith(clubId, expect.objectContaining({ title: "Платеният период за MyTeam изтече" }), null);
+  });
+
+  it("reads a renewal after acquiring the club lock", async () => {
+    let months = ["2026-10"];
+    mocks.$queryRaw.mockImplementation(async () => { months = ["2026-10", "2026-11"]; });
+    mocks.clubSubscription.findUnique.mockImplementation(async () => storedPaid(months));
+    expect(await runClubSubscriptionReminders(new Date("2026-11-01T10:00:00Z"))).toMatchObject({ reminders: 0 });
+    expect(mocks.adminNotification.create).not.toHaveBeenCalled();
+  });
+
+  it("does not duplicate a paid stage when workers acquire the lock in sequence", async () => {
+    let tail = Promise.resolve();
+    mocks.$transaction.mockImplementation((fn) => {
+      const result = tail.then(() => fn(mocks));
+      tail = result.then(() => undefined);
+      return result;
+    });
+    mocks.clubSubscription.findUnique.mockImplementation(async () => storedPaid());
+    const results = await Promise.all([
+      runClubSubscriptionReminders(new Date("2026-10-24T10:00:00Z")),
+      runClubSubscriptionReminders(new Date("2026-10-24T10:00:00Z")),
+    ]);
+    expect(results.map((r) => r.reminders).sort()).toEqual([0, 1]);
+    expect(mocks.adminNotification.create).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains a paid reminder after push failure and does not resend it", async () => {
+    mocks.clubSubscription.findUnique.mockImplementation(async () => storedPaid());
+    mocks.push.mockRejectedValue(new Error("push failed"));
+    const now = new Date("2026-11-01T10:00:00Z");
+    expect(await runClubSubscriptionReminders(now)).toMatchObject({ reminders: 1, pushWarnings: 1 });
+    expect(await runClubSubscriptionReminders(now)).toMatchObject({ reminders: 0 });
+    expect(mocks.adminNotification.create).toHaveBeenCalledTimes(1);
+  });
+});
