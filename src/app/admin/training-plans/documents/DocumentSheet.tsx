@@ -1,5 +1,7 @@
 "use client";
 
+import { trainingSubscriptionMessage } from "@/lib/exercise/useTrainingPlanAccess";
+
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { documentBottomGroups, sessionFields, type DocumentSection, type PlanContent } from "@/lib/exercise/document";
 import type { Exercise } from "@/lib/exercise/model";
@@ -63,7 +65,35 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
   </section>;
 }
 
-export default function DocumentSheet({ content, pending }: { content: PlanContent; pending: boolean }) {
+export default function DocumentSheet({ content, pending, canPrint = false, checkPrint }: {
+  content: PlanContent; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>;
+}) {
+  const [printError, setPrintError] = useState("");
+  const [checkingPrint, setCheckingPrint] = useState(false);
+  useEffect(() => {
+    const clearPrintAccess = () => { delete document.documentElement.dataset.trainingPrintAuthorized; };
+    window.addEventListener("afterprint", clearPrintAccess);
+    return () => {
+      window.removeEventListener("afterprint", clearPrintAccess);
+      clearPrintAccess();
+    };
+  }, []);
+  async function print() {
+    if (checkingPrint) return;
+    if (!canPrint) { setPrintError(trainingSubscriptionMessage); return; }
+    setCheckingPrint(true);
+    setPrintError("");
+    try {
+      if (!await checkPrint?.()) throw new Error(trainingSubscriptionMessage);
+      document.documentElement.dataset.trainingPrintAuthorized = "true";
+      window.print();
+    } catch (failure) {
+      delete document.documentElement.dataset.trainingPrintAuthorized;
+      setPrintError(failure instanceof Error ? failure.message : "Печатът не може да се подготви.");
+    } finally {
+      setCheckingPrint(false);
+    }
+  }
   const preview = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
@@ -116,9 +146,10 @@ export default function DocumentSheet({ content, pending }: { content: PlanConte
           }} />
           Черно-бял печат
         </label>
-        <button className="tp-primary-btn" type="button" disabled={!ready} onClick={() => window.print()}>Печат</button>
+        <button className="tp-primary-btn" type="button" disabled={checkingPrint || (canPrint && !ready)} onClick={() => void print()}>Печат</button>
       </div>
     </div>
+    {printError && <div className="td-feedback" role="alert">{printError}</div>}
     {failed && <div className="td-feedback" role="alert">
       Рисунките не могат да се подготвят за печат.
       <button type="button" className="tp-secondary-btn" onClick={() => { setDrawings({}); setAttempt((value) => value + 1); }}>Опитай отново</button>

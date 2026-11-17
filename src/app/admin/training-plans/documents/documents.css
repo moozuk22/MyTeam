@@ -282,3 +282,7 @@
 .td-picker-filters { display: grid; gap: 10px; margin-block: 10px; min-width: 0; }
 .td-picker-filters .td-actions { justify-content: flex-start; }
 .td-picker-filters [aria-pressed="true"] { background: var(--plan-selected); border-color: var(--plan-accent); }
+
+@media print {
+  html:not([data-training-print-authorized="true"]) .td-page { display: none !important; }
+}

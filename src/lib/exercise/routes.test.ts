@@ -1,3 +1,5 @@
+import { trainingPlanCapabilities } from "@/lib/trainingPlanSubscriptions";
+vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: vi.fn() }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { SignJWT } from "jose";
@@ -92,6 +94,7 @@ beforeEach(() => {
     roles: ["admin"],
     defaultClubId: null,
   });
+  vi.mocked(trainingPlanCapabilities).mockResolvedValue({enabled:true,canSave:true,canPrint:true});
   mocks.club.mockResolvedValue({ id: club });
   mocks.findUnique.mockResolvedValue(row);
   mocks.findMany.mockResolvedValue([row]);

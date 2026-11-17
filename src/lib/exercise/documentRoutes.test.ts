@@ -1,3 +1,5 @@
+import { trainingPlanCapabilities } from "@/lib/trainingPlanSubscriptions";
+vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { blankDocument } from "./document";
@@ -52,6 +54,7 @@ function request(method: string, body?: unknown, path = "", origin = "http://loc
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.session.mockResolvedValue({ sub: ownerId, roles: ["coach"], defaultClubId: clubId });
+  vi.mocked(trainingPlanCapabilities).mockResolvedValue({enabled:true,canSave:true,canPrint:true});
   mocks.club.mockResolvedValue({ id: clubId });
 });
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTrainingPlanAccess, trainingSubscriptionMessage, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -16,9 +18,10 @@ const DocumentSheet = dynamic(() => import("./DocumentSheet"), {
   ssr: false, loading: () => <FinanceSkeleton variant="form" />,
 });
 
-export default function DocumentEditor({ initial, groupName, context, endpoint, drawingEndpoint, location, listHref }: {
-  initial?: SavedDocument; groupName?: string; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
+export default function DocumentEditor({ clubId, initial, groupName, context, endpoint, drawingEndpoint, location, listHref }: {
+  clubId: string; initial?: SavedDocument; groupName?: string; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
 }) {
+  const subscription = useTrainingPlanAccess(clubId);
   const [content, setContent] = useState<PlanContent>(() => initial?.content ?? blankDocument(groupName));
   const [saved, setSaved] = useState(initial);
   const proposedId = useRef<string>(initial?.id ?? "");
@@ -58,6 +61,7 @@ export default function DocumentEditor({ initial, groupName, context, endpoint, 
   }
 
   async function save() {
+    if (!subscription.access?.canSave) { setError(trainingSubscriptionMessage); return; }
     if (saving) return;
     if (!content.session.title.trim()) {
       setError("Въведете заглавие на план-конспекта.");
@@ -114,16 +118,17 @@ export default function DocumentEditor({ initial, groupName, context, endpoint, 
           onClick={() => setPreviewing((value) => !value)}>
           {previewing ? "Към редакцията" : "Преглед за печат"}
         </button>
-        <button type="button" className="tp-primary-btn" onClick={() => void save()} disabled={saving || (!!saved && !dirty)}>
+        <button type="button" className="tp-primary-btn" onClick={() => void save()} disabled={saving || (!!subscription.access?.canSave && !!saved && !dirty)}>
           {saving ? "Записване…" : "Запази"}
         </button>
       </div>
     </header>
+    {(subscription.error || subscription.access && !subscription.access.canSave) && <div role="status" className="td-feedback tp-subscription-notice">{subscription.error || trainingSubscriptionInactiveMessage}{subscription.error && <button type="button" onClick={() => void subscription.refresh().catch(() => {})}>Опитай отново</button>}</div>}
     {error && <div role="alert" className="td-feedback">{error}</div>}
     {notice && <div role="status" className="td-notice">{notice}</div>}
     <div className="td-workspace">
       {previewing
-        ? <DocumentSheet content={content} pending={saving} />
+        ? <DocumentSheet content={content} pending={saving} canPrint={!!subscription.access?.canPrint} checkPrint={async () => (await subscription.refresh()).canPrint} />
         : <DocumentFields content={content} disabled={saving} drawingEndpoint={drawingEndpoint} location={location}
             onSession={(key, value) => edit((current) => ({ ...current, session: { ...current.session, [key]: value } }))}
             onSection={updateSection} onDrawing={attach} onMerge={(merge) => edit((current) => ({ ...current, merge }))} />}

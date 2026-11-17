@@ -87,3 +87,11 @@ A calculator payment can be restored from its history after cancellation. Restor
 ### Editing the subscription type
 
 **Редактирай абонамента** opens all three subscription types: free trial (limited or unlimited), paid, and contract. Active clubs without a subscription have **Настрой абонамента**. Demo clubs must first activate billing through the existing club **Такси** screen. The `configure` action accepts the same fields as activation plus `expectedVersion` (zero for missing subscriptions). Changes preserve receipts and fee history. A paid configuration must begin after non-voided paid months; use the existing fee editor for current paid subscriptions. Type changes are audited and notify the club except when selecting contract billing.
+
+## Training plans subscription
+
+The training plans subscription is separate from the calculator and platform subscriptions. Administrators can set shared prices and club prices for monthly, yearly, and lifetime access. Each club has its own payment records, access periods, reversals, and change history. Administrators can also enable free access until they disable it. Platform activation is not required.
+
+An active grant permits drawing saves and training document saves and printing. The `admin` role can perform these actions without a grant. Coaches can open saved content, draw, and edit forms without active access. Browser draft recovery remains available. Subscription expiry does not delete saved content. Existing category management and deletion rules remain in effect.
+
+Apply migration `20261117140000_training_plan_subscriptions` before starting this app version. The migration adds empty tables. It does not copy calculator prices, grants, or payments. Training subscription payments do not enable calculator revenue capture.

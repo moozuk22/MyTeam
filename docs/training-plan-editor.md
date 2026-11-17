@@ -116,3 +116,9 @@ Use **Добави рисунка** to select a saved Konva drawing. The selecti
 Choose **Преглед за печат** to check the A4 landscape layout, then **Към редакцията** to return to the editable plan. A taller pitch view turns 90° clockwise on this sheet. Players, equipment, and text keep their individual orientation while the background, arrows, and zones rotate with the pitch. The drawing editor and library keep their saved orientation. **Печат** opens the browser print dialog for one A4 landscape sheet or **Save as PDF**. The preview reduces the sheet’s scale if the entered content would otherwise exceed the page.
 
 Enable **Черно-бял печат** in the print preview for a white built-in pitch with dark markings and player labels that include the team number. Imported backgrounds are lightened and rendered in grayscale.
+
+## Subscription access
+
+Drawing saves and training document saves and printing require an active training plans subscription. Accounts with the `admin` role can save and print without a subscription. Other accounts can open saved content, draw, and edit forms without active access. Browser draft recovery remains available. A message states that training plans are not activated. Save and Print remain available as controls. If access is inactive, these actions show a subscription error and do not save or print.
+
+The server checks access on each save request. The print button checks current access before it opens the browser print dialog. The app hides the document from direct browser print output unless the print action has passed this check. Print preview remains available without a subscription. These controls cannot prevent screenshots or extraction of content already visible in the browser.

@@ -1,4 +1,6 @@
 "use client";
+
+import { useTrainingPlanAccess, trainingSubscriptionMessage, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 import {
   useCallback,
   useEffect,
@@ -515,6 +517,7 @@ function MovementPreview({ type, arrowhead }: { type: ExerciseTool; arrowhead: b
   );
 }
 export default function Editor({ plan, categories = [], clubId, userId, coachGroupId, initialPanel }: EditorProps) {
+  const subscription = useTrainingPlanAccess(clubId);
   const router = useRouter();
   const [planId, setPlanId] = useState(plan.id);
   const [showDetails, setShowDetails] = useState(!plan.id || initialPanel === "description");
@@ -1082,6 +1085,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
   }
   async function save(asCopy = false) {
+    if (!subscription.access?.canSave) { setError(trainingSubscriptionMessage); return; }
     if (savingRef.current || importingImage || recovery || pitchSelection || addingCategory) return;
     const snapshotTitle = state.current.title.trim();
     if (!snapshotTitle) {
@@ -1559,6 +1563,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   return (
     <main className="ke-page" ref={pageRef}>
       <div className="ke-inner">
+        {(subscription.error || subscription.access && !subscription.access.canSave) && <div className="ke-feedback ke-subscription-notice tp-subscription-notice" role="status">{subscription.error || trainingSubscriptionInactiveMessage}{subscription.error && <button type="button" onClick={() => void subscription.refresh().catch(() => {})}>Опитай отново</button>}</div>}
         <header className="ke-header">
           <div className="ke-header-bar">
             <button
@@ -1574,9 +1579,10 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
             <button
               type="button"
               className="ke-primary"
-              disabled={saving || importingImage || (!dirty && !conflict) || !!recovery || !!pitchSelection || addingCategory}
+              disabled={saving || importingImage || (!!subscription.access?.canSave && !dirty && !conflict) || !!recovery || !!pitchSelection || addingCategory}
               onClick={() => {
-                if (conflict && title.trim()) setShowConflict(true);
+                if (!subscription.access?.canSave) setError(trainingSubscriptionMessage);
+                else if (conflict && title.trim()) setShowConflict(true);
                 else void save();
               }}
             >

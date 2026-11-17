@@ -21,6 +21,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
+import { useTrainingPlanAccess, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
 import type { Exercise } from "@/lib/exercise/model";
 import CategoryManager, { type CategoryOption } from "./CategoryManager";
@@ -80,6 +81,7 @@ export default function TrainingPlansClient({
 }) {
   const router = useRouter();
   const selectedClubId = defaultClubId;
+  const subscription = useTrainingPlanAccess(selectedClubId);
   const listView = useSearchParams().get("view") === "list";
   const [plans, setPlans] = useState<TrainingPlanSummary[]>(initialPlans);
   const [categories, setCategories] = useState(initialCategories);
@@ -359,6 +361,13 @@ export default function TrainingPlansClient({
             Нов план
           </button>
         </header>
+
+        {selectedClubId && (subscription.error || subscription.access && !subscription.access.canSave) && (
+          <div className="tp-subscription-notice" role="status">
+            {subscription.error || trainingSubscriptionInactiveMessage}
+            {subscription.error && <button type="button" onClick={() => void subscription.refresh().catch(() => {})}>Опитай отново</button>}
+          </div>
+        )}
 
         {selectedClubId && (
           <nav className="tp-document-nav" aria-label="Тренировъчни документи">

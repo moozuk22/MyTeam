@@ -1,3 +1,4 @@
+import { trainingPlanCapabilities } from "@/lib/trainingPlanSubscriptions";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken, type AdminSessionPayload } from "@/lib/adminAuth";
 import { hasTrustedOrigin } from "@/lib/requestOrigin";
@@ -40,5 +41,13 @@ export async function authorizeTraining(request: NextRequest, clubId: string) {
       { error: "Невалиден източник на заявката." },
       { status: 403 },
     );
+  if (["POST", "PUT"].includes(request.method) &&
+      /\/training-plans(?:\/documents)?(?:\/[0-9a-f-]+)?$/i.test(request.nextUrl.pathname)) {
+    const access = await trainingPlanCapabilities(clubId, session.roles);
+    if (!access.canSave) return NextResponse.json(
+      { error: "За запазване е необходим активен абонамент за планове за тренировки." },
+      { status: 403 },
+    );
+  }
   return session;
 }
