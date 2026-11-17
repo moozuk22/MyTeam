@@ -130,8 +130,7 @@ describe("exercise model and geometry", () => {
       createObject(type, point, type, fourthTeam),
     );
     expect(figures.map(({ team, color, role }) => [team, color, role])).toEqual([
-      [4, fourthTeam.color, "coach"],
-      [4, fourthTeam.color, "goalkeeper"],
+      [4, "#000000", "coach"],
       [4, fourthTeam.color, "player"],
     ]);
     expect(nextPlayerLabel(figures, 4)).toBe("2");
@@ -171,14 +170,14 @@ describe("exercise model and geometry", () => {
     expect(redo(undo(history)).present).toEqual(deleted);
   });
 
-  it("defaults newly placed Team 1 figures to blue and Team 2 figures to red", () => {
+  it("uses team colors for players and black for coaches", () => {
     const teamTools = ALLOWED_EQUIPMENT_TYPES.filter((type) =>
       type.startsWith("team"),
     );
 
     for (const type of teamTools) {
       const object = createObject(type, point, type);
-      expect(object.color).toBe(type.startsWith("team1") ? "#3b82f6" : "#ef4444");
+      expect(object.color).toBe(type.endsWith("coach") ? "#000000" : type.startsWith("team1") ? "#3b82f6" : "#ef4444");
     }
   });
 
@@ -247,6 +246,7 @@ describe("exercise model and geometry", () => {
   it("keeps legacy tool variants out of the toolbar", () => {
     const legacyVariants = [
       "run-free", "dribble-free", "long-pass", "balls",
+      "team1-goalkeeper", "team2-goalkeeper",
       "marker-blue", "marker-orange", "marker-yellow",
       "team1-player-2", "team1-player-more", "team2-player-2", "team2-player-more",
     ];

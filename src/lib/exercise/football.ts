@@ -105,12 +105,12 @@ export const FOOTBALL_TOOLS: {
   {
     title: "Отбор 1",
     color: TEAM_COLORS[1],
-    types: ["team1-coach", "team1-goalkeeper", "team1-player-1"],
+    types: ["team1-coach", "team1-player-1"],
   },
   {
     title: "Отбор 2",
     color: TEAM_COLORS[2],
-    types: ["team2-coach", "team2-goalkeeper", "team2-player-1"],
+    types: ["team2-coach", "team2-player-1"],
   },
 ];
 
@@ -127,7 +127,7 @@ const defaultPaths: Partial<
   Record<ExerciseTool, NonNullable<ExerciseObject["path"]>>
 > = {
   run: "straight",
-  dribble: "freehand",
+  dribble: "straight",
   pass: "straight",
   shot: "straight",
 };
@@ -137,7 +137,7 @@ export const FOOTBALL = {
   id: "football",
   tools: FOOTBALL_TOOLS,
   customTeamTools: [
-    "custom-team-coach", "custom-team-goalkeeper", "custom-team-player",
+    "custom-team-coach", "custom-team-player",
   ] satisfies ExerciseTool[],
   labels: FOOTBALL_LABELS,
   defaultPaths,
