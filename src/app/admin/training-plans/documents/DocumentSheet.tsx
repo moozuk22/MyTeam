@@ -205,7 +205,7 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
     void document.fonts.ready.then(() => { if (active) setFonts(true); });
     const visible = preview.current;
     if (!visible) return;
-    const observer = new ResizeObserver(([entry]) => setScreen(Math.min(1, entry.contentRect.width / WIDTH)));
+    const observer = new ResizeObserver(([entry]) => setScreen(entry.contentRect.width / WIDTH));
     observer.observe(visible);
     return () => { active = false; observer.disconnect(); };
   }, []);
@@ -217,6 +217,16 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
     if (!drawing) return [];
     return [asset?.layout === drawing.layout && asset.placement === indices.join(":") ? asset.status : undefined];
   }));
+  // Fit again after Konva has drawn all pitch images. Their final canvas size
+  // can change the section's measured height after the initial layout pass.
+  const drawingsReady = assetStates.length > 0 && assetStates.every((status) => status === "ready");
+  useLayoutEffect(() => {
+    if (!drawingsReady || !sheet.current) return;
+    const fit = fitSheet(sheet.current);
+    setScale(fit.scale);
+    setMultiPage(fit.multiPage);
+    if (fit.multiPage) setDrawings({});
+  }, [drawingsReady]);
   const failed = assetStates.includes("failed");
   const ready = !pending && fonts && scale > 0 && assetStates.every((status) => status === "ready");
   const previewHeight = multiPage ? HEIGHT * 2 + 12 : HEIGHT;

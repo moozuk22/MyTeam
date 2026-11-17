@@ -12,7 +12,8 @@ export async function createDocumentPdf(paper: HTMLElement): Promise<Blob> {
   const canvases: HTMLCanvasElement[] = [];
   try {
     const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
-    const width = 281;
+    const width = 293;
+    const height = 206;
     for (const [index, page] of pages.entries()) {
       const canvas = await html2canvas(page, {
         backgroundColor: "#ffffff",
@@ -41,7 +42,7 @@ export async function createDocumentPdf(paper: HTMLElement): Promise<Blob> {
       });
       canvases.push(canvas);
       if (index > 0) pdf.addPage();
-      pdf.addImage(canvas, "PNG", 8, 8, width, width * 730 / 1060, undefined, "FAST");
+      pdf.addImage(canvas, "PNG", 2, 2, width, height, undefined, "FAST");
     }
     return pdf.output("blob");
   } finally {
