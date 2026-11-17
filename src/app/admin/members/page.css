@@ -5404,7 +5404,7 @@
 
 /* ── Print Media Queries ── */
 @media print {
-  body * {
+  body:where(:has(.acd-dialog)) * {
     visibility: hidden;
   }
 
