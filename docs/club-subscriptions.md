@@ -43,7 +43,11 @@ For an acceptance check, use an isolated database: activate a demo club with a l
 
 ## Reminder schedule and club visibility
 
-`runClubSubscriptionReminders` checks active clubs in Europe/Sofia calendar dates. Limited trials receive reminders in the 7-day and 1-day windows and an expiry notice after the final inclusive day. A delayed run catches up only the current window. Unlimited trials are excluded; extending the end date starts a new cycle. Unpaid subscription months become overdue after their calendar month ends. Each overdue month is reminded once; newly discovered overdue months are grouped into one club message per run. Voiding a payment produces its own correction immediately and does not reset the overdue reminder ledger.
+`runClubSubscriptionReminders` checks active clubs in Europe/Sofia calendar dates. Limited trials receive reminders in the 7-day and 1-day windows and an expiry notice after the final inclusive day. A delayed run catches up only the current window. Unlimited trials are excluded; extending the end date starts a new cycle.
+
+Paid subscriptions use the same 7-day and 1-day windows. Paid coverage ends on the last day of the last consecutive paid month, starting from the first billing month. An unpaid gap ends this coverage, even if later months are paid. The job sends an expiry notice from the first unpaid day. A delayed run sends only the current stage. Each stage is sent once for each coverage end date. A renewal that extends consecutive coverage starts a new cycle. Subscriptions with no consecutive paid months receive only overdue reminders. Future subscriptions receive no warnings before the first billing month.
+
+Unpaid subscription months become overdue after their calendar month ends. Each overdue month is reminded once; newly discovered overdue months are grouped into one club message per run. Voiding a payment produces its own correction immediately and does not reset the overdue reminder ledger.
 
 The `club_subscription_reminders` table deduplicates by club and period/stage. The job locks the same club row as subscription mutations, then rechecks current billing status, trial dates, and payments. Reminder ledger entries and the coach inbox message commit together. Push happens after commit, only for main club devices; a failed push does not remove or duplicate the saved inbox reminder. Errors for one club do not stop other clubs and return a failed job status for scheduler retry.
 

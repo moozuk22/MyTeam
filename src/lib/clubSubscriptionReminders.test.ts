@@ -31,3 +31,62 @@ describe("subscription reminder policy", () => {
 it("never reminds contract clubs even with historical trial dates and unpaid fees", () => {
   expect(subscriptionReminders({ ...trial("2026-10-24"), mode: "contract", firstBillingMonth: "2026-01", fees: [{ effectiveMonth: "2026-01", amount: "10.00" }] }, "2026-10-24")).toEqual([]);
 });
+
+const paid = (months = ["2026-10"]): SubscriptionSnapshot => ({
+  mode: "paid", trialEndDate: null, firstBillingMonth: "2026-10",
+  fees: [{ effectiveMonth: "2026-10", amount: "10.00" }],
+  payments: [{ id: "p", paidOn: "2026-10-01", createdAt: "2026-10-01", createdBy: "admin",
+    total: "10.00", note: null, voidedAt: null, voidedBy: null,
+    months: months.map((month) => ({ month, amount: "10.00" })) }],
+});
+const keys = (subscription: SubscriptionSnapshot, today: string) => subscriptionReminders(subscription, today).map((r) => r.key);
+
+describe("paid coverage reminders", () => {
+  it.each([
+    ["2026-10-23", []],
+    ["2026-10-24", ["paid:2026-10-31:7"]],
+    ["2026-10-29", ["paid:2026-10-31:7"]],
+    ["2026-10-30", ["paid:2026-10-31:1"]],
+    ["2026-10-31", ["paid:2026-10-31:1"]],
+    ["2026-11-01", ["paid:2026-10-31:expired"]],
+    ["2026-11-17", ["paid:2026-10-31:expired"]],
+    ["2026-12-01", ["paid:2026-10-31:expired", "overdue:2026-11"]],
+  ])("uses the current window on %s", (today, expected) => {
+    expect(keys(paid(), today)).toEqual(expected);
+  });
+
+  it("moves the reminder cycle when coverage is renewed", () => {
+    const renewed = paid(["2026-10", "2026-11"]);
+    expect(keys(renewed, "2026-10-30")).toEqual([]);
+    expect(keys(renewed, "2026-11-01")).toEqual([]);
+    expect(keys(renewed, "2026-11-23")).toEqual(["paid:2026-11-30:7"]);
+    expect(keys(renewed, "2026-12-01")).toEqual(["paid:2026-11-30:expired"]);
+  });
+
+  it("does not extend coverage across unpaid gaps", () => {
+    expect(keys(paid(["2026-10", "2026-12"]), "2026-11-01")).toEqual(["paid:2026-10-31:expired"]);
+  });
+
+  it("keeps unpaid subscriptions on the overdue schedule without inventing paid coverage", () => {
+    expect(keys(paid([]), "2026-10-30")).toEqual([]);
+    expect(keys(paid([]), "2026-11-01")).toEqual(["overdue:2026-10"]);
+    const voided = paid();
+    voided.payments[0].voidedAt = "2026-10-29";
+    expect(keys(voided, "2026-10-30")).toEqual([]);
+    voided.payments.push({ ...paid().payments[0], id: "replacement" });
+    expect(keys(voided, "2026-10-30")).toEqual(["paid:2026-10-31:1"]);
+  });
+
+  it("does not warn before the first billing month", () => {
+    expect(keys(paid(), "2026-09-30")).toEqual([]);
+  });
+
+  it.each([ ["2027-12", "2027-12-24", "2027-12-31"], ["2028-02", "2028-02-22", "2028-02-29"] ])(
+    "uses the calendar month end for %s", (month, today, end) => {
+      const subscription = paid([month]);
+      subscription.firstBillingMonth = month;
+      subscription.fees[0].effectiveMonth = month;
+      expect(keys(subscription, today)).toEqual([`paid:${end}:7`]);
+    },
+  );
+});
