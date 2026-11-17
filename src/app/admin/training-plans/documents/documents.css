@@ -229,6 +229,8 @@
 .td-printed-header h2 { grid-column: span 2; font-size: 17px; color: inherit; }
 .td-printed-header > div { border-left: 1px solid #586252; font-weight: bold; }
 .td-printed-row { border-left: 1px solid #586252; }
+.td-printed-row-bottom { border-bottom: 2px solid #586252; }
+.td-printed-row-bottom .td-printed-section { border-bottom: 0; }
 .td-printed-section { display: flex; flex-direction: column; min-width: 0; border: 1px solid #586252; border-left: 0; }
 .td-printed-row + .td-printed-row .td-printed-section { border-top: 0; }
 .td-printed-section h3 { margin: 0; padding: 0 6px; text-align: center; color: inherit; background: #f4ecd5; border-bottom: 1px solid #969989; font-size: 13px; }
