@@ -18,8 +18,8 @@ const DocumentSheet = dynamic(() => import("./DocumentSheet"), {
   ssr: false, loading: () => <FinanceSkeleton variant="form" />,
 });
 
-export default function DocumentEditor({ clubId, initial, groupName, context, endpoint, drawingEndpoint, location, listHref }: {
-  clubId: string; initial?: SavedDocument; groupName?: string; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
+export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName, context, endpoint, drawingEndpoint, location, listHref }: {
+  clubId: string; clubLogoUrl?: string; initial?: SavedDocument; groupName?: string; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
 }) {
   const subscription = useTrainingPlanAccess(clubId);
   const [content, setContent] = useState<PlanContent>(() => initial?.content ?? blankDocument(groupName));
@@ -128,7 +128,7 @@ export default function DocumentEditor({ clubId, initial, groupName, context, en
     {notice && <div role="status" className="td-notice">{notice}</div>}
     <div className="td-workspace">
       {previewing
-        ? <DocumentSheet content={content} pending={saving} canPrint={!!subscription.access?.canPrint} checkPrint={async () => (await subscription.refresh()).canPrint} />
+        ? <DocumentSheet content={content} clubLogoUrl={clubLogoUrl} pending={saving} canPrint={!!subscription.access?.canPrint} checkPrint={async () => (await subscription.refresh()).canPrint} />
         : <DocumentFields content={content} disabled={saving} drawingEndpoint={drawingEndpoint} location={location}
             onSession={(key, value) => edit((current) => ({ ...current, session: { ...current.session, [key]: value } }))}
             onSection={updateSection} onDrawing={attach} onMerge={(merge) => edit((current) => ({ ...current, merge }))} />}

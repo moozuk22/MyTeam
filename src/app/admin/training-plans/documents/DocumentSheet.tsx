@@ -3,7 +3,7 @@
 import { trainingSubscriptionMessage } from "@/lib/exercise/useTrainingPlanAccess";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { documentBottomGroups, sessionFields, type DocumentSection, type PlanContent } from "@/lib/exercise/document";
+import { documentBottomGroups, type DocumentSection, type PlanContent } from "@/lib/exercise/document";
 import type { Exercise } from "@/lib/exercise/model";
 import PrintDrawing, { type DrawingReport, type DrawingStatus } from "./PrintDrawing";
 
@@ -42,11 +42,10 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
   return <section className="td-printed-section" style={{ gridColumn: `span ${indices.length}` }}>
     <div className="td-printed-split">
       {indices.map((index) => <div key={index}>
-        <h3>{sections[index].title}</h3>
+        <h3 className={index === 3 ? "td-printed-section-heading-long" : undefined}>{sections[index].title}</h3>
         <div className="td-printed-text">
           <PrintedValue label="Организация" value={sections[index].organization} />
           <PrintedValue label="Цели / Насоки" value={sections[index].coaching} />
-          {sections[index].description && <div className="td-printed-description">{sections[index].description}</div>}
         </div>
       </div>)}
     </div>
@@ -65,8 +64,8 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
   </section>;
 }
 
-export default function DocumentSheet({ content, pending, canPrint = false, checkPrint }: {
-  content: PlanContent; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>;
+export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint = false, checkPrint }: {
+  content: PlanContent; clubLogoUrl?: string; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>;
 }) {
   const [printError, setPrintError] = useState("");
   const [checkingPrint, setCheckingPrint] = useState(false);
@@ -211,10 +210,21 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
             <PrintedSections indices={[1]} sections={content.sections} monochrome={monochrome} onReport={report} />
             <section className="td-printed-section td-printed-session">
               <h3>Данни за тренировката</h3>
-              <div className="td-printed-text">
-                {sessionFields.slice(3).map(([key, label]) => <PrintedValue key={key} label={label}
-                  value={key === "date" ? content.session.date.split("-").reverse().join(".") : content.session[key]} />)}
+              <div className="td-printed-session-period">
+                <div className="td-printed-text">
+                  {([["period", "Период"], ["microcycle", "Микроцикъл"], ["sessionNumber", "Тренировка №"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
+                </div>
+                <div className="td-printed-session-logo">{clubLogoUrl && <img src={clubLogoUrl} alt="" />}</div>
               </div>
+              <div className="td-printed-session-pair">
+                <div className="td-printed-text">{([["gameMoment", "Момент от играта"], ["objective", "Цел на тренировката"], ["tasks", "Задачи"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+                <div className="td-printed-text">{([["date", "Дата"], ["day", "Ден"], ["time", "Час"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={key === "date" ? content.session.date.split("-").reverse().join(".") : content.session[key]} />)}</div>
+              </div>
+              <div className="td-printed-session-pair td-printed-session-pair-fill">
+                <div className="td-printed-text">{([["playerCount", "Състезатели"], ["duration", "Времетраене (мин.)"], ["equipment", "Необходими пособия"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+                <div className="td-printed-text">{([["absences", "Отсъстващи"], ["injuries", "Контузени"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+              </div>
+              <div className="td-printed-text td-printed-session-coach">{([["coach", "Треньор"], ["group", "Група"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
             </section>
           </div>
           <div className="td-printed-row" key={`bottom:${attempt}:${monochrome}`}>

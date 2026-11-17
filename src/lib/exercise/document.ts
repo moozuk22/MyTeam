@@ -14,20 +14,19 @@ export const sessionFields = [
   ["date", "Дата", 10, "date"],
   ["day", "Ден", 50],
   ["time", "Час", 5, "time"],
-  ["group", "Група", 100],
-  ["coach", "Треньор", 100],
   ["playerCount", "Състезатели", 30],
   ["duration", "Времетраене (мин.)", 30],
   ["equipment", "Необходими пособия", 300],
   ["absences", "Отсъстващи", 300],
   ["injuries", "Контузени", 300],
+  ["coach", "Треньор", 100],
+  ["group", "Група", 100],
 ] as const;
 
 export const exerciseFields = [
   ["title", "Заглавие на секцията", 120],
   ["organization", "Организация (играчи, пространство, пособия)", 500],
   ["coaching", "Цели / Насоки / Методически изисквания", 700],
-  ["description", "Описание на упражнението", 700],
   ["repetitions", "Повторения", 60],
   ["duration", "Времетраене (мин.)", 30],
 ] as const;
@@ -73,7 +72,7 @@ export function blankDocument(group = ""): PlanContent {
     session,
     merge: "none",
     sections: sectionTitles.map((title) => ({
-      title, organization: "", coaching: "", description: "", repetitions: "", duration: "", drawing: null,
+      title, organization: "", coaching: "", repetitions: "", duration: "", drawing: null,
     })),
   };
 }
