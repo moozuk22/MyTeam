@@ -104,7 +104,7 @@ const BALLS_AND_GOALS_CATEGORY = TOOLBAR_GROUPS.findIndex(({ types }) => types.i
 const LINES_AND_AREAS_CATEGORY = TOOLBAR_GROUPS.findIndex(({ types }) => types.includes("line"));
 const FIRST_TEAM_CATEGORY = TOOLBAR_GROUPS.findIndex(({ types }) => types.includes("team1-player-1"));
 const QUICK_TOOLS = [
-  ["run", ArrowRight, "Бягане"],
+  ["run", ArrowRight, "Движения"],
   ["balls-and-goals", GoalIcon, TOOLBAR_GROUPS[BALLS_AND_GOALS_CATEGORY].title],
   ["cone", Cone, "Конус"],
   ["line", Pencil, "Линия"],

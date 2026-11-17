@@ -393,7 +393,7 @@ export function createObject(
           : type.endsWith("-2")
             ? "2"
             : "1",
-      color: customTeam?.color ?? TEAM_COLORS[team],
+      color: type.endsWith("coach") ? "#000000" : customTeam?.color ?? TEAM_COLORS[team],
     };
   }
   if (type === "text")

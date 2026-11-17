@@ -61,7 +61,9 @@ Use **Начин на рисуване** to draw **Бягане**, **Дрибъ�
 
 **Линия** and **Прекъсната линия** start without arrowheads. Turn on **Връх на стрелка** before drawing, or select an existing line and use the arrow button in its toolbar. Each line saves its own setting.
 
-Selecting **Дрибъл** defaults to **Свободна ръка**. Selecting **Бягане**, **Пас** or **Удар** defaults to **Право**. The drawing mode buttons can override these defaults for the active tool.
+The **Движения** button opens the movement tools. **Дрибъл**, **Бягане**, **Пас**, and **Удар** use **Право** as the default drawing mode. Use the drawing mode buttons to change the mode for the active tool.
+
+The team tools contain **Треньор** and **Състезател**. New coaches use black for all teams. Saved figures keep their colors.
 
 While drawing a freehand movement, the preview shows the stroke. After release, its arrowhead points along the short, straight finish at the tip. The dribbling wave fades into the centerline under the arrowhead.
 
