@@ -70,6 +70,10 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
 }) {
   const [printError, setPrintError] = useState("");
   const [checkingPrint, setCheckingPrint] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [pdf, setPdf] = useState<{ url: string; filename: string }>();
+  const actionInProgress = useRef(false);
+  const exportVersion = useRef(0);
   useEffect(() => {
     const clearPrintAccess = () => { delete document.documentElement.dataset.trainingPrintAuthorized; };
     window.addEventListener("afterprint", clearPrintAccess);
@@ -78,20 +82,46 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
       clearPrintAccess();
     };
   }, []);
-  async function print() {
-    if (checkingPrint) return;
+  async function print(asPdf = false) {
+    if (actionInProgress.current) return;
     if (!canPrint) { setPrintError(trainingSubscriptionMessage); return; }
+    if (!ready) return;
+    actionInProgress.current = true;
+    const version = exportVersion.current;
     setCheckingPrint(true);
+    setExportingPdf(asPdf);
     setPrintError("");
     try {
-      if (!await checkPrint?.()) throw new Error(trainingSubscriptionMessage);
+      if (!await checkPrint?.()) { setPrintError(trainingSubscriptionMessage); return; }
+      if (version !== exportVersion.current) return;
+      if (asPdf) {
+        const paper = preview.current?.querySelector<HTMLElement>(".td-paper");
+        if (!paper) throw new Error("PDF файлът не може да се подготви.");
+        const { createDocumentPdf, documentPdfFilename } = await import("./documentPdf");
+        const blob = await createDocumentPdf(paper);
+        if (version !== exportVersion.current) return;
+        const url = URL.createObjectURL(blob);
+        const filename = documentPdfFilename(content.session.title);
+        setPdf({ url, filename });
+        const download = document.createElement("a");
+        download.href = url;
+        download.download = filename;
+        document.body.append(download);
+        download.click();
+        download.remove();
+        return;
+      }
       document.documentElement.dataset.trainingPrintAuthorized = "true";
       window.print();
     } catch (failure) {
       delete document.documentElement.dataset.trainingPrintAuthorized;
-      setPrintError(failure instanceof Error ? failure.message : "Печатът не може да се подготви.");
+      if (version === exportVersion.current) {
+        setPrintError(asPdf ? "PDF файлът не може да се подготви. Опитайте отново." : failure instanceof Error ? failure.message : "Печатът не може да се подготви.");
+      }
     } finally {
+      actionInProgress.current = false;
       setCheckingPrint(false);
+      setExportingPdf(false);
     }
   }
   const preview = useRef<HTMLDivElement>(null);
@@ -100,6 +130,12 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
   const [screen, setScreen] = useState(1);
   const [fonts, setFonts] = useState(false);
   const [monochrome, setMonochrome] = useState(false);
+  useEffect(() => {
+    const version = ++exportVersion.current;
+    setPdf(undefined);
+    return () => { exportVersion.current = version + 1; };
+  }, [content, monochrome, canPrint]);
+  useEffect(() => () => { if (pdf) URL.revokeObjectURL(pdf.url); }, [pdf]);
   const [attempt, setAttempt] = useState(0);
   const [drawings, setDrawings] = useState<Record<number, { layout: Exercise; placement: string; status: DrawingStatus }>>({});
   const report: DrawingReport = useCallback((index, placement, layout, status) => {
@@ -140,15 +176,22 @@ export default function DocumentSheet({ content, pending, canPrint = false, chec
       <h2>Преглед за печат <small>A4 · хоризонтално</small></h2>
       <div className="td-print-actions">
         <label className="td-print-mode">
-          <input type="checkbox" checked={monochrome} onChange={(event) => {
+          <input type="checkbox" checked={monochrome} disabled={checkingPrint} onChange={(event) => {
             setDrawings({});
             setMonochrome(event.target.checked);
           }} />
           Черно-бял печат
         </label>
         <button className="tp-primary-btn" type="button" disabled={checkingPrint || (canPrint && !ready)} onClick={() => void print()}>Печат</button>
+        <button className="tp-secondary-btn" type="button" disabled={checkingPrint || (canPrint && !ready)} onClick={() => void print(true)}>
+          {exportingPdf ? "Подготовка на PDF…" : "Изтегли PDF"}
+        </button>
       </div>
     </div>
+    <p className="td-muted">За печат от телефон изтеглете PDF файла и го отворете. Изберете „Печат“ от менюто на телефона или приложението на принтера.</p>
+    {pdf && <p className="td-muted" role="status">
+      PDF файлът е готов. <a className="tp-secondary-btn" href={pdf.url} target="_blank" rel="noopener">Отвори PDF</a>
+    </p>}
     {printError && <div className="td-feedback" role="alert">{printError}</div>}
     {failed && <div className="td-feedback" role="alert">
       Рисунките не могат да се подготвят за печат.

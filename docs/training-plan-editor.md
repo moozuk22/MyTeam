@@ -115,6 +115,8 @@ Use **Добави рисунка** to select a saved Konva drawing. The selecti
 
 Choose **Преглед за печат** to check the A4 landscape layout, then **Към редакцията** to return to the editable plan. A taller pitch view turns 90° clockwise on this sheet. Players, equipment, and text keep their individual orientation while the background, arrows, and zones rotate with the pitch. The drawing editor and library keep their saved orientation. **Печат** opens the browser print dialog for one A4 landscape sheet or **Save as PDF**. The preview reduces the sheet’s scale if the entered content would otherwise exceed the page.
 
+Use **Изтегли PDF** to download one A4 landscape page without the browser print dialog. The PDF includes the current text, drawings, and color mode. The app checks current print access before it creates the file. Controls stay disabled while the file is prepared. If the download does not start, use **Отвори PDF** to open the prepared file. On a phone, select Print in the PDF viewer or printer app. The phone must have access to a compatible printer. The PDF is created in the browser. Document content is not sent to an external PDF service. Text is stored as an image in this PDF.
+
 Enable **Черно-бял печат** in the print preview for a white built-in pitch with dark markings and player labels that include the team number. Imported backgrounds are lightened and rendered in grayscale.
 
 ## Subscription access
