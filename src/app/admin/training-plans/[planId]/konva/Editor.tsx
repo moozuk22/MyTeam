@@ -1363,6 +1363,10 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
 
   function togglePitchOptions() {
     if (!pitchOptionsVisible) {
+      if (!compact) {
+        setShowDetails(false);
+        setCategory(LINES_AND_AREAS_CATEGORY);
+      }
       cancelPlacement();
       setAddingTeam(false);
       if (compact) {
@@ -1765,6 +1769,12 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                       <span>{label}</span>
                     </button>
                   ))}
+                  <button type="button" aria-label="Игрище" title="Игрище" aria-controls={pitchOptionsId}
+                    aria-pressed={pitchOptionsVisible}
+                    aria-expanded={pitchOptionsVisible} disabled={!!pitchSelection} onClick={togglePitchOptions}>
+                    <ScanLine size={19} aria-hidden="true" />
+                    <span>Игрище</span>
+                  </button>
                 </div>
                 <div className="ke-canvas-actions">
                   {historyControls}
@@ -2175,13 +2185,6 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                       })}
                     </div>
                   </>
-                )}
-                {!compact && activeCategory === LINES_AND_AREAS_CATEGORY && (
-                  <button type="button" className="ke-pitch-options-toggle" aria-controls={pitchOptionsId}
-                    aria-pressed={pitchOptionsVisible}
-                    aria-expanded={pitchOptionsVisible} disabled={!!pitchSelection} onClick={togglePitchOptions}>
-                    <ScanLine size={17} aria-hidden="true" /> Игрище
-                  </button>
                 )}
                 <div id={pitchOptionsId} hidden={!pitchOptionsVisible} inert={!!pitchSelection}>
                   {pitchOptionsVisible && pitchOptions}
