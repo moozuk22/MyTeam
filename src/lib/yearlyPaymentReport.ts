@@ -1,3 +1,5 @@
+import { isReportMonthActive, type ReportActivityInput } from "./paymentReportActivity";
+
 export type YearlyMonthStatus = "paid" | "unpaid" | "exempt" | "not_due";
 type RecordedPayment = { amount?: string | null; currency?: string };
 
@@ -21,7 +23,7 @@ export function formatRecordedPaymentAmounts(payments: RecordedPayment[]): strin
   return labels.join(" + ");
 }
 
-type ReportInput = {
+type ReportInput = ReportActivityInput & {
   firstBillingMonth: string | null;
   paymentWorkflow: string;
   paymentLogs: Array<{ paidFor: string; paidAt: string } & RecordedPayment>;
@@ -37,7 +39,8 @@ function monthIndex(value: string | null): number | null {
 export function buildYearlyPaymentReport(player: ReportInput, year: number, now = new Date()) {
   const calendarBilling = player.paymentWorkflow === "calendar_month";
   const start = monthIndex(player.firstBillingMonth);
-  const current = now.getUTCFullYear() * 12 + now.getUTCMonth();
+  const currentParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia", year: "numeric", month: "2-digit" }).formatToParts(now);
+  const current = Number(currentParts.find(part => part.type === "year")!.value) * 12 + Number(currentParts.find(part => part.type === "month")!.value) - 1;
   const waivers = new Set(player.paymentWaivers.map((waiver) => monthIndex(waiver.waivedFor)));
   const payments = new Map<number, Date>();
   const amounts = new Map<number, RecordedPayment[]>();
@@ -52,7 +55,7 @@ export function buildYearlyPaymentReport(player: ReportInput, year: number, now 
   const months = Array.from({ length: 12 }, (_, month) => {
     const index = year * 12 + month;
     const paidAt = payments.get(index) ?? null;
-    const due = calendarBilling && start !== null && index >= start && index <= current && !waivers.has(index);
+    const due = isReportMonthActive(player, year, month) && calendarBilling && start !== null && index >= start && index <= current && !waivers.has(index);
     const status: YearlyMonthStatus = paidAt ? "paid"
       : calendarBilling && waivers.has(index) ? "exempt"
       : due ? "unpaid" : "not_due";

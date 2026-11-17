@@ -95,7 +95,7 @@ export function useMemberManagement({
     setEditAvatarPreviewUrl("");
   };
 
-  const handleDeleteMember = async () => {
+  const handleDeleteMember = async (includeCurrentMonth: boolean) => {
     if (!memberToDelete || isDeletingMember) return;
 
     setIsDeletingMember(true);
@@ -103,6 +103,8 @@ export function useMemberManagement({
     try {
       const response = await fetch(`/api/admin/members/${memberToDelete.id}`, {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ includeCurrentMonth }),
       });
 
       if (!response.ok) {

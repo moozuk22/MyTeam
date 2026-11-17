@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { type Member } from "../_types/members-page-types";
 import { XIcon } from "./members-page-icons";
 
@@ -12,15 +13,16 @@ export function ConfirmDeleteModal({
 }: {
   member: Member;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (includeCurrentMonth: boolean) => void;
   isDeleting: boolean;
   error: string;
 }) {
+  const [includeCurrentMonth, setIncludeCurrentMonth] = useState<boolean | null>(null);
   return (
     <div className="amp-overlay amp-overlay--confirm" onClick={isDeleting ? undefined : onCancel}>
-      <div className="amp-modal amp-modal--confirm" onClick={(e) => e.stopPropagation()}>
+      <div className="amp-modal amp-modal--confirm" role="dialog" aria-modal="true" aria-labelledby="amp-remove-title" onClick={(e) => e.stopPropagation()}>
         <div className="amp-modal-tint" aria-hidden="true" />
-        <h2 className="amp-modal-title">
+        <h2 className="amp-modal-title" id="amp-remove-title">
           <span className="amp-modal-title-gradient">Потвърди премахване</span>
           <button className="amp-modal-close" onClick={onCancel} aria-label="Затвори" disabled={isDeleting}>
             <XIcon />
@@ -35,13 +37,19 @@ export function ConfirmDeleteModal({
             Играчът ще бъде маркиран като неактивен.
           </p>
 
+          <fieldset className="amp-report-month-choice" disabled={isDeleting}>
+            <legend>Да участва ли състезателят в отчета за текущия месец?</legend>
+            <label><input type="radio" name="report-removal-month" checked={includeCurrentMonth === true} onChange={() => setIncludeCurrentMonth(true)} />Да, включи текущия месец</label>
+            <label><input type="radio" name="report-removal-month" checked={includeCurrentMonth === false} onChange={() => setIncludeCurrentMonth(false)} />Не, изключи текущия месец</label>
+          </fieldset>
+
           {error && <p className="amp-confirm-error">{error}</p>}
 
           <div className="amp-modal-actions">
             <button className="amp-btn amp-btn--ghost" onClick={onCancel} disabled={isDeleting}>
               Отказ
             </button>
-            <button className="amp-btn amp-btn--danger" onClick={onConfirm} disabled={isDeleting}>
+            <button className="amp-btn amp-btn--danger" onClick={() => includeCurrentMonth !== null && onConfirm(includeCurrentMonth)} disabled={isDeleting || includeCurrentMonth === null}>
               {isDeleting ? "Премахване..." : "Премахни"}
             </button>
           </div>
@@ -78,7 +86,7 @@ export function ConfirmPermanentDeleteModal({
             Сигурен ли си, че искаш да изтриеш завинаги <strong>{member.fullName}</strong>?
           </p>
           <p className="amp-confirm-subtext">
-            Това действие е необратимо и ще премахне състезателя и свързаните данни.
+            Това действие е необратимо. Профилът и контактните данни ще бъдат изтрити. Името, платените месеци и сумите ще останат в отчетите на клуба.
           </p>
 
           <div className="amp-modal-actions">

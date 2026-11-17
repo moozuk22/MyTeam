@@ -1,3 +1,5 @@
+import { hasTrustedOrigin } from "@/lib/requestOrigin";
+import { canAccessTrainingClub } from "@/lib/exercise/access";
 import { optionalPlayerUpdates, playerAgeForBirthDate, PlayerFieldError } from "@/lib/playerFields";
 import { resolveMemberFee, feeConflictMessage } from "@/lib/memberFee";
 import { FeeSettingsError } from "@/lib/clubFees";
@@ -365,9 +367,12 @@ export async function PATCH(
   const token = request.cookies.get("admin_session")?.value;
   const { id } = await params;
 
-  if (!token || !(await verifyAdminToken(token))) {
+  const session = token ? await verifyAdminToken(token) : null;
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  if (!hasTrustedOrigin(request)) return NextResponse.json({ error: "Невалиден източник на заявката." }, { status: 403 });
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -385,13 +390,15 @@ export async function PATCH(
     const playerExists = await withPrismaPoolRetry(() =>
       prisma.player.findUnique({
         where: { id },
-        select: { id: true },
+        select: { id: true, clubId: true },
       }),
     );
 
     if (!playerExists) {
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
+
+    if (!canAccessTrainingClub(session, playerExists.clubId)) return NextResponse.json({ error: "Нямате достъп до този клуб." }, { status: 403 });
 
     if (action === "reactivate") {
       const reactivatedPlayer = await withPrismaPoolRetry(() => prisma.$transaction(async (tx) => {
@@ -483,8 +490,7 @@ export async function PATCH(
         new Map(normalizedMonths.map((date) => [date.toISOString(), date])).values(),
       );
 
-      const tokenPayload = await verifyAdminToken(token);
-      const createdBy = tokenPayload?.roles.includes("coach") ? "coach" : "admin";
+      const createdBy = session.roles.includes("coach") ? "coach" : "admin";
 
       await withPrismaPoolRetry(() => prisma.$transaction(async (tx) => {
         if (modeRaw === "pause") {
@@ -619,19 +625,28 @@ export async function DELETE(
     const token = request.cookies.get("admin_session")?.value;
     const { id } = await params;
 
-    if (!token || !(await verifyAdminToken(token))) {
+    const session = token ? await verifyAdminToken(token) : null;
+    if (!session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (!hasTrustedOrigin(request)) return NextResponse.json({ error: "Невалиден източник на заявката." }, { status: 403 });
+
     try {
+        const body = await request.json().catch(() => null);
+        if (!body || typeof body.includeCurrentMonth !== "boolean") {
+            return NextResponse.json({ error: "Изберете дали състезателят да участва в отчета за текущия месец." }, { status: 400 });
+        }
         const player = await withPrismaPoolRetry(() => prisma.player.findUnique({
             where: { id },
-            select: { id: true },
+            select: { id: true, clubId: true },
         }));
 
         if (!player) {
             return NextResponse.json({ error: "Player not found" }, { status: 404 });
         }
+
+        if (!canAccessTrainingClub(session, player.clubId)) return NextResponse.json({ error: "Нямате достъп до този клуб." }, { status: 403 });
 
         await withPrismaPoolRetry(() => prisma.$transaction([
             prisma.card.updateMany({
@@ -640,7 +655,7 @@ export async function DELETE(
             }),
             prisma.player.update({
                 where: { id },
-                data: { isActive: false },
+                data: { isActive: false, reportIncludeRemovalMonth: body.includeCurrentMonth },
             }),
         ]));
 

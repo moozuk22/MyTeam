@@ -39,3 +39,27 @@ it('still fails closed for invalid configuration in development', () => {
   vi.stubEnv('APP_BASE_URL', 'not-a-url');
   expect(hasTrustedOrigin(request('http://localhost'))).toBe(false);
 });
+it('accepts the browser host in development when Next.js uses an internal URL', () => {
+  vi.stubEnv('NODE_ENV', 'development');
+  vi.stubEnv('APP_BASE_URL', 'https://myteam7.com');
+  const req = new NextRequest('http://localhost:3000/api/test', {
+    headers: { origin: 'http://172.18.0.2:3000', host: '172.18.0.2:3000' },
+  });
+  expect(hasTrustedOrigin(req)).toBe(true);
+});
+it.each(['development', 'production'])('rejects a mismatched origin even with a forwarded host in %s', mode => {
+  vi.stubEnv('NODE_ENV', mode);
+  vi.stubEnv('APP_BASE_URL', 'https://myteam7.com');
+  const req = new NextRequest('http://localhost:3000/api/test', {
+    headers: { origin: 'https://evil.example', host: '172.18.0.2:3000', 'x-forwarded-host': 'evil.example' },
+  });
+  expect(hasTrustedOrigin(req)).toBe(false);
+});
+it('does not trust the browser host in production', () => {
+  vi.stubEnv('NODE_ENV', 'production');
+  vi.stubEnv('APP_BASE_URL', 'https://myteam7.com');
+  const req = new NextRequest('http://localhost:3000/api/test', {
+    headers: { origin: 'http://172.18.0.2:3000', host: '172.18.0.2:3000' },
+  });
+  expect(hasTrustedOrigin(req)).toBe(false);
+});

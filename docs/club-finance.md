@@ -67,3 +67,46 @@ The report lists enabled periods and explains excluded gaps. Balances also retai
 Apply `20261101003000_finance_backfill_payment_lock` through Prisma Migrate. Backfill holds a key-share lock on each source payment until its transaction commits. If undo deletes first, backfill waits and skips the deleted payment. If backfill locks first, undo waits and then voids the captured revenue. This also applies after a player moves clubs because capture uses the payment’s original club snapshot. Cascading player deletion continues to preserve captured revenue; deleted source payments cannot be recovered by later purchases.
 
 Run `FINANCE_TEST_DATABASE_URL='<disposable PostgreSQL connection URL>' npm run test:finance-concurrency` with `psql` available. The script creates and removes an isolated schema and exercises both transaction orderings for purchase/restoration, with and without player movement, plus cascading player deletion. It does not read the application's `DATABASE_URL`.
+
+## Player report history
+
+Apply `20261116230000_player_report_history` before you start this app version.
+Player reports use active month periods. On removal, the coach or admin must choose
+whether to include the current month. Later inactive months do not enter the monthly
+count or the yearly due count. Restoration starts a new period in the current month.
+Periods use `Europe/Sofia`. The end month is exclusive.
+
+Past status changes are not stored. For existing inactive players, reports retain
+paid months only. They do not infer unpaid months from `updated_at`. Restoration
+preserves these paid months and starts a new active period.
+
+Permanent deletion removes the profile and contact data. A database trigger first
+saves the name, report periods, group IDs, payment amounts, currencies, payment dates,
+paid months, and waivers in `player_report_archives`. Club reports include these
+records and label them as deleted. They do not appear in the player list. The club
+owns the archive. Club deletion removes it. This change cannot recover payment logs
+that were deleted before this migration.
+
+Monthly reports exclude known inactive months. Yearly reports retain actual payments,
+including advance payments outside active periods. These payments do not add inactive
+months to the due count. Archived payments do not create new calculator revenue.
+The existing calculator records and balance stay unchanged after player deletion.
+An explicit payment undo while the player exists still voids its linked revenue.
+Report reads use one database snapshot for live players and archived records.
+
+Apply `20261117010000_report_billing_start_corrections` after the report history
+migration. A billing-start correction changes the first activity period only.
+Removal dates, restoration dates, and inactive gaps stay unchanged. The database
+trigger applies the correction in the same write as `first_billing_month`.
+Clearing the billing start uses the player's creation month for this boundary.
+The yearly report still requires a billing start before it can count dues.
+
+New initial periods have a `billingStart` marker. Paid-month periods and restoration
+periods from legacy history do not have this marker. The follow-up migration uses
+the original tracking migration's start month to identify earlier initial periods.
+It corrects their start and preserves their removal and restoration boundaries.
+A closed, paid one-month period is ambiguous and stays unchanged. Unmarked periods
+that start in or after the tracking installation month also stay unchanged because
+they can be legacy restorations. These records require verified activity dates
+before their initial boundary can be corrected. The migration does not infer dues
+for unknown history. Archived records retain corrected periods on deletion.
