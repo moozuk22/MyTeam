@@ -232,7 +232,7 @@
 .td-printed-section { display: flex; flex-direction: column; min-width: 0; border: 1px solid #586252; border-left: 0; }
 .td-printed-row + .td-printed-row .td-printed-section { border-top: 0; }
 .td-printed-section h3 { margin: 0; padding: 0 6px; text-align: center; color: inherit; background: #f4ecd5; border-bottom: 1px solid #969989; font-size: 13px; }
-.td-printed-section-heading-long { white-space: nowrap; font-size: 10px !important; }
+.td-printed-section-heading-long { white-space: nowrap; font-size: 12px !important; }
 .td-printed-row-bottom h3 { display: flex; box-sizing: border-box; min-height: 34px; align-items: center; justify-content: center; background: #f3dfc7; }
 .td-printed-session h3 { background: #e7eee3; }
 .td-printed-session-pair { display: flex; border-top: 2px dashed #74786b; }

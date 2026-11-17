@@ -23,6 +23,13 @@ export async function createDocumentPdf(paper: HTMLElement): Promise<Blob> {
         onclone: (_document, clonedPage) => {
           // Export each page at the same size on phones and desktops.
           clonedPage.style.transform = "none";
+          const multipagePaper = clonedPage.closest<HTMLElement>(".td-paper-multipage");
+          if (multipagePaper) {
+            multipagePaper.style.width = "1060px";
+            multipagePaper.style.height = "auto";
+            multipagePaper.style.transform = "none";
+            multipagePaper.style.overflow = "visible";
+          }
           const preview = clonedPage.closest<HTMLElement>(".td-preview");
           if (preview) {
             preview.style.width = "1060px";
