@@ -87,6 +87,7 @@ model Club {
   discountConfigs         TeamDiscountConfig[]
   matches                    ClubMatch[]
   trainingPlans              TrainingPlan[]
+  trainingPlanDocuments      TrainingPlanDocument[]
   trainingPlanCategories     TrainingPlanCategory[]
   limitedTrainingEvents      LimitedTrainingEvent[]
 
@@ -470,6 +471,22 @@ model TrainingPlan {
   @@index([categoryId])
   @@index([createdByCoachGroupId])
   @@map("training_plans")
+}
+
+model TrainingPlanDocument {
+  id        String   @id @db.Uuid
+  clubId    String   @map("club_id") @db.Uuid
+  ownerId   String   @map("owner_id")
+  title     String
+  content   Json
+  revision  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([clubId, ownerId, updatedAt, id], map: "training_plan_documents_owner_updated_idx")
+  @@map("training_plan_documents")
 }
 
 model TrainingPlanCategory {

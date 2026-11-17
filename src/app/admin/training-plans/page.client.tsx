@@ -361,6 +361,14 @@ export default function TrainingPlansClient({
         </header>
 
         {selectedClubId && (
+          <nav className="tp-document-nav" aria-label="Тренировъчни документи">
+            <Link className="tp-secondary-btn" href={`/admin/training-plans/documents?${location}`}>
+              План-конспекти
+            </Link>
+          </nav>
+        )}
+
+        {selectedClubId && (
           <div className="tp-category-controls">
             <div className="tp-scope-controls" role="group" aria-label="Автор на плана">
               {(["mine", "club"] as const).map((option) => (
