@@ -93,3 +93,20 @@ months to the due count. Archived payments do not create new calculator revenue.
 The existing calculator records and balance stay unchanged after player deletion.
 An explicit payment undo while the player exists still voids its linked revenue.
 Report reads use one database snapshot for live players and archived records.
+
+Apply `20261117010000_report_billing_start_corrections` after the report history
+migration. A billing-start correction changes the first activity period only.
+Removal dates, restoration dates, and inactive gaps stay unchanged. The database
+trigger applies the correction in the same write as `first_billing_month`.
+Clearing the billing start uses the player's creation month for this boundary.
+The yearly report still requires a billing start before it can count dues.
+
+New initial periods have a `billingStart` marker. Paid-month periods and restoration
+periods from legacy history do not have this marker. The follow-up migration uses
+the original tracking migration's start month to identify earlier initial periods.
+It corrects their start and preserves their removal and restoration boundaries.
+A closed, paid one-month period is ambiguous and stays unchanged. Unmarked periods
+that start in or after the tracking installation month also stay unchanged because
+they can be legacy restorations. These records require verified activity dates
+before their initial boundary can be corrected. The migration does not infer dues
+for unknown history. Archived records retain corrected periods on deletion.
