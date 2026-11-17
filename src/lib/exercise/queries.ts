@@ -41,6 +41,7 @@ export async function listTrainingPlans(
   creatorUserId?: string,
   coachId?: string,
   oldestFirst = false,
+  search = "",
 ) {
   if (creatorUserId !== undefined && !TRAINING_UUID_PATTERN.test(creatorUserId)) {
     return { plans: [], nextCursor: null };
@@ -63,11 +64,14 @@ export async function listTrainingPlans(
     : category === "uncategorized"
       ? Prisma.sql`AND category_id IS NULL`
       : Prisma.sql`AND category_id = ${category}::uuid`;
+  const searchFilter = search.trim()
+    ? Prisma.sql`AND strpos(lower(title), lower(${search.trim()})) > 0`
+    : Prisma.empty;
   const rows = await prisma.$queryRaw<TrainingPlanSummary[]>(Prisma.sql`
     SELECT id, title, description, category_id AS "categoryId", creator_name AS "creatorName",
       created_at AS "createdAt", updated_at AS "updatedAt",
       CASE WHEN layout->>'version' = '2' THEN 2 ELSE 1 END AS "layoutVersion"
-    FROM training_plans WHERE club_id = ${clubId}::uuid ${categoryFilter} ${creatorFilter} ${coachFilter} ${cursorFilter}
+    FROM training_plans WHERE club_id = ${clubId}::uuid ${categoryFilter} ${creatorFilter} ${coachFilter} ${cursorFilter} ${searchFilter}
     ORDER BY updated_at ${direction}, id ${direction} LIMIT 51
   `);
   const plans = rows.slice(0, 50);

@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Group, Layer, Stage } from "react-konva";
 import { getPitchQuadrants, isInPitchQuadrants, type Exercise } from "@/lib/exercise/model";
 import { ObjectVisual, PitchBackground, usePitchIcons } from "./[planId]/konva/Visuals";
-import { fitPitchPreview, pitchViewport } from "./[planId]/konva/pitchView";
+import { fitPitchPreview, landscapePitchRotation, pitchObjectRotation, pitchViewport } from "./[planId]/konva/pitchView";
 
-export default function PlanPreview({ exercise }: { exercise: Exercise }) {
+export default function PlanPreview({ exercise, landscape = false }: { exercise: Exercise; landscape?: boolean }) {
   const icons = usePitchIcons();
   const host = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -20,8 +20,10 @@ export default function PlanPreview({ exercise }: { exercise: Exercise }) {
   }, []);
 
   const quadrants = getPitchQuadrants(exercise);
-  const rotation = exercise.pitchRotation ?? 0;
-  const { width, height, viewLayer } = fitPitchPreview(pitchViewport(quadrants), rotation, size);
+  const viewport = pitchViewport(quadrants);
+  const savedRotation = exercise.pitchRotation ?? 0;
+  const rotation = landscape ? landscapePitchRotation(viewport, savedRotation) : savedRotation;
+  const { width, height, viewLayer } = fitPitchPreview(viewport, rotation, size);
 
   return (
     <div className="tp-preview-canvas" ref={host}>
@@ -31,7 +33,7 @@ export default function PlanPreview({ exercise }: { exercise: Exercise }) {
             <PitchBackground surface={exercise.surface} background={exercise.background} />
             {exercise.objects.filter((object) => isInPitchQuadrants(object, quadrants)).map((object) => (
               <Group key={object.id} x={object.x} y={object.y}
-                rotation={object.kind === "movement" || object.kind === "zone" ? object.rotation : object.rotation - rotation}>
+                rotation={pitchObjectRotation(object.kind, object.rotation, rotation)}>
                 <ObjectVisual object={object} icons={icons} />
               </Group>
             ))}

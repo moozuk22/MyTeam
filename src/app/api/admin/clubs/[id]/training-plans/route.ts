@@ -56,6 +56,7 @@ export async function GET(
       scope === "mine" ? session.sub : undefined,
       scope === "mine" ? undefined : coach || undefined,
       request.nextUrl.searchParams.get("sort") === "oldest",
+      (request.nextUrl.searchParams.get("search") ?? "").slice(0, 200),
     ),
   );
 }

@@ -1,5 +1,5 @@
 import type Konva from "konva";
-import { HEIGHT, PITCH_QUADRANT_BOUNDS, WIDTH, type PitchQuadrant, type PitchRotation } from "@/lib/exercise/model";
+import { HEIGHT, PITCH_ROTATIONS, PITCH_QUADRANT_BOUNDS, WIDTH, type PitchQuadrant, type PitchRotation } from "@/lib/exercise/model";
 
 export function pitchViewport(quadrants: readonly PitchQuadrant[]) {
   const origins = quadrants.map((part) => PITCH_QUADRANT_BOUNDS[part]);
@@ -42,4 +42,17 @@ export function fitPitchPreview(
   const { viewLayer } = pitchView(viewport, rotation, width);
   const height = Math.min(availableHeight, Math.ceil(width * viewHeight / viewWidth));
   return { width, height, viewLayer };
+}
+
+export function landscapePitchRotation(
+  viewport: ReturnType<typeof pitchViewport>, rotation: PitchRotation,
+): PitchRotation {
+  const { viewWidth, viewHeight } = pitchView(viewport, rotation, 1);
+  return viewHeight > viewWidth
+    ? PITCH_ROTATIONS[(PITCH_ROTATIONS.indexOf(rotation) + 1) % PITCH_ROTATIONS.length]
+    : rotation;
+}
+
+export function pitchObjectRotation(kind: string, rotation: number, pitchRotation: PitchRotation) {
+  return kind === "movement" || kind === "zone" ? rotation : rotation - pitchRotation;
 }

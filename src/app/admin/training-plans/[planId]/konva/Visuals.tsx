@@ -45,19 +45,26 @@ export type PitchIcons = Partial<
 
 let pitchIconsPromise: Promise<PitchIcons> | undefined;
 
+export function loadPitchIcons() {
+  pitchIconsPromise ??= Promise.all(Object.entries(PITCH_ICON_FILES).map(([name, filename]) =>
+    new Promise<readonly [string, HTMLImageElement | undefined]>((resolve) => {
+      const image = new window.Image();
+      image.onload = () => resolve([name, image]);
+      image.onerror = () => resolve([name, undefined]);
+      image.src = `/icons/${filename}`;
+    }),
+  )).then((entries) => {
+    if (entries.some(([, image]) => !image)) pitchIconsPromise = undefined;
+    return Object.fromEntries(entries);
+  });
+  return pitchIconsPromise;
+}
+
 export function usePitchIcons() {
   const [icons, setIcons] = useState<PitchIcons>({});
   useEffect(() => {
     let mounted = true;
-    pitchIconsPromise ??= Promise.all(Object.entries(PITCH_ICON_FILES).map(([name, filename]) =>
-      new Promise<readonly [string, HTMLImageElement | undefined]>((resolve) => {
-        const image = new window.Image();
-        image.onload = () => resolve([name, image]);
-        image.onerror = () => resolve([name, undefined]);
-        image.src = `/icons/${filename}`;
-      }),
-    )).then((entries) => Object.fromEntries(entries));
-    void pitchIconsPromise.then((loaded) => {
+    void loadPitchIcons().then((loaded) => {
       if (mounted) setIcons(loaded);
     });
     return () => { mounted = false; };
@@ -293,16 +300,18 @@ export function EquipmentPreview({ type }: { type: ExerciseTool }) {
 function ColorEquipmentIcon({
   image,
   object,
+  color,
   crop,
 }: {
   image: HTMLImageElement;
   object: ExerciseObject;
+  color: string;
   crop: IconCrop;
 }) {
   const scale = Math.min(object.width / crop.width, object.height / crop.height);
   const width = crop.width * scale;
   const height = crop.height * scale;
-  if (object.color === "#f59e0b")
+  if (color === "#f59e0b")
     return (
       <KonvaImage
         image={image}
@@ -322,7 +331,7 @@ function ColorEquipmentIcon({
       height={height}
       listening={false}
       sceneFunc={(context) => {
-        const tinted = tintedIcon(image, object.color, "artwork") ?? image;
+        const tinted = tintedIcon(image, color, "artwork") ?? image;
         context.drawImage(
           tinted,
           crop.x,
@@ -345,12 +354,16 @@ function PitchArc({
   radius,
   rotation = 0,
   chordDistance = 0,
+  ink,
+  lineWidth,
 }: {
   x: number;
   y: number;
   radius: number;
   rotation?: number;
   chordDistance?: number;
+  ink: string;
+  lineWidth: number;
 }) {
   const halfAngle = Math.acos(chordDistance / radius);
   return (
@@ -358,8 +371,8 @@ function PitchArc({
       x={x}
       y={y}
       rotation={rotation}
-      stroke="#d9e5d7"
-      strokeWidth={2}
+      stroke={ink}
+      strokeWidth={lineWidth}
       sceneFunc={(context, shape) => {
         context.beginPath();
         context.arc(0, 0, radius, -halfAngle, halfAngle);
@@ -380,13 +393,19 @@ export function PitchBackground({ surface, background }: Pick<Exercise, "surface
     return () => { image.onload = null; };
   }, [src]);
 
-  if (!background) return <Pitch surface={surface} />;
+  return <PitchScene surface={surface} background={background} image={loaded?.src === src ? loaded : undefined} />;
+}
+
+export function PitchScene({
+  surface, background, image, monochrome = false,
+}: Pick<Exercise, "surface" | "background"> & { image?: CanvasImageSource; monochrome?: boolean }) {
+  if (!background) return <Pitch surface={surface} monochrome={monochrome} />;
 
   return (
     <>
-      <Rect width={WIDTH} height={HEIGHT} fill="#16221e" />
-      {loaded && loaded.src === src && (
-        <KonvaImage image={loaded} x={background.x} y={background.y}
+      <Rect width={WIDTH} height={HEIGHT} fill={monochrome ? "#ffffff" : "#16221e"} />
+      {image && (
+        <KonvaImage image={image} x={background.x} y={background.y}
           width={background.width} height={background.height}
           offsetX={background.width / 2} offsetY={background.height / 2}
           rotation={background.rotation} />
@@ -396,20 +415,24 @@ export function PitchBackground({ surface, background }: Pick<Exercise, "surface
 }
 
 export const Pitch = memo(function Pitch({
-  surface,
+  surface, monochrome = false,
 }: {
   surface: Exercise["surface"];
+  monochrome?: boolean;
 }) {
+  const ink = monochrome ? "#202020" : "#d9e5d7";
+  const lineWidth = monochrome ? 3.5 : 2;
+  const turf = surface === "blank" ? "#203c30" : "#175226";
   return (
     <Group listening={false}>
       <Rect
         width={WIDTH}
         height={HEIGHT}
-        fill={surface === "blank" ? "#203c30" : "#175226"}
+        fill={monochrome ? "#ffffff" : turf}
       />
       {surface !== "blank" && (
         <>
-          {Array.from({ length: 10 }, (_, i) => (
+          {!monochrome && Array.from({ length: 10 }, (_, i) => (
             <Rect
               key={i}
               x={i * 105}
@@ -425,24 +448,24 @@ export const Pitch = memo(function Pitch({
             y={25}
             width={1000}
             height={650}
-            stroke="#d9e5d7"
-            strokeWidth={2}
+            stroke={ink}
+            strokeWidth={lineWidth}
           />
           {surface === "full" ? (
             <>
               <Line
                 points={[525, 25, 525, 675]}
-                stroke="#d9e5d7"
-                strokeWidth={2}
+                stroke={ink}
+                strokeWidth={lineWidth}
               />
               <Circle
                 x={525}
                 y={350}
                 radius={85}
-                stroke="#d9e5d7"
-                strokeWidth={2}
+                stroke={ink}
+                strokeWidth={lineWidth}
               />
-              <Circle x={525} y={350} radius={3} fill="#d9e5d7" />
+              <Circle x={525} y={350} radius={3} fill={ink} />
               {[25, 1025].flatMap((x) => [25, 675].map((y) => (
                 <Shape
                   key={`${x}-${y}`}
@@ -450,8 +473,8 @@ export const Pitch = memo(function Pitch({
                   y={y}
                   scaleX={x === 25 ? 1 : -1}
                   scaleY={y === 25 ? 1 : -1}
-                  stroke="#d9e5d7"
-                  strokeWidth={2}
+                  stroke={ink}
+                  strokeWidth={lineWidth}
                   sceneFunc={(context, shape) => {
                     context.beginPath();
                     context.arc(0, 0, 12, 0, Math.PI / 2);
@@ -470,26 +493,26 @@ export const Pitch = memo(function Pitch({
                     y={175}
                     width={155}
                     height={350}
-                    stroke="#d9e5d7"
-                    strokeWidth={2}
+                    stroke={ink}
+                    strokeWidth={lineWidth}
                   />
                   <Rect
                     x={25}
                     y={270}
                     width={55}
                     height={160}
-                    stroke="#d9e5d7"
-                    strokeWidth={2}
+                    stroke={ink}
+                    strokeWidth={lineWidth}
                   />
-                  <Circle x={135} y={350} radius={3} fill="#d9e5d7" />
-                  <PitchArc x={135} y={350} radius={77} chordDistance={45} />
+                  <Circle x={135} y={350} radius={3} fill={ink} />
+                  <PitchArc ink={ink} lineWidth={lineWidth} x={135} y={350} radius={77} chordDistance={45} />
                   <Rect
                     x={10}
                     y={315}
                     width={15}
                     height={70}
-                    stroke="#d9e5d7"
-                    strokeWidth={2}
+                    stroke={ink}
+                    strokeWidth={lineWidth}
                   />
                 </Group>
               ))}
@@ -501,28 +524,28 @@ export const Pitch = memo(function Pitch({
                 y={25}
                 width={480}
                 height={220}
-                stroke="#d9e5d7"
-                strokeWidth={2}
+                stroke={ink}
+                strokeWidth={lineWidth}
               />
               <Rect
                 x={415}
                 y={25}
                 width={220}
                 height={75}
-                stroke="#d9e5d7"
-                strokeWidth={2}
+                stroke={ink}
+                strokeWidth={lineWidth}
               />
-              <Circle x={525} y={185} radius={3} fill="#d9e5d7" />
-              <PitchArc x={525} y={185} radius={105} rotation={90} chordDistance={60} />
+              <Circle x={525} y={185} radius={3} fill={ink} />
+              <PitchArc ink={ink} lineWidth={lineWidth} x={525} y={185} radius={105} rotation={90} chordDistance={60} />
               <Rect
                 x={475}
                 y={10}
                 width={100}
                 height={15}
-                stroke="#d9e5d7"
-                strokeWidth={2}
+                stroke={ink}
+                strokeWidth={lineWidth}
               />
-              <PitchArc x={525} y={675} radius={105} rotation={-90} />
+              <PitchArc ink={ink} lineWidth={lineWidth} x={525} y={675} radius={105} rotation={-90} />
             </>
           )}
         </>
@@ -536,15 +559,17 @@ export const ObjectVisual = memo(function ObjectVisual({
   hitWidth = 24,
   showArrowhead = true,
   icons,
+  monochrome = false,
 }: {
   object: ExerciseObject;
   hitWidth?: number;
   showArrowhead?: boolean;
   icons: PitchIcons;
+  monochrome?: boolean;
 }) {
   const w = o.width,
     h = o.height,
-    c = o.color;
+    c = monochrome ? "#202020" : o.color;
   if (o.kind === "movement") {
     const points = movementPoints(o),
       style = FOOTBALL.actions[o.action!];
@@ -558,7 +583,7 @@ export const ObjectVisual = memo(function ObjectVisual({
             key={index}
             points={shaft}
             stroke={c}
-            strokeWidth={3}
+            strokeWidth={monochrome ? 4 : 3}
             dash={style.dash}
             tension={tension}
             hitStrokeWidth={hitWidth}
@@ -571,7 +596,7 @@ export const ObjectVisual = memo(function ObjectVisual({
           <Line
             points={head}
             stroke={c}
-            strokeWidth={3}
+            strokeWidth={monochrome ? 4 : 3}
             lineCap="round"
             lineJoin="round"
           />
@@ -579,29 +604,32 @@ export const ObjectVisual = memo(function ObjectVisual({
       </Group>
     );
   }
-  if (o.kind === "player")
+  if (o.kind === "player") {
+    const label = o.label || "1";
+    const printedLabel = monochrome && o.team ? `${o.team}·${label}` : label;
     return (
       <Group>
         <Circle
           radius={w / 2}
           scaleY={h / w}
-          fill={c}
-          stroke="#ffffff"
-          strokeWidth={2}
+          fill={monochrome ? "#ffffff" : c}
+          stroke={monochrome ? c : "#ffffff"}
+          strokeWidth={monochrome ? 4 : 2}
         />
         <Text
-          text={o.label || "1"}
+          text={printedLabel}
           x={-w / 2}
           y={-h / 2 + h * 0.17}
           width={w}
           height={h * 0.66}
-          fontSize={h * 0.55}
+          fontSize={monochrome ? Math.min(h * 0.55, w / (printedLabel.length * 0.58)) : h * 0.55}
           align="center"
-          fill="#ffffff"
+          fill={monochrome ? c : "#ffffff"}
           fontStyle="bold"
         />
       </Group>
     );
+  }
   if (o.kind === "text")
     return (
       <Text
@@ -657,7 +685,7 @@ export const ObjectVisual = memo(function ObjectVisual({
   const colorIcon = COLOR_ICONS[isMarker ? "marker" : type];
   const colorImage = colorIcon && icons[colorIcon.name];
   if (colorIcon && colorImage)
-    return <ColorEquipmentIcon image={colorImage} object={o} crop={colorIcon.crop} />;
+    return <ColorEquipmentIcon image={colorImage} object={o} color={c} crop={colorIcon.crop} />;
   const iconName = type.startsWith("goal")
     ? "goal"
     : type === "flag" || type === "ring" ? type : null;

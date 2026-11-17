@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   type Member,
   type TrainingScheduleGroup,
@@ -12,7 +12,6 @@ type MemberNotificationsOptions = {
   members: Member[];
   coachGroupId: string;
   isCustomTrainingGroupMode: boolean;
-  customTrainingGroups: CustomTrainingGroup[];
   trainingScheduleGroups: TrainingScheduleGroup[];
 };
 
@@ -21,7 +20,6 @@ export function useMemberNotifications({
   members,
   coachGroupId,
   isCustomTrainingGroupMode,
-  customTrainingGroups,
   trainingScheduleGroups,
 }: MemberNotificationsOptions) {
   const [notifyPanelOpen, setNotifyPanelOpen] = useState(false);
@@ -44,6 +42,39 @@ export function useMemberNotifications({
 
   const [notifySuccess, setNotifySuccess] = useState("");
 
+  const [notifyCustomGroups, setNotifyCustomGroups] = useState<
+    Pick<CustomTrainingGroup, "id" | "name" | "playerIds" | "coachGroupId">[]
+  >([]);
+  const [notifyGroupsLoading, setNotifyGroupsLoading] = useState(false);
+  const [notifyGroupsError, setNotifyGroupsError] = useState("");
+  const [notifyGroupsRevision, setNotifyGroupsRevision] = useState(0);
+
+  useEffect(() => {
+    if (!notifyPanelOpen || !clubId || !isCustomTrainingGroupMode) return;
+    const controller = new AbortController();
+    setNotifyGroupsLoading(true);
+    setNotifyGroupsError("");
+    setNotifyCustomGroups([]);
+    const search = new URLSearchParams();
+    if (coachGroupId) search.set("coachGroupId", coachGroupId);
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/clubs/${encodeURIComponent(clubId)}/message-groups${search.size ? `?${search}` : ""}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (!response.ok) throw new Error("Неуспешно зареждане на групите.");
+        const groups = await response.json();
+        if (!controller.signal.aborted) setNotifyCustomGroups(groups);
+      } catch {
+        if (!controller.signal.aborted) setNotifyGroupsError("Неуспешно зареждане на групите.");
+      } finally {
+        if (!controller.signal.aborted) setNotifyGroupsLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [notifyPanelOpen, clubId, coachGroupId, isCustomTrainingGroupMode, notifyGroupsRevision]);
+
   const notifyVisibleMembers = useMemo(() => {
     let list = members.filter((m) => m.isActive);
     if (!coachGroupId && notifyCoachGroupFilter) {
@@ -52,7 +83,7 @@ export function useMemberNotifications({
     if (notifyGroupFilter !== "all") {
       if (isCustomTrainingGroupMode) {
         list = list.filter((m) =>
-          (customTrainingGroups.find((g) => g.id === notifyGroupFilter)?.playerIds ?? []).includes(m.id),
+          (notifyCustomGroups.find((g) => g.id === notifyGroupFilter)?.playerIds ?? []).includes(m.id),
         );
       } else {
         const tsg = trainingScheduleGroups.find((g) => g.id === notifyGroupFilter);
@@ -75,7 +106,7 @@ export function useMemberNotifications({
     notifyCoachGroupFilter,
     coachGroupId,
     isCustomTrainingGroupMode,
-    customTrainingGroups,
+    notifyCustomGroups,
     trainingScheduleGroups,
   ]);
 
@@ -112,6 +143,10 @@ export function useMemberNotifications({
 
   return {
     notifyPanelOpen,
+    notifyCustomGroups,
+    notifyGroupsLoading,
+    notifyGroupsError,
+    retryNotifyGroups: () => setNotifyGroupsRevision((value) => value + 1),
     setNotifyPanelOpen,
     notifyImage,
     setNotifyImage,
