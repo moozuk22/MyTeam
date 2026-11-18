@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, HelpCircle, Crown, Cpu, Tag, MessageSquare, X as CloseX } from "lucide-react";
+import { Home, HelpCircle, Cpu, Tag, MessageSquare, X as CloseX } from "lucide-react";
 
 export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
@@ -13,7 +13,6 @@ export default function NavBar() {
 
   const activeSection =
     pathname === "/zashto"   ? "Защо"    :
-    pathname === "/vip"      ? "VIP"     :
     pathname === "/funkcii"  ? "Функции" : "";
 
   useEffect(() => {
@@ -38,8 +37,7 @@ export default function NavBar() {
   const navItems = [
     { id: "Начало", href: "/", text: "Начало", icon: Home, index: "00" },
     { id: "Защо", href: "/zashto", text: "Защо MyTeam", icon: HelpCircle, index: "01" },
-    { id: "VIP", href: "/vip", text: "VIP CLUB", icon: Crown, index: "02" },
-    { id: "Функции", href: "/funkcii", text: "Функции", icon: Cpu, index: "03" },
+    { id: "Функции", href: "/funkcii", text: "Функции", icon: Cpu, index: "02" },
   ];
 
   return (
@@ -80,7 +78,7 @@ export default function NavBar() {
                   key={item.id}
                   href={item.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`nav-link ${isActive ? "active" : ""} ${item.id === "VIP" ? "nav-vip-link" : ""}`}
+                  className={`nav-link ${isActive ? "active" : ""}`}
                 >
                   <span className="nav-index">{item.index}</span>
                   <Icon size={18} className="nav-icon" />
