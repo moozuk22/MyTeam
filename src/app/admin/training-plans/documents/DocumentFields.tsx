@@ -116,7 +116,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
         {exerciseGroup([1])}
         <section className="td-edit-cell td-edit-session" aria-label="Данни за тренировката">
           <h2>Данни за тренировката</h2>
-          <div className="td-fields">{sessionFields.slice(3).map((field) => sessionField(field))}</div>
+          <div className="td-fields">{sessionFields.slice(3).filter(([key]) => key !== "group").map((field) => sessionField(field))}</div>
         </section>
       </div>
       <div className="td-field td-layout-control">
