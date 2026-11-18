@@ -298,7 +298,12 @@
     -webkit-print-color-adjust: exact;
   }
 
-  .td-paper { margin-inline: auto; transform: scale(1.044, 1.066); transform-origin: top center; overflow: hidden; }
+  /* Prevent scaled sheet edges from clipping the table's outer borders. */
+  .td-paper { margin-inline: auto; transform: scale(1.044, 1.066); transform-origin: top center; overflow: visible; }
+  .td-printed-header { border-top: 2px solid #586252; }
+  .td-printed-row { border-inline: 2px solid #586252; }
+  .td-printed-row > .td-printed-section:last-child { border-right: 0; }
+  .td-printed-row-bottom { border-bottom: 2px solid #586252; }
   .td-preview-multipage { width: 297mm; height: auto; max-width: none; overflow: visible; padding: 0; }
   .td-preview-multipage .td-paper-multipage { width: auto; height: auto; margin: 0; overflow: visible; transform: none; }
   .td-preview-multipage .td-print-page {
