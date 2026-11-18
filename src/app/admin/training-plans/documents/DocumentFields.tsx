@@ -60,7 +60,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
             <Field heading wrapHeading label={`Заглавие на секцията · ${sectionTitles[index]}`} max={120} value={section.title}
               onChange={(value) => onSection(index, { title: value })} />
             <div className="td-fields">
-              {exerciseFields.slice(1, 3).map(([key, label, max]) => <Field key={key} label={label} max={max}
+              {exerciseFields.slice(2, 3).map(([key, label, max]) => <Field key={key} label={label} max={max}
                 value={section[key]} onChange={(value) => onSection(index, { [key]: value })} />)}
             </div>
           </section>;

@@ -50,7 +50,6 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
       {indices.map((index) => <div key={index}>
         <h3 className={index === 3 ? "td-printed-section-heading-long" : undefined}>{sections[index].title}</h3>
         <div className="td-printed-text">
-          <PrintedValue label="Организация" value={sections[index].organization} />
           <PrintedValue label="Цели / Насоки" value={sections[index].coaching} />
         </div>
       </div>)}
@@ -85,19 +84,20 @@ function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: 
     <PrintedSections indices={[1]} sections={content.sections} monochrome={monochrome} onReport={onReport} />
     <section className="td-printed-section td-printed-session">
       <h3>Данни за тренировката</h3>
-      <div className="td-printed-session-period">
-        <div className="td-printed-text">
+      <div className="td-printed-session-grid">
+        <div className="td-printed-text td-printed-session-period">
           {([["period", "Период"], ["microcycle", "Микроцикъл"], ["sessionNumber", "Тренировка №"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
         </div>
-        <div className="td-printed-session-logo">{clubLogoUrl && <img src={clubLogoUrl} alt="" />}</div>
-      </div>
-      <div className="td-printed-session-pair">
-        <div className="td-printed-text">{([["gameMoment", "Момент от играта"], ["objective", "Цел на тренировката"], ["tasks", "Задачи"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
-        <div className="td-printed-text">{([["date", "Дата"], ["day", "Ден"], ["time", "Час"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={key === "date" ? content.session.date.split("-").reverse().join(".") : content.session[key]} />)}</div>
-      </div>
-      <div className="td-printed-session-pair td-printed-session-pair-fill">
-        <div className="td-printed-text">{([["playerCount", "Състезатели"], ["duration", "Времетраене (мин.)"], ["equipment", "Необходими пособия"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
-        <div className="td-printed-text">{([["absences", "Отсъстващи"], ["injuries", "Контузени"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+        <div className="td-printed-session-side">
+          <div className="td-printed-session-logo">{clubLogoUrl && <img src={clubLogoUrl} alt="" />}</div>
+          {([["date", "Дата"], ["day", "Ден"], ["time", "Час"]] as const).map(([key, label]) => <div className="td-printed-text td-printed-session-datetime" key={key}><PrintedValue label={label} value={key === "date" ? content.session.date.split("-").reverse().join(".") : content.session[key]} /></div>)}
+        </div>
+        <div className="td-printed-text td-printed-session-main">
+          {([["gameMoment", "Момент от играта"], ["objective", "Цел на тренировката"], ["tasks", "Задачи"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
+        </div>
+        <div className="td-printed-text td-printed-session-details">
+          {([["playerCount", "Състезатели"], ["absences", "Отсъстващи"], ["injuries", "Контузени"], ["duration", "Времетраене (мин.)"], ["equipment", "Необходими пособия"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
+        </div>
       </div>
       <div className="td-printed-text td-printed-session-coach">{([["coach", "Треньор"], ["group", "Група"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
     </section>
