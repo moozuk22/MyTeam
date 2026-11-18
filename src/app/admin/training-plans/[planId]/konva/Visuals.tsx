@@ -28,6 +28,15 @@ import {
 // The original PNG has a transparent 15px margin on every side.
 const BALL_ICON_CROP = { x: 15, y: 15, width: 170, height: 170 };
 
+const GOAL_ICON_FILES: Record<string, string> = {
+  "goal-small": "goal-front-compact.svg",
+  "goal-full": "goal-front.svg",
+  "goal-7m": "goal-front-large.svg",
+  "goal-5m": "goal-front-wide.svg",
+  "goal-3m": "goal-front-compact.svg",
+  "goal-1m": "goal-front-green.svg",
+};
+
 export const PITCH_ICON_FILES = {
   ball: "football-ball-5681732.png",
   goal: "football-goal-2451562.png",
@@ -58,6 +67,20 @@ export function loadPitchIcons() {
     return Object.fromEntries(entries);
   });
   return pitchIconsPromise;
+}
+
+function goalIconUrl(type: ExerciseTool) {
+  return GOAL_ICON_FILES[type] ? `/icons/${GOAL_ICON_FILES[type]}` : `/icons/${PITCH_ICON_FILES.goal}`;
+}
+
+function useGoalIcon(type: ExerciseTool) {
+  const [image, setImage] = useState<HTMLImageElement>();
+  useEffect(() => {
+    const next = new window.Image();
+    next.onload = () => setImage(next);
+    next.src = goalIconUrl(type);
+  }, [type]);
+  return image;
 }
 
 export function usePitchIcons() {
@@ -223,11 +246,13 @@ const GOAL_PREVIEW_SCALE =
   34 / createObject("goal-full", { x: 0, y: 0 }, "preview").width;
 
 export function EquipmentPreview({ type }: { type: ExerciseTool }) {
+  const goalImage = useGoalIcon(type);
   if (type === "pole")
     return <span className="ke-equipment-preview ke-equipment-preview--pole" aria-hidden="true" />;
 
   const ball = type === "ball" || type === "balls";
-  const tintedName = type.startsWith("goal")
+  const isGoal = type.startsWith("goal");
+  const tintedName = isGoal
     ? "goal"
     : type === "flag" || type === "ring" ? type : null;
   const icon: CroppedIcon | undefined = ball
@@ -245,6 +270,7 @@ export function EquipmentPreview({ type }: { type: ExerciseTool }) {
     : null;
   const previewWidth = goal ? goal.width * GOAL_PREVIEW_SCALE : width * scale;
   const previewHeight = goal ? goal.height * GOAL_PREVIEW_SCALE : height * scale;
+  if (isGoal && goalImage) return <img src={goalIconUrl(type)} alt="" style={{ width: previewWidth, height: previewHeight, objectFit: "fill" }} />;
   const sourceSize = ball || tintedName ? 200 : 512;
   const scaleX = previewWidth / width;
   const scaleY = previewHeight / height;
@@ -570,6 +596,7 @@ export const ObjectVisual = memo(function ObjectVisual({
   const w = o.width,
     h = o.height,
     c = monochrome ? "#202020" : o.color;
+  const goalImage = useGoalIcon(o.equipment ?? "goal-full");
   if (o.kind === "movement") {
     const points = movementPoints(o),
       style = FOOTBALL.actions[o.action!];
@@ -681,6 +708,8 @@ export const ObjectVisual = memo(function ObjectVisual({
       />
     );
   const type = o.equipment!;
+  if (type.startsWith("goal") && goalImage)
+    return <KonvaImage image={goalImage} x={-w / 2} y={-h / 2} width={w} height={h} listening={false} />;
   const isMarker = type.startsWith("marker");
   const colorIcon = COLOR_ICONS[isMarker ? "marker" : type];
   const colorImage = colorIcon && icons[colorIcon.name];
