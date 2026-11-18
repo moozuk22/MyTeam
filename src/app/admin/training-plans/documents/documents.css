@@ -240,8 +240,9 @@
 .td-printed-session-grid { display: grid; flex: 1; grid-template-columns: 1fr 32%; grid-template-rows: auto auto 1fr; min-height: 0; font-size: 11px; }
 .td-printed-session-period { border-bottom: 2px solid #74786b; }
 .td-printed-session-main, .td-printed-session-details { min-width: 0; }
+.td-printed-session-main { background: #f4ecd5; }
 .td-printed-session-details { border-top: 2px solid #74786b; }
-.td-printed-session-side { display: flex; grid-column: 2; grid-row: 1 / span 3; flex-direction: column; justify-content: space-between; border-left: 2px solid #74786b; background: #f4ecd5; }
+.td-printed-session-side { display: flex; grid-column: 2; grid-row: 1 / span 3; flex-direction: column; justify-content: space-between; border-left: 2px solid #74786b; }
 .td-printed-session-logo { display: grid; min-height: 88px; place-items: center; padding: 5px; }
 .td-printed-session-datetime { border-top: 2px solid #74786b; }
 .td-printed-session-logo img { display: block; max-width: 100%; max-height: 88px; object-fit: contain; }
@@ -264,7 +265,7 @@
 .td-printed-footer > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-around; gap: 4px 12px; }
 .td-printed-footer .td-printed-value + .td-printed-value { margin-top: 0; }
 
-.td-paper-monochrome :is(.td-printed-header, .td-printed-section h3, .td-printed-session-side) { background: #fff; }
+.td-paper-monochrome :is(.td-printed-header, .td-printed-section h3, .td-printed-session-main) { background: #fff; }
 
 @page training-note { size: A4 landscape; margin: 0; }
 @media print {
