@@ -92,6 +92,24 @@ describe("График 2 weekly schedule", () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it.each(["custom_group", "team_group"])("returns the stored match subtype only for Schedule 2 in %s mode", async (trainingGroupMode) => {
+    mocks.club.mockResolvedValue({ id: "club-1", trainingGroupMode });
+    mocks.matches.mockResolvedValue([{
+      id: "tournament", eventType: "tournament", matchDate: "2026-11-10", matchTime: "19:30",
+      opponent: "Локо", teamGroups: [], customGroupId: null, isHome: false,
+    }]);
+
+    const planner = await request("?view=schedule2");
+    expect((await planner.json()).sessions).toContainEqual(expect.objectContaining({
+      id: "match-tournament", eventType: "match", matchEventType: "tournament", isHome: false,
+    }));
+
+    const original = await request("");
+    const { sessions } = await original.json();
+    expect(sessions).toContainEqual(expect.objectContaining({ id: "match-tournament", label: "Турнир · Локо" }));
+    expect(sessions.find(({ id }: { id: string }) => id === "match-tournament")).not.toHaveProperty("matchEventType");
+  });
+
   it("returns both coach sessions when they share a training date", async () => {
     mocks.sessions.mockImplementation(async ({ where }) => where.scopeType === "coachGroup" ? [
       { id: "first", scopeId: "coach-group-1", trainingDate: new Date("2026-11-17"), trainingTime: "16:00", trainingDurationMinutes: 60 },

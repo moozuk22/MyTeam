@@ -178,10 +178,6 @@
   font-size: 0.875rem;
 }
 
-.grid [data-today="true"] {
-  background: #16291e;
-}
-
 .event,
 .emptyCell {
   display: grid;
@@ -190,9 +186,9 @@
   gap: 0.125rem;
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--green);
+  border-left-width: 3px;
   border-radius: 0.375rem;
-  background: #1a2e24;
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
@@ -207,9 +203,78 @@
   margin-top: 0.25rem;
 }
 
-.event[data-match="true"] {
-  border-left-color: #e8c96d;
-  background: #2c271d;
+.eventTab[data-event-type] {
+  min-height: 44px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-left-width: 3px;
+  color: var(--event-accent, #f3f6f7);
+}
+
+.eventTab[data-event-type]:is(:hover, [aria-pressed="true"]) {
+  border-color: var(--event-accent, #f3f6f7);
+}
+
+.eventTab:focus-visible {
+  outline: 2px solid var(--event-accent, #f3f6f7);
+  outline-offset: 2px;
+}
+
+:is(.event, .eventTab)[data-event-type] {
+  --event-accent: initial;
+  --event-background: initial;
+  border-left-color: var(--event-accent, var(--line, rgba(148, 163, 184, 0.24)));
+  background: var(--event-background, transparent);
+}
+
+.eventDetails[data-event-type] {
+  --details-accent: var(--event-accent, #f3f6f7);
+  --amp-modal-tint-bg: linear-gradient(135deg, color-mix(in srgb, var(--details-accent) 5%, transparent), transparent);
+  scrollbar-color: color-mix(in srgb, var(--details-accent) 20%, transparent) transparent;
+}
+
+.eventDetails[data-event-type]::before {
+  background: linear-gradient(90deg, transparent, var(--details-accent) 50%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--details-accent) 55%, transparent);
+}
+
+.eventDetails :global(.amp-modal-title-gradient) {
+  background: none;
+  color: var(--details-accent);
+  -webkit-text-fill-color: currentColor;
+}
+
+:is(.event, .eventTab, .eventDetails)[data-match-venue="home"][data-event-type] {
+  --event-accent: #4ade80;
+  --event-background: #1a2e24;
+}
+
+:is(.event, .eventTab, .eventDetails)[data-match-venue="away"][data-event-type] {
+  --event-accent: #f87171;
+  --event-background: #331f24;
+}
+
+:is(.event, .eventTab, .eventDetails)[data-event-type="training"] {
+  --event-accent: #fff;
+}
+
+:is(.event, .eventTab, .eventDetails)[data-event-type="duel"] {
+  --event-accent: #60a5fa;
+  --event-background: #1d3559;
+}
+
+:is(.event, .eventTab, .eventDetails)[data-event-type="competition"] {
+  --event-accent: #c084fc;
+  --event-background: #3b2455;
+}
+
+:is(.event, .eventTab, .eventDetails)[data-event-type="tournament"] {
+  --event-accent: #facc15;
+  --event-background: #483b16;
+}
+
+:is(.event, .eventTab, .eventDetails)[data-event-type="participation"] {
+  --event-accent: #22d3ee;
+  --event-background: #153d46;
 }
 
 .event small,
@@ -220,7 +285,6 @@
 .emptyCell {
   place-items: center;
   border: 1px dashed var(--line);
-  background: transparent;
   color: var(--green);
 }
 

@@ -4,6 +4,7 @@ import { mergeTrainingCalendarDates } from "@/lib/trainingCalendarDates";
 import { getNewTrainingEditorMode } from "@/lib/coachTrainingWizard";
 import { type CoachTraining } from "@/lib/coachTrainingSchedule";
 import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
+import { isMatchEventType } from "@/lib/matchEventType";
 import {
   DEFAULT_TRAINING_DURATION_MINUTES,
   TRAINING_TIME_REGEX,
@@ -509,6 +510,9 @@ export function createTrainingAttendanceActions({
               trainingTime: typeof raw.trainingTime === "string" ? raw.trainingTime : null,
               scopeType: raw.scopeType === "trainingGroup" ? "trainingGroup" : "teamGroup",
               eventType: raw.eventType === "match" ? "match" : "training",
+              ...(includeFields && raw.eventType === "match" && isMatchEventType(raw.matchEventType)
+                ? { matchEventType: raw.matchEventType }
+                : {}),
               label: String(raw.label ?? ""),
               teamGroups: Array.isArray(raw.teamGroups)
                 ? (raw.teamGroups as unknown[]).map(Number).filter(Number.isInteger)
@@ -536,7 +540,7 @@ export function createTrainingAttendanceActions({
                   return null;
                 return { id: o.id, maxSpots: o.maxSpots, registeredCount: o.registeredCount };
               })(),
-            } satisfies TrainingWeekSessionItem;
+            } satisfies Schedule2Session;
           })
         : [];
       if (!isCurrent()) return;

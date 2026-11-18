@@ -1,10 +1,11 @@
 import { useId, useState } from "react";
 import { AttendanceFilterSelect } from "@/components/AttendanceFilterSelect";
+import type { MatchEventType } from "@/lib/matchEventType";
 import type { TrainingWeekSessionItem } from "../_types/members-page-types";
 import { SkeletonLine } from "./FinanceSkeleton";
 import styles from "./Schedule2.module.css";
 
-export type Schedule2Session = TrainingWeekSessionItem & { fieldName?: string };
+export type Schedule2Session = TrainingWeekSessionItem & { fieldName?: string; matchEventType?: MatchEventType };
 
 export type Schedule2Group = {
   id: string;
@@ -19,7 +20,6 @@ type Props = {
   openingEditor?: boolean;
   detailsActive?: boolean;
   error: string;
-  today: string;
   week: number;
   lastWeek: number;
   canScheduleDate: (date: string) => boolean;
@@ -58,7 +58,7 @@ export function schedule2SessionBelongsToGroup(session: Schedule2Session, group:
   return session.eventType === "training" && Boolean(group.coachGroupId && group.coachGroupId === session.coachGroupId);
 }
 
-export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, today, week, lastWeek, canScheduleDate, onWeekChange, customGroups, restDays, onOpen, onCreate }: Props) {
+export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, week, lastWeek, canScheduleDate, onWeekChange, customGroups, restDays, onOpen, onCreate }: Props) {
   const [view, setView] = useState<"team" | "field">("team");
   const [team, setTeam] = useState("");
   const [field, setField] = useState("");
@@ -81,6 +81,10 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
 
   function eventButton(session: Schedule2Session, fieldView = false) {
     const isMatch = session.eventType === "match";
+    const eventType = isMatch ? session.matchEventType ?? "match" : "training";
+    const matchVenue = eventType === "match" && session.isHome !== undefined
+      ? (session.isHome ? "home" : "away")
+      : undefined;
     const time = session.trainingTime || "Без час";
     // Match labels from the weekly endpoint start with the event type.
     const separator = session.label.indexOf(" · ");
@@ -90,7 +94,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
     const accessibleLabel = [time, isMatch ? session.label : "Тренировка", !isMatch && label, session.location]
       .filter(Boolean).join(", ");
     return (
-      <button key={session.id} type="button" className={styles.event} data-match={isMatch} aria-label={accessibleLabel} disabled={openingEditor || detailsActive} onClick={() => onOpen(session)}>
+      <button key={session.id} type="button" className={styles.event} data-event-type={eventType} data-match-venue={matchVenue} aria-label={accessibleLabel} disabled={openingEditor || detailsActive} onClick={() => onOpen(session)}>
         <strong>{time}</strong>
         {label && <span>{label}</span>}
         {session.location && <small>{session.location}</small>}
@@ -164,7 +168,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                 {dates.map((date) => {
                   const day = new Date(date + "T00:00:00Z");
                   return (
-                    <th key={date} scope="col" data-today={date === today}>
+                    <th key={date} scope="col">
                       <span className={styles.weekday}>{fullDayFormat.format(day)}</span>
                       <time className={styles.dayDate} dateTime={date}>{dateFormat.format(day)}</time>
                     </th>
@@ -184,7 +188,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                     const restDay = entries.length === 0 && restDays[group.id]?.includes(date);
                     const canAddEvent = !activeField && canScheduleDate(date);
                     return (
-                      <td key={date} data-today={date === today}>
+                      <td key={date}>
                         {entries.map((session) => eventButton(session))}
                         {canAddEvent ? (
                           <button

@@ -277,7 +277,6 @@ export function TrainingAttendanceDialog({
                   openingEditor={trainingDaysEditorLoading}
                   detailsActive={trainingDayDetailsOpening || trainingDayDetailsOpen}
                   error={schedule2Error}
-                  today={todayIsoDate}
                   week={schedule2Week}
                   lastWeek={Math.floor((TRAINING_SELECTION_WINDOW_DAYS - 1 + (new Date(todayIsoDate + "T00:00:00Z").getUTCDay() + 6) % 7) / 7)}
                   canScheduleDate={(date) => schedulerCalendarDateSet.has(date)}

@@ -26,6 +26,7 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
     date: tomorrow,
     trainingTime: "15:00",
     eventType: "match",
+    isHome: true,
     label: "Мач · Академик",
     customGroupId: "second",
     coachGroupId: "coach-1",
@@ -33,11 +34,20 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
   const html = renderToStaticMarkup(
     <Schedule2
       dates={[today, tomorrow]}
-      sessions={[training, match, { ...match, id: "match-2", customGroupId: null, label: "Мач · Без група" }]}
+      sessions={[
+        training,
+        match,
+        { ...match, id: "away", isHome: false, label: "Мач · Левски" },
+        { ...match, id: "unknown", isHome: undefined, label: "Мач · Спартак" },
+        { ...match, id: "duel", matchEventType: "duel", label: "Двубой · Локо" },
+        { ...match, id: "competition", matchEventType: "competition", label: "Състезание · Локо" },
+        { ...match, id: "tournament", matchEventType: "tournament", label: "Турнир · Локо" },
+        { ...match, id: "participation", matchEventType: "participation", label: "Участие · Локо" },
+        { ...match, id: "match-2", customGroupId: null, label: "Мач · Без група" },
+      ]}
       loading={false}
       detailsActive={detailsActive}
       error=""
-      today={today}
       week={0}
       lastWeek={1}
       canScheduleDate={() => true}
@@ -63,9 +73,21 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
   expect(matchCell).toContain(">Академик</span>");
   expect(matchCell).toContain('aria-label="15:00, Мач · Академик"');
   expect(matchCell).not.toContain("Почивен ден");
-  for (const row of [rows[0], matchCell]) {
-    const eventButton = row.match(/<button[^>]+data-match="(?:true|false)"[^>]*>/)?.[0];
+  const events = [
+    ["18:00, Тренировка", "training", undefined],
+    ["15:00, Мач · Академик", "match", "home"],
+    ["15:00, Мач · Левски", "match", "away"],
+    ["15:00, Мач · Спартак", "match", undefined],
+    ["15:00, Двубой · Локо", "duel", undefined],
+    ["15:00, Състезание · Локо", "competition", undefined],
+    ["15:00, Турнир · Локо", "tournament", undefined],
+    ["15:00, Участие · Локо", "participation", undefined],
+  ];
+  for (const [label, type, venue] of events) {
+    const eventButton = html.match(new RegExp(`<button[^>]+aria-label="${label}"[^>]*>`))?.[0];
     expect(eventButton).toBeDefined();
+    expect(eventButton).toContain(`data-event-type="${type}"`);
+    expect(eventButton?.match(/data-match-venue="([^"]+)"/)?.[1]).toBe(venue);
     expect(eventButton?.includes(' disabled=""')).toBe(detailsActive);
   }
   expect(rows[2]).toMatch(/^Lemon<\/th>/);
