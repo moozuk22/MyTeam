@@ -3,6 +3,7 @@ export const MATCH_EVENT_TYPES = {
   duel: "Двубой",
   competition: "Състезание",
   participation: "Участие",
+  tournament: "Турнир",
 } as const;
 
 export type MatchEventType = keyof typeof MATCH_EVENT_TYPES;
