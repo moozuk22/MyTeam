@@ -67,7 +67,7 @@ import { TeamGroupWarningDialog } from "./_components/TeamGroupWarningDialog";
 import { PostScheduleSaveDialog } from "./_components/PostScheduleSaveDialog";
 import { TrainingGroupEditorDialog } from "./_components/TrainingGroupEditorDialog";
 import { TrainingGroupCreateDialog } from "./_components/TrainingGroupCreateDialog";
-import { ScheduleEventDialog } from "./_components/ScheduleEventDialog";
+import { ScheduleEventDialog, type ScheduleEventStep } from "./_components/ScheduleEventDialog";
 import { TrainingDaysEditorDialog } from "./_components/TrainingDaysEditorDialog";
 import { TrainingFieldEditorDialog } from "./_components/TrainingFieldEditorDialog";
 import { TrainingScheduleSuccessDialog } from "./_components/TrainingScheduleSuccessDialog";
@@ -185,9 +185,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
   const [schedule2RestDays, setSchedule2RestDays] = useState<Record<string, string[]>>({});
   const [scheduleEventModalOpen, setScheduleEventModalOpen] = useState(false);
 
-  const [scheduleEventStep, setScheduleEventStep] = useState<
-    "type" | "match-type" | "match-days" | "match-details"
-  >("type");
+  const [scheduleEventStep, setScheduleEventStep] = useState<ScheduleEventStep>("type");
 
   const [clubMatches, setClubMatches] = useState<ClubMatch[]>([]);
 
@@ -1249,14 +1247,20 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
   } = trainingAttendanceActions;
 
   const schedule2EventGroup = schedule2Groups.find((group) => group.id === schedule2EventTarget?.groupId);
-  const schedule2EventDate = schedule2EventTarget?.date;
-  const markSchedule2RestDay = schedule2EventGroup && schedule2EventDate && !trainingWeekSessions.some((session) =>
-    session.date === schedule2EventDate && schedule2SessionBelongsToGroup(session, schedule2EventGroup),
-  ) ? () => {
+  const schedule2RestDayDates = schedule2EventGroup
+    ? trainingAttendanceState.trainingWeekDates.filter((date) =>
+        trainingDaysForm.schedulerCalendarDateSet.has(date) &&
+        !trainingWeekSessions.some((session) =>
+          session.date === date && schedule2SessionBelongsToGroup(session, schedule2EventGroup),
+        ),
+      )
+    : [];
+  const markSchedule2RestDay = schedule2EventGroup ? (date: string) => {
+    if (!schedule2RestDayDates.includes(date)) return;
     const groupId = schedule2EventGroup.id;
     setSchedule2RestDays((previous) => {
       const dates = previous[groupId] ?? [];
-      return dates.includes(schedule2EventDate) ? previous : { ...previous, [groupId]: [...dates, schedule2EventDate] };
+      return dates.includes(date) ? previous : { ...previous, [groupId]: [...dates, date] };
     });
     setScheduleEventModalOpen(false);
   } : undefined;
@@ -1644,6 +1648,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
         schedule2EventTarget={schedule2EventTarget}
         schedule2EventGroup={schedule2EventGroup}
         schedule2CanCreateTraining={trainingAttendanceState.schedule2CanCreateTraining}
+        schedule2RestDayDates={schedule2RestDayDates}
         onSchedule2RestDay={markSchedule2RestDay}
         openTrainingDaysEditor={openTrainingDaysEditor}
         matchEditorState={matchEditorState}
