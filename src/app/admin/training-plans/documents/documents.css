@@ -267,7 +267,7 @@
 
 .td-paper-monochrome :is(.td-printed-header, .td-printed-section h3, .td-printed-session-main) { background: #fff; }
 
-@page training-note { size: A4 landscape; margin: 0; }
+@page training-note { size: A4 landscape; margin: 8mm; }
 @media print {
   html:has(.td-preview), body:has(.td-preview) { margin: 0 !important; padding: 0 !important; min-height: 0 !important; background: white !important; }
   body:has(.td-preview) > :not(:has(.td-preview)),
@@ -289,34 +289,34 @@
     page: training-note;
     box-sizing: border-box;
     margin: 0;
-    width: 297mm;
-    height: 210mm;
+    width: auto;
+    height: auto;
     max-width: none;
-    padding: 2mm 0 0;
+    padding: 0;
     break-inside: avoid;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
-  /* Prevent scaled sheet edges from clipping the table's outer borders. */
-  .td-paper { margin-inline: auto; transform: scale(1.044, 1.066); transform-origin: top center; overflow: visible; }
+  /* Keep the sheet inside the printable area of non-borderless printers. */
+  .td-paper { width: 1060px; height: 730px; margin-inline: auto; transform: none; overflow: visible; }
   .td-printed-header { border-top: 2px solid #586252; }
   .td-printed-row { border-inline: 2px solid #586252; }
   .td-printed-row > .td-printed-section:last-child { border-right: 0; }
   .td-printed-row-bottom { border-bottom: 2px solid #586252; }
-  .td-preview-multipage { width: 297mm; height: auto; max-width: none; overflow: visible; padding: 0; }
+  .td-preview-multipage { width: auto; height: auto; max-width: none; overflow: visible; padding: 0; }
   .td-preview-multipage .td-paper-multipage { width: auto; height: auto; margin: 0; overflow: visible; transform: none; }
   .td-preview-multipage .td-print-page {
     box-sizing: border-box;
-    width: 293mm;
-    height: 206mm;
-    margin: 2mm auto;
+    width: auto;
+    height: 194mm;
+    margin: 0 auto;
     break-after: page;
     page-break-after: always;
     overflow: visible;
   }
   .td-preview-multipage .td-print-page:last-child { margin-bottom: 0; break-after: auto; page-break-after: auto; }
-  .td-preview-multipage .td-print-page-sheet { width: 1107px; height: 730px; min-height: 730px; transform: scale(1, 1.066); transform-origin: top center; }
+  .td-preview-multipage .td-print-page-sheet { width: 1060px; height: 730px; min-height: 730px; margin-inline: auto; transform: none; }
   .td-preview[data-print-ready="false"] .td-paper { visibility: hidden; }
 }
 

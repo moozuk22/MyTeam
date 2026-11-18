@@ -17,7 +17,7 @@ it("exports the complete sheet on one A4 landscape page and releases its canvas"
   expect(await createDocumentPdf(paper)).toBe(blob);
   expect(mocks.capture).toHaveBeenCalledWith(paper, expect.objectContaining({ width: 1060, height: 730, scale: 2 }));
   const preview = { style: {} };
-  const clone = { style: {}, closest: vi.fn(() => preview) };
+  const clone = { style: {}, closest: vi.fn((selector: string) => selector === ".td-preview" ? preview : null) };
   mocks.capture.mock.calls[0][1].onclone({}, clone);
   expect(clone.style).toEqual({ transform: "none" });
   expect(preview.style).toEqual({ width: "1060px", maxWidth: "none", height: "730px", overflow: "visible" });
