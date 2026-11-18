@@ -99,7 +99,7 @@ function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: 
           {([["playerCount", "Състезатели"], ["absences", "Отсъстващи"], ["injuries", "Контузени"], ["duration", "Времетраене (мин.)"], ["equipment", "Необходими пособия"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
         </div>
       </div>
-      <div className="td-printed-text td-printed-session-coach">{([["coach", "Треньор"], ["group", "Група"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+      <div className="td-printed-text td-printed-session-coach"><PrintedValue label="Треньор" value={content.session.coach} /></div>
     </section>
   </div>;
 }
