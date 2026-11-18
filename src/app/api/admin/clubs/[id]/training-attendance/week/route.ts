@@ -1,4 +1,4 @@
-import { matchEventTypeLabel } from "@/lib/matchEventType";
+import { isMatchEventType, matchEventTypeLabel, type MatchEventType } from "@/lib/matchEventType";
 import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -78,6 +78,7 @@ type WeekSession = {
   trainingTime: string | null;
   scopeType: "teamGroup" | "trainingGroup";
   eventType: "training" | "match";
+  matchEventType?: MatchEventType;
   label: string;
   teamGroups: number[];
   color?: string | null;
@@ -365,6 +366,7 @@ export async function GET(
           scopeType: "teamGroup",
           eventType: "match",
           label: `${matchEventTypeLabel(match.eventType)} · ${match.opponent}`,
+          ...(includeFields && isMatchEventType(match.eventType) ? { matchEventType: match.eventType } : {}),
           teamGroups: match.teamGroups,
           location: match.location,
           scopeLabel: match.customGroup?.name ?? resolveMatchScopeLabel(match.teamGroups, []),
@@ -490,6 +492,7 @@ export async function GET(
         scopeType: "teamGroup",
         eventType: "match",
         label: `${matchEventTypeLabel(match.eventType)} · ${match.opponent}`,
+        ...(includeFields && isMatchEventType(match.eventType) ? { matchEventType: match.eventType } : {}),
         teamGroups: match.teamGroups,
         location: match.location,
         scopeLabel: match.customGroup?.name ?? resolveMatchScopeLabel(match.teamGroups, trainingGroups),

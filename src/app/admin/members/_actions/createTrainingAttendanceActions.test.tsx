@@ -143,6 +143,34 @@ function schedule2Requests() {
 
 const detailDate = "2026-11-10";
 
+it("preserves each stored match subtype when loading the Schedule 2 cards", async () => {
+  const input = options();
+  input.canUseSchedule2 = true;
+  const types = ["match", "duel", "competition", "participation", "tournament"];
+  const fetch = vi.fn().mockResolvedValue(Response.json({
+    sessions: types.map((type, index) => ({
+      id: type,
+      date: detailDate,
+      eventType: "match",
+      matchEventType: type,
+      isHome: index % 2 === 0,
+    })),
+  }));
+  vi.stubGlobal("fetch", fetch);
+
+  await createTrainingAttendanceActions(input).fetchTrainingWeekSessions({ schedule2: true });
+
+  expect(fetch).toHaveBeenCalledWith(expect.stringContaining("?view=schedule2&week=0"), { cache: "no-store" });
+  expect(input.trainingAttendanceState.setTrainingWeekSessions).toHaveBeenCalledWith(
+    types.map((type, index) => expect.objectContaining({
+      id: type,
+      eventType: "match",
+      matchEventType: type,
+      isHome: index % 2 === 0,
+    })),
+  );
+});
+
 it("does not delete any training when the selected Schedule 2 session disappears", async () => {
   const input = options();
   Object.assign(input.trainingAttendanceState, {

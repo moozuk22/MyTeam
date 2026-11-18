@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
+import { AttendanceFilterSelect } from "@/components/AttendanceFilterSelect";
+import type { MatchEventType } from "@/lib/matchEventType";
 import type { TrainingWeekSessionItem } from "../_types/members-page-types";
 import { SkeletonLine } from "./FinanceSkeleton";
 import styles from "./Schedule2.module.css";
 
-export type Schedule2Session = TrainingWeekSessionItem & { fieldName?: string };
+export type Schedule2Session = TrainingWeekSessionItem & { fieldName?: string; matchEventType?: MatchEventType };
 
 export type Schedule2Group = {
   id: string;
@@ -18,7 +20,6 @@ type Props = {
   openingEditor?: boolean;
   detailsActive?: boolean;
   error: string;
-  today: string;
   week: number;
   lastWeek: number;
   canScheduleDate: (date: string) => boolean;
@@ -32,6 +33,16 @@ type Props = {
 const dayFormat = new Intl.DateTimeFormat("bg-BG", { weekday: "short", timeZone: "UTC" });
 const fullDayFormat = new Intl.DateTimeFormat("bg-BG", { weekday: "long", timeZone: "UTC" });
 const dateFormat = new Intl.DateTimeFormat("bg-BG", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+
+function Schedule2Select(props: React.ComponentProps<typeof AttendanceFilterSelect>) {
+  const id = useId();
+  return (
+    <div className={styles.select}>
+      <label htmlFor={id}>{props.label}</label>
+      <AttendanceFilterSelect {...props} id={id} />
+    </div>
+  );
+}
 
 function formatDay(date: string) {
   const day = new Date(date + "T00:00:00Z");
@@ -47,7 +58,7 @@ export function schedule2SessionBelongsToGroup(session: Schedule2Session, group:
   return session.eventType === "training" && Boolean(group.coachGroupId && group.coachGroupId === session.coachGroupId);
 }
 
-export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, today, week, lastWeek, canScheduleDate, onWeekChange, customGroups, restDays, onOpen, onCreate }: Props) {
+export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, week, lastWeek, canScheduleDate, onWeekChange, customGroups, restDays, onOpen, onCreate }: Props) {
   const [view, setView] = useState<"team" | "field">("team");
   const [team, setTeam] = useState("");
   const [field, setField] = useState("");
@@ -66,9 +77,14 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
   const visibleSessions = teamSessions.filter((session) => !activeField || getField(session) === activeField)
     .sort((a, b) => (a.trainingTime || "99:99").localeCompare(b.trainingTime || "99:99"));
   const newGroupId = customGroups.find(({ id }) => id === newGroup)?.id ?? customGroups[0]?.id;
+  const groupOptions = customGroups.map(({ id, name }) => ({ value: id, label: name }));
 
   function eventButton(session: Schedule2Session, fieldView = false) {
     const isMatch = session.eventType === "match";
+    const eventType = isMatch ? session.matchEventType ?? "match" : "training";
+    const matchVenue = eventType === "match" && session.isHome !== undefined
+      ? (session.isHome ? "home" : "away")
+      : undefined;
     const time = session.trainingTime || "Без час";
     // Match labels from the weekly endpoint start with the event type.
     const separator = session.label.indexOf(" · ");
@@ -78,7 +94,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
     const accessibleLabel = [time, isMatch ? session.label : "Тренировка", !isMatch && label, session.location]
       .filter(Boolean).join(", ");
     return (
-      <button key={session.id} type="button" className={styles.event} data-match={isMatch} aria-label={accessibleLabel} disabled={openingEditor || detailsActive} onClick={() => onOpen(session)}>
+      <button key={session.id} type="button" className={styles.event} data-event-type={eventType} data-match-venue={matchVenue} aria-label={accessibleLabel} disabled={openingEditor || detailsActive} onClick={() => onOpen(session)}>
         <strong>{time}</strong>
         {label && <span>{label}</span>}
         {session.location && <small>{session.location}</small>}
@@ -94,13 +110,8 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
           {!loading && <p>{dates.length > 0 && `${formatDay(dates[0])} – ${formatDay(dates[dates.length - 1])} · `}{visibleSessions.length} събития</p>}
         </div>
         <div className={styles.actions}>
-          {customGroups.length > 1 && (
-            <label>
-              Група за ново събитие
-              <select value={newGroupId} onChange={(event) => setNewGroup(event.target.value)}>
-                {customGroups.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </label>
+          {customGroups.length > 1 && newGroupId && (
+            <Schedule2Select label="Група за ново събитие" value={newGroupId} options={groupOptions} onChange={setNewGroup} />
           )}
           <button className={styles.create} type="button" disabled={loading || openingEditor || !newGroupId} onClick={() => { if (newGroupId) onCreate(newGroupId); }}>+ Ново събитие</button>
         </div>
@@ -116,20 +127,8 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
           <button type="button" aria-pressed={view === "team"} onClick={() => setView("team")}>По групи</button>
           <button type="button" aria-pressed={view === "field"} onClick={() => setView("field")}>Терени и часове</button>
         </div>
-        <label>
-          Група
-          <select value={activeTeam} onChange={(event) => setTeam(event.target.value)}>
-            <option value="">Всички групи</option>
-            {customGroups.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-        <label>
-          Терен
-          <select value={activeField} onChange={(event) => setField(event.target.value)}>
-            <option value="">Всички терени</option>
-            {fields.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
+        <Schedule2Select label="Група" value={activeTeam} options={[{ value: "", label: "Всички групи" }, ...groupOptions]} onChange={setTeam} />
+        <Schedule2Select label="Терен" value={activeField} options={[{ value: "", label: "Всички терени" }, ...fields.map((name) => ({ value: name, label: name }))]} onChange={setField} />
       </div>
 
       {!loading && !error && view === "team" && hasUngroupedMatches && (
@@ -169,7 +168,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                 {dates.map((date) => {
                   const day = new Date(date + "T00:00:00Z");
                   return (
-                    <th key={date} scope="col" data-today={date === today}>
+                    <th key={date} scope="col">
                       <span className={styles.weekday}>{fullDayFormat.format(day)}</span>
                       <time className={styles.dayDate} dateTime={date}>{dateFormat.format(day)}</time>
                     </th>
@@ -189,7 +188,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                     const restDay = entries.length === 0 && restDays[group.id]?.includes(date);
                     const canAddEvent = !activeField && canScheduleDate(date);
                     return (
-                      <td key={date} data-today={date === today}>
+                      <td key={date}>
                         {entries.map((session) => eventButton(session))}
                         {canAddEvent ? (
                           <button

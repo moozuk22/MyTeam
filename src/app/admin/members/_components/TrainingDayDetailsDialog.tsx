@@ -3,7 +3,8 @@ import { TrainingDayRegistrations } from "./TrainingDayRegistrations";
 import { TrainingDayMatchContent } from "./TrainingDayMatchContent";
 import { SkeletonLine } from "./FinanceSkeleton";
 
-import { matchEventTypeLabel } from "@/lib/matchEventType";
+import { isMatchEventType, matchEventTypeLabel } from "@/lib/matchEventType";
+import scheduleStyles from "./Schedule2.module.css";
 
 import { type CSSProperties } from "react";
 import {
@@ -184,6 +185,9 @@ export function TrainingDayDetailsDialog({
     dayDetailsMatchOriginalResult,
   } = matchEditorState;
   const { customTrainingGroups, isCustomTrainingGroupMode } = trainingGroups;
+  const activeEventType = dayDetailsIsMatchTab
+    ? isMatchEventType(dayDetailsActiveMatch?.eventType) ? dayDetailsActiveMatch.eventType : "match"
+    : "training";
   const schedule2ActionPending = schedule2DayDetails &&
     (limitedEventSaving || trainingDayCancelLoading || dayDetailsMatchSaving);
   const closeBlocked = trainingNoteSaving || trainingDayDetailsTabLoading ||
@@ -201,7 +205,11 @@ export function TrainingDayDetailsDialog({
           onClick={() => { if (!closeBlocked) closeDetails(); }}
         >
           <div
-            className="amp-modal amp-modal--confirm amp-modal--training-day-details"
+            className={`amp-modal amp-modal--confirm amp-modal--training-day-details${schedule2DayDetails ? ` ${scheduleStyles.eventDetails}` : ""}`}
+            data-event-type={schedule2DayDetails ? activeEventType : undefined}
+            data-match-venue={schedule2DayDetails && activeEventType === "match" && dayDetailsActiveMatch
+              ? (dayDetailsActiveMatch.isHome ? "home" : "away")
+              : undefined}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="amp-modal-tint" aria-hidden="true" />
@@ -210,7 +218,7 @@ export function TrainingDayDetailsDialog({
                 className={`amp-modal-title-gradient${dayDetailsIsMatchTab ? " amp-modal-title-gradient--match" : ""}`}
               >
                 {dayDetailsIsMatchTab
-                  ? "Детайли за мач"
+                  ? `Детайли за ${matchEventTypeLabel(schedule2DayDetails ? dayDetailsActiveMatch?.eventType : undefined).toLocaleLowerCase("bg-BG")}`
                   : "Детайли за тренировка"}
               </span>
               <button
@@ -253,7 +261,7 @@ export function TrainingDayDetailsDialog({
                         (dayDetailsSessions.length === 1 ||
                           trainingDayDetailsTab === session.id);
                       const accent =
-                        session.color &&
+                        !schedule2DayDetails && session.color &&
                         isCustomTrainingGroupPaletteColor(session.color)
                           ? session.color
                           : null;
@@ -277,7 +285,9 @@ export function TrainingDayDetailsDialog({
                         <button
                           key={session.id}
                           type="button"
-                          className={`amp-day-details-tab${accent ? " amp-day-details-tab--custom" : " amp-day-details-tab--training"}${isActive ? " amp-day-details-tab--active" : ""}`}
+                          className={`amp-day-details-tab ${schedule2DayDetails ? scheduleStyles.eventTab : accent ? "amp-day-details-tab--custom" : "amp-day-details-tab--training"}${isActive ? " amp-day-details-tab--active" : ""}`}
+                          data-event-type={schedule2DayDetails ? "training" : undefined}
+                          aria-pressed={schedule2DayDetails ? isActive : undefined}
                           style={tabStyle}
                           onClick={() => {
                             setTrainingDayDetailsTab(session.id);
@@ -331,8 +341,9 @@ export function TrainingDayDetailsDialog({
                         (g) => g.id === match.customGroupId,
                       ) ?? null;
                     const matchGroupName = matchGroup?.name ?? matchEditCustomGroups.find((group) => group.id === match.customGroupId)?.name;
+                    const eventType = isMatchEventType(match.eventType) ? match.eventType : "match";
                     const matchAccent =
-                      matchGroup?.color &&
+                      !schedule2DayDetails && matchGroup?.color &&
                       isCustomTrainingGroupPaletteColor(matchGroup.color)
                         ? matchGroup.color
                         : null;
@@ -356,7 +367,10 @@ export function TrainingDayDetailsDialog({
                       <button
                         key={match.id}
                         type="button"
-                        className={`amp-day-details-tab${matchAccent ? " amp-day-details-tab--custom" : " amp-day-details-tab--match"}${isActive ? " amp-day-details-tab--active" : ""}`}
+                        className={`amp-day-details-tab ${schedule2DayDetails ? scheduleStyles.eventTab : matchAccent ? "amp-day-details-tab--custom" : "amp-day-details-tab--match"}${isActive ? " amp-day-details-tab--active" : ""}`}
+                        data-event-type={schedule2DayDetails ? eventType : undefined}
+                        data-match-venue={schedule2DayDetails && eventType === "match" ? (match.isHome ? "home" : "away") : undefined}
+                        aria-pressed={schedule2DayDetails ? isActive : undefined}
                         style={matchTabStyle}
                         onClick={() => {
                           setTrainingDayDetailsTab(`match-${match.id}`);

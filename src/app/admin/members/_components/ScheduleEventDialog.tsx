@@ -18,11 +18,14 @@ import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
 import type { Schedule2Group } from "./Schedule2";
 
+export type ScheduleEventStep = "type" | "rest-day" | "match-type" | "match-days" | "match-details";
+
 type ScheduleEventDialogProps = {
   schedule2EventTarget: { groupId: string; date?: string } | null;
   schedule2EventGroup: Schedule2Group | undefined;
   schedule2CanCreateTraining: boolean;
-  onSchedule2RestDay?: () => void;
+  schedule2RestDayDates?: string[];
+  onSchedule2RestDay?: (date: string) => void;
   openTrainingDaysEditor: (
     mode: "customGroup", editDate: undefined, coachTarget: undefined,
     customTarget: { group: Schedule2Group; date?: string },
@@ -48,10 +51,8 @@ type ScheduleEventDialogProps = {
   trainingGroups: Pick<TrainingGroups, "isCustomTrainingGroupMode">;
   scheduleEventModalOpen: boolean;
   setScheduleEventModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setScheduleEventStep: React.Dispatch<
-    React.SetStateAction<"type" | "match-type" | "match-days" | "match-details">
-  >;
-  scheduleEventStep: "type" | "match-type" | "match-days" | "match-details";
+  setScheduleEventStep: React.Dispatch<React.SetStateAction<ScheduleEventStep>>;
+  scheduleEventStep: ScheduleEventStep;
   openTrainingDaysEditorForCurrentScope: () => Promise<void>;
   selectedTrainingGroup: TrainingScheduleGroup | null;
   selectedTeamGroup: number | null;
@@ -69,6 +70,7 @@ export function ScheduleEventDialog({
   schedule2EventTarget,
   schedule2EventGroup,
   schedule2CanCreateTraining,
+  schedule2RestDayDates = [],
   onSchedule2RestDay,
   openTrainingDaysEditor,
   matchEditorState,
@@ -110,6 +112,7 @@ export function ScheduleEventDialog({
   const { isCustomTrainingGroupMode } = trainingGroups;
   const customTrainingUnavailable = Boolean(schedule2EventTarget &&
     (!schedule2EventGroup || !schedule2CanCreateTraining));
+  const matchEditorClass = schedule2EventTarget ? "amp-modal--schedule2-match-editor" : "amp-modal--match-editor";
   return (
     <>
       {scheduleEventModalOpen && (
@@ -123,7 +126,7 @@ export function ScheduleEventDialog({
           }}
         >
           <div
-            className={`amp-modal amp-modal--confirm${scheduleEventStep !== "type" ? " amp-modal--match-editor" : ""}`}
+            className={`amp-modal amp-modal--confirm${scheduleEventStep.startsWith("match-") ? ` ${matchEditorClass}` : ""}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="amp-modal-tint" aria-hidden="true" />
@@ -133,7 +136,9 @@ export function ScheduleEventDialog({
                   ? "Насрочи събитие"
                   : scheduleEventStep === "match-type"
                     ? "Избери вид събитие"
-                    : matchEventTypeLabel(matchEventType)}
+                    : scheduleEventStep === "rest-day"
+                      ? "Почивен ден"
+                      : matchEventTypeLabel(matchEventType)}
               </span>
               <button
                 className="amp-modal-close"
@@ -167,10 +172,10 @@ export function ScheduleEventDialog({
                       }
                     }}
                   >
-                    <span
+                    {!schedule2EventTarget && <span
                       className="amp-schedule-event-type-icon amp-schedule-event-type-icon--training"
                       aria-hidden="true"
-                    />
+                    />}
                     Тренировка
                   </button>
                   {schedule2EventTarget && !schedule2CanCreateTraining && (
@@ -178,7 +183,7 @@ export function ScheduleEventDialog({
                   )}
                   <button
                     type="button"
-                    className="amp-btn amp-schedule-event-type-btn amp-schedule-event-type-btn--match"
+                    className={schedule2EventTarget ? "amp-btn amp-schedule-event-type-btn" : "amp-btn amp-schedule-event-type-btn amp-schedule-event-type-btn--match"}
                     onClick={() => {
                       const scopeTeamGroups =
                         trainingAttendanceView === "trainingGroups" && !isCustomTrainingGroupMode
@@ -200,22 +205,40 @@ export function ScheduleEventDialog({
                       setScheduleEventStep("match-type");
                     }}
                   >
-                    <span
+                    {!schedule2EventTarget && <span
                       className="amp-schedule-event-type-icon amp-schedule-event-type-icon--match"
                       aria-hidden="true"
-                    />
-                    Мач / Двубой / Състезание / Участие
+                    />}
+                    {Object.values(MATCH_EVENT_TYPES).join(" / ")}
                   </button>
-                  {schedule2EventTarget?.date && onSchedule2RestDay && (
-                    <button type="button" className="amp-btn amp-schedule-event-type-btn" onClick={onSchedule2RestDay}>
-                      <span
-                        className="amp-schedule-event-type-icon amp-schedule-event-type-icon--rest"
-                        aria-hidden="true"
-                      />
+                  {schedule2EventTarget && (
+                    <button type="button" className="amp-btn amp-schedule-event-type-btn" onClick={() => {
+                      const date = schedule2EventTarget.date;
+                      if (date && onSchedule2RestDay && schedule2RestDayDates.includes(date)) onSchedule2RestDay(date);
+                      else setScheduleEventStep("rest-day");
+                    }}>
                       Почивен ден
                     </button>
                   )}
                 </div>
+              ) : scheduleEventStep === "rest-day" ? (
+                <>
+                  <p className="amp-lbl">{schedule2EventGroup?.name}</p>
+                  {schedule2RestDayDates.length > 0 ? (
+                    <div className="amp-schedule-event-type-picker amp-schedule-event-type-picker--schedule2">
+                      {schedule2RestDayDates.map((date) => (
+                        <button key={date} type="button" className="amp-btn amp-schedule-event-type-btn" onClick={() => onSchedule2RestDay?.(date)}>
+                          {formatIsoDateForDisplay(date)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : <p className="amp-lbl">Няма свободни дни за тази група през избраната седмица.</p>}
+                  <div className="amp-modal-actions amp-modal-actions--end">
+                    <button type="button" className="amp-btn amp-btn--ghost" onClick={() => setScheduleEventStep("type")}>
+                      Назад
+                    </button>
+                  </div>
+                </>
               ) : scheduleEventStep === "match-type" ? (
                 <>
                   <p className="amp-lbl" style={{ textAlign: "center" }}>
