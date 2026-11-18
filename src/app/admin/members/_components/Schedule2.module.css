@@ -35,20 +35,24 @@
 }
 
 .header p,
-.planner label {
+.select label {
   color: var(--muted);
   font-size: 0.875rem;
 }
 
-.planner label {
+.select {
   display: grid;
-  margin-bottom: 0 !important;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.25rem;
   min-width: 0;
-  max-width: 100%;
+  max-width: min(100%, 15rem);
 }
 
-.planner select,
+.select label {
+  margin-bottom: 0;
+}
+
+.select :global(.acd-select-trigger),
 .views button,
 .create {
   box-sizing: border-box;
@@ -63,8 +67,37 @@
   font: inherit;
 }
 
-.planner select {
+.select :global(.acd-select-trigger) {
+  position: relative;
+  width: 100%;
+  padding-right: 2rem;
+  text-align: left;
+}
+
+.select :global(.acd-select-trigger) svg {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.select :global(.acd-select-trigger) span {
+  display: block;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select :global(.acd-select-options) {
+  background: var(--panel);
+  border-color: var(--line);
+  overscroll-behavior: contain;
+}
+
+.select :global(.acd-select-option) {
+  box-sizing: border-box;
+  display: grid;
+  align-items: center;
+  min-height: 44px;
+  text-align: left;
 }
 
 .views button[aria-pressed="true"] {
@@ -93,7 +126,7 @@
   opacity: 0.55;
 }
 
-.planner :is(button, select, .grid):focus-visible {
+.planner :is(button, .grid):focus-visible {
   outline: 2px solid var(--green);
   outline-offset: -2px;
 }
@@ -314,5 +347,9 @@
     max-height: calc(100dvw - 1rem);
     transform: translate(-50%, -50%) rotate(90deg);
     overscroll-behavior: contain;
+  }
+
+  .select :global(.acd-select-options) {
+    max-height: min(15rem, 50dvw);
   }
 }

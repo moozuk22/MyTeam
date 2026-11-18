@@ -73,4 +73,9 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
   expect(html).not.toContain(">Мачове</th>");
   expect(html).not.toContain("Мач · Без група");
   expect(html).toContain("Мачовете без персонализирана група");
+  // A native select opens a system picker outside the rotated schedule.
+  expect(html).not.toContain("<select");
+  for (const label of ["Група за ново събитие", "Група", "Терен"]) {
+    expect(html).toContain(`role="combobox" aria-label="${label}" aria-haspopup="listbox"`);
+  }
 });

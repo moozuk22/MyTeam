@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useId, useState } from "react";
+import { AttendanceFilterSelect } from "@/components/AttendanceFilterSelect";
 import type { TrainingWeekSessionItem } from "../_types/members-page-types";
 import { SkeletonLine } from "./FinanceSkeleton";
 import styles from "./Schedule2.module.css";
@@ -33,6 +34,16 @@ const dayFormat = new Intl.DateTimeFormat("bg-BG", { weekday: "short", timeZone:
 const fullDayFormat = new Intl.DateTimeFormat("bg-BG", { weekday: "long", timeZone: "UTC" });
 const dateFormat = new Intl.DateTimeFormat("bg-BG", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
 
+function Schedule2Select(props: React.ComponentProps<typeof AttendanceFilterSelect>) {
+  const id = useId();
+  return (
+    <div className={styles.select}>
+      <label htmlFor={id}>{props.label}</label>
+      <AttendanceFilterSelect {...props} id={id} />
+    </div>
+  );
+}
+
 function formatDay(date: string) {
   const day = new Date(date + "T00:00:00Z");
   return `${dayFormat.format(day)} ${dateFormat.format(day)}`;
@@ -66,6 +77,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
   const visibleSessions = teamSessions.filter((session) => !activeField || getField(session) === activeField)
     .sort((a, b) => (a.trainingTime || "99:99").localeCompare(b.trainingTime || "99:99"));
   const newGroupId = customGroups.find(({ id }) => id === newGroup)?.id ?? customGroups[0]?.id;
+  const groupOptions = customGroups.map(({ id, name }) => ({ value: id, label: name }));
 
   function eventButton(session: Schedule2Session, fieldView = false) {
     const isMatch = session.eventType === "match";
@@ -94,13 +106,8 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
           {!loading && <p>{dates.length > 0 && `${formatDay(dates[0])} – ${formatDay(dates[dates.length - 1])} · `}{visibleSessions.length} събития</p>}
         </div>
         <div className={styles.actions}>
-          {customGroups.length > 1 && (
-            <label>
-              Група за ново събитие
-              <select value={newGroupId} onChange={(event) => setNewGroup(event.target.value)}>
-                {customGroups.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </label>
+          {customGroups.length > 1 && newGroupId && (
+            <Schedule2Select label="Група за ново събитие" value={newGroupId} options={groupOptions} onChange={setNewGroup} />
           )}
           <button className={styles.create} type="button" disabled={loading || openingEditor || !newGroupId} onClick={() => { if (newGroupId) onCreate(newGroupId); }}>+ Ново събитие</button>
         </div>
@@ -116,20 +123,8 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
           <button type="button" aria-pressed={view === "team"} onClick={() => setView("team")}>По групи</button>
           <button type="button" aria-pressed={view === "field"} onClick={() => setView("field")}>Терени и часове</button>
         </div>
-        <label>
-          Група
-          <select value={activeTeam} onChange={(event) => setTeam(event.target.value)}>
-            <option value="">Всички групи</option>
-            {customGroups.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-        <label>
-          Терен
-          <select value={activeField} onChange={(event) => setField(event.target.value)}>
-            <option value="">Всички терени</option>
-            {fields.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
+        <Schedule2Select label="Група" value={activeTeam} options={[{ value: "", label: "Всички групи" }, ...groupOptions]} onChange={setTeam} />
+        <Schedule2Select label="Терен" value={activeField} options={[{ value: "", label: "Всички терени" }, ...fields.map((name) => ({ value: name, label: name }))]} onChange={setField} />
       </div>
 
       {!loading && !error && view === "team" && hasUngroupedMatches && (
