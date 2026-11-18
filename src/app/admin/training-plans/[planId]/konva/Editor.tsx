@@ -1427,7 +1427,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   );
 
   const drawingHint = (
-    <p className="ke-drawing-hint">
+    <div className="ke-drawing-hint">
       <Info size={15} aria-hidden="true" />
       <span>
         {panning
@@ -1443,9 +1443,9 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
               : "Плъзнете по игрището, за да нарисувате линия или фигура."}
         {compact
           ? " За да спрете рисуването или поставянето, натиснете „Избор“ над игрището."
-          : " За да спрете рисуването или поставянето, натиснете Esc или бутона „Избор“."}
+          : " Натиснете Esc или щракнете с десния бутон, за да отмените и да преминете към „Избор“."}
       </span>
-    </p>
+    </div>
   );
 
   const ToolsPanel = compact ? "dialog" : "div";
@@ -1879,6 +1879,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                     onCommit={change}
                     onPlaced={onPlaced}
                     onError={setError}
+                    onCancelPlacement={cancelPlacement}
                   />
                 </div>
               </div>

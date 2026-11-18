@@ -96,6 +96,7 @@ export type CanvasProps = {
   onCommit: (next: Exercise) => void;
   onPlaced: (object: ExerciseObject) => void;
   onError: (message: string) => void;
+  onCancelPlacement: () => void;
 };
 export default function Canvas({
   exercise,
@@ -118,6 +119,7 @@ export default function Canvas({
   onCommit,
   onPlaced,
   onError,
+  onCancelPlacement,
 }: CanvasProps) {
   const host = useRef<HTMLDivElement>(null),
     stage = useRef<Konva.Stage>(null),
@@ -145,7 +147,10 @@ export default function Canvas({
   } | null>(null);
   const cancelling = useRef(false);
   const [width, setWidth] = useState(0),
-    [preview, setPreview] = useState<ExerciseObject | null>(null);
+    [preview, setPreview] = useState<ExerciseObject | null>(null),
+    [cursorPreview, setCursorPreview] = useState<ExerciseObject | null>(null);
+  const cursorPending = useRef<ExerciseObject | null>(null);
+  const cursorRaf = useRef(0);
   const icons = usePitchIcons();
   const gesture = useRef<{
     tool: ExerciseTool;
@@ -198,6 +203,14 @@ export default function Canvas({
       raf.current = requestAnimationFrame(() => {
         raf.current = 0;
         setPreview(pending.current);
+      });
+  }
+  function cursorPreviewAtFrame(object: ExerciseObject | null) {
+    cursorPending.current = object;
+    if (!cursorRaf.current)
+      cursorRaf.current = requestAnimationFrame(() => {
+        cursorRaf.current = 0;
+        setCursorPreview(cursorPending.current);
       });
   }
   function isolateObject(node: Konva.Node, hideHandles: boolean) {
@@ -257,6 +270,7 @@ export default function Canvas({
     pending.current = null;
     gesture.current = null;
     setPreview(null);
+    cursorPreviewAtFrame(null);
   }
   const cancelFromEffect = useEffectEvent(() => clear());
 
@@ -491,6 +505,17 @@ export default function Canvas({
     const g = gesture.current;
     const box = boxGesture.current;
     const p = position(!box?.objects);
+    if (!g && !box && tool !== "select") {
+      const cursorPoint = position();
+      if (cursorPoint && isInPitchQuadrants(cursorPoint, quadrants)) {
+        const ghost = createObject(tool, cursorPoint, "cursor-preview",
+          tool.startsWith("custom-team-") && customTeamNumber !== undefined
+            ? { number: customTeamNumber, color: getCustomTeamColors(exercise)[customTeamNumber - 3] ?? "#ffffff" }
+            : undefined);
+        if (ghost.kind === "movement") ghost.path = pathMode;
+        if (ghost.kind !== "movement" && ghost.kind !== "zone") cursorPreviewAtFrame(ghost);
+      } else cursorPreviewAtFrame(null);
+    }
     if (box && p && box.pointerId === e.evt.pointerId) {
       const bounds = selectionBounds(box.start, p);
       if (box.objects) {
@@ -805,7 +830,13 @@ export default function Canvas({
         else onSelect(visibleObjects[next].id);
       }}
       onPointerCancel={clear}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (!surfacePreview && tool !== "select") {
+          clear();
+          onCancelPlacement();
+        }
+      }}
     >
       <span className="ke-sr" role="status">
         {multiSelection
@@ -830,21 +861,24 @@ export default function Canvas({
               ? rendered
               : rendered.slice(0, colorPreviewIndex)
             ).map(renderObject)}
-            {preview && !exercise.objects.some((o) => o.id === preview.id) && (
+            {(cursorPreview ?? (preview && !exercise.objects.some((o) => o.id === preview.id) ? preview : null)) && (() => {
+              const ghost = cursorPreview ?? preview!;
+              return (
               <Group
-                x={preview.x}
-                y={preview.y}
-                rotation={displayedRotation(preview)}
+                x={ghost.x}
+                y={ghost.y}
+                rotation={displayedRotation(ghost)}
                 listening={false}
-                opacity={0.75}
+                opacity={0.42}
               >
                 <ObjectVisual
-                  object={preview}
+                  object={ghost}
                   icons={icons}
-                  showArrowhead={preview.path !== "freehand"}
+                  showArrowhead={ghost.path !== "freehand"}
                 />
               </Group>
-            )}
+              );
+            })()}
           </Layer>
           {/* Keep the surrounding layers still during live color changes. */}
           {colorPreviewIndex >= 0 && (
