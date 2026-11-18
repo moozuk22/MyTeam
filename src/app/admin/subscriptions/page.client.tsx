@@ -1,5 +1,7 @@
 "use client";
 
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
+
 import TrainingPlanSubscription, { SharedTrainingPlanPrices, type TrainingPlanClub } from "./TrainingPlanSubscription";
 
 import Link from "next/link";
@@ -32,6 +34,7 @@ function endOfMonth(month: string): string {
 }
 
 export default function SubscriptionsPageClient() {
+  const dialogs = useBrowserDialogs();
   const [trainingPlanRevision, setTrainingPlanRevision] = useState(0);
   const [sharedTrainingPlanPrices, setSharedTrainingPlanPrices] = useState<CalculatorPrice[]>();
   const [calculatorRevision, setCalculatorRevision] = useState(0);
@@ -123,7 +126,7 @@ export default function SubscriptionsPageClient() {
           </> : <p>{club.billingStatus === "active" ? "Абонаментът още не е настроен. Изберете „Настрой абонамента“." : "Активирайте таксуването от страницата „Такси“ на клуба, за да настроите абонамент."}</p>}
           <div className={styles.actions}>
             {club.billingStatus === "active" && <button type="button" disabled={busy || loading} onClick={() => { setError(""); setEditor({ clubId: club.id, action: "configure" }); }}>{club.subscription ? "Редактирай абонамента" : "Настрой абонамента"}</button>}
-            {club.subscription && club.subscription.mode !== "contract" && <button type="button" disabled={busy || loading} onClick={() => { if (window.confirm("Задаване на статус „С договор“? Таксуването ще се управлява извън приложението и известията за абонамент ще бъдат изключени.")) void save(club, { action: "contract" }).catch(() => {}); }}>Задай „С договор“</button>}
+            {club.subscription && club.subscription.mode !== "contract" && <button type="button" disabled={busy || loading} onClick={async () => { if (await dialogs.confirm("Задаване на статус „С договор“? Таксуването ще се управлява извън приложението и известията за абонамент ще бъдат изключени.")) void save(club, { action: "contract" }).catch(() => {}); }}>Задай „С договор“</button>}
             {club.subscription?.mode === "contract" && <>
               <button type="button" disabled={busy || loading} onClick={() => setEditor({ clubId: club.id, action: "history" })}>История</button></>}
             {club.subscription?.mode === "trial" && <>
@@ -239,10 +242,11 @@ function PaymentForm({ club, busy, save }: { club: ClubSubscriptionView; busy: b
 }
 
 function PaymentHistory({ club, busy, save }: { club: ClubSubscriptionView; busy: boolean; save: Save }) {
+  const dialogs = useBrowserDialogs();
   const subscription = club.subscription!;
   const [error, setError] = useState("");
   async function voidPayment(paymentId: string) {
-    if (!window.confirm("Анулирате това плащане? Месеците му отново ще са неплатени. Записът ще остане в историята.")) return;
+    if (!await dialogs.confirm("Анулирате това плащане? Месеците му отново ще са неплатени. Записът ще остане в историята.")) return;
     setError("");
     try { await save({ action: "void", paymentId }); } catch (err) { setError((err as Error).message); }
   }

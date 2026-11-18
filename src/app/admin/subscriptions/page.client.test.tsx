@@ -8,6 +8,9 @@ vi.mock("react", async original => ({
     subscription: { mode: "contract", version: 1 }, summary: { status: "contract" },
   }] : initial === true ? false : initial, vi.fn()],
 }));
+vi.mock("@/components/admin/BrowserDialogProvider", () => ({
+  useBrowserDialogs: () => ({ alert: vi.fn(), confirm: vi.fn(), prompt: vi.fn() }),
+}));
 vi.mock("./TrainingPlanSubscription", () => ({ default: () => null, SharedTrainingPlanPrices: () => null }));
 vi.mock("./CalculatorSubscription", () => ({ default: () => null, SharedCalculatorPrices: () => null }));
 import SubscriptionsPageClient from "./page.client";

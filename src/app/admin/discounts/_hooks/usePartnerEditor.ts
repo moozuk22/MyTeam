@@ -1,5 +1,7 @@
 "use client";
 
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
+
 import { uploadImage } from "@/lib/uploadImage";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { type PartnerDiscount } from "../_types/discount-types";
@@ -9,6 +11,7 @@ type Options = {
   fetchData: () => Promise<void>;
 };
 export function usePartnerEditor({ setSaving, fetchData }: Options) {
+  const dialogs = useBrowserDialogs();
   const [editingPartner, setEditingPartner] =
     useState<Partial<PartnerDiscount> | null>(null);
 
@@ -49,7 +52,7 @@ export function usePartnerEditor({ setSaving, fetchData }: Options) {
   };
 
   const handleDeletePartner = async (id: string) => {
-    if (!confirm("Сигурни ли сте, че искате да изтриете този партньор?"))
+    if (!await dialogs.confirm("Сигурни ли сте, че искате да изтриете този партньор?"))
       return;
     try {
       const res = await fetch(`/api/admin/discounts?id=${id}`, {
@@ -71,7 +74,7 @@ export function usePartnerEditor({ setSaving, fetchData }: Options) {
       );
       setEditingPartner({ ...editingPartner, logoUrl: response.secure_url });
     } catch (error) {
-      alert(
+      await dialogs.alert(
         "Грешка при качване: " +
           (error instanceof Error ? error.message : "Неизвестна грешка"),
       );

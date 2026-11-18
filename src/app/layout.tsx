@@ -1,3 +1,4 @@
+import { BrowserHistoryTracker } from "@/components/BrowserHistoryTracker";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaClientBootstrap } from "@/components/pwa/PwaClientBootstrap";
@@ -86,6 +87,7 @@ export default function RootLayout({
   return (
     <html lang="bg">
       <body>
+        <BrowserHistoryTracker />
         <PwaClientBootstrap />
         <GDPRConsent />
         <MicrosoftClarity />
