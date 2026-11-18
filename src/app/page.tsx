@@ -225,7 +225,6 @@ export default function Home() {
         </section>
       </RevealSection>
 
-      {/* VIP section moved to /vip */}
       {/* Функции section moved to /funkcii */}
 
       {/* <RevealSection>
