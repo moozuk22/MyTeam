@@ -4,7 +4,7 @@ import type { CarouselImage, LandingFeature } from "./_utils/landing-content";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Users, ArrowRight, ArrowDown, Calendar, Check, X as CloseX, PhoneCall, Crown, Puzzle } from "lucide-react";
+import { Users, ArrowRight, ArrowDown, Check, X as CloseX, PhoneCall } from "lucide-react";
 import ChatBot from "@/components/ChatBot";
 import NavBar from "@/components/NavBar";
 import { G, B, BG, COMPARISON, PARTNERS, ALL_PARTNERS } from "./_utils/landing-content";
@@ -17,8 +17,6 @@ import { Lightbox, VideoModal } from "./_components/MediaModals";
 import "./page.css";
 
 export default function Home() {
-  const [subActive, setSubActive] = useState(false);
-  const [withSchedule, setWithSchedule] = useState(false);
   const [popup, setPopup] = useState<LandingFeature | null>(null);
   const [expandedImage, setExpandedImage] = useState<CarouselImage | null>(null);
   const [benefitsOpen, setBenefitsOpen] = useState(false);
@@ -311,109 +309,7 @@ export default function Home() {
         </section>
       </RevealSection> */}
 
-      <RevealSection>
-        <section id="Абонаменти" className="new-pricing-section" style={{ scrollMarginTop: "100px" }}>
-          <div className="section-container-wide">
-            <h2 style={{ fontSize: 42, fontWeight: 800, textAlign: "center", marginBottom: 8 }}>
-              <span style={{ background: "linear-gradient(135deg, #39FF14, #00D4FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Абонаменти</span>
-            </h2>
-            <p style={{ color: "#FF3E3E", fontWeight: 700, fontSize: 18, textAlign: "center", marginBottom: 20, width: "100%" }}>* Свободни места: 1 от общо 10 отбора</p>
-            <div className="new-pricing-grid">
 
-              {/* LEFT: Subscription Levels Table */}
-              <div className="pricing-table-container">
-                <div className="pricing-table-header">АБОНАМЕНТНИ НИВА</div>
-                <table className="pricing-modern-table">
-                  <thead>
-                    <tr>
-                      <th>Категория <br /> (Брой деца)</th>
-                      <th>Стандартна месечна такса</th>
-                      <th className="vip-column-header">
-                        <div className="vip-header-content">
-                          <Crown size={50} color="#39FF14" />
-                          <div>
-                            <div className="vip-title">VIP Цена <br /> <span className="vip-subtitle">(Първи 10 отбора)</span></div>
-                          </div>
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { cat: "0 - 50 деца", old: "35 €", new: "0 €" },
-                      { cat: "50 - 100 деца", old: "44 €", new: "17 €" },
-                      { cat: "100 - 200 деца", old: "53 €", new: "26 €" },
-                      { cat: "200 - 300 деца", old: "62 €", new: "35 €" },
-                      { cat: "Над 300 деца", old: "71 €", new: "44 €" },
-                    ].map((row, i) => (
-                      <tr key={i}>
-                        <td>
-                          <div className="cat-cell">
-                            <Users size={18} color="rgba(131, 102, 102, 0.7)" />
-                            {row.cat}
-                          </div>
-                        </td>
-                        <td><span className="old-price-cell">{row.old}</span></td>
-                        <td className="vip-price-cell">{row.new}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="pricing-disclaimer">
-                  *Преференциалните VIP цени са валидни до края на годината единствено за първите 10 клуба, присъединили се към програмата.
-                </p>
-              </div>
-
-              {/* RIGHT: Additional Modules */}
-              <div className="additional-modules-container">
-                <div className="pricing-table-header">ДОПЪЛНИТЕЛНИ МОДУЛИ</div>
-
-                <div className="module-box-v2">
-                  <div className="module-icon-v2">
-                    <Calendar size={28} color="#39FF14" />
-                  </div>
-                  <div className="module-info-v2">
-                    <div className="module-top-row">
-                      <h3>+ Интелигентен тренировъчен график</h3>
-                      <div className="module-price-tag">+9 € / месец</div>
-                    </div>
-                    <p className="module-include-label">Включва:</p>
-                    <ul className="module-checklist-v2">
-                      <li><Check size={14} /> Онлайн график на тренировките</li>
-                      <li><Check size={14} /> Следене на присъствия</li>
-                      <li><Check size={14} /> Автоматични известия към родители</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="module-box-v2">
-                  <div className="module-icon-v2">
-                    <Puzzle size={28} color="#39FF14" />
-                  </div>
-                  <div className="module-info-v2">
-                    <div className="module-top-row">
-                      <h3>+ Модул „Разширяване“</h3>
-                      <div className="module-offer-text">
-                        Персонална оферта <br />
-                        <span>след индивидуална консултация</span>
-                      </div>
-                    </div>
-                    <p className="module-include-label">Подходящ за:</p>
-                    <ul className="module-checklist-v2">
-                      <li><Check size={14} /> Клубове с множество филиали</li>
-                      <li><Check size={14} /> Маркетинг и привличане на нови състезатели</li>
-                      <li><Check size={14} /> Разширено управление и анализи</li>
-                    </ul>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          </div>
-        </section>
-      </RevealSection>
-      
       <RevealSection>
         <section id="Контакт" ref={contactRef} style={{ padding: "40px 24px", background: `linear-gradient(180deg,#09101C 0%,${BG} 100%)`, scrollMarginTop: "100px" }}>
           <div style={{ maxWidth: 800, margin: "0 auto" }}>
