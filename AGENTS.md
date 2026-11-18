@@ -37,6 +37,23 @@ These requirements apply to every frontend change:
 - **Preserve the design system:** inspect existing pages and shared components first. Reuse established components, colors, typography, spacing, border radii, and styling patterns across admin/member pages, dashboards, forms, and modals. Do not introduce a new design language or significantly change layouts without an explicit request.
 - **Develop mobile first:** over 80% of users access MyTeam on phones. Build for mobile, then adapt to tablet and desktop; never sacrifice mobile usability for desktop. Avoid fixed widths, unnecessary horizontal scrolling, and large-screen dependencies. Make buttons, inputs, menus, tables, and dialogs usable on touchscreens.
 - **Accessibility and usability:** preserve keyboard access, visible focus, semantic controls, readable contrast, and accessible labels. Provide clear loading, empty, success, and error states; apply the existing mobile and touch requirements when testing interactions.
+- **Confirmation dialogs:** never use native browser dialogs such as `window.confirm()`, `window.alert()`, or `window.prompt()`. Use custom dialogs or modals that follow the existing design system, and reuse existing dialog components whenever possible.
+- **Desktop time pickers:** on desktop views, do not use the browser's native `<input type="time">`. Use the existing custom time picker component and its functionality. Do not copy generated CSS module class names or build a new picker. The desktop picker must use 24-hour formatting and match the existing design system. Native HTML time inputs are allowed on mobile to preserve the platform's time-selection experience. The custom picker trigger follows this pattern:
+
+  ```html
+  <input
+    class="amp-inner-time-input TimeInput-module__FXByVa__trigger"
+    step="60"
+    required
+    readonly
+    placeholder="Изберете час"
+    aria-label="Час (24-часов формат)"
+    role="combobox"
+    aria-haspopup="dialog"
+    aria-expanded="false"
+    type="text"
+  />
+  ```
 - **Minimum checks for every UI change:** verify the affected interface at at least one small-phone width of 320–375 px, one large-phone width of 390–430 px, and a desktop width of 1440 px (CSS pixels). Mobile compatibility is mandatory regardless of change size.
 - **Significant layout changes:** test the complete viewport matrix below for new pages, redesigned layouts, dashboards, complex forms, and major component changes. Pay special attention to 320–375 px widths:
 
