@@ -13,8 +13,8 @@ const PlanPreview = dynamic(() => import("../PlanPreview"), {
   ssr: false, loading: () => <FinanceSkeleton variant="chart" />,
 });
 
-function Field({ label, value, max, type, id: customId, heading, wrapHeading, onChange }: {
-  label: string; value: string; max: number; type?: string; id?: string; heading?: boolean; wrapHeading?: boolean;
+function Field({ label, value, max, type, id: customId, heading, wrapHeading, readOnly, onChange }: {
+  label: string; value: string; max: number; type?: string; id?: string; heading?: boolean; wrapHeading?: boolean; readOnly?: boolean;
   onChange: (value: string) => void;
 }) {
   const generatedId = useId();
@@ -23,9 +23,9 @@ function Field({ label, value, max, type, id: customId, heading, wrapHeading, on
   return <div className={className}>
     <label className={heading ? "td-sr-only" : undefined} htmlFor={id}>{label}</label>
     {max >= 250 || wrapHeading
-      ? <textarea id={id} value={value} maxLength={max} rows={wrapHeading ? 1 : 2}
+      ? <textarea id={id} value={value} maxLength={max} rows={wrapHeading ? 1 : 2} readOnly={readOnly}
           placeholder={wrapHeading ? label : undefined} onChange={(event) => onChange(event.target.value)} />
-      : <input id={id} type={type ?? "text"} value={value} maxLength={max} placeholder={heading ? label : undefined}
+      : <input id={id} type={type ?? "text"} value={value} maxLength={max} readOnly={readOnly} placeholder={heading ? label : undefined}
           onChange={(event) => onChange(event.target.value)} />}
   </div>;
 }
@@ -45,8 +45,8 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
     requestAnimationFrame(() => pickerButtons.current[index]?.focus());
   }
 
-  function sessionField([key, label, max, type]: typeof sessionFields[number], heading = false) {
-    return <Field key={key} id={key === "title" ? "td-plan-title" : undefined} heading={heading}
+  function sessionField([key, label, max, type]: typeof sessionFields[number], heading = false, readOnly = false) {
+    return <Field key={key} id={key === "title" ? "td-plan-title" : undefined} heading={heading} readOnly={readOnly}
       label={label} max={max} type={type} value={content.session[key]} onChange={(value) => onSession(key, value)} />;
   }
 
@@ -108,7 +108,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
       <div className="td-edit-header">
         {sessionField(sessionFields[0], true)}
         <div className="td-edit-season">
-          {sessionFields.slice(1, 3).map((field) => sessionField(field, true))}
+          {sessionFields.slice(1, 3).map((field) => sessionField(field, true, true))}
         </div>
       </div>
       <div className="td-edit-row td-edit-top">

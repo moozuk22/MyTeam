@@ -70,9 +70,11 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
 }
 
 function PrintedHeader({ content }: { content: PlanContent }) {
+  const competitionLabel = [content.session.halfSeason.toLocaleLowerCase("bg-BG"), content.session.season]
+    .filter(Boolean).join(" ");
   return <header className="td-printed-header">
     <h2>{content.session.title}</h2>
-    <div>{[content.session.season, content.session.halfSeason].filter(Boolean).join(" · ") || "Спортно-състезателен сезон"}</div>
+    <div>{competitionLabel ? `Спортно-състезателен ${competitionLabel}` : "Спортно-състезателен сезон"}</div>
   </header>;
 }
 
