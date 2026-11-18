@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import { ArrowLeft, FileText } from "lucide-react";
 import {
   blankDocument,
-  type DocumentInput, type DrawingSnapshot, type PlanContent, type SavedDocument,
+  type CompetitionSeason, type DocumentInput, type DrawingSnapshot, type PlanContent, type SavedDocument,
 } from "@/lib/exercise/document";
 import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
 import DocumentFields from "./DocumentFields";
@@ -18,11 +18,14 @@ const DocumentSheet = dynamic(() => import("./DocumentSheet"), {
   ssr: false, loading: () => <FinanceSkeleton variant="form" />,
 });
 
-export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName, context, endpoint, drawingEndpoint, location, listHref }: {
-  clubId: string; clubLogoUrl?: string; initial?: SavedDocument; groupName?: string; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
+export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName, competitionSeason, context, endpoint, drawingEndpoint, location, listHref }: {
+  clubId: string; clubLogoUrl?: string; initial?: SavedDocument; groupName?: string; competitionSeason: CompetitionSeason; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
 }) {
   const subscription = useTrainingPlanAccess(clubId);
-  const [content, setContent] = useState<PlanContent>(() => initial?.content ?? blankDocument(groupName));
+  const [content, setContent] = useState<PlanContent>(() => {
+    const document = initial?.content ?? blankDocument(groupName);
+    return { ...document, session: { ...document.session, ...competitionSeason } };
+  });
   const [saved, setSaved] = useState(initial);
   const proposedId = useRef<string>(initial?.id ?? "");
   const [changes, setChanges] = useState<Partial<Record<number, string | null>>>({});

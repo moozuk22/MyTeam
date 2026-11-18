@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
-import { readDocumentInput, type PlanContent } from "@/lib/exercise/document";
+import { currentCompetitionSeason, readDocumentInput, type PlanContent } from "@/lib/exercise/document";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
 
 type Context = { params: Promise<{ id: string; documentId: string }> };
@@ -36,9 +36,10 @@ export async function PUT(request: NextRequest, context: Context) {
   const where = await documentScope(request, context, "save");
   if (where instanceof NextResponse) return where;
   const body = await request.json().catch(() => null);
-  const input = readDocumentInput(body?.content);
-  if (!input || !Number.isSafeInteger(body?.revision) || body.revision < 1)
+  const parsedInput = readDocumentInput(body?.content);
+  if (!parsedInput || !Number.isSafeInteger(body?.revision) || body.revision < 1)
     return NextResponse.json({ error: "Невалидни полета в план-конспекта." }, { status: 400 });
+  const input = { ...parsedInput, session: { ...parsedInput.session, ...currentCompetitionSeason() } };
 
   const previous = await prisma.trainingPlanDocument.findFirst({ where, select: documentDetail });
   if (!previous) return missing();

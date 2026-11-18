@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, Plus, RefreshCw, Trash2 } from "lucide-react";
-import type { DocumentSummary, SavedDocument } from "@/lib/exercise/document";
+import type { CompetitionSeason, DocumentSummary, SavedDocument } from "@/lib/exercise/document";
 import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
 import DocumentEditor from "./DocumentEditor";
 import { documentRequest } from "./documentRequest";
@@ -83,8 +83,8 @@ function DocumentList({ endpoint, listHref, libraryHref, context }: { endpoint: 
   </>;
 }
 
-export default function DocumentWorkspace({ clubId, clubName, clubLogoUrl, groupName, location, selected }: {
-  clubId: string; clubName: string; clubLogoUrl?: string; groupName?: string; location: string; selected?: string;
+export default function DocumentWorkspace({ clubId, clubName, clubLogoUrl, groupName, competitionSeason, location, selected }: {
+  clubId: string; clubName: string; clubLogoUrl?: string; groupName?: string; competitionSeason: CompetitionSeason; location: string; selected?: string;
 }) {
   const drawingEndpoint = `/api/admin/clubs/${clubId}/training-plans`;
   const endpoint = `${drawingEndpoint}/documents`;
@@ -121,7 +121,7 @@ export default function DocumentWorkspace({ clubId, clubName, clubLogoUrl, group
               onClick={() => { setError(""); setAttempt((value) => value + 1); }}>Опитай отново</button></div>
           : <FinanceSkeleton variant="form" />}
       </section>}
-      {(loaded || selected === "new") && <DocumentEditor clubId={clubId} clubLogoUrl={clubLogoUrl} initial={loaded} groupName={groupName} context={context} endpoint={endpoint}
+      {(loaded || selected === "new") && <DocumentEditor clubId={clubId} clubLogoUrl={clubLogoUrl} initial={loaded} groupName={groupName} competitionSeason={competitionSeason} context={context} endpoint={endpoint}
         drawingEndpoint={drawingEndpoint} location={location} listHref={listHref} />}
     </div>
   </main>;

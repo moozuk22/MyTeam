@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
-import { readDocumentInput } from "@/lib/exercise/document";
+import { currentCompetitionSeason, readDocumentInput } from "@/lib/exercise/document";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -33,9 +33,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (session instanceof NextResponse) return session;
 
   const body = await request.json().catch(() => null);
-  const input = readDocumentInput(body?.content);
-  if (!input || typeof body?.id !== "string" || !UUID_RE.test(body.id))
+  const parsedInput = readDocumentInput(body?.content);
+  if (!parsedInput || typeof body?.id !== "string" || !UUID_RE.test(body.id))
     return NextResponse.json({ error: "Невалидни полета в план-конспекта." }, { status: 400 });
+  const input = { ...parsedInput, session: { ...parsedInput.session, ...currentCompetitionSeason() } };
 
   const where = { id: body.id as string, clubId, ownerId: session.sub };
   const existing = await prisma.trainingPlanDocument.findFirst({ where, select: documentDetail });

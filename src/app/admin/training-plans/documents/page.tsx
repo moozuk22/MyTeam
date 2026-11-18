@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { canAccessTrainingClub, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/exercise/access";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
+import { currentCompetitionSeason } from "@/lib/exercise/document";
 import { applyCloudinaryTransformToUrl, buildCloudinaryUrlFromUploadPath } from "@/lib/cloudinaryImagePath";
 import DocumentWorkspace from "./DocumentWorkspace";
 import "../page.css";
@@ -40,6 +41,7 @@ export default async function DocumentsPage({
     clubName={club.name}
     clubLogoUrl={clubLogoUrl}
     groupName={coachGroup?.name}
+    competitionSeason={currentCompetitionSeason()}
     location={trainingPlanSearch(clubId, coachGroup?.id).toString()}
     selected={selected}
   />;

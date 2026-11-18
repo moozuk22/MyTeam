@@ -70,9 +70,11 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
 }
 
 function PrintedHeader({ content }: { content: PlanContent }) {
+  const competitionLabel = [content.session.halfSeason.toLocaleLowerCase("bg-BG"), content.session.season]
+    .filter(Boolean).join(" ");
   return <header className="td-printed-header">
     <h2>{content.session.title}</h2>
-    <div>{[content.session.season, content.session.halfSeason].filter(Boolean).join(" · ") || "Спортно-състезателен сезон"}</div>
+    <div>{competitionLabel ? `Спортно-състезателен ${competitionLabel}` : "Спортно-състезателен сезон"}</div>
   </header>;
 }
 
@@ -99,7 +101,7 @@ function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: 
           {([["playerCount", "Състезатели"], ["absences", "Отсъстващи"], ["injuries", "Контузени"], ["duration", "Времетраене (мин.)"], ["equipment", "Необходими пособия"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
         </div>
       </div>
-      <div className="td-printed-text td-printed-session-coach">{([["coach", "Треньор"], ["group", "Група"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}</div>
+      <div className="td-printed-text td-printed-session-coach"><PrintedValue label="Треньор" value={content.session.coach} /></div>
     </section>
   </div>;
 }

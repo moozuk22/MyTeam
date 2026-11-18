@@ -35,6 +35,7 @@ type Fields<T extends readonly (readonly [string, string, number, ...string[]])[
   Record<T[number][0], string>;
 export type SessionFields = Fields<typeof sessionFields>;
 export type SectionFields = Fields<typeof exerciseFields>;
+export type CompetitionSeason = Pick<SessionFields, "season" | "halfSeason">;
 export type DrawingSnapshot = { sourceId: string; title: string; layout: Exercise };
 export type DocumentSection = SectionFields & { drawing: DrawingSnapshot | null };
 export type Merge = "none" | "left" | "right";
@@ -56,6 +57,20 @@ export const sectionTitles = [
   "Фаза №3 · Игрова форма / Позиционна игра / Тактика",
   "Игрова форма / Игра с акцент / Свободна игра",
 ];
+
+export function currentCompetitionSeason(now = new Date()): CompetitionSeason {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Sofia", year: "numeric", month: "2-digit",
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const firstHalf = month >= 7;
+  const startYear = firstHalf ? year : year - 1;
+  return {
+    season: `${startYear}/${startYear + 1}`,
+    halfSeason: firstHalf ? "Първи полусезон" : "Втори полусезон",
+  };
+}
 
 export function documentBottomGroups(merge: Merge) {
   if (merge === "left") return [[2, 3], [4]];
