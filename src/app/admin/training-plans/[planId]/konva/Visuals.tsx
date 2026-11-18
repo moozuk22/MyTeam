@@ -13,7 +13,6 @@ import { FOOTBALL } from "@/lib/exercise/football";
 import {
   HEIGHT,
   WIDTH,
-  createObject,
   textFontSize,
   type Exercise,
   type ExerciseObject,
@@ -39,7 +38,6 @@ const GOAL_ICON_FILES: Record<string, string> = {
 
 export const PITCH_ICON_FILES = {
   ball: "football-ball-5681732.png",
-  goal: "football-goal-2451562.png",
   flag: "football-flag-6452452.png",
   ring: "football-hoop-3437627.png",
   barrier: "football-barrier-1540543.png",
@@ -70,7 +68,7 @@ export function loadPitchIcons() {
 }
 
 function goalIconUrl(type: ExerciseTool) {
-  return GOAL_ICON_FILES[type] ? `/icons/${GOAL_ICON_FILES[type]}` : `/icons/${PITCH_ICON_FILES.goal}`;
+  return `/icons/${GOAL_ICON_FILES[type] ?? "goal-front.svg"}`;
 }
 
 function useGoalIcon(type: ExerciseTool) {
@@ -242,19 +240,13 @@ const COLOR_ICONS: Partial<Record<ExerciseTool, CroppedIcon>> = {
   hurdle: { name: "hurdle", crop: { x: 151, y: 16, width: 210, height: 94 } },
   marker: { name: "marker", crop: { x: 10, y: 97, width: 492, height: 318 } },
 };
-const GOAL_PREVIEW_SCALE =
-  34 / createObject("goal-full", { x: 0, y: 0 }, "preview").width;
-
 export function EquipmentPreview({ type }: { type: ExerciseTool }) {
-  const goalImage = useGoalIcon(type);
   if (type === "pole")
     return <span className="ke-equipment-preview ke-equipment-preview--pole" aria-hidden="true" />;
 
   const ball = type === "ball" || type === "balls";
-  const isGoal = type.startsWith("goal");
-  const tintedName = isGoal
-    ? "goal"
-    : type === "flag" || type === "ring" ? type : null;
+  if (type.startsWith("goal")) return <span className="ke-equipment-preview" aria-hidden="true" style={{ background: `url("${goalIconUrl(type)}") center / contain no-repeat`, width: 34, height: 24 }} />;
+  const tintedName = type === "flag" || type === "ring" ? type : null;
   const icon: CroppedIcon | undefined = ball
     ? { name: "ball", crop: BALL_ICON_CROP }
     : tintedName
@@ -265,12 +257,8 @@ export function EquipmentPreview({ type }: { type: ExerciseTool }) {
   const { x, y, width, height } = icon.crop;
   const availableWidth = type === "balls" ? 16 : 34;
   const scale = Math.min(availableWidth / width, 24 / height);
-  const goal = tintedName === "goal"
-    ? createObject(type, { x: 0, y: 0 }, "preview")
-    : null;
-  const previewWidth = goal ? goal.width * GOAL_PREVIEW_SCALE : width * scale;
-  const previewHeight = goal ? goal.height * GOAL_PREVIEW_SCALE : height * scale;
-  if (isGoal && goalImage) return <img src={goalIconUrl(type)} alt="" style={{ width: previewWidth, height: previewHeight, objectFit: "fill" }} />;
+  const previewWidth = width * scale;
+  const previewHeight = height * scale;
   const sourceSize = ball || tintedName ? 200 : 512;
   const scaleX = previewWidth / width;
   const scaleY = previewHeight / height;
@@ -313,7 +301,7 @@ export function EquipmentPreview({ type }: { type: ExerciseTool }) {
           height: previewHeight,
           ...(tintedName
             ? {
-                backgroundColor: tintedName === "goal" ? "#ffffff" : "#f59e0b",
+                backgroundColor: "#f59e0b",
                 mask: artwork,
               }
             : { background: artwork }),
@@ -715,9 +703,7 @@ export const ObjectVisual = memo(function ObjectVisual({
   const colorImage = colorIcon && icons[colorIcon.name];
   if (colorIcon && colorImage)
     return <ColorEquipmentIcon image={colorImage} object={o} color={c} crop={colorIcon.crop} />;
-  const iconName = type.startsWith("goal")
-    ? "goal"
-    : type === "flag" || type === "ring" ? type : null;
+  const iconName = type === "flag" || type === "ring" ? type : null;
   const image = iconName && icons[iconName];
   if (iconName && image)
     return (
@@ -728,28 +714,6 @@ export const ObjectVisual = memo(function ObjectVisual({
         width={w}
         height={h}
       />
-    );
-  if (type.startsWith("goal"))
-    return (
-      <Group>
-        <Rect
-          x={-w / 2}
-          y={-h / 2}
-          width={w}
-          height={h}
-          stroke={c}
-          strokeWidth={3}
-        />
-        {[0.25, 0.5, 0.75].map((n) => (
-          <Line
-            key={n}
-            points={[-w / 2 + w * n, -h / 2, -w / 2 + w * n, h / 2]}
-            stroke={c}
-            strokeWidth={1}
-          />
-        ))}
-        <Line points={[-w / 2, 0, w / 2, 0]} stroke={c} strokeWidth={1} />
-      </Group>
     );
   if (type === "ball" || type === "balls")
     return (
