@@ -1,10 +1,13 @@
 "use client";
 
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type Status = { ready: boolean; connectionUrl: string | null; page: { id: string; name: string } | null; choices: { id: string; name: string }[]; choosing: boolean };
 export default function FacebookConnection({ clubId, failed }: { clubId: string; failed: boolean }) {
+  const dialogs = useBrowserDialogs();
   const [status, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState(failed ? "Свързването с Facebook не завърши. Проверете разрешенията и опитайте отново." : "");
   const [busy, setBusy] = useState(false);
@@ -28,7 +31,7 @@ export default function FacebookConnection({ clubId, failed }: { clubId: string;
 
   async function action(action: "start" | "select" | "disconnect", pageId?: string) {
     if (lock.current) return;
-    if (action === "disconnect" && !window.confirm("Да прекъснем ли Facebook връзката на клуба?")) return;
+    if (action === "disconnect" && !await dialogs.confirm("Да прекъснем ли Facebook връзката на клуба?")) return;
     lock.current = true; setBusy(true); setError("");
     try {
       const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, pageId }) });

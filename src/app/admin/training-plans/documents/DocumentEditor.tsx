@@ -1,9 +1,13 @@
 "use client";
 
+import { guardBrowserHistory } from "@/lib/browserHistoryGuard";
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
+
 import { useTrainingPlanAccess, trainingSubscriptionMessage, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ArrowLeft, FileText } from "lucide-react";
 import {
@@ -21,6 +25,8 @@ const DocumentSheet = dynamic(() => import("./DocumentSheet"), {
 export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName, competitionSeason, context, endpoint, drawingEndpoint, location, listHref }: {
   clubId: string; clubLogoUrl?: string; initial?: SavedDocument; groupName?: string; competitionSeason: CompetitionSeason; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
 }) {
+  const dialogs = useBrowserDialogs();
+  const router = useRouter();
   const subscription = useTrainingPlanAccess(clubId);
   const [content, setContent] = useState<PlanContent>(() => {
     const document = initial?.content ?? blankDocument(groupName);
@@ -35,15 +41,24 @@ export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  const blocked = dirty || saving;
+  const navigationBlocked = useRef(blocked);
+  useEffect(() => { navigationBlocked.current = blocked; }, [blocked]);
+  useEffect(() => guardBrowserHistory(
+    window,
+    () => dialogs.confirm("Имате незапазени промени. Да излезете ли?"),
+    () => navigationBlocked.current,
+  ), [dialogs]);
+
   useEffect(() => {
-    if (!dirty) return;
+    if (!blocked) return;
     function onUnload(event: BeforeUnloadEvent) {
       event.preventDefault();
       event.returnValue = true;
     }
     window.addEventListener("beforeunload", onUnload);
     return () => window.removeEventListener("beforeunload", onUnload);
-  }, [dirty]);
+  }, [blocked]);
 
   function edit(updater: (content: PlanContent) => PlanContent) {
     setContent(updater);
@@ -110,7 +125,12 @@ export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName
   return <>
     <header className="tp-header td-editor-header">
       <Link href={listHref} className="tp-back-btn" onNavigate={(event) => {
-        if ((dirty || saving) && !window.confirm("Имате незапазени промени. Да излезете ли?")) event.preventDefault();
+        if (dirty || saving) {
+          event.preventDefault();
+          void dialogs.confirm("Имате незапазени промени. Да излезете ли?").then((confirmed) => {
+            if (confirmed) router.push(listHref);
+          });
+        }
       }}><ArrowLeft size={16} aria-hidden="true" /> Към план-конспектите</Link>
       <div className="tp-heading">
         <h1 className="tp-title"><FileText aria-hidden="true" />{saved ? "Редакция на план-конспект" : "Нов план-конспект"}</h1>

@@ -1,3 +1,4 @@
+import type { BrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 import { formatBirthDateForExport } from "./members-page-utils";
 import { type Member } from "../_types/members-page-types";
 
@@ -5,10 +6,12 @@ export async function downloadMemberLinks({
   isAdmin,
   members,
   clubName,
+  dialogs,
 }: {
   isAdmin: boolean;
   members: Member[];
   clubName: string;
+  dialogs: BrowserDialogs;
 }) {
   if (!isAdmin || typeof window === "undefined" || typeof document === "undefined") {
     return;
@@ -34,7 +37,7 @@ export async function downloadMemberLinks({
     .sort((a, b) => a.fullName.localeCompare(b.fullName, undefined, { sensitivity: "base" }));
 
   if (rows.length === 0) {
-    window.alert("Няма активни състезатели с карта за export.");
+    await dialogs.alert("Няма активни състезатели с карта за export.");
     return;
   }
 
@@ -52,8 +55,9 @@ export async function downloadMemberLinks({
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9_-]/g, "");
   const defaultBaseName = `${safeClub || "club"}-member-links`;
-  const requestedName = window.prompt("Име на файла:", defaultBaseName) ?? "";
-  const cleanBaseName = (requestedName.trim() || defaultBaseName).replace(/[\\/:*?"<>|]/g, "-");
+  const requestedName = await dialogs.prompt("Име на файла:", defaultBaseName);
+  if (requestedName === undefined) return;
+  const cleanBaseName = (requestedName?.trim() || defaultBaseName).replace(/[\\/:*?"<>|]/g, "-");
   const filename = `${cleanBaseName}.txt`;
   const blob = new Blob(["\uFEFF", content], { type: "text/plain;charset=utf-8" });
 

@@ -1,4 +1,6 @@
 "use client";
+
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 import { useEffect, useRef, useState } from "react";
 import type { ClubRow } from "../_types/club";
 import {
@@ -15,6 +17,7 @@ export function DemoNotificationPanel({
   clubs: ClubRow[];
   clubsLoading: boolean;
 }) {
+  const dialogs = useBrowserDialogs();
   const [demoSendingType, setDemoSendingType] = useState<
     "reminder" | "overdue" | null
   >(null);
@@ -126,10 +129,10 @@ export function DemoNotificationPanel({
       };
       const sent = payload.summary?.sent ?? 0;
       const total = payload.summary?.total ?? 0;
-      window.alert(`Известия изпратени: ${sent}/${total}`);
+      await dialogs.alert(`Известия изпратени: ${sent}/${total}`);
     } catch (error) {
       console.error("Demo notification send error:", error);
-      window.alert(
+      await dialogs.alert(
         error instanceof Error
           ? error.message
           : "Възникна грешка при изпращане.",

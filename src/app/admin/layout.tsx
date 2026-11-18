@@ -1,3 +1,4 @@
+import { BrowserDialogProvider } from "@/components/admin/BrowserDialogProvider";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -18,5 +19,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <BrowserDialogProvider>{children}</BrowserDialogProvider>;
 }

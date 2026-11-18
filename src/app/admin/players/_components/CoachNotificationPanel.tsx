@@ -1,4 +1,6 @@
 "use client";
+
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 import { useEffect, useRef, useState } from "react";
 import type { ClubRow } from "../_types/club";
 import { BellIcon, ChevronDownIcon, SearchIcon } from "./PlayersIcons";
@@ -10,6 +12,7 @@ export function CoachNotificationPanel({
   clubs: ClubRow[];
   clubsLoading: boolean;
 }) {
+  const dialogs = useBrowserDialogs();
   const [coachMessage, setCoachMessage] = useState("");
   const [coachImage, setCoachImage] = useState<File | null>(null);
   const [coachClubIds, setCoachClubIds] = useState<string[]>([]);
@@ -62,13 +65,13 @@ export function CoachNotificationPanel({
           typeof data.error === "string" ? data.error : "Неуспешно изпращане.",
         );
       }
-      window.alert(
+      await dialogs.alert(
         `Съобщението е изпратено: ${data.sent ?? 0}/${data.total ?? 0}`,
       );
       setCoachMessage("");
       setCoachImage(null);
     } catch (error) {
-      window.alert(
+      await dialogs.alert(
         error instanceof Error
           ? error.message
           : "Възникна грешка при изпращане.",

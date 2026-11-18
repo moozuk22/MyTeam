@@ -1,5 +1,7 @@
 "use client";
 
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -12,6 +14,7 @@ type Page = { documents: DocumentSummary[]; nextCursor: string | null };
 const dateFormat = new Intl.DateTimeFormat("bg-BG", { dateStyle: "medium", timeZone: "Europe/Sofia" });
 
 function DocumentList({ endpoint, listHref, libraryHref, context }: { endpoint: string; listHref: string; libraryHref: string; context: string }) {
+  const dialogs = useBrowserDialogs();
   const [page, setPage] = useState<Page>();
   const [cursor, setCursor] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -35,7 +38,7 @@ function DocumentList({ endpoint, listHref, libraryHref, context }: { endpoint: 
   }
 
   async function remove(item: DocumentSummary) {
-    if (deleting || !window.confirm(`Да изтрием ли „${item.title}“?`)) return;
+    if (deleting || !await dialogs.confirm(`Да изтрием ли „${item.title}“?`)) return;
     setDeleting(item.id);
     setError("");
     try {

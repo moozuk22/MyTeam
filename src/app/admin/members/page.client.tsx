@@ -1,5 +1,7 @@
 "use client";
 
+import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
+
 import { getMatchCalendarDates } from "@/lib/matchScheduleWindow";
 
 import MatchHistoryModal from "@/components/MatchHistoryModal";
@@ -88,6 +90,7 @@ import { createTrainingNoteActions } from "./_actions/createTrainingNoteActions"
 import { createReminderSettingsActions } from "./_actions/createReminderSettingsActions";
 
 function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean }) {
+  const dialogs = useBrowserDialogs();
   const router = useRouter();
 
   const searchParams = useSearchParams();
@@ -439,7 +442,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
     schedulerCalendarMonths,
   } = trainingDaysForm;
 
-  const handleDownloadMemberLinks = () => downloadMemberLinks({ isAdmin, members, clubName });
+  const handleDownloadMemberLinks = () => downloadMemberLinks({ isAdmin, members, clubName, dialogs });
 
   const handleDownloadPlayersExcel = () => downloadPlayersExcel({ isAdmin, members, clubSport, clubName });
 
@@ -552,12 +555,12 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
         throw new Error(message);
       }
 
-      window.alert(`Отбор "${displayTeamName}" беше изтрит успешно.`);
+      if (!await dialogs.alert(`Отбор "${displayTeamName}" беше изтрит успешно.`)) return;
       setIsTeamDeleteConfirmOpen(false);
       router.push("/admin/players");
     } catch (error) {
       console.error("Error deleting team:", error);
-      window.alert(error instanceof Error ? error.message : "Възникна грешка при изтриване на отбора.");
+      await dialogs.alert(error instanceof Error ? error.message : "Възникна грешка при изтриване на отбора.");
     } finally {
       setIsDeletingTeam(false);
     }
