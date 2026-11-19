@@ -1,14 +1,18 @@
 "use client";
+
+import BackLink from "../BackLink";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
-import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronLeft, ChevronRight, Download, FileText, Images, Plus, Printer, Save, Trash2 } from "lucide-react";
+import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Images, Layers, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
 import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 import { cycleColumns, emptyCycle, formatWeekDates, formatWeekRange, shiftWeek, type CycleContent } from "@/lib/exercise/microcycle";
 import type { CompetitionSeason } from "@/lib/exercise/document";
+import { coachSections, filterGroups, NO_COACH_ID, type FilterGroup } from "@/lib/exercise/microcycleGroupFilter";
 import "./workspace.css";
 type Cycle = { groupKey: string; groupName: string; content: CycleContent; revision: number };
-type Data = { club: { name: string }; groups: { key: string; name: string }[]; cycles: Cycle[] };
+type Data = { club: { name: string }; groups: FilterGroup[]; coachView?: boolean; cycles: Cycle[] };
+const groupCount = (n: number) => `${n} ${n === 1 ? "група" : "групи"}`;
 const headerFields = [["format", "Формат"], ["age", "Възраст"], ["season", "Сезон"], ["half", "Полусезон"], ["number", "Микроцикъл №"]] as const;
 
 /** Waits for the paper sheet images so print and PDF include the club logo. */
@@ -65,6 +69,11 @@ export default function Workspace({ clubId, coachGroupId, initialWeek, clubLogoU
   const [paper, setPaper] = useState(false);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
+  const [query, setQuery] = useState("");
+  const [byCoach, setByCoach] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  // While searching, every matching coach opens; this set holds the ones the user closed again. It resets with each new query.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const dialogs = useBrowserDialogs();
   const sheet = useRef<HTMLDivElement>(null);
   const location = new URLSearchParams({ clubId, ...(coachGroupId ? { coachGroupId } : {}) }).toString();
@@ -125,7 +134,26 @@ export default function Workspace({ clubId, coachGroupId, initialWeek, clubLogoU
     } catch (e) { setPaper(false); setBusy(false); setError(e instanceof Error ? e.message : "Грешка при печат."); }
   }
 
-  const archived = data?.cycles.filter(c => !data.groups.some(g => g.key === c.groupKey)) ?? [];
+  const archived = filterGroups((data?.cycles.filter(c => !data.groups.some(g => g.key === c.groupKey)) ?? []).map(c => ({ key: c.groupKey, name: c.groupName })), query);
+  const coachMode = Boolean(data?.coachView) && byCoach;
+  const searching = query.trim() !== "";
+  const visibleGroups = data ? filterGroups(data.groups, query) : [];
+  const sections = data && coachMode ? coachSections(data.groups, query) : [];
+  const hasSaved = (key: string) => Boolean(data?.cycles.some(c => c.groupKey === key));
+  const toggleCoach = (id: string) => (searching ? setCollapsed : setExpanded)(current => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; });
+  const showByCoach = (value: boolean) => {
+    setByCoach(value);
+    // Open the coach of the selected group so the selection stays visible.
+    const coach = data?.groups.find(g => g.key === selected)?.coach;
+    if (value && selected) setExpanded(current => new Set(current).add(coach?.id ?? NO_COACH_ID));
+  };
+  const groupCard = (g: FilterGroup) => {
+    const exists = hasSaved(g.key);
+    return <button type="button" className="mc-group" disabled={busy || (readOnly && !exists)} key={g.key} aria-pressed={g.key === selected} onClick={() => void open(g.key)}>
+      <strong>{g.name}</strong>
+      <span className={`mc-chip${exists ? " mc-chip--saved" : ""}`}>{exists ? "Има микроцикъл" : readOnly ? "Няма микроцикъл" : "Създай микроцикъл"}</span>
+    </button>;
+  };
   const selectedName = data?.groups.find(g => g.key === selected)?.name ?? data?.cycles.find(c => c.groupKey === selected)?.groupName;
   const range = formatWeekRange(week);
   const updateCell = (i: number, j: number, value: string) => change({ ...content, rows: content.rows.map((r, n) => n === i ? r.map((v, k) => k === j ? value : v) : r) });
@@ -133,7 +161,7 @@ export default function Workspace({ clubId, coachGroupId, initialWeek, clubLogoU
   return <main className={`tp-page mc-page${printAllowed ? " mc-print-allowed" : ""}`}>
     <div className="tp-inner">
       <header className="tp-header">
-        <Link className="tp-back-btn" href={`/admin/members?${location}`}><ArrowLeft size={16} aria-hidden="true" /> Назад</Link>
+        <BackLink className="tp-back-btn" href={`/admin/members?${location}`}><ArrowLeft size={16} aria-hidden="true" /> Назад</BackLink>
         <div className="tp-heading">
           <h1 className="tp-title"><CalendarRange aria-hidden="true" />Седмичен микроцикъл</h1>
           {data ? <p>{data.club.name}</p> : <p aria-hidden="true"><span className="mc-line mc-line--title" /></p>}
@@ -161,20 +189,43 @@ export default function Workspace({ clubId, coachGroupId, initialWeek, clubLogoU
         {[0, 1, 2].map(i => <div key={i} className="mc-group mc-group--skeleton" aria-hidden="true"><span className="mc-line mc-line--name" /><span className="mc-line mc-line--chip" /></div>)}
       </div>}
       {data && data.groups.length === 0 && <div className="tp-empty">Няма налични групи.</div>}
-      {data && data.groups.length > 0 && <div className="mc-groups">
-        {data.groups.map(g => {
-          const exists = data.cycles.some(c => c.groupKey === g.key);
-          return <button type="button" className="mc-group" disabled={busy || (readOnly && !exists)} key={g.key} aria-pressed={g.key === selected} onClick={() => void open(g.key)}>
-            <strong>{g.name}</strong>
-            <span className={`mc-chip${exists ? " mc-chip--saved" : ""}`}>{exists ? "Има микроцикъл" : readOnly ? "Няма микроцикъл" : "Създай микроцикъл"}</span>
-          </button>;
+      {data && data.groups.length > 0 && <div className="tp-category-controls mc-filters">
+        {data.coachView && <div className="tp-scope-controls" role="group" aria-label="Изглед на групите">
+          <button type="button" className={coachMode ? "tp-secondary-btn" : "tp-primary-btn"} aria-pressed={!coachMode} onClick={() => showByCoach(false)}><Layers size={16} aria-hidden="true" /> Всички групи</button>
+          <button type="button" className={coachMode ? "tp-primary-btn" : "tp-secondary-btn"} aria-pressed={coachMode} onClick={() => showByCoach(true)}><Users size={16} aria-hidden="true" /> По треньори</button>
+        </div>}
+        <label className="tp-field mc-search">
+          <span><Search size={16} aria-hidden="true" />Търсене</span>
+          <input type="search" maxLength={200} value={query} placeholder={coachMode ? "Търси група или треньор" : "Търси група"} onChange={e => { setQuery(e.target.value); setCollapsed(new Set()); }} />
+        </label>
+      </div>}
+      {data && data.groups.length > 0 && (coachMode ? sections.length === 0 : visibleGroups.length === 0) && <div className="tp-empty">Няма групи, които отговарят на търсенето.</div>}
+      {data && !coachMode && visibleGroups.length > 0 && <div className="mc-groups">{visibleGroups.map(groupCard)}</div>}
+      {coachMode && sections.length > 0 && <div className="mc-groups">
+        {sections.map(section => {
+          const isOpen = searching ? !collapsed.has(section.id) : expanded.has(section.id);
+          const saved = section.groups.filter(g => hasSaved(g.key)).length;
+          const panel = `mc-coach-${section.id}`;
+          return <div key={section.id} className={`mc-coach${isOpen ? " mc-coach--open" : ""}`}>
+            <button type="button" className="mc-coach-toggle" aria-expanded={isOpen} aria-controls={panel} onClick={() => toggleCoach(section.id)}>
+              <span className="mc-coach-text">
+                <strong>{section.name}</strong>
+                <span className="mc-coach-chips">
+                  <span className="mc-chip">{groupCount(section.groups.length)}</span>
+                  {saved > 0 && <span className="mc-chip mc-chip--saved">{saved} с микроцикъл</span>}
+                </span>
+              </span>
+              <ChevronDown className="mc-coach-icon" size={20} aria-hidden="true" />
+            </button>
+            {isOpen && <div id={panel} className="mc-groups mc-coach-groups">{section.groups.map(groupCard)}</div>}
+          </div>;
         })}
       </div>}
       {archived.length > 0 && <>
         <h2 className="mc-section-title"><Archive size={16} aria-hidden="true" /> Архив</h2>
         <div className="mc-groups">
-          {archived.map(c => <button type="button" className="mc-group" disabled={busy} key={c.groupKey} aria-pressed={c.groupKey === selected} onClick={() => void open(c.groupKey)}>
-            <strong>{c.groupName}</strong><span className="mc-chip mc-chip--saved">Архивирана група</span>
+          {archived.map(c => <button type="button" className="mc-group" disabled={busy} key={c.key} aria-pressed={c.key === selected} onClick={() => void open(c.key)}>
+            <strong>{c.name}</strong><span className="mc-chip mc-chip--saved">Архивирана група</span>
           </button>)}
         </div>
       </>}

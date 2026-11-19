@@ -1,5 +1,7 @@
 "use client";
 
+import BackLink from "./BackLink";
+
 import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -306,10 +308,10 @@ export default function TrainingPlansClient({
     <main className="tp-page tp-library">
       <div className="tp-inner">
         <header className="tp-header">
-          <Link className="tp-back-btn" href={membersHref}>
+          <BackLink className="tp-back-btn" href={membersHref}>
             <ArrowLeft size={16} />
             <span>Назад</span>
-          </Link>
+          </BackLink>
           <div className="tp-heading">
             <h1 className="tp-title"><Waypoints aria-hidden="true" />Планове за тренировки</h1>
             <p>{selectedClub?.name ?? "Няма избран отбор"}</p>

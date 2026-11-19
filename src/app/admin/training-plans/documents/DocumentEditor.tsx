@@ -6,10 +6,9 @@ import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 import { useTrainingPlanAccess, trainingSubscriptionMessage, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import BackLink from "../BackLink";
 import dynamic from "next/dynamic";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, Eye, FileText, PenLine } from "lucide-react";
 import {
   blankDocument,
   type CompetitionSeason, type DocumentInput, type DrawingSnapshot, type PlanContent, type SavedDocument,
@@ -26,7 +25,6 @@ export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName
   clubId: string; clubLogoUrl?: string; initial?: SavedDocument; groupName?: string; competitionSeason: CompetitionSeason; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
 }) {
   const dialogs = useBrowserDialogs();
-  const router = useRouter();
   const subscription = useTrainingPlanAccess(clubId);
   const [content, setContent] = useState<PlanContent>(() => {
     const document = initial?.content ?? blankDocument(groupName);
@@ -124,23 +122,25 @@ export default function DocumentEditor({ clubId, clubLogoUrl, initial, groupName
 
   return <>
     <header className="tp-header td-editor-header">
-      <Link href={listHref} className="tp-back-btn" onNavigate={(event) => {
-        if (dirty || saving) {
-          event.preventDefault();
-          void dialogs.confirm("Имате незапазени промени. Да излезете ли?").then((confirmed) => {
-            if (confirmed) router.push(listHref);
-          });
-        }
-      }}><ArrowLeft size={16} aria-hidden="true" /> Към план-конспектите</Link>
+      <BackLink href={listHref} className="tp-back-btn" beforeBack={async () => {
+        if (saving) return false;
+        if (dirty && !await dialogs.confirm("Имате незапазени промени. Да излезете ли?")) return false;
+        navigationBlocked.current = false;
+        return true;
+      }}><ArrowLeft size={16} aria-hidden="true" /> Към план-конспектите</BackLink>
       <div className="tp-heading">
         <h1 className="tp-title"><FileText aria-hidden="true" />{saved ? "Редакция на план-конспект" : "Нов план-конспект"}</h1>
         <p>{context}</p>
       </div>
       <div className="td-actions td-header-actions">
-        <button type="button" className="tp-secondary-btn"
-          onClick={() => setPreviewing((value) => !value)}>
-          {previewing ? "Към редакцията" : "Преглед за печат"}
-        </button>
+        <div className="td-view-switch" role="group" aria-label="Изглед">
+          <button type="button" aria-pressed={!previewing} onClick={() => setPreviewing(false)}>
+            <PenLine size={16} aria-hidden="true" />Редакция
+          </button>
+          <button type="button" aria-pressed={previewing} onClick={() => setPreviewing(true)}>
+            <Eye size={16} aria-hidden="true" />Преглед за печат
+          </button>
+        </div>
         <button type="button" className="tp-primary-btn" onClick={() => void save()} disabled={saving || (!!subscription.access?.canSave && !!saved && !dirty)}>
           {saving ? "Записване…" : "Запази"}
         </button>

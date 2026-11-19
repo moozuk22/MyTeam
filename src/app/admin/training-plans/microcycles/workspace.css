@@ -1,23 +1,5 @@
-/* Weekly microcycle page. Uses the training-plan theme tokens from ../workspace.css. */
-.tp-page.mc-page {
-  --plan-bg: radial-gradient(ellipse at 91% 79%, #10241c 0%, transparent 37%), #0a1412;
-  --plan-panel: #13221d;
-  --plan-card: #0e1c18;
-  --plan-field: #0b1714;
-  --plan-border: #2b4138;
-  --plan-text: #f3f7f4;
-  --plan-muted: #c5d0ca;
-  --plan-accent: #b9f5b5;
-  --plan-accent-border: #2b8539;
-  --plan-selected: #173b25;
-  padding: 18px 14px 44px;
-}
-.mc-page .tp-inner { width: min(1280px, 100%); }
-.mc-page .tp-header { padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--plan-border); }
-.mc-page .tp-title { display: flex; align-items: center; gap: 12px; background: none; color: var(--plan-text); font-size: clamp(1.4rem, 3vw, 2.125rem); font-weight: 750; }
-.mc-page .tp-title svg { flex: none; width: 1.05em; height: 1.05em; color: #68db68; }
-.mc-page .tp-heading p { color: var(--plan-text); font-size: 1rem; font-weight: 600; min-height: 1.5em; }
-.mc-page .tp-primary-btn { background: #11421d; color: #dcfbd8; }
+/* Weekly microcycle page. Theme tokens and the page shell come from ../workspace.css and ../page.css. */
+.mc-page .tp-heading p { min-height: 1.5em; }
 .mc-links { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
 .mc-links > a { flex: 1 1 180px; }
 
@@ -61,6 +43,44 @@
 .mc-chip { display: inline-flex; align-items: center; min-height: 26px; padding: 2px 10px; border: 1px dashed var(--plan-border); border-radius: 999px; color: var(--plan-muted); font-size: .8125rem; font-weight: 600; }
 .mc-chip--saved { border-style: solid; border-color: var(--plan-accent-border); background: var(--plan-selected); color: var(--plan-accent); }
 .mc-group[aria-pressed="true"] .mc-chip { background: #0d2f17; }
+
+/* Search and "По треньори" view toggle above the group cards */
+.mc-filters { margin-bottom: 12px; }
+.mc-filters .tp-scope-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+.mc-page .mc-search { margin: 0; }
+.mc-search > span { display: inline-flex; align-items: center; gap: 6px; }
+@media (min-width: 720px) {
+  .mc-filters:has(.tp-scope-controls) { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+/* Coach cards. An open card stays in its grid column and shows the coach's groups inside it.
+   Cards align to the top, so a closed card does not grow to the height of an open card in the same row. */
+.mc-groups:has(> .mc-coach) { align-items: start; }
+.mc-coach { min-width: 0; border: 1px solid var(--plan-border); border-radius: 12px; background: var(--plan-card); }
+.mc-coach--open { border-color: var(--plan-accent-border); }
+.mc-page .mc-coach-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 88px;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--plan-text);
+  text-align: left;
+  cursor: pointer;
+}
+.mc-coach-text { display: grid; justify-items: start; gap: 10px; min-width: 0; }
+.mc-coach-text strong { font-size: 1.0625rem; line-height: 1.35; overflow-wrap: anywhere; }
+.mc-coach-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mc-coach-icon { flex: none; color: var(--plan-muted); transition: transform .2s ease; }
+.mc-coach--open .mc-coach-icon { transform: rotate(180deg); }
+.mc-coach-groups { padding: 0 14px 14px; }
+@media (hover: hover) { .mc-coach:not(.mc-coach--open):hover { border-color: var(--plan-accent-border); } }
+@media (prefers-reduced-motion: reduce) { .mc-coach-icon { transition: none; } }
 
 /* Skeleton */
 .mc-group--skeleton { cursor: default; }
@@ -110,7 +130,7 @@
 .mc-col-num { width: 64px; }
 .mc-row-title { display: block; text-align: center; font-weight: 750; font-size: 1.0625rem; }
 .mc-row-label { display: none; }
-.mc-page .mc-remove { margin: 8px auto 0; color: #ffd3d1; }
+.mc-page .mc-remove { margin: 8px auto 0; color: var(--plan-danger-text); }
 .mc-table td textarea { min-height: 150px; }
 .mc-cell-label { display: none; }
 .mc-empty-row td { padding: 28px 16px; color: var(--plan-muted); text-align: center; }

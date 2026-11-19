@@ -1,5 +1,6 @@
 "use client";
 
+import { navigateBack } from "../../backNavigation";
 import { useTrainingPlanAccess, trainingSubscriptionMessage, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 import {
   useCallback,
@@ -1268,8 +1269,12 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
   }
 
-  function navigateAway(path: string) {
+  const leaveBack = useRef(false);
+
+  function navigateAway(path: string, back = false) {
+    leaveBack.current = back;
     if (dirty || recovery) setLeavePath(path);
+    else if (back) navigateBack(router, path, window.history.length);
     else router.push(path);
   }
 
@@ -1574,7 +1579,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
               type="button"
               className="ke-back"
               aria-label="Към плановете"
-              onClick={() => navigateAway(`/admin/training-plans?${search}`)}
+              onClick={() => navigateAway(`/admin/training-plans?${search}`, true)}
             >
               <ArrowLeft size={18} />
               <span>Към плановете</span>
@@ -1646,7 +1651,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
               if (!leavePath) return;
               persistDraft();
               closeLeaveDialog();
-              router.push(leavePath);
+              if (leaveBack.current) navigateBack(router, leavePath, window.history.length);
+              else router.push(leavePath);
             }}>
               Напусни
             </button>

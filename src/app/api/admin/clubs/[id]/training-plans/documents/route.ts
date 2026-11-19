@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
-import { currentCompetitionSeason, readDocumentInput } from "@/lib/exercise/document";
+import { currentCompetitionSeason, readDocumentInput, summarizeDocument } from "@/lib/exercise/document";
 import { storeDocumentImages, syncDocumentImages, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
 
@@ -21,9 +21,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     take: 26,
-    select: { id: true, title: true, updatedAt: true, revision: true },
+    select: { id: true, title: true, updatedAt: true, revision: true, content: true },
   });
-  const documents = rows.slice(0, 25);
+  const documents = rows.slice(0, 25).map(({ content, ...row }) => ({ ...row, preview: summarizeDocument(content) }));
   return NextResponse.json({ documents, nextCursor: rows.length > 25 ? documents[24].id : null },
     { headers: { "Cache-Control": "private, no-store" } });
 }

@@ -46,7 +46,14 @@ export type PlanContent = {
   merge: Merge;
 };
 export type SavedDocument = { id: string; content: PlanContent; revision: number; updatedAt: string };
-export type DocumentSummary = { id: string; title: string; updatedAt: string; revision: number };
+export type DocumentPreview = {
+  date: string; day: string; time: string; period: string; microcycle: string; sessionNumber: string;
+  gameMoment: string; objective: string; group: string; coach: string; playerCount: string;
+  /** Session duration, or the sum of the section durations when it is empty. */
+  duration: string;
+  drawings: number;
+};
+export type DocumentSummary = { id: string; title: string; updatedAt: string; revision: number; preview: DocumentPreview | null };
 export type DocumentInput = Omit<PlanContent, "sections"> & {
   sections: (SectionFields & { drawing: string | null })[];
 };
@@ -131,4 +138,34 @@ export function readDocumentInput(input: unknown): DocumentInput | null {
     sections.push({ ...fields, drawing });
   }
   return { version: 1, session, sections, merge: input.merge };
+}
+
+function text(value: unknown, max: number) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+/** Small, display-only summary of a saved document for the list cards. */
+export function summarizeDocument(content: unknown): DocumentPreview | null {
+  if (!isRecord(content) || !isRecord(content.session)) return null;
+  const { session } = content;
+  const sections = (Array.isArray(content.sections) ? content.sections : []).slice(0, sectionTitles.length).filter(isRecord);
+  const minutes = sections.reduce((sum, { duration }) => {
+    const value = Number(text(duration, 30).replace(",", "."));
+    return Number.isFinite(value) && value > 0 ? sum + value : sum;
+  }, 0);
+  return {
+    date: text(session.date, 10),
+    day: text(session.day, 50),
+    time: text(session.time, 5),
+    period: text(session.period, 100),
+    microcycle: text(session.microcycle, 40),
+    sessionNumber: text(session.sessionNumber, 40),
+    gameMoment: text(session.gameMoment, 160),
+    objective: text(session.objective, 160),
+    group: text(session.group, 100),
+    coach: text(session.coach, 100),
+    playerCount: text(session.playerCount, 30),
+    duration: text(session.duration, 30) || (minutes ? String(Math.round(minutes)) : ""),
+    drawings: sections.filter(({ drawing }) => isRecord(drawing)).length,
+  };
 }

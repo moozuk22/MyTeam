@@ -99,13 +99,25 @@ describe("training plan documents", () => {
     expect((await list(request("GET"), collection)).status).toBe(200);
     expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({
       where: { clubId, ownerId }, take: 26,
-      select: { id: true, title: true, updatedAt: true, revision: true },
+      select: { id: true, title: true, updatedAt: true, revision: true, content: true },
     }));
     expect((await GET(request("GET"), detail)).status).toBe(404);
     expect(mocks.find).toHaveBeenCalledWith(expect.objectContaining({ where: scope }));
     mocks.delete.mockResolvedValue({ count: 0 });
     expect((await DELETE(request("DELETE", undefined, "?revision=1"), detail)).status).toBe(404);
     expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("lists a small preview instead of the full document content", async () => {
+    mocks.session.mockResolvedValue({ sub: ownerId, roles: ["admin"] });
+    const content = blankDocument("U12");
+    content.session.date = "2026-11-19";
+    content.sections[1] = { ...content.sections[1], duration: "15", drawing: { sourceId: documentId, title: "Рисунка", layout: EMPTY_EXERCISE } };
+    mocks.list.mockResolvedValue([{ id: documentId, title: "План", updatedAt: new Date(0), revision: 2, content }]);
+    const body = await (await list(request("GET"), collection)).json();
+    expect(body.documents[0]).not.toHaveProperty("content");
+    expect(body.documents[0].preview).toMatchObject({ date: "2026-11-19" });
+    expect(JSON.stringify(body)).not.toContain("objects");
   });
 
   it("rejects a cross-club coach, untrusted origin and forged drawing before writing", async () => {

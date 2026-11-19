@@ -1,3 +1,4 @@
+import BackLink from "../BackLink";
 import { ArrowLeft, Box, Edit2, Ellipsis, History, Info, Layers, Plus, UserRound } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -110,9 +111,9 @@ export default async function TrainingPlanReview({
   return (
     <main className="tp-page tp-review">
       <div className="tp-inner">
-        <Link className="tp-back-btn" href={listHref}>
+        <BackLink className="tp-back-btn" href={listHref}>
           <ArrowLeft size={16} aria-hidden="true" /> Към плановете
-        </Link>
+        </BackLink>
         <header className="tp-review-heading">
           <h1 className="tp-title"><Layers aria-hidden="true" />{plan.title}</h1>
           <div className="tp-review-actions">
