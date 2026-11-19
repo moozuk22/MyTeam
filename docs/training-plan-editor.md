@@ -6,11 +6,11 @@ Konva is the training plan editor at `/admin/training-plans/[planId]/konva`. Sel
 
 Open the sidebar’s **Детайли** tab to edit **Име на плана**, **Категория** and **Описание**, then choose **Запази**. New plans open on **Детайли** and saved plans open on **Инструменти**. Local draft recovery includes unsaved changes to these fields.
 
-Choose **Внеси изображение** to use a JPG, PNG, or WebP file up to 9 MB as the drawing background. The editor fits the image to the current board and activates **Свободна ръка** for **Линия**. The other drawing tools also work over the image. **Смени изображението** and **Премахни изображението** keep the markings, and **Отмени** can restore the previous background. Saving includes the background in the editor, review, and plan list previews.
+Choose **Внеси изображение** to use a JPG, PNG, or WebP file up to 9 MB as the drawing background. The editor fits the image to the current board and activates **Свободна ръка** for **Линия**. The other drawing tools also work over the image. **Смени изображението** and **Премахни изображението** keep the markings, and **Отмени** can restore the previous background. Saving includes the background in the editor, review, and plan list previews. The database stores each JPEG once per club. Saved drawings contain a local image URL and a separate image reference. Image bytes do not change after creation. The editor keeps image bytes in its local history and drafts so that Undo can restore an image after the last saved reference is removed.
 
 If a newer version exists, the editor opens a dialog. Save your changes as a separate plan, load the latest saved version after confirming, or dismiss the dialog to keep editing. **Запази** reopens the dialog while the conflict is unresolved.
 
-Konva plan cards show a read-only preview of the saved pitch and drawing. Previews load in batches as cards approach the visible part of the list.
+Konva plan cards show a read-only preview of the saved pitch and drawing. Previews load as cards approach the visible part of the list. Only one preview request runs at a time, with up to 12 drawings per request. When a card leaves this area, the list removes its drawing data and canvas. Returning to the card loads its preview again. Filters and view changes clear the preview data.
 
 The plan review supports zoom and an expanded view of the saved pitch. **Детайли** brings the description, information, and equipment cards into focus. **Пособия** shows the total and a breakdown by type for items visible on the saved pitch. The description and equipment shortcuts open the corresponding panel in the editor.
 
@@ -115,7 +115,7 @@ Open **План-конспекти** from the drawing library. Documents are pri
 
 Browser Back and Forward use a custom dialog for navigation within the app. The dialog opens if the document has unsaved changes or a save is in progress. **Отказ** keeps the editor and its changes. **Потвърди** continues the requested navigation. **Към план-конспектите** uses the same warning. Reloading or closing the tab uses the browser warning. The history guard keeps the existing history entries and Next.js state.
 
-Use **Добави рисунка** to select a saved Konva drawing. The selection area opens with **Мои** active each time. **Мои** shows drawings from the signed-in account in this club. **Клубни** shows all drawings in this club. Use **Търсене по заглавие** to find titles in the active filter. Search ignores letter case and applies before pagination. The search text stays when you change the filter. Closing the selection area clears the filter and search text. Saving the document captures a copy of that drawing. Subsequent library edits and deletions leave the document’s copy available. Use **Смени рисунката** to attach a newer version.
+Use **Добави рисунка** to select a saved Konva drawing. The selection area opens with **Мои** active each time. **Мои** shows drawings from the signed-in account in this club. **Клубни** shows all drawings in this club. Use **Търсене по заглавие** to find titles in the active filter. Search ignores letter case and applies before pagination. The search text stays when you change the filter. Closing the selection area clears the filter and search text. Saving the document captures a copy of that drawing. Subsequent library edits and deletions leave the document’s copy available. Use **Смени рисунката** to attach a newer version. The document keeps its drawing data and references the shared image. It does not copy the image bytes. Deleting or changing the source drawing keeps the image while a saved document uses it. When the last drawing or document reference is removed, the same transaction deletes the unused image. An image used only by private documents is available only to their owners.
 
 Choose **Преглед за печат** to check the A4 landscape layout, then **Към редакцията** to return to the editable plan. A taller pitch view turns 90° clockwise on this sheet. Players, equipment, and text keep their individual orientation while the background, arrows, and zones rotate with the pitch. The drawing editor and library keep their saved orientation. **Печат** opens the browser print dialog for one A4 landscape sheet or **Save as PDF**. The preview reduces the sheet’s scale if the entered content would otherwise exceed the page.
 
@@ -128,3 +128,18 @@ Enable **Черно-бял печат** in the print preview for a white built-i
 Drawing saves and training document saves and printing require an active training plans subscription. Accounts with the `admin` role can save and print without a subscription. Other accounts can open saved content, draw, and edit forms without active access. Browser draft recovery remains available. A message states that training plans are not activated. Save and Print remain available as controls. If access is inactive, these actions show a subscription error and do not save or print.
 
 Each drawing and document save handler explicitly requires save access. The check does not depend on the URL text. The print button checks current access before it opens the browser print dialog. The app hides the document from direct browser print output unless the print action has passed this check. Print preview remains available without a subscription. These controls cannot prevent screenshots or extraction of content already visible in the browser.
+
+
+### Shared image migration
+
+The `20261119160000_shared_training_images` migration adds the image table and image references. Apply it through the normal deployment workflow. Existing embedded JPEG backgrounds remain readable. New saves convert embedded backgrounds to shared image references. Saves, copies, deletion, and backfill use one transaction lock per club to protect shared references.
+
+Convert existing drawings and document copies only after the updated app is running. The backfill uses one record per transaction. It keeps document revisions and update times. It also converts document copies whose source drawing was deleted. The command can run again after completion or failure.
+
+1. Run `npm run backfill:training-images` to display the resolved host and database name. This command does not change records.
+2. Check that this is the intended database.
+3. Run `npm run backfill:training-images -- --apply --expected-host HOST --expected-database NAME` with the displayed host and database name.
+
+A non-Neon target also requires `--allow-production`. Obtain explicit authorization before running the command against production. Do not put a database URL or password in the command. The schema migration does not run the backfill automatically.
+
+Run `npm run test:training-images:db` to check the complete save and deletion flows against the configured Neon development database. This check creates a temporary schema and removes it when the check completes. It does not change the public schema or existing club data. The default test suite checks the migration constraints with PGlite and does not connect to an external database.

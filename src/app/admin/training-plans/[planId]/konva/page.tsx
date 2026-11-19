@@ -1,3 +1,4 @@
+import { inlineDrawingImage } from "@/lib/exercise/imageStorage";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -40,7 +41,8 @@ export default async function KonvaPage({
     },
   });
   if (!plan) notFound();
-  const layout = isV2(plan.layout) ? plan.layout : null;
+  const editableLayout = await inlineDrawingImage(clubId, plan.layout);
+  const layout = isV2(editableLayout) ? editableLayout : null;
   const error = layout
     ? validateExercise(layout)
     : "Планът е създаден със стария редактор. Изберете „Копирай в новия редактор“ от списъка с планове, за да редактирате копието.";

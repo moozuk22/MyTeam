@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { currentCompetitionSeason, readDocumentInput, type PlanContent } from "@/lib/exercise/document";
+import { documentImageIds, removeUnusedImages, storeDocumentImages, syncDocumentImages, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
 
 type Context = { params: Promise<{ id: string; documentId: string }> };
@@ -41,21 +42,27 @@ export async function PUT(request: NextRequest, context: Context) {
     return NextResponse.json({ error: "Невалидни полета в план-конспекта." }, { status: 400 });
   const input = { ...parsedInput, session: { ...parsedInput.session, ...currentCompetitionSeason() } };
 
-  const previous = await prisma.trainingPlanDocument.findFirst({ where, select: documentDetail });
-  if (!previous) return missing();
-  if (previous.revision !== body.revision) return conflict();
-  const content = await snapshotDocument(where.clubId, input, previous.content as PlanContent);
-  if (!content)
-    return NextResponse.json({ error: "Изберете налична рисунка от този клуб." }, { status: 400 });
-
-  const updatedAt = new Date();
-  const result = await prisma.trainingPlanDocument.updateMany({
-    where: { ...where, revision: previous.revision },
-    data: { content, title: content.session.title.trim(), revision: { increment: 1 }, updatedAt },
-  });
-  if (!result.count) return conflict();
-  return NextResponse.json({
-    document: { id: where.id, revision: previous.revision + 1, content, updatedAt },
+  return withTrainingImages(where.clubId, async (tx) => {
+    const previous = await tx.trainingPlanDocument.findFirst({ where, select: documentDetail });
+    if (!previous) return missing();
+    if (previous.revision !== body.revision) return conflict();
+    const snapshot = await snapshotDocument(where.clubId, input, previous.content as PlanContent, tx);
+    if (!snapshot)
+      return NextResponse.json({ error: "Изберете налична рисунка от този клуб." }, { status: 400 });
+    const { content, imageIds } = await storeDocumentImages(tx, where.clubId, where.ownerId, snapshot);
+    const updatedAt = new Date();
+    const result = await tx.trainingPlanDocument.updateMany({
+      where: { ...where, revision: previous.revision },
+      data: { content, title: content.session.title.trim(), revision: { increment: 1 }, updatedAt },
+    });
+    if (!result.count) throw new TrainingImageError(
+      "Има по-нова версия на план-конспекта. Отворете я в нов раздел, за да сравните промените.", 409,
+    );
+    await syncDocumentImages(tx, where.clubId, where.id, imageIds);
+    await removeUnusedImages(tx, where.clubId, documentImageIds(previous.content as PlanContent));
+    return NextResponse.json({
+      document: { id: where.id, revision: previous.revision + 1, content, updatedAt },
+    });
   });
 }
 
@@ -65,7 +72,13 @@ export async function DELETE(request: NextRequest, context: Context) {
   const revision = Number(request.nextUrl.searchParams.get("revision"));
   if (!Number.isSafeInteger(revision) || revision < 1)
     return NextResponse.json({ error: "Невалидна версия на план-конспекта." }, { status: 400 });
-  const result = await prisma.trainingPlanDocument.deleteMany({ where: { ...where, revision } });
-  if (result.count) return new NextResponse(null, { status: 204 });
-  return await prisma.trainingPlanDocument.findFirst({ where, select: { id: true } }) ? conflict() : missing();
+  return withTrainingImages(where.clubId, async (tx) => {
+    const previous = await tx.trainingPlanDocument.findFirst({ where, select: documentDetail });
+    if (!previous) return missing();
+    if (previous.revision !== revision) return conflict();
+    const result = await tx.trainingPlanDocument.deleteMany({ where: { ...where, revision } });
+    if (!result.count) return conflict();
+    await removeUnusedImages(tx, where.clubId, documentImageIds(previous.content as PlanContent));
+    return new NextResponse(null, { status: 204 });
+  });
 }

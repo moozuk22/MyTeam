@@ -1,3 +1,4 @@
+import { readTrainingImageSource } from "./imageSource";
 import {
   ALLOWED_EQUIPMENT_TYPES,
   MAX_ITEMS,
@@ -170,8 +171,10 @@ function validBackground(value: unknown): value is ExerciseBackground {
     Object.keys(value).length !== 6 ||
     typeof value.src !== "string" ||
     value.src.length > MAX_BACKGROUND_IMAGE_LENGTH ||
-    !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(value.src) ||
-    (value.src.length - "data:image/jpeg;base64,".length) % 4 !== 0 ||
+    (!readTrainingImageSource(value.src) && (
+      !/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(value.src) ||
+      (value.src.length - "data:image/jpeg;base64,".length) % 4 !== 0
+    )) ||
     !PITCH_ROTATIONS.includes(value.rotation as PitchRotation)
   ) return false;
   const { x, y, width, height, rotation } = value;

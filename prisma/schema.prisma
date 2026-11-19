@@ -90,6 +90,7 @@ model Club {
   trainingPlans              TrainingPlan[]
   playerReportArchives       PlayerReportArchive[]
   trainingPlanDocuments      TrainingPlanDocument[]
+  trainingImages             TrainingImage[]
   trainingPlanCategories     TrainingPlanCategory[]
   limitedTrainingEvents      LimitedTrainingEvent[]
 
@@ -459,6 +460,8 @@ model TrainingPlan {
   description     String?
   categoryId      String?  @map("category_id") @db.Uuid
   layout          Json
+  backgroundImageId String? @map("background_image_id") @db.Uuid
+  backgroundImage TrainingImage? @relation(fields: [backgroundImageId, clubId], references: [id, clubId], onDelete: NoAction, onUpdate: NoAction)
   createdByUserId String?  @map("created_by_user_id") @db.Uuid
   createdByCoachGroupId String? @map("created_by_coach_group_id") @db.Uuid
   creatorName     String?  @map("creator_name")
@@ -471,6 +474,7 @@ model TrainingPlan {
   createdByCoachGroup CoachGroup? @relation(fields: [createdByCoachGroupId], references: [id], onDelete: SetNull)
 
   @@index([clubId])
+  @@index([backgroundImageId])
   @@index([clubId, categoryId, updatedAt, id])
   @@index([categoryId])
   @@index([createdByCoachGroupId])
@@ -489,6 +493,9 @@ model TrainingPlanDocument {
 
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
+  images TrainingDocumentImage[]
+
+  @@unique([id, clubId])
   @@index([clubId, ownerId, updatedAt, id], map: "training_plan_documents_owner_updated_idx")
   @@map("training_plan_documents")
 }
@@ -1138,4 +1145,32 @@ model ClubTrainingPlanChange {
   subscription ClubTrainingPlanSubscription @relation(fields: [clubId], references: [clubId], onDelete: Cascade)
   @@index([clubId, createdAt])
   @@map("club_training_plan_changes")
+}
+
+
+model TrainingImage {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  sha256 String @db.VarChar(64)
+  bytes Bytes
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  plans TrainingPlan[]
+  documents TrainingDocumentImage[]
+
+  @@unique([clubId, sha256])
+  @@unique([id, clubId])
+  @@map("training_images")
+}
+
+model TrainingDocumentImage {
+  documentId String @map("document_id") @db.Uuid
+  imageId String @map("image_id") @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  document TrainingPlanDocument @relation(fields: [documentId, clubId], references: [id, clubId], onDelete: Cascade, onUpdate: NoAction)
+  image TrainingImage @relation(fields: [imageId, clubId], references: [id, clubId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([documentId, imageId])
+  @@index([imageId])
+  @@map("training_document_images")
 }

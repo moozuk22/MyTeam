@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { storeDrawingImage, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { authorizeTraining, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/exercise/access";
 import {
   convertLegacy,
@@ -117,82 +117,86 @@ export async function POST(
     : body.editorVersion === 2
       ? EMPTY_EXERCISE
       : DEFAULT_LAYOUT;
-  if (body.sourcePlanId !== undefined) {
-    if (
-      typeof body.sourcePlanId !== "string" ||
-      !UUID_RE.test(body.sourcePlanId)
-    )
-      return NextResponse.json(
-        { error: "Невалиден източник." },
-        { status: 400 },
-      );
-    const source = await prisma.trainingPlan.findFirst({
-      where: { id: body.sourcePlanId, clubId: id },
-      select: { layout: true, categoryId: true },
-    });
-    if (!source)
-      return NextResponse.json(
-        { error: "Изходният план не е намерен." },
-        { status: 404 },
-      );
-    if (!Object.hasOwn(body, "categoryId")) categoryId = source.categoryId;
-    const sourceError = validateSavedLayout(source.layout);
-    if (sourceError)
-      return NextResponse.json({ error: sourceError }, { status: 400 });
-    try {
-      layout =
-        body.editorVersion === 2 && !isV2(source.layout)
-          ? convertLegacy(source.layout as unknown as PlanLayout)
-          : source.layout;
-    } catch (error) {
-      return NextResponse.json(
-        {
-          error:
-            error instanceof Error
-              ? error.message
-              : "Грешка при преобразуване.",
-        },
-        { status: 400 },
-      );
-    }
-  }
-  const layoutError = validateSavedLayout(layout);
-  if (layoutError)
-    return NextResponse.json({ error: layoutError }, { status: 400 });
-
   const group = body.coachGroupId == null ? null
     : await findTrainingPlanCoachGroup(id, body.coachGroupId);
   if (body.coachGroupId != null && !group)
     return NextResponse.json({ error: "Невалидна треньорска група." }, { status: 400 });
 
-  const userId = UUID_RE.test(session.sub) ? session.sub : null;
-  const plan = await prisma.trainingPlan.create({
-    data: {
-      clubId: id,
-      title,
-      description,
-      categoryId,
-      layout: layout as Prisma.InputJsonValue,
-      createdByUserId: userId,
-      createdByCoachGroupId: group?.id ?? null,
-      creatorName: group ? group.name : "Администратор",
-      updatedByUserId: userId,
-    },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      categoryId: true,
-      creatorName: true,
-      updatedAt: true,
-      createdAt: true,
-      layout: true,
-    },
-  });
+  return withTrainingImages(id, async (tx) => {
+    if (body.sourcePlanId !== undefined) {
+      if (
+        typeof body.sourcePlanId !== "string" ||
+        !UUID_RE.test(body.sourcePlanId)
+      )
+        return NextResponse.json(
+          { error: "Невалиден източник." },
+          { status: 400 },
+        );
+      const source = await tx.trainingPlan.findFirst({
+        where: { id: body.sourcePlanId, clubId: id },
+        select: { layout: true, categoryId: true },
+      });
+      if (!source)
+        return NextResponse.json(
+          { error: "Изходният план не е намерен." },
+          { status: 404 },
+        );
+      if (!Object.hasOwn(body, "categoryId")) categoryId = source.categoryId;
+      const sourceError = validateSavedLayout(source.layout);
+      if (sourceError)
+        return NextResponse.json({ error: sourceError }, { status: 400 });
+      try {
+        layout =
+          body.editorVersion === 2 && !isV2(source.layout)
+            ? convertLegacy(source.layout as unknown as PlanLayout)
+            : source.layout;
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Грешка при преобразуване.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+    const layoutError = validateSavedLayout(layout);
+    if (layoutError)
+      return NextResponse.json({ error: layoutError }, { status: 400 });
 
-  const { layout: savedLayout, ...summary } = plan;
-  return NextResponse.json(
-    { plan: { ...summary, layoutVersion: layoutVersion(savedLayout) } },
-    { status: 201 },
-  );
+    const userId = UUID_RE.test(session.sub) ? session.sub : null;
+    const stored = await storeDrawingImage(tx, id, session.sub, layout, body.sourcePlanId !== undefined);
+    const plan = await tx.trainingPlan.create({
+      data: {
+        clubId: id,
+        title,
+        description,
+        categoryId,
+        layout: stored.layout,
+        backgroundImageId: stored.backgroundImageId,
+        createdByUserId: userId,
+        createdByCoachGroupId: group?.id ?? null,
+        creatorName: group ? group.name : "Администратор",
+        updatedByUserId: userId,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        categoryId: true,
+        creatorName: true,
+        updatedAt: true,
+        createdAt: true,
+        layout: true,
+      },
+    });
+
+    const { layout: savedLayout, ...summary } = plan;
+    return NextResponse.json(
+      { plan: { ...summary, layoutVersion: layoutVersion(savedLayout) } },
+      { status: 201 },
+    );
+  });
 }
