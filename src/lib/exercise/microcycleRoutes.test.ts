@@ -1,0 +1,12 @@
+import { beforeEach, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+const mocks = vi.hoisted(() => ({ findMany: vi.fn() }));
+vi.mock("@/lib/db", () => ({ prisma: { trainingMicrocycle: { findMany: mocks.findMany } } }));
+vi.mock("@/lib/exercise/access", () => ({ authorizeTraining: vi.fn().mockResolvedValue({ roles: ["admin"] }), findTrainingPlanCoachGroup: vi.fn(), UUID_RE: /./ }));
+vi.mock("@/lib/exercise/microcycleGroups", () => ({ microcycleGroups: vi.fn().mockResolvedValue({ club: { name: "Club" }, groups: [] }) }));
+import { GET } from "@/app/api/admin/clubs/[id]/training-plans/microcycles/route";
+beforeEach(() => vi.clearAllMocks());
+const get = (week: string) => GET(new NextRequest(`http://localhost/api?week=${week}`), { params: Promise.resolve({ id: "club" }) });
+it("returns server error instead of invalid week when database is unavailable", async () => { mocks.findMany.mockRejectedValue({ code: "P2021" }); const response = await get("2026-11-16"); expect(response.status).toBe(500); expect(await response.json()).toEqual({ error: "Микроциклите не могат да бъдат заредени. Опитайте отново." }); });
+it("rejects an invalid date before querying cycles", async () => { expect((await get("2026-02-30")).status).toBe(400); expect(mocks.findMany).not.toHaveBeenCalled(); });
+it("accepts the reported week with no saved cycles", async () => { mocks.findMany.mockResolvedValue([]); const response = await get("2026-11-16"); expect(response.status).toBe(200); expect((await response.json()).cycles).toEqual([]); });

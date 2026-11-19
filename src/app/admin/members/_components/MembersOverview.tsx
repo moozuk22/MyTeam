@@ -491,11 +491,11 @@ export function MembersOverview({
               </button>
               <button
                 className="amp-btn amp-btn--ghost amp-btn--compact amp-training-plans-btn"
-                onClick={() => router.push(`/admin/training-plans?${trainingPlanSearch(clubId, coachGroupId)}`)}
+                onClick={() => router.push(`/admin/training-plans/microcycles?${trainingPlanSearch(clubId, coachGroupId)}`)}
                 type="button"
               >
                 <ClipboardListIcon />
-                <span>Планове за тренировки</span>
+                <span>Тренировъчен план</span>
               </button>
               {isAdmin && (
                 <button

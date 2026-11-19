@@ -70,6 +70,7 @@ model Club {
   trainingNotes           TrainingNote[]
   trainingSessions        TrainingSession[]
   trainingGroupSchedules  ClubTrainingGroupSchedule[]
+  trainingMicrocycles TrainingMicrocycle[]
   trainingScheduleGroups  ClubTrainingScheduleGroup[]
   customTrainingGroups    ClubCustomTrainingGroup[]
   fields                  Field[]
@@ -1173,4 +1174,17 @@ model TrainingDocumentImage {
   @@id([documentId, imageId])
   @@index([imageId])
   @@map("training_document_images")
+}
+
+model TrainingMicrocycle {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  groupKey String @map("group_key")
+  groupName String @map("group_name")
+  week String
+  content Json
+  revision Int @default(1)
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  @@unique([clubId, groupKey, week])
+  @@map("training_microcycles")
 }

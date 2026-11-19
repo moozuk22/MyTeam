@@ -143,3 +143,13 @@ Convert existing drawings and document copies only after the updated app is runn
 A non-Neon target also requires `--allow-production`. Obtain explicit authorization before running the command against production. Do not put a database URL or password in the command. The schema migration does not run the backfill automatically.
 
 Run `npm run test:training-images:db` to check the complete save and deletion flows against the configured Neon development database. This check creates a temporary schema and removes it when the check completes. It does not change the public schema or existing club data. The default test suite checks the migration constraints with PGlite and does not connect to an external database.
+
+## Weekly training microcycles
+
+**Тренировъчен план** opens the weekly cycle page. The page starts with the current Monday–Sunday week in `Europe/Sofia`. Use the week controls to select another week. Group cards show whether a saved cycle exists. Links open the drawing library and **План-конспекти**.
+
+Entry from the club page permits creation, changes, and deletion. Entry with `coachGroupId` shows that group's custom training groups in a read-only view. Save and print access use the existing training plan subscription checks. Each group has one shared cycle per week. Existing private documents retain their access rules.
+
+Choose a group to open its cycle. Use **Добави тренировка** to add a row. Enter text in the warm-up field and the four main-part fields. Use **Запази** to save changes. Concurrent changes produce an error instead of replacing the saved revision.
+
+The `20261119200000_training_microcycles` migration creates a separate table. Apply and verify this migration in development before deployment. No production migration has been run during this change.
