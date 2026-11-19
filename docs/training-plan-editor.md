@@ -132,7 +132,7 @@ Each drawing and document save handler explicitly requires save access. The chec
 
 ### Shared image migration
 
-The `20261119160000_shared_training_images` migration adds the image table and image references. Apply it through the normal deployment workflow. Existing embedded JPEG backgrounds remain readable. New saves convert embedded backgrounds to shared image references. Saves, copies, deletion, and backfill use one transaction lock per club to protect shared references.
+The `20261119160000_shared_training_images` migration adds the image table and image references. Apply it through the normal deployment workflow. Existing embedded JPEG backgrounds remain readable. New saves convert embedded backgrounds to shared image references. Saves, copies, deletion, and backfill use one transaction lock per club to protect shared references. The editor page and its reload API read the drawing and image in one repeatable-read transaction. A concurrent image replacement or deletion does not change that read snapshot.
 
 Convert existing drawings and document copies only after the updated app is running. The backfill uses one record per transaction. It keeps document revisions and update times. It also converts document copies whose source drawing was deleted. The command can run again after completion or failure.
 

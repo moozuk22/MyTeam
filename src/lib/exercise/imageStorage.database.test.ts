@@ -9,6 +9,7 @@ import { imageMigrationStatements, imageTestSchema } from "./imageTestSchema";
 
 const state = vi.hoisted(() => ({
   enabled: process.env.TRAINING_IMAGE_DB_TEST === "1",
+  beforeImageRead: undefined as (() => Promise<void>) | undefined,
   schema: `training_images_test_${globalThis.crypto.randomUUID().replaceAll("-", "")}`,
   session: { sub: "99999999-9999-4999-8999-999999999999", roles: ["coach"], defaultClubId: "11111111-1111-4111-8111-111111111111" },
 }));
@@ -19,12 +20,18 @@ vi.mock("@/lib/db", async () => {
   if (!url.hostname.endsWith(".neon.tech") || url.pathname !== "/neondb")
     throw new Error("These checks require the configured Neon development database.");
   url.searchParams.set("schema", state.schema);
-  const client = new PrismaClient({ datasources: { db: { url: url.toString() } } });
-  const scoped = async <T,>(operation: (tx: import("@prisma/client").Prisma.TransactionClient) => Promise<T>) =>
+  const client = new PrismaClient({ datasources: { db: { url: url.toString() } } }).$extends({
+    query: { trainingImage: { async findFirst({ args, query }) {
+      await state.beforeImageRead?.();
+      return query(args);
+    } } },
+  });
+  type TestTransaction = Omit<typeof client, "$extends" | "$transaction" | "$connect" | "$disconnect" | "$on" | "$use">;
+  const scoped = async <T,>(operation: (tx: TestTransaction) => Promise<T>, options?: { isolationLevel?: import("@prisma/client").Prisma.TransactionIsolationLevel }) =>
     client.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${state.schema}"`);
       return operation(tx);
-    });
+    }, options);
   return { prisma: new Proxy(client, {
     get(target, property) {
       if (property === "$transaction") return scoped;
@@ -38,6 +45,11 @@ vi.mock("@/lib/db", async () => {
 });
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: async () => state.session }));
 vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: async () => ({ canSave: true }) }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "test" }) }) }));
+vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("TEST_NOT_FOUND"); }, redirect: () => { throw new Error("TEST_REDIRECT"); } }));
+vi.mock("./categories", () => ({ listTrainingPlanCategories: async () => [], isTrainingPlanCategoryAvailable: async () => true }));
+vi.mock("@/app/admin/training-plans/[planId]/konva/EditorLoader", () => ({ default: () => null }));
+import KonvaPage from "@/app/admin/training-plans/[planId]/konva/page";
 import { prisma } from "@/lib/db";
 import { POST } from "@/app/api/admin/clubs/[id]/training-plans/route";
 import { GET, PUT, DELETE } from "@/app/api/admin/clubs/[id]/training-plans/[planId]/route";
@@ -162,6 +174,45 @@ describe.skipIf(!state.enabled)("shared images in an isolated development schema
     expect(await prisma.trainingImage.count()).toBe(0);
     expect((await imageResponse(originalImage)).status).toBe(404);
   }, 60000);
+
+  for (const reader of ["page", "api"] as const) {
+    for (const writer of ["replace", "delete"] as const) {
+      it(`${reader} hydrates a consistent snapshot during concurrent ${writer}`, async () => {
+        const id = await create(drawing("03"));
+        const previous = await prisma.trainingPlan.findUniqueOrThrow({ where: { id } });
+        let reached!: () => void;
+        let resume!: () => void;
+        const paused = new Promise<void>((resolve) => { reached = resolve; });
+        const released = new Promise<void>((resolve) => { resume = resolve; });
+        state.beforeImageRead = async () => {
+          state.beforeImageRead = undefined;
+          reached();
+          await released;
+        };
+        const read = () => reader === "api"
+          ? GET(request("GET", undefined, "?inlineBackground=1"), params(id))
+          : KonvaPage({ params: Promise.resolve({ planId: id }), searchParams: Promise.resolve({ clubId: club }) });
+        const pending = read();
+        try {
+          await paused;
+          if (writer === "replace") await edit(id, drawing("04"));
+          else expect((await DELETE(request("DELETE"), params(id))).status).toBe(200);
+          expect(await prisma.trainingImage.findUnique({ where: { id: previous.backgroundImageId! } })).toBeNull();
+        } finally {
+          state.beforeImageRead = undefined;
+          resume();
+        }
+        const result = await pending;
+        const snapshot = result instanceof Response ? (await result.json()).plan : result.props.plan;
+        expect(snapshot.layout.background.src).toBe(inline("03"));
+        expect(snapshot.updatedAt).toBe(previous.updatedAt.toISOString());
+        if (writer === "replace") expect((await DELETE(request("DELETE"), params(id))).status).toBe(200);
+        // Readers that start after deletion use the existing missing-plan response.
+        if (reader === "api") expect((await GET(request("GET", undefined, "?inlineBackground=1"), params(id))).status).toBe(404);
+        else await expect(read()).rejects.toThrow("TEST_NOT_FOUND");
+      }, 30000);
+    }
+  }
 
   it("backfills embedded images, including document-only copies, without changing revisions", async () => {
     const timestamp = new Date("2026-01-01T10:00:00Z");

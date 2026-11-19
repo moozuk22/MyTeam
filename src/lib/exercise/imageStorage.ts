@@ -111,12 +111,27 @@ export function documentImageIds(content: PlanContent) {
 }
 
 /** Keep open editor history and local drafts independent of saved image lifetimes. */
-export async function inlineDrawingImage<T>(clubId: string, layout: T): Promise<T> {
+async function inlineDrawingImage<T>(tx: TrainingImageTx, clubId: string, layout: T): Promise<T> {
   if (!isV2(layout) || !layout.background) return layout;
   const reference = readTrainingImageSource(layout.background.src);
   if (!reference) return layout;
   if (reference.clubId !== clubId) throw new TrainingImageError();
-  const image = await prisma.trainingImage.findFirst({ where: { id: reference.imageId, clubId }, select: { bytes: true } });
+  const image = await tx.trainingImage.findFirst({ where: { id: reference.imageId, clubId }, select: { bytes: true } });
   if (!image) throw new TrainingImageError();
   return { ...layout, background: { ...layout.background, src: `${INLINE_IMAGE_PREFIX}${Buffer.from(image.bytes).toString("base64")}` } };
+}
+
+/** Read the plan and its image from one snapshot, even if a writer removes them. */
+export async function readEditableTrainingPlan(clubId: string, planId: string) {
+  return prisma.$transaction(async (tx) => {
+    const plan = await tx.trainingPlan.findFirst({
+      where: { id: planId, clubId },
+      select: {
+        id: true, clubId: true, title: true, description: true, categoryId: true,
+        layout: true, updatedAt: true, createdAt: true,
+      },
+    });
+    if (!plan) return null;
+    return { ...plan, layout: await inlineDrawingImage(tx, clubId, plan.layout) };
+  }, { isolationLevel: "RepeatableRead" });
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { inlineDrawingImage, removeUnusedImages, storeDrawingImage, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
+import { readEditableTrainingPlan, removeUnusedImages, storeDrawingImage, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { isTrainingPlanCategoryAvailable } from "@/lib/exercise/categories";
 import { isV2, layoutVersion, validateSavedLayout } from "@/lib/exercise/model";
@@ -28,19 +28,21 @@ export async function GET(
     );
   }
 
-  const plan = await prisma.trainingPlan.findUnique({
-    where: { id: planId },
-    select: {
-      id: true,
-      clubId: true,
-      title: true,
-      description: true,
-      categoryId: true,
-      layout: true,
-      updatedAt: true,
-      createdAt: true,
-    },
-  });
+  const plan = request.nextUrl.searchParams.get("inlineBackground") === "1"
+    ? await readEditableTrainingPlan(id, planId)
+    : await prisma.trainingPlan.findUnique({
+      where: { id: planId },
+      select: {
+        id: true,
+        clubId: true,
+        title: true,
+        description: true,
+        categoryId: true,
+        layout: true,
+        updatedAt: true,
+        createdAt: true,
+      },
+    });
   if (!plan || plan.clubId !== id)
     return NextResponse.json(
       { error: "Планът не е намерен." },
@@ -48,7 +50,7 @@ export async function GET(
     );
 
   return NextResponse.json({
-    plan: { ...plan, layout: request.nextUrl.searchParams.get("inlineBackground") === "1" ? await inlineDrawingImage(id, plan.layout) : plan.layout, layoutVersion: layoutVersion(plan.layout) },
+    plan: { ...plan, layoutVersion: layoutVersion(plan.layout) },
   });
 }
 
