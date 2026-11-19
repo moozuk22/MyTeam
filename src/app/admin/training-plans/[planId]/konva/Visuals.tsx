@@ -398,16 +398,16 @@ function PitchArc({
 
 export function PitchBackground({ surface, background }: Pick<Exercise, "surface" | "background">) {
   const src = background?.src;
-  const [loaded, setLoaded] = useState<HTMLImageElement>();
+  const [loaded, setLoaded] = useState<{ source: string; image: HTMLImageElement }>();
   useEffect(() => {
     if (!src) return;
     const image = new window.Image();
-    image.onload = () => setLoaded(image);
+    image.onload = () => setLoaded({ source: src, image });
     image.src = src;
     return () => { image.onload = null; };
   }, [src]);
 
-  return <PitchScene surface={surface} background={background} image={loaded?.src === src ? loaded : undefined} />;
+  return <PitchScene surface={surface} background={background} image={loaded && loaded.source === src ? loaded.image : undefined} />;
 }
 
 export function PitchScene({

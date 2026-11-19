@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { currentCompetitionSeason, readDocumentInput } from "@/lib/exercise/document";
+import { storeDocumentImages, syncDocumentImages, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -38,21 +39,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Невалидни полета в план-конспекта." }, { status: 400 });
   const input = { ...parsedInput, session: { ...parsedInput.session, ...currentCompetitionSeason() } };
 
-  const where = { id: body.id as string, clubId, ownerId: session.sub };
-  const existing = await prisma.trainingPlanDocument.findFirst({ where, select: documentDetail });
-  if (existing) return NextResponse.json({ document: existing, alreadyCreated: true });
-  if (!await prisma.club.findUnique({ where: { id: clubId }, select: { id: true } }))
-    return NextResponse.json({ error: "Клубът не е намерен." }, { status: 404 });
-  const content = await snapshotDocument(clubId, input);
-  if (!content)
-    return NextResponse.json({ error: "Изберете налична рисунка от този клуб." }, { status: 400 });
-
-  const inserted = await prisma.trainingPlanDocument.createMany({
-    data: { ...where, title: content.session.title.trim(), content },
-    skipDuplicates: true,
+  return withTrainingImages(clubId, async (tx) => {
+    const where = { id: body.id as string, clubId, ownerId: session.sub };
+    const existing = await tx.trainingPlanDocument.findFirst({ where, select: documentDetail });
+    if (existing) return NextResponse.json({ document: existing, alreadyCreated: true });
+    if (!await tx.club.findUnique({ where: { id: clubId }, select: { id: true } }))
+      return NextResponse.json({ error: "Клубът не е намерен." }, { status: 404 });
+    const snapshot = await snapshotDocument(clubId, input, undefined, tx);
+    if (!snapshot)
+      return NextResponse.json({ error: "Изберете налична рисунка от този клуб." }, { status: 400 });
+    const { content, imageIds } = await storeDocumentImages(tx, clubId, session.sub, snapshot);
+    const inserted = await tx.trainingPlanDocument.createMany({
+      data: { ...where, title: content.session.title.trim(), content }, skipDuplicates: true,
+    });
+    const document = await tx.trainingPlanDocument.findFirst({ where, select: documentDetail });
+    if (!document) throw new TrainingImageError("План-конспектът не може да бъде създаден.", 409);
+    if (inserted.count) await syncDocumentImages(tx, clubId, document.id, imageIds);
+    return NextResponse.json({ document, alreadyCreated: !inserted.count }, { status: inserted.count ? 201 : 200 });
   });
-  const document = await prisma.trainingPlanDocument.findFirst({ where, select: documentDetail });
-  if (!document)
-    return NextResponse.json({ error: "План-конспектът не може да бъде създаден." }, { status: 409 });
-  return NextResponse.json({ document, alreadyCreated: !inserted.count }, { status: inserted.count ? 201 : 200 });
 }

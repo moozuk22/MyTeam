@@ -681,3 +681,11 @@ describe("history and recovery", () => {
     expect(sameExercise(submitted, edited)).toBe(false);
   });
 });
+
+it("accepts only local training image references or embedded JPEG backgrounds", () => {
+  const background = { src: "/api/admin/clubs/11111111-1111-4111-8111-111111111111/training-plans/images/22222222-2222-4222-8222-222222222222", x: 525, y: 350, width: 100, height: 100, rotation: 0 };
+  expect(validateExercise({ ...EMPTY_EXERCISE, background })).toBeNull();
+  for (const src of ["https://example.com/image.jpg", "//example.com/image.jpg", background.src + "?clubId=other", background.src.replace("22222222-2222-4222-8222-222222222222", "invalid")]) {
+    expect(validateExercise({ ...EMPTY_EXERCISE, background: { ...background, src } })).toBeTruthy();
+  }
+});

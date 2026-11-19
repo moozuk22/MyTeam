@@ -115,6 +115,7 @@ beforeEach(() => {
   mocks.transaction.mockImplementation(async (fn) =>
     fn({
       $queryRaw: mocks.queryRaw,
+      $executeRaw: vi.fn(),
       trainingPlanCategory: {
         findFirst: mocks.categoryFindFirst,
         create: mocks.categoryCreate,
@@ -122,6 +123,9 @@ beforeEach(() => {
         updateMany: mocks.categoryUpdate,
       },
       trainingPlan: {
+        findFirst: mocks.findFirst,
+        create: mocks.create,
+        delete: mocks.delete,
         updateMany: mocks.updateMany,
         findUnique: mocks.findUnique,
       },
@@ -603,5 +607,13 @@ describe("training plan categories", () => {
     expect(mocks.create.mock.calls[0][0].data.categoryId).toBe(category.id);
     expect((await POST(request("POST", { ...body, categoryId: null }), params)).status).toBe(201);
     expect(mocks.create.mock.calls[1][0].data.categoryId).toBeNull();
+  });
+});
+
+describe("training image delivery", () => {
+  it("rejects another club before reading image data", async () => {
+    const { GET: image } = await import("@/app/api/admin/clubs/[id]/training-plans/images/[imageId]/route");
+    mocks.verify.mockResolvedValue({ sub: id, roles: ["coach"], defaultClubId: otherClub });
+    expect((await image(request("GET"), { params: Promise.resolve({ id: club, imageId: id }) })).status).toBe(403);
   });
 });

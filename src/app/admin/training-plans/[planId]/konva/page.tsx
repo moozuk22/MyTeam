@@ -1,6 +1,6 @@
+import { readEditableTrainingPlan } from "@/lib/exercise/imageStorage";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { canAccessTrainingClub, UUID_RE } from "@/lib/exercise/access";
 import { listTrainingPlanCategories } from "@/lib/exercise/categories";
@@ -28,17 +28,7 @@ export default async function KonvaPage({
   )
     notFound();
   const groupContext = UUID_RE.test(coachGroupId ?? "") ? coachGroupId : undefined;
-  const plan = await prisma.trainingPlan.findFirst({
-    where: { id: planId, clubId },
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      categoryId: true,
-      layout: true,
-      updatedAt: true,
-    },
-  });
+  const plan = await readEditableTrainingPlan(clubId, planId);
   if (!plan) notFound();
   const layout = isV2(plan.layout) ? plan.layout : null;
   const error = layout

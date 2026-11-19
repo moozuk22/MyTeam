@@ -23,6 +23,7 @@ import {
 import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
 import { useTrainingPlanAccess, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
+import { observePreviews } from "./viewportPreviews";
 import type { Exercise } from "@/lib/exercise/model";
 import CategoryManager, { type CategoryOption } from "./CategoryManager";
 import "./page.css";
@@ -152,48 +153,10 @@ export default function TrainingPlansClient({
   const visiblePlans = plans.filter((plan) => matchesCategory(plan, categoryFilter));
 
   useEffect(() => {
-    const pending = gridRef.current?.querySelectorAll<HTMLElement>("[data-preview-id]");
-    if (!pending?.length) return;
-    const controller = new AbortController();
-    const observer = new IntersectionObserver((entries) => {
-      const targets = entries.filter(({ isIntersecting }) => isIntersecting)
-        .map(({ target }) => target as HTMLElement);
-      for (const target of targets) observer.unobserve(target);
-      for (let offset = 0; offset < targets.length; offset += 50) {
-        const batch = targets.slice(offset, offset + 50);
-        void loadPreviews(batch);
-      }
-    }, { rootMargin: "160px" });
-    async function loadPreviews(batch: HTMLElement[]) {
-      const requested = batch.map(({ dataset }) => ({
-        id: dataset.previewId!,
-        key: dataset.previewKey!,
-      }));
-      const params = new URLSearchParams({ ids: requested.map(({ id }) => id).join(",") });
-      const layouts = new Map<string, Exercise>();
-      try {
-        const response = await fetch(`/api/admin/clubs/${selectedClubId}/training-plans/previews?${params}`, {
-          signal: controller.signal,
-        });
-        if (response.ok) {
-          const data: { previews: { id: string; layout: Exercise }[] } = await response.json();
-          for (const { id, layout } of data.previews) layouts.set(id, layout);
-        }
-      } catch {
-        // A preview failure leaves the plan card and its actions usable.
-      }
-      if (!controller.signal.aborted)
-        setPreviews((current) => ({
-          ...current,
-          ...Object.fromEntries(requested.map(({ id, key }) => [key, layouts.get(id) ?? null])),
-        }));
-    }
-    pending.forEach((element) => observer.observe(element));
-    return () => {
-      observer.disconnect();
-      controller.abort();
-    };
-  }, [plans, categoryFilter, selectedClubId, isFiltering]);
+    const host = gridRef.current;
+    if (!host) return;
+    return observePreviews(host, selectedClubId, setPreviews);
+  }, [plans, categoryFilter, selectedClubId, isFiltering, listView]);
 
   function changeFilter(
     { category = categoryFilter, nextScope = scope, coach = coachFilter, oldest = oldestFirst } = {},
@@ -481,7 +444,7 @@ export default function TrainingPlansClient({
                     <div
                       className="tp-card-preview"
                       aria-hidden="true"
-                      data-preview-id={plan.layoutVersion === 2 && preview === undefined ? plan.id : undefined}
+                      data-preview-id={plan.layoutVersion === 2 ? plan.id : undefined}
                       data-preview-key={previewKey}
                     >
                       {preview ? <PlanPreview exercise={preview} /> :

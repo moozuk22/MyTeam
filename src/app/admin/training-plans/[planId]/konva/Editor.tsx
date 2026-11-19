@@ -1183,7 +1183,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(endpoint, { cache: "no-store" }),
+      const response = await fetch(`${endpoint}?inlineBackground=1`, { cache: "no-store" }),
         data = await response.json();
       if (!response.ok || validateExercise(data.plan?.layout))
         throw new Error(data.error || "Невалиден запис.");

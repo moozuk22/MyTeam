@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/db";
+import type { TrainingImageTx } from "./imageStorage";
 import { isV2, validateExercise } from "./model";
 import type { DocumentInput, DrawingSnapshot, PlanContent } from "./document";
 
 export async function snapshotDocument(
-  clubId: string, input: DocumentInput, previous?: PlanContent,
+  clubId: string, input: DocumentInput, previous?: PlanContent, tx: Pick<TrainingImageTx, "trainingPlan"> = prisma,
 ): Promise<PlanContent | null> {
   const ids = [...new Set(input.sections.flatMap(({ drawing }) => drawing && drawing !== "keep" ? [drawing] : []))];
-  const drawings = ids.length ? await prisma.trainingPlan.findMany({
+  const drawings = ids.length ? await tx.trainingPlan.findMany({
     where: { clubId, id: { in: ids } },
     select: { id: true, title: true, layout: true },
   }) : [];

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { readEditableTrainingPlan, removeUnusedImages, storeDrawingImage, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { isTrainingPlanCategoryAvailable } from "@/lib/exercise/categories";
 import { isV2, layoutVersion, validateSavedLayout } from "@/lib/exercise/model";
@@ -27,19 +28,21 @@ export async function GET(
     );
   }
 
-  const plan = await prisma.trainingPlan.findUnique({
-    where: { id: planId },
-    select: {
-      id: true,
-      clubId: true,
-      title: true,
-      description: true,
-      categoryId: true,
-      layout: true,
-      updatedAt: true,
-      createdAt: true,
-    },
-  });
+  const plan = request.nextUrl.searchParams.get("inlineBackground") === "1"
+    ? await readEditableTrainingPlan(id, planId)
+    : await prisma.trainingPlan.findUnique({
+      where: { id: planId },
+      select: {
+        id: true,
+        clubId: true,
+        title: true,
+        description: true,
+        categoryId: true,
+        layout: true,
+        updatedAt: true,
+        createdAt: true,
+      },
+    });
   if (!plan || plan.clubId !== id)
     return NextResponse.json(
       { error: "Планът не е намерен." },
@@ -144,7 +147,13 @@ export async function PUT(
       { error: "Липсва версията на записа." },
       { status: 400 },
     );
-  const plan = await prisma.$transaction(async (tx) => {
+  const plan = await withTrainingImages(id, async (tx) => {
+    const current = await tx.trainingPlan.findFirst({
+      where: { id: planId, clubId: id }, select: { layout: true, backgroundImageId: true },
+    });
+    if (!current) return null;
+    const stored = await storeDrawingImage(tx, id, session.sub, data.layout ?? current.layout, data.layout === undefined);
+
     const changed = await tx.trainingPlan.updateMany({
       where: {
         id: planId,
@@ -155,12 +164,17 @@ export async function PUT(
       },
       data: {
         ...data,
+        layout: stored.layout,
+        backgroundImageId: stored.backgroundImageId,
         updatedAt: new Date(
           Math.max(Date.now(), existing.updatedAt.getTime() + 1),
         ),
       },
     });
-    if (changed.count !== 1) return null;
+    if (changed.count !== 1) throw new TrainingImageError(
+      "Планът е променен в друг прозорец. Запазете копие или заредете последния запис.", 409,
+    );
+    await removeUnusedImages(tx, id, current.backgroundImageId ? [current.backgroundImageId] : []);
     return tx.trainingPlan.findUnique({
       where: { id: planId },
       select: {
@@ -174,6 +188,7 @@ export async function PUT(
       },
     });
   });
+  if (plan instanceof NextResponse) return plan;
   if (!plan)
     return NextResponse.json(
       {
@@ -212,7 +227,17 @@ export async function DELETE(
       { status: 404 },
     );
 
-  await prisma.trainingPlan.delete({ where: { id: planId } });
+  const deleted = await withTrainingImages(id, async (tx) => {
+    const current = await tx.trainingPlan.findFirst({
+      where: { id: planId, clubId: id }, select: { backgroundImageId: true },
+    });
+    if (!current) return false;
+    await tx.trainingPlan.delete({ where: { id: planId } });
+    await removeUnusedImages(tx, id, current.backgroundImageId ? [current.backgroundImageId] : []);
+    return true;
+  });
+  if (deleted instanceof NextResponse) return deleted;
+  if (!deleted) return NextResponse.json({ error: "Планът не е намерен." }, { status: 404 });
 
   return NextResponse.json({ success: true });
 }

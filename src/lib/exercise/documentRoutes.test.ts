@@ -2,7 +2,7 @@ import { trainingPlanCapabilities } from "@/lib/trainingPlanSubscriptions";
 vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: vi.fn() }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { blankDocument } from "./document";
+import { blankDocument, currentCompetitionSeason } from "./document";
 import { EMPTY_EXERCISE } from "./model";
 
 const mocks = vi.hoisted(() => ({
@@ -14,10 +14,13 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
+  transaction: vi.fn(),
+  syncImages: vi.fn(),
 }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
 vi.mock("@/lib/db", () => ({
   prisma: {
+    $transaction: mocks.transaction,
     club: { findUnique: mocks.club },
     trainingPlan: { findMany: mocks.drawings },
     trainingPlanDocument: {
@@ -56,6 +59,13 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ sub: ownerId, roles: ["coach"], defaultClubId: clubId });
   vi.mocked(trainingPlanCapabilities).mockResolvedValue({enabled:true,canSave:true,canPrint:true});
   mocks.club.mockResolvedValue({ id: clubId });
+  mocks.transaction.mockImplementation((fn) => fn({
+    $executeRaw: vi.fn(),
+    club: { findUnique: mocks.club },
+    trainingPlan: { findMany: mocks.drawings },
+    trainingPlanDocument: { findFirst: mocks.find, createMany: mocks.create, updateMany: mocks.update, deleteMany: mocks.delete },
+    trainingDocumentImage: { deleteMany: mocks.syncImages },
+  }));
 });
 
 describe("training plan documents", () => {
@@ -95,7 +105,7 @@ describe("training plan documents", () => {
     expect(mocks.find).toHaveBeenCalledWith(expect.objectContaining({ where: scope }));
     mocks.delete.mockResolvedValue({ count: 0 });
     expect((await DELETE(request("DELETE", undefined, "?revision=1"), detail)).status).toBe(404);
-    expect(mocks.delete).toHaveBeenCalledWith({ where: { ...scope, revision: 1 } });
+    expect(mocks.delete).not.toHaveBeenCalled();
   });
 
   it("rejects a cross-club coach, untrusted origin and forged drawing before writing", async () => {
@@ -116,11 +126,12 @@ describe("training plan documents", () => {
     const layout = { ...EMPTY_EXERCISE, pitchRotation: 90 };
     const input = blankDocument();
     const attach = { ...input, sections: input.sections.map((section, index) => ({
-      ...section, description: index === 2 ? "Подаване" : "", drawing: index === 2 ? drawingId : null,
+      ...section, organization: index === 2 ? "Подаване" : "", drawing: index === 2 ? drawingId : null,
     })) };
     mocks.drawings.mockResolvedValue([{ id: drawingId, title: "Схема", layout }]);
     const stored = {
       ...input,
+      session: { ...input.session, ...currentCompetitionSeason() },
       sections: attach.sections.map((section, index) => ({
         ...section, drawing: index === 2 ? { sourceId: drawingId, title: "Схема", layout } : null,
       })),

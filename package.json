@@ -13,7 +13,9 @@
     "test:training-migration": "node scripts/verify-coach-training-migration.mjs",
     "typecheck": "tsc --noEmit",
     "import:players": "node scripts/import-players-from-csv.js",
-    "seed:users": "node scripts/seed-users.mjs"
+    "seed:users": "node scripts/seed-users.mjs",
+    "backfill:training-images": "tsx scripts/backfill-training-images.ts",
+    "test:training-images:db": "TRAINING_IMAGE_DB_TEST=1 node --env-file=.env node_modules/vitest/vitest.mjs run src/lib/exercise/imageStorage.database.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.2",
@@ -42,6 +44,7 @@
     "eslint-config-next": "16.1.6",
     "prisma": "^5.10.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^4.1.11"
   }
