@@ -358,7 +358,7 @@ export default function TrainingPlansClient({
             disabled={!selectedClubId}
           >
             <Plus size={18} aria-hidden="true" />
-            Нов план
+            Ново упражнение
           </button>
         </header>
 
