@@ -1,3 +1,35 @@
+.td-save-choice {
+  position: fixed;
+  inset: 0;
+  width: min(440px, calc(100% - 32px));
+  margin: auto;
+  overscroll-behavior: contain;
+}
+
+.td-save-choice::backdrop {
+  background: #08120ecc;
+}
+
+body:has(.td-save-choice[open]) {
+  overflow: hidden;
+}
+
+.td-save-choice p {
+  color: var(--plan-muted);
+}
+
+.td-save-choice-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+}
+
+.td-save-choice-actions button {
+  min-height: 44px;
+  white-space: normal;
+  text-align: center;
+}
+
 .td-library .tp-header {
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
@@ -46,6 +78,8 @@
   text-decoration: none;
   overflow-wrap: anywhere;
 }
+button.td-document-open { width: 100%; border: 0; background: transparent; font: inherit; text-align: start; cursor: pointer; }
+button.td-document-open:disabled { cursor: wait; opacity: .65; }
 .td-document-open:focus-visible { outline-offset: -3px; border-radius: 16px 16px 0 0; }
 .td-document-top { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .td-date {
@@ -165,6 +199,13 @@
   justify-content: space-between;
 }
 
+/* Plan preview before it is linked: stacked buttons on phones, one row on wider screens. */
+.td-library .tp-header > .td-choice-actions { grid-column: 1 / -1; }
+.td-choice-actions > * { flex: 1 1 12rem; }
+@media (min-width: 640px) {
+  .td-library .tp-header > .td-choice-actions { grid-column: 2; justify-content: flex-end; }
+  .td-choice-actions > * { flex: none; }
+}
 .td-header-actions { grid-column: 1 / -1; justify-content: flex-start; }
 @media (min-width: 640px) {
   .td-header-actions { grid-column: auto; justify-content: flex-end; }
@@ -507,3 +548,81 @@
 @media print {
   html:not([data-training-print-authorized="true"]) .td-page { display: none !important; }
 }
+
+.td-reference { margin-block: 12px; padding: 12px; border: 1px solid var(--plan-border); border-radius: 12px; background: var(--plan-card); }
+.td-reference summary { cursor: pointer; font-weight: 700; }
+.td-reference dl { display: grid; gap: .75rem; }
+.td-reference dt { font-weight: 600; }
+.td-reference dd { margin: .25rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media print { .td-reference { display: none; } }
+@media (max-width: 375px) {
+  .td-view-switch { min-width: 0; max-width: 100%; }
+  .td-page .td-view-switch button { white-space: normal; padding-inline: 6px; }
+}
+
+/* "Микроцикъл" and "Тренировка №": text fields with suggestions. The list must not be cut by the card. */
+.td-edit-cell.td-edit-session { overflow: visible; }
+.td-edit-session h2 { border-radius: 13px 13px 0 0; }
+.td-combo-control { position: relative; }
+.td-field.td-combo input { padding-inline-end: 44px; }
+.td-combo-toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  border: 0;
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+  color: var(--plan-muted);
+  cursor: pointer;
+}
+.td-combo-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline: 0;
+  z-index: 30;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--plan-border);
+  border-radius: 10px;
+  background: var(--plan-panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+.td-combo-options[hidden] { display: none; }
+.td-combo-option {
+  display: grid;
+  gap: 2px;
+  min-height: 44px;
+  align-content: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.td-combo-option small { color: var(--plan-muted); font-weight: 400; }
+.td-combo-option[aria-selected="true"] { background: var(--plan-selected); }
+.td-combo-option--current { color: var(--plan-accent); }
+.td-combo-empty { padding: 10px; color: var(--plan-muted); font-weight: 400; }
+.td-field.td-combo input[aria-invalid="true"] { border-color: var(--plan-warning-border); }
+.td-field-warning {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--plan-warning-bg);
+  color: var(--plan-warning-text);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.td-field-warning svg { flex: none; margin-top: 1px; }
+.td-reference-training { color: var(--plan-muted); font-weight: 600; }
+.td-reference-note { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--plan-selected); color: var(--plan-accent); }
+@media print { .td-field-warning, .td-combo-options { display: none; } }

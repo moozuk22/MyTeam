@@ -45,7 +45,7 @@ export type PlanContent = {
   sections: DocumentSection[];
   merge: Merge;
 };
-export type SavedDocument = { id: string; content: PlanContent; revision: number; updatedAt: string };
+export type SavedDocument = { originKey?: string | null; id: string; content: PlanContent; revision: number; updatedAt: string };
 export type DocumentPreview = {
   date: string; day: string; time: string; period: string; microcycle: string; sessionNumber: string;
   gameMoment: string; objective: string; group: string; coach: string; playerCount: string;

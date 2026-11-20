@@ -494,6 +494,8 @@ model TrainingPlanDocument {
 
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
+  originKey String? @map("origin_key")
+  sessionLinks TrainingSessionDocument[]
   images TrainingDocumentImage[]
 
   @@unique([id, clubId])
@@ -1185,6 +1187,21 @@ model TrainingMicrocycle {
   content Json
   revision Int @default(1)
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  documents TrainingSessionDocument[]
+  @@unique([id, clubId])
   @@unique([clubId, groupKey, week])
   @@map("training_microcycles")
+}
+
+model TrainingSessionDocument {
+  cycleId String @map("cycle_id") @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  groupKey String @map("group_key")
+  rowId String @map("row_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  cycle TrainingMicrocycle @relation(fields: [cycleId, clubId], references: [id, clubId], onDelete: Cascade)
+  document TrainingPlanDocument @relation(fields: [documentId, clubId], references: [id, clubId], onDelete: Cascade)
+  @@id([cycleId, groupKey, rowId])
+  @@index([documentId, clubId])
+  @@map("training_session_documents")
 }

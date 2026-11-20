@@ -217,7 +217,7 @@
 .mc-view .mcp-empty td { padding: 28px 16px; color: var(--plan-muted); font-style: normal; }
 
 @media (min-width: 640px) {
-  .mc-view { overflow-x: auto; }
+  .mc-sheet.mc-view { overflow-x: auto; }
   .mc-view .mcp-table { min-width: 900px; }
 }
 
@@ -251,3 +251,35 @@
   .mcp-table tr { break-inside: avoid; }
   @page { size: A4 landscape; margin: 10mm; }
 }
+
+.mc-page .mc-doc-action {
+  display: block;
+  margin: 6px auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: .875rem;
+  text-align: center;
+}
+@media (max-width: 639px) {
+  .mc-table tbody th { flex-wrap: wrap; }
+  .mc-page .mc-doc-action { margin-inline: 0; }
+}
+@media print {
+  .mc-page .mc-doc-action { display: none; }
+}
+
+/* Plan of a training: one card with its actions in a modal dialog. */
+.mc-doc-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(460px, calc(100% - 32px));
+  margin: auto;
+  overscroll-behavior: contain;
+}
+.mc-doc-dialog::backdrop { background: #08120ecc; }
+body:has(.mc-doc-dialog[open]) { overflow: hidden; }
+.mc-doc-dialog .tp-modal-header { flex-wrap: nowrap; align-items: flex-start; margin-bottom: 14px; }
+.mc-doc-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
+.mc-doc-dialog-actions > * { flex: 1 1 10rem; justify-content: center; }

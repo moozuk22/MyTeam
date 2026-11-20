@@ -153,3 +153,29 @@ Entry from the club page permits creation, changes, and deletion. Entry with `co
 Choose a group to open its cycle. Use **Добави тренировка** to add a row. Enter text in the warm-up field and the four main-part fields. Use **Запази** to save changes. Concurrent changes produce an error instead of replacing the saved revision.
 
 The `20261119200000_training_microcycles` migration creates a separate table. Apply and verify this migration in development before deployment. No production migration has been run during this change.
+
+### Plan-documents for individual training sessions
+
+Open a saved cycle from the coach group link. Select **Добави план-конспект** below the training number. The editor shows the instructions for that row. Use **Обнови указанията** to read changes from the methodist. The editor also checks for changes when the tab regains focus. The reference panel cannot change the exercises in the document.
+
+Choose an existing plan to open its read-only A4 preview. **Използвай този план-конспект** links the plan to the training. **Редактирай** opens the plan in the editor without a link. The first save links the plan to the training. **Към списъка** returns to the list without a link. A plan can have links from several trainings. Linking keeps the saved plan fields. After editing a plan, choose whether to update the shared plan or save a new plan for the current training. Saving a new plan changes only the current link.
+
+When a training has a plan, **Отвори план-конспекта** opens a dialog with the plan card. **Преглед** opens the linked plan. **Избери друг** opens the plan list with `replace=<plan ID>`. Use the list to link another plan, edit and save another plan, or create a new plan. In the same transaction, the server replaces the link only while the training still uses the plan in `replace`. If the training has a different plan, the server rejects the save and keeps the current link. The replaced plan stays in the author's library.
+
+#### Choosing the training in the editor
+
+When the editor has a `coachGroupId`, **Микроцикъл** and **Тренировка №** are text fields with suggestions. `GET …/training-plans/microcycles/options?coachGroupId=` gives the microcycles of the coach's custom groups from the last 53 weeks and later, to a maximum of 200. The response contains only the microcycle numbers, the weeks, and the training row IDs. It does not contain the training text. The training suggestions show after the coach enters a microcycle. In the library, the editor finds the group from the group name in the plan. A coach with one group uses that group. A coach with more groups selects the group in **Група**.
+
+The coach can type a number that is not a suggestion. A microcycle number that the group does not have, or a training number that the microcycle does not have, shows a warning below the field. **Запази** shows the warning again in a dialog. The coach can save after the dialog. If two weeks have the same microcycle number, the editor uses the week that the coach picked, then the training that opened the editor, then the latest week.
+
+The plan moves to another training only after the coach changes these fields. When the fields identify another training, **Указания от методиста** shows the instructions of that training, and the editor copies its group and season into the plan. The save then links the plan to that training through the existing `target` and `link` rules. The training that opened the editor keeps its current plan, and `replace` does not apply. If the chosen training has a plan, the server rejects the save and the changes stay in the editor. When the fields identify no training, the save keeps the training that opened the editor. In the library, the plan then has no link. After the save, the editor opens the week of the linked training.
+
+The first save of a new plan creates the document and its link in one transaction. A retry uses the same document ID. If another draft has claimed the row, the coach can keep editing or save a separate document in the library. The editor keeps the draft in tab storage when storage is available. Save and cancel return to the original row.
+
+The carried `coachGroupId` identifies the author of a linked document. The server checks the club and the custom training group's coach group before it creates a link. People who use the same coach link have the same author identity. The existing login and standalone document rules still apply. Drawing selection uses the existing club drawing library.
+
+The `20261120100000_training_session_documents` migration gives each saved row a permanent UUID. It preserves the instruction text and the order of the rows. It increments each cycle revision. Reload any open cycle editor before saving. The link key contains the cycle ID, group key, and row ID. Removing the row or cycle removes its link. The document stays in the author's library.
+
+The `20261121100000_reuse_training_documents` migration permits several links to one document. It preserves existing documents and links. Apply it before enabling plan reuse.
+
+Schedule the original row migration and server switch together. An older running server cannot display migrated rows. Earlier servers expect arrays of text cells in the database. To recover after rollout, keep a server that reads version 2, or restore the application and its matching database backup together. Restoring a backup requires reconciliation of subsequent saves.

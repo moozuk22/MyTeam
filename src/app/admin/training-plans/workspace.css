@@ -17,6 +17,9 @@
   --plan-danger-bg: #582f31;
   --plan-danger-border: #985658;
   --plan-danger-text: #ffd3d1;
+  --plan-warning-bg: #3d3214;
+  --plan-warning-border: #8a6d1f;
+  --plan-warning-text: #ffe2a3;
   color-scheme: dark;
   background: var(--plan-bg);
   color: var(--plan-text);

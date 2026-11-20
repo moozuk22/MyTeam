@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
+import { authorizeTraining, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/exercise/access";
 import { currentCompetitionSeason, readDocumentInput, summarizeDocument } from "@/lib/exercise/document";
 import { storeDocumentImages, syncDocumentImages, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
+import type { PlanContent } from "@/lib/exercise/document";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
+
+import { canLinkTraining, linkTrainingDocument, replacedDocument, sessionOrigin, sessionTarget } from "@/lib/exercise/trainingSession";
+import { coachAuthor, documentOwnerFilter, trainingReference } from "@/lib/exercise/trainingSessionAccess";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: clubId } = await params;
@@ -11,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (session instanceof NextResponse) return session;
 
   const cursor = request.nextUrl.searchParams.get("cursor");
-  const where = { clubId, ownerId: session.sub };
+  const where = { clubId, ownerId: await documentOwnerFilter(clubId, session.sub, request.headers.get("x-coach-group")) };
   if (cursor && (!UUID_RE.test(cursor) || !await prisma.trainingPlanDocument.findFirst({
     where: { ...where, id: cursor }, select: { id: true },
   }))) return NextResponse.json({ error: "Невалидна страница." }, { status: 400 });
@@ -34,26 +38,95 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (session instanceof NextResponse) return session;
 
   const body = await request.json().catch(() => null);
+  const target = sessionTarget(body?.target);
+  const coach = request.headers.get("x-coach-group");
+  // A coach can replace the plan of a training only while the training still uses that plan.
+  const replace = replacedDocument(body?.replaceDocumentId);
+  if (replace === undefined || (replace && !target))
+    return NextResponse.json({ error: "Невалиден план-конспект за замяна." }, { status: 400 });
+  if (body?.linkDocumentId !== undefined) {
+    const id = body.linkDocumentId;
+    if (!target || typeof id !== "string" || !UUID_RE.test(id))
+      return NextResponse.json({ error: "Невалидна тренировка или план-конспект." }, { status: 400 });
+    const ownerId = await documentOwnerFilter(clubId, session.sub, coach);
+    return withTrainingImages(clubId, async tx => {
+      const reference = await trainingReference(tx, clubId, coach, target, true, session.sub);
+      const source = await tx.trainingPlanDocument.findFirst({ where: { id, clubId, ownerId }, select: { id: true } });
+      if (!source) throw new TrainingImageError("План-конспектът не е намерен.", 404);
+      if (reference.documentId === source.id) return NextResponse.json(source);
+      if (!canLinkTraining(reference, replace)) throw new TrainingImageError("За тренировката вече има план-конспект.", 409);
+      await linkTrainingDocument(tx, clubId, target, source.id, reference.occupied);
+      return NextResponse.json(source, { status: 201 });
+    });
+  }
+  const forkFrom = body?.forkFrom;
+  if (forkFrom !== undefined && (!target || typeof forkFrom !== "string" || !UUID_RE.test(forkFrom) || !Number.isInteger(body.sourceRevision)))
+    return NextResponse.json({ error: "Невалиден изходен план-конспект." }, { status: 400 });
+  // A copy of an unlinked plan is linked to the training when it is saved.
+  const link = body?.link === true;
+  if (body?.link !== undefined && (!link || !forkFrom))
+    return NextResponse.json({ error: "Невалидна тренировка." }, { status: 400 });
   const parsedInput = readDocumentInput(body?.content);
   if (!parsedInput || typeof body?.id !== "string" || !UUID_RE.test(body.id))
     return NextResponse.json({ error: "Невалидни полета в план-конспекта." }, { status: 400 });
-  const input = { ...parsedInput, session: { ...parsedInput.session, ...currentCompetitionSeason() } };
+  if (body.target !== undefined && !target) return NextResponse.json({ error: "Невалидна тренировка." }, { status: 400 });
 
+  const privateDraft = !target && body.privateCoachDraft === true;
+  if (privateDraft && !await findTrainingPlanCoachGroup(clubId, coach))
+    return NextResponse.json({ error: "Необходима е група на треньора." }, { status: 403 });
+  const input = { ...parsedInput, session: { ...parsedInput.session, ...(!privateDraft && !forkFrom && currentCompetitionSeason()) } };
+  const sourceOwner = forkFrom ? await documentOwnerFilter(clubId, session.sub, coach) : undefined;
   return withTrainingImages(clubId, async (tx) => {
-    const where = { id: body.id as string, clubId, ownerId: session.sub };
+    if (target && !coach) throw new TrainingImageError("Необходима е група на треньора.", 403);
+    const where = { id: body.id as string, clubId, ownerId: target || privateDraft ? coachAuthor(coach!) : session.sub };
     const existing = await tx.trainingPlanDocument.findFirst({ where, select: documentDetail });
+    let previous: PlanContent | undefined;
+    let occupied = false;
+    if (target) {
+      let reference;
+      try {
+        reference = await trainingReference(tx, clubId, coach, target, true, session.sub);
+      } catch (error) {
+        if (error instanceof TrainingImageError && (error.status === 410 || error.status === 403)) {
+          const committed = existing?.originKey === sessionOrigin(target);
+          return NextResponse.json({ error: error.message, recovery: committed ? "saved" : forkFrom ? undefined : "private",
+            documentId: committed ? existing.id : undefined }, { status: error.status });
+        }
+        throw error;
+      }
+      if (existing && (existing.originKey !== sessionOrigin(target) || reference.documentId !== existing.id))
+        throw new TrainingImageError("Този запис вече съществува в библиотеката.", 409);
+      occupied = reference.occupied;
+      if (!existing && !forkFrom && !canLinkTraining(reference, replace))
+        return NextResponse.json({ error: "За тренировката вече има друг план-конспект. Вашият текст е в редактора.", recovery: "private" }, { status: 409 });
+      if (forkFrom && !existing) {
+        if (reference.documentId !== forkFrom && (!link || !canLinkTraining(reference, replace)))
+          throw new TrainingImageError(link ? "За тренировката вече има план-конспект. Вашите промени са в редактора."
+            : "Връзката с тренировката е променена. Вашите промени са в редактора.", 409);
+        const source = await tx.trainingPlanDocument.findFirst({ where: { id: forkFrom, clubId, ownerId: sourceOwner }, select: documentDetail });
+        if (!source || source.revision !== body.sourceRevision)
+          throw new TrainingImageError("Изходният план-конспект е променен. Вашите промени са в редактора.", 409);
+        previous = source.content as unknown as PlanContent;
+      }
+      if (!forkFrom) Object.assign(input.session, { group: reference.group, season: reference.season, halfSeason: reference.halfSeason });
+      if (body.automaticNumber === true) input.session.sessionNumber = reference.sessionNumber;
+    }
     if (existing) return NextResponse.json({ document: existing, alreadyCreated: true });
     if (!await tx.club.findUnique({ where: { id: clubId }, select: { id: true } }))
       return NextResponse.json({ error: "Клубът не е намерен." }, { status: 404 });
-    const snapshot = await snapshotDocument(clubId, input, undefined, tx);
+    const snapshot = await snapshotDocument(clubId, input, previous, tx);
     if (!snapshot)
       return NextResponse.json({ error: "Изберете налична рисунка от този клуб." }, { status: 400 });
-    const { content, imageIds } = await storeDocumentImages(tx, clubId, session.sub, snapshot);
+    const { content, imageIds } = await storeDocumentImages(tx, clubId, where.ownerId, snapshot);
     const inserted = await tx.trainingPlanDocument.createMany({
-      data: { ...where, title: content.session.title.trim(), content }, skipDuplicates: true,
+      data: { ...where, ...(target ? { originKey: sessionOrigin(target) } : privateDraft ? { originKey: "private" } : {}), title: content.session.title.trim(), content }, skipDuplicates: true,
     });
     const document = await tx.trainingPlanDocument.findFirst({ where, select: documentDetail });
     if (!document) throw new TrainingImageError("План-конспектът не може да бъде създаден.", 409);
+    if (target) {
+      if (!inserted.count) throw new TrainingImageError("Записът е в конфликт. Опитайте отново.", 409);
+      await linkTrainingDocument(tx, clubId, target, document.id, occupied);
+    }
     if (inserted.count) await syncDocumentImages(tx, clubId, document.id, imageIds);
     return NextResponse.json({ document, alreadyCreated: !inserted.count }, { status: inserted.count ? 201 : 200 });
   });

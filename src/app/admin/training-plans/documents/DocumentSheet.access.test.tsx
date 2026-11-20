@@ -109,3 +109,9 @@ it("prevents duplicate PDF requests while the access check is pending", async ()
   await vi.waitFor(() => expect(hooks.setState).toHaveBeenLastCalledWith(false));
   expect(hooks.pdf).not.toHaveBeenCalled();
 });
+
+it("hides print and PDF actions in a read-only preview", () => {
+  const sheet = DocumentSheet({ content: blankDocument(), pending: false, printActions: false });
+  expect(findPrint(sheet)).toBeUndefined();
+  expect(findPrint(sheet, "Изтегли PDF")).toBeUndefined();
+});

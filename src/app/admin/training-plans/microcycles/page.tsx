@@ -7,6 +7,7 @@ import { monday } from "@/lib/exercise/microcycle";
 import { prisma } from "@/lib/db";
 import { applyCloudinaryTransformToUrl, buildCloudinaryUrlFromUploadPath } from "@/lib/cloudinaryImagePath";
 import { currentCompetitionSeason } from "@/lib/exercise/document";
+import { sessionTarget } from "@/lib/exercise/trainingSession";
 import Workspace from "./workspace";
 import "../page.css";
 export default async function Page({ searchParams }: { searchParams: Promise<{ clubId?: string; coachGroupId?: string }> }) {
@@ -22,5 +23,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
   const clubLogoUrl = storedLogo && /^https?:\/\//i.test(storedLogo)
     ? applyCloudinaryTransformToUrl(storedLogo, "w_240,h_240,c_limit,f_auto,q_auto:eco")
     : storedLogo && cloudName ? buildCloudinaryUrlFromUploadPath(storedLogo, cloudName, "w_240,h_240,c_limit,f_auto,q_auto:eco") : storedLogo;
-  return <Workspace competitionSeason={currentCompetitionSeason()} clubId={p.clubId} coachGroupId={p.coachGroupId} clubLogoUrl={clubLogoUrl || undefined} initialWeek={monday(getTodayIsoDateInTimeZone("Europe/Sofia"))} />;
+  return <Workspace restore={sessionTarget(p) ?? undefined} competitionSeason={currentCompetitionSeason()} clubId={p.clubId} coachGroupId={p.coachGroupId} clubLogoUrl={clubLogoUrl || undefined} initialWeek={monday(getTodayIsoDateInTimeZone("Europe/Sofia"))} />;
 }

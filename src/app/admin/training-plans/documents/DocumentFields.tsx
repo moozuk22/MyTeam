@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { Fragment, useId, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import {
   documentBottomGroups, exerciseFields, sessionFields, sectionTitles,
@@ -30,8 +30,10 @@ function Field({ label, value, max, type, id: customId, heading, wrapHeading, re
   </div>;
 }
 
-export default function DocumentFields({ content, disabled, drawingEndpoint, location, onSession, onSection, onDrawing, onMerge }: {
+export default function DocumentFields({ content, disabled, drawingEndpoint, location, sessionSlot, onSession, onSection, onDrawing, onMerge }: {
   content: PlanContent; disabled: boolean; drawingEndpoint: string; location: string;
+  /** Replaces the default text field of a session field, for example with a field that has suggestions. */
+  sessionSlot?: (key: keyof SessionFields) => ReactNode;
   onSession: (key: keyof SessionFields, value: string) => void;
   onSection: (index: number, patch: Partial<DocumentSection>) => void;
   onDrawing: (index: number, drawing: DrawingSnapshot | null) => void;
@@ -46,6 +48,8 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
   }
 
   function sessionField([key, label, max, type]: typeof sessionFields[number], heading = false, readOnly = false) {
+    const slot = sessionSlot?.(key);
+    if (slot !== undefined) return <Fragment key={key}>{slot}</Fragment>;
     return <Field key={key} id={key === "title" ? "td-plan-title" : undefined} heading={heading} readOnly={readOnly}
       label={label} max={max} type={type} value={content.session[key]} onChange={(value) => onSession(key, value)} />;
   }

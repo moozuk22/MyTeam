@@ -8,7 +8,7 @@ CREATE TABLE training_plans (
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE training_plan_documents (
-  id uuid PRIMARY KEY, club_id uuid NOT NULL REFERENCES clubs(id) ON DELETE CASCADE, owner_id text NOT NULL,
+  id uuid PRIMARY KEY, club_id uuid NOT NULL REFERENCES clubs(id) ON DELETE CASCADE, owner_id text NOT NULL, origin_key text,
   title text NOT NULL, content jsonb NOT NULL, revision integer NOT NULL DEFAULT 1,
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );

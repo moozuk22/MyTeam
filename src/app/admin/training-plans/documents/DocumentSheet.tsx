@@ -115,8 +115,8 @@ function PrintedBottomRow({ content, monochrome, onReport, attempt }: {
   </div>;
 }
 
-export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint = false, checkPrint }: {
-  content: PlanContent; clubLogoUrl?: string; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>;
+export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint = false, checkPrint, printActions = true }: {
+  content: PlanContent; clubLogoUrl?: string; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>; printActions?: boolean;
 }) {
   const [printError, setPrintError] = useState("");
   const [checkingPrint, setCheckingPrint] = useState(false);
@@ -240,8 +240,8 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
 
   return <section className="td-print-area" id="td-print-preview" aria-label="Преглед за печат">
     <div className="td-print-toolbar">
-      <h2>Преглед за печат <small>A4 · хоризонтално</small></h2>
-      <div className="td-print-actions">
+      <h2>{printActions ? "Преглед за печат" : "Преглед"} <small>A4 · хоризонтално</small></h2>
+      {printActions && <div className="td-print-actions">
         <label className="td-print-mode">
           <input type="checkbox" checked={monochrome} disabled={checkingPrint} onChange={(event) => {
             setDrawings({});
@@ -253,9 +253,9 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
         <button className="tp-secondary-btn" type="button" disabled={checkingPrint || (canPrint && !ready)} onClick={() => void print(true)}>
           {exportingPdf ? "Подготовка на PDF…" : "Изтегли PDF"}
         </button>
-      </div>
+      </div>}
     </div>
-    <p className="td-muted">За печат от телефон изтеглете PDF файла и го отворете. Изберете „Печат“ от менюто на телефона или приложението на принтера.</p>
+    {printActions && <p className="td-muted">За печат от телефон изтеглете PDF файла и го отворете. Изберете „Печат“ от менюто на телефона или приложението на принтера.</p>}
     {pdf && <p className="td-muted" role="status">
       PDF файлът е готов. <a className="tp-secondary-btn" href={pdf.url} target="_blank" rel="noopener">Отвори PDF</a>
     </p>}

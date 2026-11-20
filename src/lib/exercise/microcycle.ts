@@ -1,6 +1,8 @@
+import { TRAINING_UUID_PATTERN } from "@/lib/trainingPlans";
 export const cycleColumns = ["Загрявка", "Фаза №1", "Фаза №2", "Фаза №3", "Физическа подготовка"];
-export type CycleContent = { format: string; age: string; season: string; half: string; number: string; saturday: string; sunday: string; rows: string[][] };
-export const emptyCycle = (): CycleContent => ({ format: "", age: "", season: "", half: "", number: "", saturday: "", sunday: "", rows: [] });
+export type CycleRow = { id: string; cells: string[] };
+export type CycleContent = { version: 2; format: string; age: string; season: string; half: string; number: string; saturday: string; sunday: string; rows: CycleRow[] };
+export const emptyCycle = (): CycleContent => ({ version: 2, format: "", age: "", season: "", half: "", number: "", saturday: "", sunday: "", rows: [] });
 export function monday(date: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Невалидна дата.");
   const d = new Date(`${date}T00:00:00Z`);
@@ -17,8 +19,17 @@ export function parseCycle(raw: unknown): CycleContent {
     if (typeof value[key] !== "string" || value[key].length > 2000) throw new Error("Текстът е твърде дълъг или невалиден.");
     result[key] = value[key];
   }
-  if (!Array.isArray(value.rows) || value.rows.length > 30 || value.rows.some(row => !Array.isArray(row) || row.length !== 5 || row.some(cell => typeof cell !== "string" || cell.length > 4000))) throw new Error("Невалидни тренировки (до 30 реда).");
-  result.rows = value.rows as string[][];
+  if (value.version !== 2 || !Array.isArray(value.rows) || value.rows.length > 30)
+    throw new Error("Презаредете микроцикъла.");
+  const ids = new Set<string>();
+  result.rows = value.rows.map(row => {
+    if (!row || typeof row.id !== "string" || !TRAINING_UUID_PATTERN.test(row.id) || ids.has(row.id.toLowerCase()) ||
+        !Array.isArray(row.cells) || row.cells.length !== cycleColumns.length ||
+        row.cells.some((cell: unknown) => typeof cell !== "string" || cell.length > 4000))
+      throw new Error("Невалидна тренировка.");
+    ids.add(row.id.toLowerCase());
+    return { id: row.id.toLowerCase(), cells: row.cells };
+  });
   return result;
 }
 const weekDay = new Intl.DateTimeFormat("bg-BG", { day: "numeric", month: "long", timeZone: "UTC" });
