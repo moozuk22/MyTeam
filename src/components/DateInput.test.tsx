@@ -115,3 +115,37 @@ it("shows the native text and hides the overlay in typing mode", () => {
   expect(html).toMatch(/<input[^>]*class="field "/);
   expect(html).toMatch(/aria-hidden="true" hidden="">/);
 });
+
+it("shows the native segments before arrow, delete or backspace keys edit the date", () => {
+  hooks.mockRefs = true;
+  const setTyping = vi.fn();
+  hooks.setTyping = setTyping;
+  const showPicker = vi.fn();
+  const target = { disabled: false, readOnly: false, showPicker };
+  const press = (key: string) => {
+    const input = find(DateInput({ value: "2026-11-05", onValueChange: () => {} }), (props) => props.type === "date");
+    const event = { key, currentTarget: target, preventDefault: vi.fn() };
+    (input.props.onKeyDown as (event: unknown) => void)(event);
+    return event;
+  };
+
+  for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Backspace", "Delete"]) {
+    expect(press(key).preventDefault).toHaveBeenCalled();
+  }
+  expect(setTyping).toHaveBeenCalledTimes(6);
+  expect(setTyping).toHaveBeenCalledWith(true);
+  expect(press("Tab").preventDefault).not.toHaveBeenCalled();
+  expect(showPicker).not.toHaveBeenCalled();
+
+  // In typing mode the native field handles every key, including digits.
+  hooks.typing = true;
+  expect(press("ArrowUp").preventDefault).not.toHaveBeenCalled();
+  expect(press("5").preventDefault).not.toHaveBeenCalled();
+  expect(showPicker).not.toHaveBeenCalled();
+  expect(setTyping).toHaveBeenCalledTimes(6);
+
+  hooks.typing = false;
+  target.readOnly = true;
+  expect(press("ArrowUp").preventDefault).not.toHaveBeenCalled();
+  expect(setTyping).toHaveBeenCalledTimes(6);
+});

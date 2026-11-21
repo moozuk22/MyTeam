@@ -17,6 +17,9 @@ type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "valu
   wrapperStyle?: CSSProperties;
 };
 
+/** Keys that move between or change the native date segments. */
+const SEGMENT_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Backspace", "Delete", "PageUp", "PageDown", "Home", "End"]);
+
 const px = (value: string) => Number.parseFloat(value) || 0;
 
 /** Opens the native calendar. Returns false when the browser cannot open it. */
@@ -33,7 +36,7 @@ function openPicker(input: HTMLInputElement): boolean {
 export function DateInput({ value, onValueChange, wrapperClassName, wrapperStyle, className, onClick, onKeyDown, ...props }: DateInputProps) {
   const input = useRef<HTMLInputElement>(null);
   const overlay = useRef<HTMLSpanElement>(null);
-  // When the calendar cannot open, show the native text so that the user can type the date.
+  // During keyboard editing, show the native text and its focused segment instead of the overlay.
   const [typing, setTyping] = useState(false);
 
   function sync() {
@@ -71,11 +74,18 @@ export function DateInput({ value, onValueChange, wrapperClassName, wrapperStyle
       onBlur={(event) => { setTyping(false); sync(); props.onBlur?.(event); }}
       onClick={(event: MouseEvent<HTMLInputElement>) => { openPicker(event.currentTarget); onClick?.(event); }}
       onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+        const field = event.currentTarget;
+        const editable = !field.disabled && !field.readOnly;
         // Typing would fill the hidden locale-specific segments, so open the calendar instead.
         // If the calendar cannot open, let the key through and show the native text for typing.
-        if (/^\d$/.test(event.key) || event.key === " ") {
-          if (openPicker(event.currentTarget)) event.preventDefault();
-          else if (!event.currentTarget.disabled && !event.currentTarget.readOnly) setTyping(true);
+        if (!typing && (/^\d$/.test(event.key) || event.key === " ")) {
+          if (openPicker(field)) event.preventDefault();
+          else if (editable) setTyping(true);
+        } else if (!typing && editable && SEGMENT_KEYS.has(event.key)) {
+          // These keys edit or move between hidden segments. The first press only shows the native
+          // text with its focused segment, so that the user can see what the next press changes.
+          event.preventDefault();
+          setTyping(true);
         }
         onKeyDown?.(event);
       }} />
