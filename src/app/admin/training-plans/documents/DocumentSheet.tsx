@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { documentBottomGroups, type DocumentSection, type PlanContent } from "@/lib/exercise/document";
 import type { Exercise } from "@/lib/exercise/model";
 import PrintDrawing, { type DrawingReport, type DrawingStatus } from "./PrintDrawing";
+import { equalDrawings } from "./equalDrawings";
 
 const WIDTH = 1060;
 const HEIGHT = 730;
@@ -229,6 +230,10 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
     setMultiPage(fit.multiPage);
     if (fit.multiPage) setDrawings({});
   }, [drawingsReady]);
+  // Runs after the sheet fits the page, so the space of each section is final.
+  useLayoutEffect(() => {
+    if (preview.current) equalDrawings(preview.current);
+  }, [content, fonts, drawingsReady, multiPage, scale]);
   const failed = assetStates.includes("failed");
   const ready = !pending && fonts && scale > 0 && assetStates.every((status) => status === "ready");
   const previewHeight = multiPage ? HEIGHT * 2 + 12 : HEIGHT;
