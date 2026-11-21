@@ -12,6 +12,7 @@ import MatchAttendancePanel from "@/components/MatchAttendancePanel";
 import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
 
 import type { TrainingDayDetailsDialogProps } from "./TrainingDayDetailsDialog";
+import { DateInput } from "@/components/DateInput";
 type Props = {
   schedule2DayDetails: boolean;
   matchEditCustomGroups: TrainingDayDetailsDialogProps["matchEditCustomGroups"];
@@ -75,14 +76,13 @@ export function TrainingDayMatchContent({
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <div className="amp-edit-field">
         <span className="amp-lbl">Дата</span>
-        <input
-          type="date"
+        <DateInput
           className="amp-edit-input"
           value={dayDetailsMatchEditForm.matchDate}
-          onChange={(e) =>
+          onValueChange={(value) =>
             setDayDetailsMatchEditForm((f) => ({
               ...f,
-              matchDate: e.target.value,
+              matchDate: value,
             }))
           }
           disabled={dayDetailsMatchSaving}

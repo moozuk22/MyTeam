@@ -11,6 +11,7 @@ import MatchAttendancePanel from "@/components/MatchAttendancePanel";
 import { AttendanceFilterSelect } from "@/components/AttendanceFilterSelect";
 import { formatMatchResult, getMatchOutcome, hasMatchFinished, parseMatchResult } from "@/lib/matchResult";
 import "@/components/matchHistory.css";
+import { DateInput } from "@/components/DateInput";
 
 type HistoryMatch = {
   description?: string;
@@ -181,8 +182,8 @@ export default function MatchHistoryModal({ clubId, clubName = "Нашият о�
       </section>
       <div className="match-history-filters">
         <div className="amp-edit-field match-history-group-filter"><span className="amp-lbl">Група</span><AttendanceFilterSelect label="Група" value={customGroupId} options={[{ value: "", label: "Всички групи" }, ...(data?.customGroups ?? []).map((group) => ({ value: group.id, label: group.name }))]} onChange={(value) => { setCustomGroupId(value); resetPage(); }} /></div>
-        <label className="amp-edit-field"><span className="amp-lbl">От</span><input type="date" className="amp-edit-input" value={from} max={to || today} onChange={(event) => { setFrom(event.target.value); resetPage(); }} /></label>
-        <label className="amp-edit-field"><span className="amp-lbl">До</span><input type="date" className="amp-edit-input" value={to} min={from} max={today} onChange={(event) => { setTo(event.target.value); resetPage(); }} /></label>
+        <label className="amp-edit-field"><span className="amp-lbl">От</span><DateInput className="amp-edit-input" value={from} max={to || today} onValueChange={(value) => { setFrom(value); resetPage(); }} /></label>
+        <label className="amp-edit-field"><span className="amp-lbl">До</span><DateInput className="amp-edit-input" value={to} min={from} max={today} onValueChange={(value) => { setTo(value); resetPage(); }} /></label>
         <label className="amp-edit-field match-history-search"><span className="amp-lbl">Съперник или място</span><input className="amp-edit-input" type="search" maxLength={200} placeholder="Търси мач..." value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} /></label>
       </div>
       {error ? <p className="amp-confirm-error" role="alert">{error}</p> : loading ? <p className="amp-empty amp-empty--modal" role="status">Зареждане...</p> : data && <>

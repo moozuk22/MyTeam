@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { localToday, parseSubscriptionSetup, SubscriptionError } from "@/lib/clubSubscriptionDomain";
 import styles from "./SubscriptionSetupFields.module.css";
+import { DateInput } from "@/components/DateInput";
 
 export type SubscriptionDraft = { mode: "trial" | "paid" | "contract"; trialChoice: "" | "limited" | "unlimited"; trialEndDate: string; firstBillingMonth: string; amount: string };
 export function defaultTrialDraft(): SubscriptionDraft {
@@ -33,7 +34,7 @@ export default function SubscriptionSetupFields({ value, onChange, disabled = fa
         </select>
       </label>
       {value.trialChoice === "limited" && <label htmlFor={`${id}-end`}>Последен ден (включително)
-        <input id={`${id}-end`} type="date" required value={value.trialEndDate} onChange={(e) => onChange({ ...value, trialEndDate: e.target.value })} />
+        <DateInput id={`${id}-end`} required value={value.trialEndDate} onValueChange={(trialEndDate) => onChange({ ...value, trialEndDate })} />
       </label>}
     </> : value.mode === "contract" ? <p>Таксуването се управлява извън приложението. Не се изпращат известия за абонамент.</p> : <>
       <label htmlFor={`${id}-amount`}>Месечна такса (EUR)

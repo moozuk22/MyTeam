@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import "./page.css";
+import { DateInput } from "@/components/DateInput";
 
 const PARTNER_LABELS: Record<string, string> = {
   SPORT_DEPOT: "Sport Depot",
@@ -163,19 +164,17 @@ export default function AdminDiscountStatsClient() {
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <input
-            type="date"
+          <DateInput
             className="ds-filter-input"
             style={{ textAlign: "center", textIndent: "16px" }}
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onValueChange={setFrom}
           />
-          <input
-            type="date"
+          <DateInput
             className="ds-filter-input"
             style={{ textAlign: "center", textIndent: "16px" }}
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onValueChange={setTo}
           />
         </div>
 

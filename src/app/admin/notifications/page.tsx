@@ -4,6 +4,7 @@ import { TimeInput } from "@/components/TimeInput";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DateInput } from "@/components/DateInput";
 
 type NotificationType = "training_reminder" | "trainer_message";
 
@@ -323,12 +324,11 @@ export default function AdminNotificationsPage() {
               Ден и час на тренировката
             </label>
             <div className="flex gap-3" style={{ flexWrap: "wrap" }}>
-              <input
+              <DateInput
                 id="trainingDate"
-                type="date"
                 className="input"
+                wrapperStyle={{ flex: "1 1 60px" }}
                 style={{ 
-                  flex: "1 1 60px",
                   background: "var(--bg-secondary)",
                   border: "1px solid var(--accent-gold-color)",
                   borderRadius: "8px",
@@ -337,7 +337,7 @@ export default function AdminNotificationsPage() {
                   fontSize: "14px"
                 }}
                 value={trainingDate}
-                onChange={(event) => setTrainingDate(event.target.value)}
+                onValueChange={setTrainingDate}
               />
               <TimeInput
                 id="trainingTime"

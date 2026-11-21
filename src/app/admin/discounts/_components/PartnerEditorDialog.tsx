@@ -2,6 +2,7 @@
 
 import { Check, Loader2, Upload, X } from "lucide-react";
 import { type PartnerDiscount } from "../_types/discount-types";
+import { DateInput } from "@/components/DateInput";
 
 type Props = {
   editingPartner: Partial<PartnerDiscount> | null;
@@ -221,8 +222,7 @@ export function PartnerEditorDialog({
                 </div>
                 <div>
                   <label className="form-label">Валидна до</label>
-                  <input
-                    type="date"
+                  <DateInput
                     className="form-input"
                     style={{ textAlign: "center" }}
                     value={
@@ -232,10 +232,10 @@ export function PartnerEditorDialog({
                             .split("T")[0]
                         : ""
                     }
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setEditingPartner({
                         ...editingPartner,
-                        validUntil: e.target.value,
+                        validUntil: value,
                       })
                     }
                   />

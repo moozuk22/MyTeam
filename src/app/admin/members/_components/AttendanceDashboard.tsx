@@ -6,6 +6,7 @@ import { attendancePercentage } from "@/lib/attendanceEligibility";
 import { type AttendanceReportData, type TrainingScheduleGroup } from "../_types/members-page-types";
 import { sortByName, normalizeOptionalId, normalizeTrainingDurationInput, normalizeTrainingFieldSelections } from "../_utils/members-page-utils";
 import { CalendarIcon, ClipboardListIcon, PencilIcon, PrinterIcon, SpinnerIcon, XIcon } from "./members-page-icons";
+import { DateInput } from "@/components/DateInput";
 
 export function AttendanceDashboard({
   onClose,
@@ -516,12 +517,12 @@ export function AttendanceDashboard({
           <div className="rd-field">
             <label className="rd-label">От</label>
             <div className="rd-select-wrap">
-              <input
-                type="date"
+              <DateInput
                 className="rd-date-input"
+                wrapperStyle={{ flex: "1 1 auto", minWidth: 0 }}
                 value={from}
                 max={to}
-                onChange={(e) => setFrom(e.target.value)}
+                onValueChange={setFrom}
               />
               <CalendarIcon size={16} />
             </div>
@@ -529,13 +530,13 @@ export function AttendanceDashboard({
           <div className="rd-field">
             <label className="rd-label">До</label>
             <div className="rd-select-wrap">
-              <input
-                type="date"
+              <DateInput
                 className="rd-date-input"
+                wrapperStyle={{ flex: "1 1 auto", minWidth: 0 }}
                 value={to}
                 min={from}
                 max={eventType === "training" ? todayIso : undefined}
-                onChange={(e) => setTo(e.target.value)}
+                onValueChange={setTo}
               />
               <CalendarIcon size={16} />
             </div>

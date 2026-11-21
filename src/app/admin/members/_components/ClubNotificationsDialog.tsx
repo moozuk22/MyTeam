@@ -4,6 +4,7 @@ import { NotificationImage } from "@/components/NotificationImage";
 import { NotificationText } from "@/components/NotificationText";
 import { XIcon } from "./members-page-icons";
 import { type ClubNotifications } from "../_hooks/useClubNotifications";
+import { DateInput } from "@/components/DateInput";
 
 type ClubNotificationsDialogProps = {
   clubNotificationsController: Pick<
@@ -91,12 +92,12 @@ export function ClubNotificationsDialog({
                         >
                           {"\u0412\u0441\u0438\u0447\u043a\u0438"}
                         </button>
-                        <input
-                          type="date"
-                          className="amp-edit-input amp-notification-date-input"
+                        <DateInput
+                          className="amp-edit-input"
+                          wrapperClassName="amp-notification-date-input"
                           value={clubNotificationsDateFilter}
                           max={todayIsoDate}
-                          onChange={(event) => setClubNotificationsDateFilter(event.target.value)}
+                          onValueChange={setClubNotificationsDateFilter}
                         />
                       </div>
                     </label>
