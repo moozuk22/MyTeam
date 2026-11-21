@@ -42,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const updatedClub = await tx.club.update({ where: { id: clubId }, data: {
         billingStatus: "active", firstBillingMonth, billingActivatedAt: new Date(), defaultPaymentAmount: paymentAmount,
       } });
-      await tx.player.updateMany({ where: { clubId }, data: { paymentAmount } });
+      await tx.player.updateMany({ where: { clubId, feeExempt: false }, data: { paymentAmount } });
       const affected = await tx.player.updateMany({ where: { clubId, isActive: true }, data: {
         firstBillingMonth, ...(playerStatus !== "keep" ? { status: playerStatus } : {}),
       } });

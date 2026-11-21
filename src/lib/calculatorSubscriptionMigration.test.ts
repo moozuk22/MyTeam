@@ -5,13 +5,15 @@ const club='00000000-0000-0000-0000-000000000001';const player='00000000-0000-00
 it('gates live capture, backfills paid periods once, leaves gaps empty and preserves earlier history',async()=>{
  const db=new PGlite();
  try{
-  await db.exec(`CREATE TABLE clubs(id uuid PRIMARY KEY);CREATE TABLE players(id uuid PRIMARY KEY,club_id uuid,full_name text);CREATE TABLE payment_logs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),player_id uuid REFERENCES players(id) ON DELETE CASCADE,paid_at timestamptz DEFAULT CURRENT_TIMESTAMP,amount numeric,currency text DEFAULT 'EUR');CREATE TABLE club_subscriptions(club_id uuid PRIMARY KEY,mode text,trial_end_date text);INSERT INTO clubs VALUES('${club}'),('${other}');INSERT INTO players VALUES('${player}','${club}','Player');`);
+  await db.exec(`CREATE TABLE clubs(id uuid PRIMARY KEY);CREATE TABLE players(id uuid PRIMARY KEY,club_id uuid,full_name text,payment_amount numeric NOT NULL DEFAULT 0);CREATE TABLE payment_logs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),player_id uuid REFERENCES players(id) ON DELETE CASCADE,paid_at timestamptz DEFAULT CURRENT_TIMESTAMP,amount numeric,currency text DEFAULT 'EUR');CREATE TABLE club_subscriptions(club_id uuid PRIMARY KEY,mode text,trial_end_date text);INSERT INTO clubs VALUES('${club}'),('${other}');INSERT INTO players(id,club_id,full_name) VALUES('${player}','${club}','Player');`);
   for(const migration of ['20261029160000_club_finance','20261029190000_manual_club_revenue'])await db.exec(readFileSync(`prisma/migrations/${migration}/migration.sql`,'utf8'));
   await db.exec(`UPDATE clubs SET finance_started_at='2020-01-01';INSERT INTO payment_logs(player_id,amount,paid_at)VALUES('${player}',5,'2021-01-01');`);
   await db.exec(readFileSync('prisma/migrations/20261031120000_calculator_subscriptions/migration.sql','utf8'));
   await db.exec(readFileSync('prisma/migrations/20261101003000_finance_backfill_payment_lock/migration.sql','utf8'));
+  await db.exec(readFileSync('prisma/migrations/20261121120000_player_fee_exemptions/migration.sql','utf8'));
+  expect((await db.query('SELECT fee_exempt FROM players')).rows).toEqual([{fee_exempt:false}]);
   // Existing data survives rollout, but disabled capture adds nothing.
-  await db.exec(`INSERT INTO payment_logs(player_id,amount,paid_at)VALUES('${player}',10,'2026-01-03'),('${player}',20,'2026-02-03'),('${player}',30,'2026-03-03');`);
+  await db.exec(`INSERT INTO payment_logs(player_id,amount,paid_at)VALUES('${player}',10,'2026-01-03'),('${player}',0,'2026-01-04'),('${player}',20,'2026-02-03'),('${player}',30,'2026-03-03');`);
   expect((await db.query('SELECT amount::text FROM club_finance_entries')).rows).toEqual([{amount:'5.00'}]);
   await db.exec(`INSERT INTO club_calculator_subscriptions(club_id)VALUES('${club}');INSERT INTO club_calculator_payments(id,club_id,billing_mode,paid_on,total,request,created_by)VALUES('10000000-0000-0000-0000-000000000001','${club}','monthly','2026-01-15',10,'{}','admin');INSERT INTO club_calculator_grants(club_id,kind,starts_at,ends_at,payment_id)VALUES('${club}','paid','2026-01-01 Europe/Sofia','2026-02-01 Europe/Sofia','10000000-0000-0000-0000-000000000001');SELECT backfill_calculator_revenue('${club}','10000000-0000-0000-0000-000000000001');SELECT backfill_calculator_revenue('${club}','10000000-0000-0000-0000-000000000001');`);
   expect((await db.query('SELECT sum(amount)::text total FROM club_finance_entries')).rows).toEqual([{total:'15.00'}]);
@@ -26,10 +28,13 @@ it('gates live capture, backfills paid periods once, leaves gaps empty and prese
   // Snapshots keep uncaptured payments attached to their original club when players move.
   await db.exec(`UPDATE players SET club_id='${other}';INSERT INTO club_calculator_subscriptions(club_id)VALUES('${other}');INSERT INTO club_calculator_grants(club_id,kind,starts_at)VALUES('${other}','contract','2020-01-01');SELECT backfill_calculator_revenue('${other}','10000000-0000-0000-0000-000000000001');`);
   expect((await db.query(`SELECT count(*)::int count FROM club_finance_entries WHERE club_id='${other}'`)).rows).toEqual([{count:0}]);
-  await db.exec(`UPDATE players SET club_id='${club}';INSERT INTO club_calculator_grants(club_id,kind,starts_at)VALUES('${club}','contract',clock_timestamp()-interval '1 minute');INSERT INTO payment_logs(player_id,amount,currency)VALUES('${player}',7,'USD');`);
+  await db.exec(`UPDATE players SET club_id='${club}';INSERT INTO club_calculator_grants(club_id,kind,starts_at)VALUES('${club}','contract',clock_timestamp()-interval '1 minute');INSERT INTO payment_logs(player_id,amount,currency)VALUES('${player}',7,'USD'),('${player}',0,'EUR');`);
   expect((await db.query("SELECT amount::text,currency FROM club_finance_entries WHERE currency='USD'")).rows).toEqual([{amount:'7.00',currency:'USD'}]);
   await db.exec(`UPDATE club_calculator_grants SET ends_at=clock_timestamp() WHERE club_id='${club}' AND kind='contract';INSERT INTO payment_logs(player_id,amount)VALUES('${player}',11);`);
   expect((await db.query('SELECT count(*)::int count FROM club_finance_entries WHERE amount=11')).rows).toEqual([{count:0}]);
+  expect((await db.query('SELECT amount FROM club_finance_entries WHERE amount=0')).rows).toEqual([]);
+  await db.exec(`DELETE FROM payment_logs WHERE amount=0; INSERT INTO payment_logs(player_id,amount) VALUES ('${player}',0);`);
+  expect((await db.query('SELECT amount FROM club_finance_entries WHERE amount=0')).rows).toEqual([]);
   // Voiding entitlement never deletes financial history. Explicit player payment undo still voids revenue.
   await db.exec(`UPDATE club_calculator_grants SET revoked_at=clock_timestamp() WHERE payment_id IS NOT NULL;DELETE FROM payment_logs WHERE amount=30;`);
   expect((await db.query('SELECT count(*)::int count FROM club_finance_entries WHERE amount=30 AND voided_at IS NOT NULL')).rows).toEqual([{count:1}]);

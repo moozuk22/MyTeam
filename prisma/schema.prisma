@@ -306,6 +306,7 @@ model Player {
   coachGroups                  CoachGroup[]                    @relation("PlayerCoachGroups")
   firstBillingMonth            DateTime?                       @map("first_billing_month") @db.Timestamptz(6)
   paymentAmount                Decimal                         @default(0) @map("payment_amount") @db.Decimal(10, 2)
+  feeExempt                    Boolean                         @default(false) @map("fee_exempt")
   billingCoachGroupId          String?                         @map("billing_coach_group_id") @db.Uuid
   billingCoachGroup            CoachGroup?                     @relation("PlayerBillingCoachGroup", fields: [billingCoachGroupId], references: [id], onDelete: SetNull)
   remainingTrainingCredits     Int                             @default(0) @map("remaining_training_credits")

@@ -14,16 +14,17 @@ beforeEach(() => {
 it('aggregates exact amounts by Sofia month and type, excluding voided, other-club and next-year entries', async () => {
  const db = new PGlite();
  try {
-  await db.exec(`CREATE TABLE club_finance_entries(club_id uuid,category_id uuid,kind text,currency text,amount numeric,occurred_at timestamptz,voided_at timestamptz);
+  await db.exec(`CREATE TABLE club_finance_entries(club_id uuid,category_id uuid,kind text,currency text,amount numeric,occurred_at timestamptz,voided_at timestamptz,payment_reference uuid);
    INSERT INTO club_finance_entries VALUES
-   ('${club}','${category}','revenue','EUR',0.10,'2025-12-31 22:00Z',NULL),
-   ('${club}','${category}','revenue','EUR',0.20,'2026-10-01 12:00Z',NULL),
-   ('${club}','${category}','expense','EUR',5,'2026-10-10 12:00Z',NULL),
-   ('${club}','${category}','revenue','USD',8,'2026-09-30 21:30Z',NULL),
-   ('${club}','${category}','revenue','EUR',1000,'2025-12-31 21:59Z',NULL),
-   ('${club}','${category}','revenue','EUR',2000,'2026-12-31 22:00Z',NULL),
-   ('${club}','${category}','revenue','EUR',3000,'2026-10-20 12:00Z',now()),
-   ('00000000-0000-0000-0000-000000000004','${category}','revenue','EUR',4000,'2026-10-20 12:00Z',NULL);`);
+   ('${club}','${category}','revenue','EUR',0.10,'2025-12-31 22:00Z',NULL,NULL),
+   ('${club}','${category}','revenue','EUR',0.20,'2026-10-01 12:00Z',NULL,NULL),
+   ('${club}','${category}','expense','EUR',5,'2026-10-10 12:00Z',NULL,NULL),
+   ('${club}','${category}','revenue','USD',8,'2026-09-30 21:30Z',NULL,NULL),
+   ('${club}','${category}','revenue','EUR',1000,'2025-12-31 21:59Z',NULL,NULL),
+   ('${club}','${category}','revenue','EUR',2000,'2026-12-31 22:00Z',NULL,NULL),
+   ('${club}','${category}','revenue','EUR',3000,'2026-10-20 12:00Z',now(),NULL),
+   ('00000000-0000-0000-0000-000000000004','${category}','revenue','EUR',4000,'2026-10-20 12:00Z',NULL,NULL),
+   ('${club}','${category}','revenue','USD',0,'2026-12-01 12:00Z',NULL,'00000000-0000-0000-0000-000000000005');`);
   tx.$queryRaw.mockImplementation(async (sql:{text:string;values:unknown[]}) => (await db.query(sql.text,sql.values)).rows);
   const result = await getClubFinanceAnalysis(club,new Date('2026-10-30T12:00:00Z'));
   expect(result.rows.map(row=>row.key)).toEqual(['year','2026-10','2026-09','2026-08','2026-07','2026-06','2026-05','2026-04','2026-03','2026-02','2026-01']);

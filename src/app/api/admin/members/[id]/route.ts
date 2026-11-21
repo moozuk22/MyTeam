@@ -131,7 +131,8 @@ export async function PUT(
   const token = request.cookies.get("admin_session")?.value;
   const { id } = await params;
 
-  if (!token || !(await verifyAdminToken(token))) {
+  const session = token ? await verifyAdminToken(token) : null;
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -153,6 +154,9 @@ export async function PUT(
     const hasPlayerPhone = Object.prototype.hasOwnProperty.call(body, "playerPhone");
     const hasFirstBillingMonth = Object.prototype.hasOwnProperty.call(body, "firstBillingMonth");
     const hasPaymentAmount = Object.prototype.hasOwnProperty.call(body, "paymentAmount");
+    if (hasPaymentAmount && !hasTrustedOrigin(request)) {
+      return NextResponse.json({ error: "Невалиден източник на заявката." }, { status: 403 });
+    }
 
     if (!fullName) {
       return NextResponse.json(
@@ -192,6 +196,11 @@ export async function PUT(
       clubIdRaw === null || clubIdRaw === undefined || String(clubIdRaw).trim() === ""
         ? undefined
         : String(clubIdRaw).trim();
+
+    if (!canAccessTrainingClub(session, existingPlayer.clubId) ||
+      (clubId && !canAccessTrainingClub(session, clubId))) {
+      return NextResponse.json({ error: "Нямате достъп до този клуб." }, { status: 403 });
+    }
 
     if (clubId) {
       const clubExists = await prisma.club.findUnique({
@@ -235,6 +244,9 @@ export async function PUT(
       }
     }
 
+    if (body.feeExempt !== undefined && (typeof body.feeExempt !== "boolean" || !hasPaymentAmount)) {
+      return NextResponse.json({ error: "Невалидна настройка за освобождаване от такса." }, { status: 400 });
+    }
     let paymentAmountUpdate: string | undefined = undefined;
     if (hasPaymentAmount) {
       const parsed = parsePaymentAmount(body.paymentAmount);
@@ -243,6 +255,9 @@ export async function PUT(
           { error: "Invalid paymentAmount. Use a non-negative amount with up to 2 decimals." },
           { status: 400 },
         );
+      }
+      if (body.feeExempt === true && parsed !== "0.00") {
+        return NextResponse.json({ error: "Освобождаването от такса изисква сума 0." }, { status: 400 });
       }
       paymentAmountUpdate = parsed;
     }
@@ -266,9 +281,20 @@ export async function PUT(
     const updatedPlayer = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM clubs WHERE id = ${existingPlayer.clubId}::uuid FOR UPDATE`;
       const current = await tx.player.findUniqueOrThrow({ where: { id }, include: { coachGroups: true, club: true } });
+      if (!canAccessTrainingClub(session, current.clubId)) {
+        throw new FeeSettingsError("Нямате достъп до този клуб.", 403);
+      }
+      if (current.clubId !== existingPlayer.clubId) {
+        throw new FeeSettingsError("Клубът на състезателя е променен. Опитайте отново.", 409);
+      }
       const targetClub = clubId && clubId !== current.clubId ? await tx.club.findUniqueOrThrow({ where: { id: clubId } }) : current.club;
       if (clubId && clubId !== current.clubId && current.coachGroups.length) throw new FeeSettingsError("Премахнете групите на състезателя преди смяна на клуба.");
-      if (resolveMemberFee({ ...current, paymentAmount: paymentAmountUpdate ?? current.paymentAmount }, targetClub.defaultPaymentAmount).source === "conflict") {
+      const proposedFee = resolveMemberFee({
+        ...current,
+        paymentAmount: paymentAmountUpdate ?? current.paymentAmount,
+        feeExempt: hasPaymentAmount ? body.feeExempt === true : current.feeExempt,
+      }, targetClub.defaultPaymentAmount);
+      if (proposedFee.source === "conflict") {
         throw new FeeSettingsError(feeConflictMessage, 409);
       }
       return tx.player.update({
@@ -311,7 +337,7 @@ export async function PUT(
             : {}),
           ...(status ? { status } : {}),
           ...(firstBillingMonthUpdate !== undefined ? { firstBillingMonth: firstBillingMonthUpdate } : {}),
-          ...(paymentAmountUpdate !== undefined ? { paymentAmount: paymentAmountUpdate } : {}),
+          ...(paymentAmountUpdate !== undefined ? { paymentAmount: paymentAmountUpdate, feeExempt: body.feeExempt === true } : {}),
         },
         include: {
           cards: { orderBy: { createdAt: "desc" } },

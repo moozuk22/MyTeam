@@ -73,6 +73,7 @@ export async function POST(
           select: {
             firstBillingMonth: true,
             paymentAmount: true,
+            feeExempt: true,
             billingCoachGroupId: true,
             coachGroups: { select: { id: true, name: true, paymentAmount: true } },
             remainingTrainingCredits: true,

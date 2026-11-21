@@ -5,7 +5,7 @@ export type GroupFeeSettings = {
   revision: string;
   groups: { id: string; name: string; paymentAmount: string | null }[];
   players: {
-    id: string; fullName: string; paymentAmount: string;
+    id: string; fullName: string; paymentAmount: string; feeExempt?: boolean;
     billingCoachGroupId: string | null; coachGroupIds: string[];
     isActive: boolean; teamGroup: number | null;
   }[];
@@ -21,7 +21,7 @@ export function previewGroupAssignmentFees(settings: GroupFeeSettings, targetId:
     const groups = coachGroupIds.map((id) => groupsById.get(id)).filter((group) => group !== undefined);
     const storedChoice = choices[player.id] ?? player.billingCoachGroupId;
     const billingCoachGroupId = storedChoice && coachGroupIds.includes(storedChoice) ? storedChoice : null;
-    const fee = resolveMemberFee({ paymentAmount: player.paymentAmount, billingCoachGroupId, coachGroups: groups }, settings.paymentAmount);
+    const fee = resolveMemberFee({ paymentAmount: player.paymentAmount, feeExempt: player.feeExempt, billingCoachGroupId, coachGroups: groups }, settings.paymentAmount);
     return { ...player, coachGroupIds, groups, billingCoachGroupId, fee };
   });
 }

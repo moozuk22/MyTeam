@@ -2,7 +2,7 @@
 
 import { isReportMonthActive } from "@/lib/paymentReportActivity";
 import { useEffect, useState } from "react";
-import { buildYearlyPaymentReport, formatRecordedPaymentAmounts } from "@/lib/yearlyPaymentReport";
+import { buildYearlyPaymentReport, formatRecordedPaymentAmounts, isZeroFeeRecord } from "@/lib/yearlyPaymentReport";
 import { type ReportKind, type ReportPlayer } from "../_types/members-page-types";
 import { MONTHS } from "../_utils/members-page-utils";
 import { CalendarIcon, ChartColumnIcon, ChevronDownIcon, CircleAlertIcon, PrinterIcon, TrendingUpIcon, UsersIcon, XIcon } from "./members-page-icons";
@@ -183,26 +183,6 @@ export function ReportsDialog({
   const selectedMonthIdx = MONTHS.indexOf(month);
   const selectedYear = Number(year);
 
-  const getPaymentDateForMonth = (player: ReportPlayer): string | null => {
-    let latestPaidAt: Date | null = null;
-
-    for (const log of player.paymentLogs ?? []) {
-      const paidForDate = new Date(log.paidFor);
-      const paidAtDate = new Date(log.paidAt);
-      if (Number.isNaN(paidForDate.getTime()) || Number.isNaN(paidAtDate.getTime())) {
-        continue;
-      }
-      if (paidForDate.getMonth() !== selectedMonthIdx || paidForDate.getFullYear() !== selectedYear) {
-        continue;
-      }
-      if (!latestPaidAt || paidAtDate > latestPaidAt) {
-        latestPaidAt = paidAtDate;
-      }
-    }
-
-    return latestPaidAt ? latestPaidAt.toLocaleDateString("bg-BG") : null;
-  };
-
   const normalizePlayerName = (name: string) =>
     name.normalize("NFC").toLocaleLowerCase("bg-BG").trim().replace(/\s+/g, " ");
   const searchTerms = normalizePlayerName(playerSearch).split(" ").filter(Boolean);
@@ -225,19 +205,22 @@ export function ReportsDialog({
   );
 
   const rows = monthlyPlayers.map((player) => {
-    const paidDate = getPaymentDateForMonth(player);
+    const records = player.paymentLogs.filter((log) => {
+      const period = new Date(log.paidFor);
+      const paidAt = new Date(log.paidAt);
+      return period.getUTCFullYear() === selectedYear && period.getUTCMonth() === selectedMonthIdx &&
+        !Number.isNaN(paidAt.getTime()) && paidAt <= now;
+    });
+    const payments = records.filter((record) => !isZeroFeeRecord(record));
+    const latestPaidAt = Math.max(...payments.map((payment) => new Date(payment.paidAt).getTime()));
     return {
       id: player.id,
       name: `${player.fullName}${player.isDeleted ? " (изтрит)" : ""}`,
       group: player.teamGroup,
-      amount: formatRecordedPaymentAmounts(player.paymentLogs.filter((log) => {
-        const period = new Date(log.paidFor);
-        const paidAt = new Date(log.paidAt);
-        return period.getUTCFullYear() === selectedYear && period.getUTCMonth() === selectedMonthIdx &&
-          !Number.isNaN(paidAt.getTime()) && paidAt <= now;
-      })),
-      date: paidDate ?? "—",
-      paid: Boolean(paidDate),
+      amount: formatRecordedPaymentAmounts(payments),
+      date: Number.isFinite(latestPaidAt) ? new Date(latestPaidAt).toLocaleDateString("bg-BG") : "—",
+      paid: payments.length > 0,
+      exempt: records.length > 0 && payments.length === 0,
       isActive: player.isActive !== false,
     };
   });
@@ -255,13 +238,13 @@ export function ReportsDialog({
   });
 
   const paidCount = rows.filter((row) => row.paid).length;
-  const total = rows.length;
+  const total = rows.filter((row) => !row.exempt).length;
   const pct = total > 0 ? Math.round((paidCount / total) * 100) : 0;
   const missing = total - paidCount;
 
   const filtered = rows.filter((row) => {
     if (statusFilter === "paid") return row.paid;
-    if (statusFilter === "unpaid") return !row.paid;
+    if (statusFilter === "unpaid") return !row.paid && !row.exempt;
     return true;
   });
 
@@ -282,7 +265,7 @@ export function ReportsDialog({
   const printReport = (kind: ReportKind) => {
     const yearly = kind === "yearly";
     const paid = yearly ? rowsYearly.reduce((sum, row) => sum + row.paidDueCount, 0) : paidCount;
-    const totalRows = yearly ? rowsYearly.reduce((sum, row) => sum + row.dueCount, 0) : rows.length;
+    const totalRows = yearly ? rowsYearly.reduce((sum, row) => sum + row.dueCount, 0) : total;
     const percent = totalRows > 0 ? Math.round((paid / totalRows) * 100) : 0;
     const unpaid = totalRows - paid;
     const periodTitle = kind === "monthly" ? `${month} ${year}` : `Година ${year}`;
@@ -296,7 +279,7 @@ export function ReportsDialog({
 
     if (typeof window === "undefined") return;
 
-    const monthLabels = { paid: "Платено", unpaid: "Неплатено", exempt: "Освободен", not_due: "Не се дължи" };
+    const monthLabels = { paid: "Платено", unpaid: "Неплатено", exempt: "Освободен от такса", not_due: "Не се дължи" };
     const yearlyStatusLabels = { paid: "Всички дължими такси са платени", unpaid: "Има неплатени такси", not_due: "Няма дължими такси", activity: "Платежна активност" };
     const tableRowsHtml = yearly
       ? filteredYearly.length > 0 ? filteredYearly.map((row, idx) => `
@@ -311,9 +294,9 @@ export function ReportsDialog({
             <tr>
               <td>${idx + 1}</td>
               <td>${escapeHtml(row.name)}</td>
-              <td>${escapeHtml(row.amount)}</td>
+              <td>${escapeHtml(row.exempt ? monthLabels.exempt : row.amount)}</td>
               <td>${escapeHtml(row.date)}</td>
-              <td>${row.paid ? "Платено" : "Неплатено"}</td>
+              <td>${row.exempt ? "Освободен от такса" : row.paid ? "Платено" : "Неплатено"}</td>
             </tr>
           `)
         .join("")
@@ -565,7 +548,7 @@ export function ReportsDialog({
               <tr>
                 <th>#</th>
                 <th>Име</th>
-                <th>Дата на плащане</th>
+                <th className="rd-date-heading">Дата на плащане</th>
                 <th>Статус</th>
               </tr>
             </thead>
@@ -583,11 +566,11 @@ export function ReportsDialog({
               {!loading && filtered.map((row, i) => (
                 <tr key={row.id}>
                   <td className="rd-td-muted">{i + 1}</td>
-                  <td>{row.name}</td>
+                  <td className="rd-player-name">{row.name}</td>
                   <td className="rd-td-dim">{row.date}</td>
                   <td>
-                    <span className={`rd-badge ${row.paid ? "rd-badge--paid" : "rd-badge--unpaid"}`}>
-                      {row.paid ? "Платено" : "Неплатено"}
+                    <span className={`rd-badge ${row.exempt ? "rd-badge--exempt" : row.paid ? "rd-badge--paid" : "rd-badge--unpaid"}`}>
+                      {row.exempt ? "Освободен от такса" : row.paid ? "Платено" : "Неплатено"}
                     </span>
                   </td>
                 </tr>

@@ -80,9 +80,12 @@ function normalizeMember(item: unknown): Member {
     birthDate: raw.birthDate ? String(raw.birthDate) : null,
     lastPaymentDate: raw.lastPaymentDate ? String(raw.lastPaymentDate) : null,
     paymentAmount: raw.paymentAmount === null || raw.paymentAmount === undefined ? null : String(raw.paymentAmount),
+    feeExempt: raw.feeExempt === true,
+    inheritedPaymentAmount: raw.inheritedPaymentAmount == null ? null : String(raw.inheritedPaymentAmount),
     club: clubRaw
       ? {
         playerFields: Array.isArray(clubRaw.playerFields) ? clubRaw.playerFields.map(String) : undefined,
+        defaultPaymentAmount: clubRaw.defaultPaymentAmount == null ? null : String(clubRaw.defaultPaymentAmount),
         id: String(clubRaw.id ?? ""),
         name: String(clubRaw.name ?? ""),
       }

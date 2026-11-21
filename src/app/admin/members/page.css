@@ -4023,6 +4023,16 @@
     text-align: left;
   }
 
+  .rd-table .rd-player-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .rd-table .rd-date-heading,
+  .rd-badge--exempt {
+    white-space: normal;
+  }
+
   .rd-table tbody tr {
     display: table-row;
   }

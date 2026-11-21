@@ -19,11 +19,11 @@ function amount(value: unknown) {
   if (parsed === null) throw new FeeSettingsError("Въведете валидна сума с до 2 десетични знака.");
   return parsed;
 }
-function feeRevision(clubAmount: string, groups: { id: string; paymentAmount: string | null }[], players: { id: string; paymentAmount: string; billingCoachGroupId: string | null; coachGroupIds: string[] }[]) {
+function feeRevision(clubAmount: string, groups: { id: string; paymentAmount: string | null }[], players: { id: string; paymentAmount: string; feeExempt?: boolean; billingCoachGroupId: string | null; coachGroupIds: string[] }[]) {
   return createHash("sha256").update(JSON.stringify({
     club: clubAmount,
     groups: groups.map((g) => [g.id, g.paymentAmount]).sort(),
-    players: players.map((p) => [p.id, p.paymentAmount, p.billingCoachGroupId, [...p.coachGroupIds].sort()]).sort(),
+    players: players.map((p) => [p.id, p.paymentAmount, Boolean(p.feeExempt), p.billingCoachGroupId, [...p.coachGroupIds].sort()]).sort(),
   })).digest("hex");
 }
 
@@ -38,7 +38,7 @@ export async function updateClubFees(clubId: string, input: unknown) {
     const players = await tx.player.findMany({ where: { clubId }, include: { coachGroups: true }, orderBy: { fullName: "asc" } });
     const revision = feeRevision(club.defaultPaymentAmount.toFixed(2),
       groups.map((g) => ({ id: g.id, paymentAmount: g.paymentAmount?.toFixed(2) ?? null })),
-      players.map((p) => ({ id: p.id, paymentAmount: p.paymentAmount.toFixed(2), billingCoachGroupId: p.billingCoachGroupId, coachGroupIds: p.coachGroups.map((g) => g.id) })));
+      players.map((p) => ({ id: p.id, paymentAmount: p.paymentAmount.toFixed(2), feeExempt: p.feeExempt, billingCoachGroupId: p.billingCoachGroupId, coachGroupIds: p.coachGroups.map((g) => g.id) })));
     if (body.expectedRevision !== undefined && body.expectedRevision !== revision) {
       throw new FeeSettingsError("Настройките са променени от друг потребител. Затворете прозореца и го отворете отново.", 409);
     }
@@ -75,9 +75,10 @@ export async function updateClubFees(clubId: string, input: unknown) {
         billingCoachGroupId = selected as string | null;
       }
       const paymentAmount = Object.hasOwn(personalFees, p.id) ? amount(personalFees[p.id]) : p.paymentAmount.toFixed(2);
-      const fee = resolveMemberFee({ paymentAmount, billingCoachGroupId, coachGroups: memberships }, clubAmount);
+      const feeExempt = !Object.hasOwn(personalFees, p.id) && Boolean(p.feeExempt);
+      const fee = resolveMemberFee({ paymentAmount, feeExempt, billingCoachGroupId, coachGroups: memberships }, clubAmount);
       if (fee.source === "conflict") conflicts.push({ id: p.id, fullName: p.fullName, groups: memberships.map((g) => ({ id: g.id, name: g.name, amount: g.paymentAmount ?? clubAmount })) });
-      return { id: p.id, fullName: p.fullName, paymentAmount, billingCoachGroupId, coachGroupIds: ids, effectiveAmount: fee.amount, source: fee.source, isActive: p.isActive, teamGroup: p.teamGroup };
+      return { id: p.id, fullName: p.fullName, paymentAmount, feeExempt, billingCoachGroupId, coachGroupIds: ids, effectiveAmount: fee.amount, source: fee.source, isActive: p.isActive, teamGroup: p.teamGroup };
     });
     if (body.preview !== true) {
       if (conflicts.length) throw new FeeSettingsError("Изберете такса за състезателите в групи с различни такси.", 409, conflicts);
@@ -96,7 +97,7 @@ export async function updateClubFees(clubId: string, input: unknown) {
         const original = playersById.get(p.id)!;
         if (Object.hasOwn(personalFees, p.id) || Object.hasOwn(choices, p.id) || Object.hasOwn(assignments, p.id) || original.billingCoachGroupId !== p.billingCoachGroupId) {
           await tx.player.update({ where: { id: p.id }, data: {
-            ...(Object.hasOwn(personalFees, p.id) ? { paymentAmount: p.paymentAmount } : {}),
+            ...(Object.hasOwn(personalFees, p.id) ? { paymentAmount: p.paymentAmount, feeExempt: false } : {}),
             billingCoachGroupId: p.billingCoachGroupId,
             ...(Object.hasOwn(assignments, p.id) ? { coachGroups: {
               disconnect: original.coachGroups.filter((group) => !p.coachGroupIds.includes(group.id)).map((group) => ({ id: group.id })),

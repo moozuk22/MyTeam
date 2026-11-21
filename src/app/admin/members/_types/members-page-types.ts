@@ -36,6 +36,7 @@ interface MemberCard {
 }
 
 interface MemberClub {
+  defaultPaymentAmount?: string | number | null;
   playerFields?: string[];
   id: string;
   name: string;
@@ -94,6 +95,8 @@ interface Member {
   birthDate: string | null;
   lastPaymentDate: string | null;
   paymentAmount: string | null;
+  feeExempt?: boolean;
+  inheritedPaymentAmount?: string | null;
   remainingTrainingCredits?: number;
   club?: MemberClub;
   paymentLogs: PaymentLog[];

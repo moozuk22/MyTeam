@@ -24,6 +24,7 @@ export async function getClubFinanceAnalysis(clubId: string, now = new Date()) {
           category_id AS "categoryId",kind,currency,sum(amount)::text AS amount
         FROM club_finance_entries
         WHERE club_id=${clubId}::uuid AND voided_at IS NULL
+          AND (kind <> 'revenue' OR amount <> 0 OR payment_reference IS NULL)
           AND occurred_at>=${period.gte} AND occurred_at<${period.lt}
         GROUP BY 1,category_id,kind,currency
       `),
@@ -52,7 +53,7 @@ export async function getClubDebtSummary(clubId: string) {
     const club = await tx.club.findUnique({where:{id:clubId},select:{paymentWorkflow:true,defaultPaymentAmount:true,overdueDay:true,overdueHour:true,overdueMinute:true}});
     if (!club) throw new FinanceError('Клубът не е намерен.',404);
     const debtAt = new Date();
-    const players = await tx.player.findMany({where:{clubId,isActive:true,status:{in:['warning','overdue']}},select:{id:true,createdAt:true,status:true,fullName:true,firstBillingMonth:true,remainingTrainingCredits:true,paymentAmount:true,billingCoachGroupId:true,coachGroups:{select:{id:true,name:true,paymentAmount:true}},paymentLogs:{select:{paidFor:true}},paymentWaivers:{select:{waivedFor:true}}}});
+    const players = await tx.player.findMany({where:{clubId,isActive:true,status:{in:['warning','overdue']}},select:{id:true,createdAt:true,status:true,fullName:true,firstBillingMonth:true,remainingTrainingCredits:true,paymentAmount:true,feeExempt:true,billingCoachGroupId:true,coachGroups:{select:{id:true,name:true,paymentAmount:true}},paymentLogs:{select:{paidFor:true}},paymentWaivers:{select:{waivedFor:true}}}});
     const debts = players.map(p=>playerDebt(p,club.paymentWorkflow,club.defaultPaymentAmount,debtAt,club)).filter(p=>p.periods.length);
     const outstanding = debts.reduce((sum,p)=>p.fee===null?sum:sum.add(new Prisma.Decimal(p.fee).mul(p.periods.length)),new Prisma.Decimal(0));
     return {outstanding:outstanding.toFixed(2),count:debts.length,incomplete:debts.some(p=>p.conflict)};
@@ -71,14 +72,19 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
   return prisma.$transaction(async tx => {
     const club = await tx.club.findUnique({ where: { id: clubId }, select: { financeStartedAt: true, paymentWorkflow: true, defaultPaymentAmount: true, overdueDay: true, overdueHour: true, overdueMinute: true } });
     if (!club) throw new FinanceError('Клубът не е намерен.',404);
-    const where = { clubId, voidedAt: null, ...(period ? { occurredAt: period } : {}) };
+    const where: Prisma.ClubFinanceEntryWhereInput = {
+      clubId,
+      voidedAt: null,
+      OR: [{ kind: { not: 'revenue' } }, { amount: { not: 0 } }, { paymentReference: null }],
+      ...(period ? { occurredAt: period } : {}),
+    };
     const listWhere = { ...where, ...(kind ? { kind } : {}), ...(category ? { categoryId: category } : {}) };
     const [categories, totals, entries, count, players] = await Promise.all([
       tx.clubFinanceCategory.findMany({ where: { clubId }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }] }),
       duesOnly ? Promise.resolve([]) : tx.clubFinanceEntry.groupBy({ by: ['kind','currency','categoryId'], where, _sum: { amount: true } }),
       duesOnly ? Promise.resolve([]) : tx.clubFinanceEntry.findMany({ where: listWhere, orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }], skip: (page-1)*20, take: 20, include: { category: { select: { name: true, isMembership: true } } } }),
       duesOnly ? Promise.resolve(0) : tx.clubFinanceEntry.count({ where: listWhere }),
-      tx.player.findMany({ where: { clubId, isActive: true, status: { in: ['warning','overdue'] } }, select: { id: true, createdAt: true, status: true, fullName: true, images: { select: { imageUrl: true, isAdminView: true } }, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
+      tx.player.findMany({ where: { clubId, isActive: true, status: { in: ['warning','overdue'] } }, select: { id: true, createdAt: true, status: true, fullName: true, images: { select: { imageUrl: true, isAdminView: true } }, firstBillingMonth: true, remainingTrainingCredits: true, paymentAmount: true, feeExempt: true, billingCoachGroupId: true, coachGroups: { select: { id: true, name: true, paymentAmount: true } }, paymentLogs: { select: { paidFor: true } }, paymentWaivers: { select: { waivedFor: true } } } }),
     ]);
     const currencies = new Map<string, { revenue: Prisma.Decimal; expense: Prisma.Decimal }>();
     currencies.set('EUR', { revenue: new Prisma.Decimal(0), expense: new Prisma.Decimal(0) });

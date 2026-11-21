@@ -15,6 +15,7 @@ import {
   resolveRollingThirtyDayStatus,
 } from "@/lib/paymentStatus";
 import { normalizePhone } from "@/lib/phone";
+import { resolveMemberFee } from "@/lib/memberFee";
 import { parsePaymentAmount } from "@/lib/paymentAmount";
 import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
 
@@ -385,9 +386,11 @@ export async function GET(request: NextRequest) {
         lastPaymentDate: true,
         firstBillingMonth: true,
         paymentAmount: true,
+        feeExempt: true,
+        billingCoachGroupId: true,
         remainingTrainingCredits: true,
         isActive: true,
-        coachGroups: { select: { id: true } },
+        coachGroups: { select: { id: true, name: true, paymentAmount: true } },
         customTrainingGroups: {
           select: {
             group: {
@@ -401,6 +404,7 @@ export async function GET(request: NextRequest) {
             name: true,
             paymentWorkflow: true,
             playerFields: true,
+            defaultPaymentAmount: true,
           },
         },
         cards: {
@@ -473,6 +477,7 @@ export async function GET(request: NextRequest) {
           : [];
       return {
         ...rest,
+        inheritedPaymentAmount: resolveMemberFee({ ...rest, paymentAmount: 0, feeExempt: false, coachGroups }, rest.club.defaultPaymentAmount).amount,
         coachGroupIds: coachGroups.map((g) => g.id),
         customTrainingGroupColors,
         customTrainingGroupNames: Array.from(new Set(

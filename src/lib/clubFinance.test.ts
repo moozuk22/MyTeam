@@ -7,6 +7,7 @@ vi.mock('./db', () => ({ prisma: { $transaction: (fn: (value: unknown) => unknow
 import { getClubDebtSummary, getClubFinance, mutateClubFinance } from './clubFinance';
 const club = '00000000-0000-0000-0000-000000000001';
 const category = '00000000-0000-0000-0000-000000000002';
+const visibleEntries = [{ kind: { not: 'revenue' } }, { amount: { not: 0 } }, { paymentReference: null }];
 const expense = { action: 'createExpense', categoryId: category, amount: '12,34', date: '2026-10-29', description: '' };
 beforeEach(() => { vi.resetAllMocks(); access.mockResolvedValue({enabled:true}); tx.clubCalculatorGrant.findFirst.mockResolvedValue({id:"grant"}); tx.clubFinanceCategory.findFirst.mockResolvedValue({ id: category }); });
 it('uses a shared category owned by this club and stores exact amounts', async () => {
@@ -57,7 +58,7 @@ it('reports exact decimal totals per currency and separates debt from period fil
  expect(result.debts[0].periods).toContain('2026-01');
  expect(result.debts[0].avatarUrl).toBe('https://example.com/admin.jpg');
  expect(tx.player.findMany).toHaveBeenCalledWith(expect.objectContaining({select:expect.objectContaining({images:{select:{imageUrl:true,isAdminView:true}}})}));
- expect(tx.clubFinanceEntry.groupBy).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,occurredAt:expect.any(Object)}}));
+ expect(tx.clubFinanceEntry.groupBy).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,OR:visibleEntries,occurredAt:expect.any(Object)}}));
  expect(tx.clubFinanceEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({kind:'expense'})}));
 });
 
@@ -131,9 +132,9 @@ it('applies the same inclusive month range to totals, categories and paginated e
  const result = await getClubFinance(club,new URLSearchParams({month:'2026-03..2026-10',page:'2',kind:'expense',category}));
  const occurredAt = {gte:new Date('2026-02-28T22:00:00Z'),lt:new Date('2026-10-31T22:00:00Z')};
  expect(result.month).toBe('2026-03..2026-10');
- expect(tx.clubFinanceEntry.groupBy).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,occurredAt}}));
- expect(tx.clubFinanceEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,occurredAt,kind:'expense',categoryId:category},skip:20,take:20}));
- expect(tx.clubFinanceEntry.count).toHaveBeenCalledWith({where:{clubId:club,voidedAt:null,occurredAt,kind:'expense',categoryId:category}});
+ expect(tx.clubFinanceEntry.groupBy).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,OR:visibleEntries,occurredAt}}));
+ expect(tx.clubFinanceEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{clubId:club,voidedAt:null,OR:visibleEntries,occurredAt,kind:'expense',categoryId:category},skip:20,take:20}));
+ expect(tx.clubFinanceEntry.count).toHaveBeenCalledWith({where:{clubId:club,voidedAt:null,OR:visibleEntries,occurredAt,kind:'expense',categoryId:category}});
  await expect(getClubFinance(club,new URLSearchParams({month:'2026-10..2026-03'}))).rejects.toThrow();
 });
 

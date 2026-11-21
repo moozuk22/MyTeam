@@ -187,3 +187,52 @@ it.each(["create", "admin edit", "member edit"])("saves the Sofia birthday age d
   expect(response.status).toBe(action === "create" ? 201 : 200);
   expect(action === "create" ? mocks.playerCreate.mock.calls[0][0].data.age : stored.age).toBe(16);
 });
+
+it("saves explicit zero separately from the inherited fee and restores inheritance", async () => {
+  const body = { fullName: "Player", clubId: "club", paymentAmount: "0" };
+  const exempt = await editPlayer(request({ ...body, feeExempt: true }), params);
+  expect(exempt.status).toBe(200);
+  expect(await exempt.json()).toMatchObject({ paymentAmount: "0.00", feeExempt: true });
+  const inherit = await editPlayer(request({ ...body, feeExempt: false }), params);
+  expect(inherit.status).toBe(200);
+  expect(await inherit.json()).toMatchObject({ paymentAmount: "0.00", feeExempt: false });
+});
+
+it("rejects fee changes by a coach from another club", async () => {
+  mocks.verify.mockResolvedValue({ roles: ["coach"], defaultClubId: "another-club" });
+  const response = await editPlayer(request({ fullName: "Player", paymentAmount: "0", feeExempt: true }), params);
+  expect(response.status).toBe(403);
+  expect(mocks.playerUpdate).not.toHaveBeenCalled();
+});
+
+it("rejects a transfer into a coach's club followed by a fee edit", async () => {
+  mocks.verify.mockResolvedValue({ roles: ["coach"], defaultClubId: "destination" });
+  mocks.clubFind.mockResolvedValue({ ...settings, id: "destination" });
+
+  const transfer = await editPlayer(request({ fullName: "Player", clubId: "destination" }), params);
+  const fee = await editPlayer(request({ fullName: "Player", paymentAmount: "15" }), params);
+
+  expect(transfer.status).toBe(403);
+  expect(fee.status).toBe(403);
+  expect(stored).toMatchObject({ clubId: "club", paymentAmount: 0 });
+  expect(mocks.playerUpdate).not.toHaveBeenCalled();
+});
+
+it("rejects an edit if the player moved out of the coach's club before the transaction", async () => {
+  mocks.verify.mockResolvedValue({ roles: ["coach"], defaultClubId: "club" });
+  mocks.playerCurrent.mockResolvedValue({ ...stored, clubId: "destination", club: settings });
+
+  const response = await editPlayer(request({ fullName: "Player" }), params);
+
+  expect(response.status).toBe(403);
+  expect(mocks.playerUpdate).not.toHaveBeenCalled();
+});
+
+it("rejects a transfer from the coach's club into a club outside their scope", async () => {
+  mocks.verify.mockResolvedValue({ roles: ["coach"], defaultClubId: "club" });
+
+  const response = await editPlayer(request({ fullName: "Player", clubId: "destination" }), params);
+
+  expect(response.status).toBe(403);
+  expect(mocks.playerUpdate).not.toHaveBeenCalled();
+});
