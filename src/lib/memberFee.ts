@@ -3,6 +3,7 @@ import { parsePaymentAmount } from "@/lib/paymentAmount";
 export type FeeGroup = { id: string; name: string; paymentAmount: unknown };
 export type FeePlayer = {
   paymentAmount: unknown;
+  feeExempt?: boolean;
   billingCoachGroupId?: string | null;
   coachGroups?: FeeGroup[];
 };
@@ -10,8 +11,9 @@ export const feeConflictMessage = "Изберете група за месечн
 
 export function resolveMemberFee(player: FeePlayer, clubAmount: unknown): {
   amount: string | null;
-  source: "personal" | "group" | "club" | "conflict";
+  source: "personal" | "group" | "club" | "exempt" | "conflict";
 } {
+  if (player.feeExempt) return { amount: "0.00", source: "exempt" };
   const personal = parsePaymentAmount(player.paymentAmount);
   if (personal !== null && Number(personal) > 0) return { amount: personal, source: "personal" };
   const fallback = parsePaymentAmount(clubAmount);

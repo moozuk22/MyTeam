@@ -46,3 +46,18 @@ it("snapshots the club fee when no personal fee is set, without requiring amount
   expect(response.status).toBe(200);
   expect(mocks.create).toHaveBeenCalledWith({ data: expect.objectContaining({ amount: "40.00", currency: "EUR" }) });
 });
+
+it("records a zero fee for an exempt player and keeps the period settled", async () => {
+  mocks.prisma.player.findUnique.mockResolvedValue({
+    id: "player", fullName: "Player", paymentAmount: "0.00", feeExempt: true,
+    firstBillingMonth: null, cards: [], club: { paymentWorkflow: "calendar_month", defaultPaymentAmount: "40.00" },
+  });
+  const response = await POST(request(), context);
+  expect(response.status).toBe(200);
+  expect(mocks.create).toHaveBeenCalledWith({ data: expect.objectContaining({ amount: "0.00" }) });
+  expect(mocks.updatePlayerStatusAfterPayment).toHaveBeenCalledWith(expect.objectContaining({ playerId: "player" }));
+
+  mocks.prisma.paymentLog.findFirst.mockResolvedValue({ id: "log" });
+  expect((await POST(request(), context)).status).toBe(400);
+  expect(mocks.create).toHaveBeenCalledTimes(1);
+});

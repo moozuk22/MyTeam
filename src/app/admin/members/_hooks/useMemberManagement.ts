@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import { uploadImage } from "@/lib/uploadImage";
 import { isValidPhone } from "@/lib/phone";
+import { parsePaymentAmount } from "@/lib/paymentAmount";
 import { normalizeMember } from "../_utils/members-page-utils";
 import { type Member, type ClubOption } from "../_types/members-page-types";
 
@@ -64,6 +65,7 @@ export function useMemberManagement({
     playerPhone: "",
     birthDate: "",
     paymentAmount: "",
+    useInheritedFee: true,
     avatarUrl: "",
     imageUrl: "",
     imagePublicId: "",
@@ -163,12 +165,14 @@ export function useMemberManagement({
                           imageUrl?: unknown;
                           imagePublicId?: unknown;
                           paymentWorkflow?: unknown;
+                          defaultPaymentAmount?: unknown;
                         })
                       : {};
                   const rawName = String(item.name ?? "").trim();
                   return {
                     id: String(item.id ?? ""),
                     name: rawName,
+                    defaultPaymentAmount: item.defaultPaymentAmount == null ? null : String(item.defaultPaymentAmount),
                     playerFields: Array.isArray(item.playerFields)
                       ? item.playerFields.map(String)
                       : undefined,
@@ -209,7 +213,8 @@ export function useMemberManagement({
       parentPhone: member.parentPhone ?? "",
       playerPhone: member.playerPhone ?? "",
       birthDate: member.birthDate ? new Date(member.birthDate).toISOString().slice(0, 10) : "",
-      paymentAmount: member.paymentAmount ?? "",
+      paymentAmount: member.feeExempt ? "0" : member.paymentAmount ?? "",
+      useInheritedFee: !member.feeExempt && !(Number(member.paymentAmount) > 0),
       avatarUrl: member.avatarUrl ?? "",
       imageUrl: member.imageUrl ?? "",
       imagePublicId: member.imagePublicId ?? "",
@@ -257,11 +262,15 @@ export function useMemberManagement({
       setEditError("Player phone is invalid.");
       return;
     }
-    const normalizedPaymentAmount = !coachGroupId ? editForm.paymentAmount.trim().replace(",", ".") : "";
-    if (normalizedPaymentAmount && !/^\d+(\.\d{1,2})?$/.test(normalizedPaymentAmount)) {
-      setEditError("Месечната такса трябва да е положително число с до 2 знака след десетичната запетая.");
+    const paymentAmount = editForm.useInheritedFee ? "0.00" : parsePaymentAmount(editForm.paymentAmount);
+    if (!coachGroupId && paymentAmount === null) {
+      setEditError("Въведете сума от 0 нагоре с до 2 знака след десетичната запетая.");
       return;
     }
+    const feeExempt = !editForm.useInheritedFee && paymentAmount === "0.00";
+    const previousFeeExempt = memberToEdit.feeExempt === true;
+    const previousAmount = previousFeeExempt ? "0.00" : parsePaymentAmount(memberToEdit.paymentAmount) ?? "0.00";
+    const feeChanged = !coachGroupId && (feeExempt !== previousFeeExempt || paymentAmount !== previousAmount);
 
     setIsSavingEdit(true);
     setEditError("");
@@ -295,7 +304,7 @@ export function useMemberManagement({
           parentPhone: editForm.parentPhone.trim() || null,
           playerPhone: editForm.playerPhone.trim() || null,
           birthDate: editForm.birthDate.trim() || null,
-          ...(normalizedPaymentAmount ? { paymentAmount: normalizedPaymentAmount } : {}),
+          ...(feeChanged ? { paymentAmount, feeExempt } : {}),
           avatarUrl: resolvedAvatarUrl,
           imageUrl: resolvedImageUrl,
           imagePublicId: resolvedImagePublicId,

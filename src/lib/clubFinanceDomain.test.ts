@@ -85,3 +85,10 @@ it('uses the Sofia creation month at a UTC month boundary',()=>{
  const added={...player,createdAt:new Date('2026-09-30T21:30:00Z'),firstBillingMonth:date('2026-09')};
  expect(playerDebt(added,'calendar_month','75',new Date('2026-11-05T12:00:00Z')).periods).toEqual(['2026-10','2026-11']);
 });
+
+it("excludes exempt players from outstanding periods", () => {
+  const exempt = { ...player, feeExempt: true };
+  const now = new Date("2026-10-29");
+  expect(playerDebt(exempt, "calendar_month", "40", now)).toMatchObject({ periods: [], fee: "0.00", conflict: false });
+  expect(playerDebt(exempt, "rolling_30_days", "40", now).periods).toEqual([]);
+});

@@ -54,6 +54,12 @@ export function MemberEditorDialog({
     handleSaveMemberEdit,
   } = memberManagement;
   const { trainingDayDetailsOpening } = trainingAttendanceState;
+  const clubFee = editForm.clubId === memberToEdit?.club?.id
+    ? memberToEdit?.club?.defaultPaymentAmount
+    : clubs.find((club) => club.id === editForm.clubId)?.defaultPaymentAmount;
+  const inheritedFee = editForm.clubId === memberToEdit?.club?.id
+    ? memberToEdit?.inheritedPaymentAmount
+    : clubFee;
   return (
     <>
       {memberToEdit && (
@@ -162,17 +168,43 @@ export function MemberEditorDialog({
                   />
                 </label>
                 {!coachGroupId && (
-                  <label className="amp-edit-field">
-                    <span className="amp-lbl">Лична такса (0 = групова / клубна)</span>
-                    <input
-                      className="amp-edit-input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editForm.paymentAmount}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, paymentAmount: e.target.value }))}
-                    />
-                  </label>
+                  <div className="amp-edit-field">
+                    <label className="amp-edit-field">
+                      <span className="amp-lbl">Месечна такса (€)</span>
+                      <input
+                        className="amp-edit-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editForm.useInheritedFee ? inheritedFee ?? "" : editForm.paymentAmount}
+                        onChange={(e) => setEditForm((prev) => ({
+                          ...prev, paymentAmount: e.target.value, useInheritedFee: false,
+                        }))}
+                      />
+                    </label>
+                    <span className="amp-lbl">
+                      Клубна такса: {clubFee == null ? "—" : `${clubFee} €`}
+                    </span>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={editForm.useInheritedFee}
+                        onChange={(e) => setEditForm((prev) => ({
+                          ...prev,
+                          useInheritedFee: e.target.checked,
+                          paymentAmount: e.target.checked ? "" : String(inheritedFee ?? ""),
+                        }))}
+                      />{" "}
+                      Използвай групова / клубна такса
+                    </label>
+                    {!editForm.useInheritedFee && (
+                      <span className="amp-lbl">
+                        {editForm.paymentAmount !== "" && Number(editForm.paymentAmount) === 0
+                          ? "Освободен от такса"
+                          : "Лична такса"}
+                      </span>
+                    )}
+                  </div>
                 )}
                 <label className="amp-edit-field amp-edit-field--full">
                   <span className="amp-lbl">Текуща снимка</span>

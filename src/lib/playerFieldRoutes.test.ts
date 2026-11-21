@@ -187,3 +187,20 @@ it.each(["create", "admin edit", "member edit"])("saves the Sofia birthday age d
   expect(response.status).toBe(action === "create" ? 201 : 200);
   expect(action === "create" ? mocks.playerCreate.mock.calls[0][0].data.age : stored.age).toBe(16);
 });
+
+it("saves explicit zero separately from the inherited fee and restores inheritance", async () => {
+  const body = { fullName: "Player", clubId: "club", paymentAmount: "0" };
+  const exempt = await editPlayer(request({ ...body, feeExempt: true }), params);
+  expect(exempt.status).toBe(200);
+  expect(await exempt.json()).toMatchObject({ paymentAmount: "0.00", feeExempt: true });
+  const inherit = await editPlayer(request({ ...body, feeExempt: false }), params);
+  expect(inherit.status).toBe(200);
+  expect(await inherit.json()).toMatchObject({ paymentAmount: "0.00", feeExempt: false });
+});
+
+it("rejects fee changes by a coach from another club", async () => {
+  mocks.verify.mockResolvedValue({ roles: ["coach"], defaultClubId: "another-club" });
+  const response = await editPlayer(request({ fullName: "Player", paymentAmount: "0", feeExempt: true }), params);
+  expect(response.status).toBe(403);
+  expect(mocks.playerUpdate).not.toHaveBeenCalled();
+});

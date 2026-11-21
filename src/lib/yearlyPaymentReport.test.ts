@@ -70,3 +70,17 @@ it("uses the fee period year, ignores invalid logs, and does not invent monthly 
   expect(report).toMatchObject({ status: "activity", dueCount: 0, missingCount: 0, paidMonthCount: 1 });
   expect(report.months[11].status).toBe("paid");
 });
+
+it("shows a recorded zero fee as exempt and keeps paid amounts in later months", () => {
+  const report = buildYearlyPaymentReport({
+    ...player,
+    paymentLogs: [
+      { paidFor: "2026-01-01", paidAt: "2026-01-05", amount: "0.00" },
+      { paidFor: "2026-02-01", paidAt: "2026-02-05", amount: "50.00" },
+    ],
+  }, 2026, new Date("2026-02-20"));
+  expect(report.months[0]).toMatchObject({ status: "exempt", due: false });
+  expect(report.months[1].status).toBe("paid");
+  expect(report.paidMonthCount).toBe(1);
+  expect(report.totalAmountLabel).toBe("50.00 EUR");
+});

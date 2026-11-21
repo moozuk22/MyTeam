@@ -20,3 +20,8 @@ describe("member fee priority", () => {
     expect(resolveMemberFee({ paymentAmount: 0, coachGroups: [{ ...groups[0], paymentAmount: "0" }] }, "85").amount).toBe("0.00");
   });
 });
+
+it("keeps explicit zero exempt even when the player belongs to groups with different fees", () => {
+  expect(resolveMemberFee({ paymentAmount: 0, feeExempt: true, coachGroups: groups }, "85"))
+    .toEqual({ amount: "0.00", source: "exempt" });
+});

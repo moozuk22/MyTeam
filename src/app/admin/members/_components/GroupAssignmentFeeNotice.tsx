@@ -15,7 +15,7 @@ export default function GroupAssignmentFeeNotice({ rows, clubAmount, busy, onCho
     </p>}
     {rows.map((row) => <div className="amp-assignment-fee-row" key={row.id}>
       <strong>{row.fullName}</strong>
-      {row.fee.source === "personal" ? <p>Личната такса {row.fee.amount} € се запазва. Групите няма да я променят.</p> : <>
+      {row.fee.source === "exempt" ? <p>Освободен от такса</p> : row.fee.source === "personal" ? <p>Личната такса {row.fee.amount} € се запазва. Групите няма да я променят.</p> : <>
         {row.groups.length > 1 && <label className="amp-edit-field amp-edit-field--full">
           <span className="amp-lbl">Група за таксата на {row.fullName}</span>
           <select className="amp-edit-input" value={row.billingCoachGroupId ?? ""} disabled={busy} onChange={(e) => onChoice(row.id, e.target.value)}>

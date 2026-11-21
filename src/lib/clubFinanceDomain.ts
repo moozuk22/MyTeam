@@ -47,7 +47,7 @@ function hasReachedStatusUpdate(now: Date, schedule: ClubDebtSchedule) {
 export function playerDebt(player: DebtPlayer, workflow: string, clubAmount: unknown, now = new Date(), schedule: ClubDebtSchedule = {}) {
   const fee = resolveMemberFee(player, clubAmount);
   const periods: string[] = [];
-  const eligible = player.status === 'warning' || player.status === 'overdue';
+  const eligible = fee.source !== 'exempt' && (player.status === 'warning' || player.status === 'overdue');
   if (eligible && workflow === 'calendar_month') {
     if (player.firstBillingMonth) {
       const created = financeDateKey(player.createdAt);
