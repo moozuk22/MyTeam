@@ -2,7 +2,7 @@
 
 import { sessionUrl, type SessionTarget } from "@/lib/exercise/trainingSession";
 import SectionNav from "../SectionNav";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
 import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Layers, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
@@ -14,6 +14,7 @@ import TrainingDocumentDialog from "./TrainingDocumentDialog";
 import PrintChoiceDialog, { type PrintChoice, type PrintTraining } from "./PrintChoiceDialog";
 import dynamic from "next/dynamic";
 import { withCoachImages } from "../documents/documentRequest";
+import { fitTextareas } from "./fitTextareas";
 import "../documents/documents.css";
 import "./workspace.css";
 type Cycle = { id: string; canLink: boolean; links: Record<string, string | null>; groupKey: string; groupName: string; content: CycleContent; revision: number };
@@ -256,6 +257,18 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const selectedName = data?.groups.find(g => g.key === selected)?.name ?? data?.cycles.find(c => c.groupKey === selected)?.groupName;
   const range = formatWeekRange(week);
   const updateCell = (i: number, j: number, value: string) => change({ ...content, rows: content.rows.map((r, n) => n === i ? { ...r, cells: r.cells.map((v, k) => k === j ? value : v) } : r) });
+  const rowsRef = useRef<HTMLTableSectionElement>(null);
+  // The fields of each training fit their text. On wide screens the fields of a training have the same height.
+  useLayoutEffect(() => {
+    const body = rowsRef.current;
+    if (!body) return;
+    const wide = window.matchMedia("(min-width: 640px)");
+    const fit = () => fitTextareas(Array.from(body.rows, (row) => Array.from(row.querySelectorAll("textarea"))), wide.matches);
+    fit();
+    void document.fonts?.ready.then(fit);
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [content.rows, selected, paper]);
 
   const selectedCycle = data?.cycles.find(c => c.groupKey === selected);
   function documentAction(rowId: string) {
@@ -395,7 +408,7 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
                 <tr><th rowSpan={2} className="mc-col-num">№</th><th>Подготвителна част</th><th colSpan={4}>Основна част</th></tr>
                 <tr>{cycleColumns.map(c => <th key={c}>{c}</th>)}</tr>
               </thead>
-              <tbody>
+              <tbody ref={rowsRef}>
                 {content.rows.length === 0 && <tr className="mc-empty-row"><td colSpan={6}>{readOnly ? "Няма добавени тренировки." : "Няма добавени тренировки. Използвайте „Добави тренировка“."}</td></tr>}
                 {content.rows.map((row, i) => <tr key={row.id} id={`training-${row.id}`} tabIndex={-1}>
                   <th scope="row" className="mc-col-num">

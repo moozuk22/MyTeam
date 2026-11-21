@@ -160,7 +160,7 @@ Run `npm run test:training-images:db` to check the complete save and deletion fl
 
 Entry from the club page permits creation, changes, and deletion. Entry with `coachGroupId` shows that group's custom training groups in a read-only view. Save and print access use the existing training plan subscription checks. Each group has one shared cycle per week. Existing private documents retain their access rules.
 
-Choose a group to open its cycle. Use **Добави тренировка** to add a row. Enter text in the warm-up field and the four main-part fields. Use **Запази** to save changes. Concurrent changes produce an error instead of replacing the saved revision.
+Choose a group to open its cycle. Use **Добави тренировка** to add a row. Enter text in the warm-up field and the four main-part fields. Each field changes its height to fit its text. On screens 640 px or wider, all fields of a training have the height of the tallest field. Use **Запази** to save changes. Concurrent changes produce an error instead of replacing the saved revision.
 
 The `20261119200000_training_microcycles` migration creates a separate table. Apply and verify this migration in development before deployment. No production migration has been run during this change.
 

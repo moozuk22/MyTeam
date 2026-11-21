@@ -129,7 +129,8 @@
 .mc-row-title { display: block; text-align: center; font-weight: 750; font-size: 1.0625rem; }
 .mc-row-label { display: none; }
 .mc-page .mc-remove { margin: 8px auto 0; color: var(--plan-danger-text); }
-.mc-table td textarea { min-height: 150px; }
+/* The script sets the height of the fields to the height of their text. */
+.mc-page .mc-table td textarea { min-height: 72px; overflow: hidden; resize: none; }
 .mc-cell-label { display: none; }
 .mc-empty-row td { padding: 28px 16px; color: var(--plan-muted); text-align: center; }
 .mc-page .mc-add { margin-top: 12px; width: 100%; border-style: dashed; }
@@ -160,7 +161,7 @@
   .mc-page .mc-remove { margin: 0; }
   .mc-table td { display: grid; gap: 5px; }
   .mc-cell-label { display: block; }
-  .mc-table td textarea { min-height: 88px; }
+  .mc-page .mc-table td textarea { min-height: 52px; }
   .mc-empty-row { background: transparent !important; border-style: dashed !important; }
   .mc-actions > :is(.tp-primary-btn) { flex: 1 1 100%; }
   .mc-actions > .tp-secondary-btn, .mc-actions > .tp-danger-btn { flex: 1 1 calc(50% - 4px); }
