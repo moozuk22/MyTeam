@@ -570,11 +570,121 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
   html:not([data-training-print-authorized="true"]) .td-page { display: none !important; }
 }
 
-.td-reference { margin-block: 12px; padding: 12px; border: 1px solid var(--plan-border); border-radius: 12px; background: var(--plan-card); }
-.td-reference summary { cursor: pointer; font-weight: 700; }
-.td-reference dl { display: grid; gap: .75rem; }
-.td-reference dt { font-weight: 600; }
-.td-reference dd { margin: .25rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The methodist's instructions: a card above the editor with one tile for each part of the training. */
+.td-reference {
+  margin-block: 12px;
+  overflow: hidden;
+  border: 1px solid var(--plan-accent-border);
+  border-radius: 16px;
+  background: var(--plan-card);
+  color: var(--plan-text);
+}
+.td-reference-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 0;
+  background: linear-gradient(120deg, #123220, var(--plan-panel));
+}
+.td-reference-title { display: flex; flex: 1 1 auto; min-width: 0; margin: 0; font-size: inherit; }
+.td-reference-toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 4px 4px 4px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.td-reference-toggle:focus-visible { outline: 2px solid var(--plan-accent); outline-offset: -2px; }
+.td-reference-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--plan-selected);
+  color: var(--plan-icon);
+}
+.td-reference-heading { display: grid; flex: 1 1 auto; gap: 6px; min-width: 0; }
+.td-reference-name { font-size: 1rem; font-weight: 800; line-height: 1.2; }
+.td-reference-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.td-reference-chips span {
+  padding: 2px 10px;
+  border: 1px solid var(--plan-border);
+  border-radius: 999px;
+  background: var(--plan-field);
+  color: var(--plan-muted);
+  font-size: .8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.td-reference-chevron { flex: none; color: var(--plan-muted); transition: transform .2s ease; }
+.td-reference-toggle[aria-expanded="false"] .td-reference-chevron { transform: rotate(-90deg); }
+.td-page .td-reference-refresh { flex: none; }
+.td-reference-body { display: grid; gap: 10px; padding: 12px; }
+.td-reference-body[hidden] { display: none; }
+.td-reference-body > p, .td-reference-body > .td-feedback { margin: 0; }
+.td-reference-changed {
+  padding: 8px 10px;
+  border: 1px solid var(--plan-warning-border);
+  border-radius: 10px;
+  background: var(--plan-warning-bg);
+  color: var(--plan-warning-text);
+  font-size: .875rem;
+}
+.td-reference-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.td-reference-item {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--plan-border);
+  border-radius: 12px;
+  background: var(--plan-panel);
+}
+.td-reference-item > div { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.td-reference-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--plan-primary-bg);
+  color: var(--plan-primary-text);
+  font-size: .8125rem;
+  font-weight: 800;
+}
+.td-reference-item--extra .td-reference-mark { background: var(--plan-field); color: var(--plan-accent); box-shadow: inset 0 0 0 1px var(--plan-accent-border); }
+.td-reference-item h3 {
+  margin: 0;
+  color: var(--plan-accent);
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.td-reference-item p { margin: 0; line-height: 1.4; white-space: pre-line; overflow-wrap: anywhere; }
+.td-reference-item p.td-reference-empty { color: var(--plan-muted); font-style: italic; }
+.td-reference-item .td-skeleton--meta { width: 55%; }
+.td-reference-item .td-skeleton--title { width: 85%; }
+@media (prefers-reduced-motion: reduce) { .td-reference-chevron { transition: none; } }
 @media print { .td-reference { display: none; } }
 @media (max-width: 375px) {
   .td-view-switch { min-width: 0; max-width: 100%; }
@@ -644,8 +754,7 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
   overflow-wrap: anywhere;
 }
 .td-field-warning svg { flex: none; margin-top: 1px; }
-.td-reference-training { color: var(--plan-muted); font-weight: 600; }
-.td-reference-note { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--plan-selected); color: var(--plan-accent); }
+.td-reference-note { padding: 8px 10px; border-radius: 8px; background: var(--plan-selected); color: var(--plan-accent); }
 @media print { .td-field-warning, .td-combo-options { display: none; } }
 
 /* The trainings that use the plan. The numbers come from the microcycles. */
