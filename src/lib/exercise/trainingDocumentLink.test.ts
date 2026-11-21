@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   updateDocument: vi.fn(),
   createLink: vi.fn(),
   updateLink: vi.fn(),
+  deleteLink: vi.fn(),
   club: vi.fn(),
 }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
@@ -41,13 +42,14 @@ vi.mock("@/lib/db", () => ({
       club: { findUnique: mocks.club },
       trainingPlan: { findMany: vi.fn().mockResolvedValue([]) },
       trainingPlanDocument: { findFirst: mocks.find, createMany: mocks.createDocument, updateMany: mocks.updateDocument },
-      trainingSessionDocument: { create: mocks.createLink, update: mocks.updateLink },
+      trainingSessionDocument: { create: mocks.createLink, update: mocks.updateLink, deleteMany: mocks.deleteLink },
     }),
   },
 }));
 
 import { POST } from "@/app/api/admin/clubs/[id]/training-plans/documents/route";
 import { GET, PUT } from "@/app/api/admin/clubs/[id]/training-plans/documents/[documentId]/route";
+import { DELETE as unlink } from "@/app/api/admin/clubs/[id]/training-plans/microcycles/session/route";
 
 const clubId = "11111111-1111-4111-8111-111111111111";
 const documentId = "22222222-2222-4222-8222-222222222222";
@@ -348,5 +350,43 @@ describe("the author of a plan", () => {
     const response = await POST(request("POST", { id: copyId, content }), { params: Promise.resolve({ id: clubId }) });
     expect(response.status).toBe(201);
     expect(mocks.createDocument).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ownerId: `coach-group:${coach}` }) }));
+  });
+});
+
+describe("removing the plan from a training", () => {
+  const remove = (id = documentId) => unlink(new NextRequest(`${base}/api/admin/clubs/${clubId}/training-plans/microcycles/session?${
+    new URLSearchParams({ clubId, coachGroupId: coach, ...target, documentId: id })}`, {
+    method: "DELETE", headers: { cookie: "admin_session=test", origin: base },
+  }), { params: Promise.resolve({ id: clubId }) });
+
+  it("removes only the link and keeps the plan", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId, occupied: true });
+    expect((await remove()).status).toBe(204);
+    expect(mocks.reference).toHaveBeenCalledWith(expect.anything(), clubId, coach, target, true);
+    expect(mocks.deleteLink).toHaveBeenCalledWith({ where: { ...link, documentId } });
+    expect(mocks.updateDocument).not.toHaveBeenCalled();
+  });
+
+  it("does not remove a plan of another author", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: true });
+    expect((await remove()).status).toBe(409);
+    expect(mocks.deleteLink).not.toHaveBeenCalled();
+  });
+
+  it("does not remove a plan that the training no longer uses", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: current, occupied: true });
+    expect((await remove()).status).toBe(409);
+    expect(mocks.deleteLink).not.toHaveBeenCalled();
+  });
+
+  it("accepts a training that has no plan", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: false });
+    expect((await remove()).status).toBe(204);
+    expect(mocks.deleteLink).not.toHaveBeenCalled();
+  });
+
+  it("refuses a plan that is not valid", async () => {
+    expect((await remove("bad")).status).toBe(400);
+    expect(mocks.reference).not.toHaveBeenCalled();
   });
 });

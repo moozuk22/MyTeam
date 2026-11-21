@@ -11,6 +11,9 @@ import { cycleColumns, emptyCycle, formatWeekDates, formatWeekRange, shiftWeek, 
 import type { CompetitionSeason } from "@/lib/exercise/document";
 import { coachSections, filterGroups, NO_COACH_ID, type FilterGroup } from "@/lib/exercise/microcycleGroupFilter";
 import TrainingDocumentDialog from "./TrainingDocumentDialog";
+import PrintChoiceDialog, { type PrintChoice, type PrintTraining } from "./PrintChoiceDialog";
+import dynamic from "next/dynamic";
+import { withCoachImages } from "../documents/documentRequest";
 import "../documents/documents.css";
 import "./workspace.css";
 type Cycle = { id: string; canLink: boolean; links: Record<string, string | null>; groupKey: string; groupName: string; content: CycleContent; revision: number };
@@ -20,6 +23,34 @@ const headerFields = [["format", "Формат"], ["age", "Възраст"], ["s
 
 /** Waits for the paper sheet images so print and PDF include the club logo. */
 const imagesReady = (root: HTMLElement | null) => Promise.all([...root?.querySelectorAll("img") ?? []].map(img => img.decode().catch(() => undefined)));
+const DocumentSheet = dynamic(() => import("../documents/DocumentSheet"), { ssr: false });
+
+/** A4 landscape with 10 mm margins is 277 × 190 mm (about 1047 × 718 CSS px). Shrinks the week sheet to fit one page. */
+function fitWeek(el: HTMLElement) {
+  el.style.width = "1047px";
+  const scale = Math.min(1, 710 / el.offsetHeight);
+  if (scale < 1) el.style.zoom = String(scale);
+}
+
+/** Puts the week sheet on one A4 landscape page (277 × 190 mm inside 10 mm margins). */
+function addWeekPage(doc: import("jspdf").jsPDF, canvas: HTMLCanvasElement) {
+  const fit = Math.min(277 / canvas.width, 190 / canvas.height);
+  const width = canvas.width * fit; const height = canvas.height * fit;
+  doc.addImage(canvas.toDataURL("image/png"), "PNG", (297 - width) / 2, 10, width, height);
+}
+
+/** Waits until each plan has its drawings and the sheets keep the same layout. */
+async function printPagesReady(root: HTMLElement, count: number) {
+  const deadline = Date.now() + 30_000;
+  let stable = 0;
+  while (stable < 3) {
+    if (root.querySelector(".mc-print-doc [role=alert]")) throw new Error("Рисунките не могат да се подготвят за печат. Опитайте отново.");
+    if (Date.now() > deadline) throw new Error("Печатът не може да се подготви. Опитайте отново.");
+    stable = root.querySelectorAll('.td-preview[data-print-ready="true"]').length === count ? stable + 1 : 0;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  await imagesReady(root);
+}
 const upper = (value: string) => value.trim().toLocaleUpperCase("bg-BG");
 
 /** Sheet in the club's paper layout (without Saturday and Sunday rows). Used for print, PDF and the read-only coach view. */
@@ -79,6 +110,9 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const dialogs = useBrowserDialogs();
   const [openDocument, setOpenDocument] = useState<{ rowId: string; documentId: string }>();
+  const [printChoice, setPrintChoice] = useState<{ pdf: boolean }>();
+  const [bundle, setBundle] = useState<{ week: boolean; documents: PrintChoice["documents"] }>();
+  const bundleRef = useRef<HTMLDivElement>(null);
   const pendingRestore = useRef(restore);
   const sheet = useRef<HTMLDivElement>(null);
   const location = new URLSearchParams({ clubId, ...(coachGroupId ? { coachGroupId } : {}) }).toString();
@@ -134,30 +168,69 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
       const r = await fetch(`/api/admin/clubs/${clubId}/training-plans/access?operation=print`);
       const access = await r.json();
       if (!r.ok || !access.canPrint) throw new Error("Необходим е активен абонамент за печат.");
+      // When the trainings have plans, the user chooses what to print.
+      if (printTrainings().some(training => training.documentId)) { setPrintChoice({ pdf }); setBusy(false); return; }
+      await exportWeek(pdf);
+    } catch (e) { setPaper(false); setBusy(false); setError(e instanceof Error ? e.message : "Грешка при печат."); }
+  }
+  function printTrainings(): PrintTraining[] {
+    const links = selectedCycle?.canLink ? selectedCycle.links : {};
+    return content.rows.map((row, index) => ({ rowId: row.id, number: index + 1, documentId: links[row.id] }));
+  }
+  async function exportWeek(pdf: boolean) {
+    if (!pdf) {
+      flushSync(() => { setPrintAllowed(true); setPaper(true); });
+      await imagesReady(sheet.current);
+      const el = sheet.current!;
+      fitWeek(el);
+      requestAnimationFrame(() => { window.print(); el.style.width = ""; el.style.zoom = ""; setPrintAllowed(false); setPaper(false); setBusy(false); });
+      return;
+    }
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
+    flushSync(() => setPaper(true));
+    await imagesReady(sheet.current);
+    const canvas = await html2canvas(sheet.current!, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+    setPaper(false);
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    addWeekPage(doc, canvas);
+    doc.save(`microcycle-${week}.pdf`);
+    setBusy(false);
+  }
+  /** Prints the chosen pages. The week and each plan start on a separate page. */
+  async function exportChoice(pdf: boolean, choice: PrintChoice) {
+    setPrintChoice(undefined);
+    setBusy(true); setError("");
+    try {
+      if (!choice.documents.length) { await exportWeek(pdf); return; }
+      const documents = choice.documents.map(item => ({ ...item, content: withCoachImages({ ...item.content, session: {
+        // A linked plan does not store the numbers. The training gives them.
+        ...item.content.session, microcycle: content.number, sessionNumber: String(item.number) } }, coachGroupId ?? null) }));
+      flushSync(() => setBundle({ week: choice.week, documents }));
+      const root = bundleRef.current!;
+      await printPagesReady(root, documents.length);
+      const weekPage = root.querySelector<HTMLElement>(".mc-print-week");
+      const papers = [...root.querySelectorAll<HTMLElement>(".mc-print-doc .td-paper")];
       if (!pdf) {
-        flushSync(() => { setPrintAllowed(true); setPaper(true); });
-        await imagesReady(sheet.current);
-        const el = sheet.current!;
-        // A4 landscape with 10 mm margins is 277 × 190 mm (about 1047 × 718 CSS px). Shrink the sheet to fit one page.
-        el.style.width = "1047px";
-        const scale = Math.min(1, 710 / el.offsetHeight);
-        if (scale < 1) el.style.zoom = String(scale);
-        requestAnimationFrame(() => { window.print(); el.style.width = ""; el.style.zoom = ""; setPrintAllowed(false); setPaper(false); setBusy(false); });
+        if (weekPage) fitWeek(weekPage);
+        await new Promise<void>(resolve => requestAnimationFrame(() => { window.print(); resolve(); }));
         return;
       }
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
-      flushSync(() => setPaper(true));
-      await imagesReady(sheet.current);
-      const canvas = await html2canvas(sheet.current!, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-      setPaper(false);
-      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      // Fit the whole sheet on one A4 landscape page (277 × 190 mm inside 10 mm margins).
-      const fit = Math.min(277 / canvas.width, 190 / canvas.height);
-      const width = canvas.width * fit; const height = canvas.height * fit;
-      doc.addImage(canvas.toDataURL("image/png"), "PNG", (297 - width) / 2, 10, width, height);
-      doc.save(`microcycle-${week}.pdf`);
-      setBusy(false);
-    } catch (e) { setPaper(false); setBusy(false); setError(e instanceof Error ? e.message : "Грешка при печат."); }
+      const [{ default: html2canvas }, { jsPDF }, { addDocumentPages, releaseCanvases }] = await Promise.all([
+        import("html2canvas-pro"), import("jspdf"), import("../documents/documentPdf")]);
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+      const canvases: HTMLCanvasElement[] = [];
+      try {
+        if (weekPage) {
+          const canvas = await html2canvas(weekPage, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+          canvases.push(canvas);
+          addWeekPage(doc, canvas);
+        }
+        for (const [index, paper] of papers.entries()) await addDocumentPages(doc, paper, canvases, index === 0 && !weekPage);
+        doc.save(`microcycle-${week}.pdf`);
+      } finally { releaseCanvases(canvases); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Грешка при печат.");
+    } finally { setBundle(undefined); setBusy(false); }
   }
 
   const archived = filterGroups((data?.cycles.filter(c => !data.groups.some(g => g.key === c.groupKey)) ?? []).map(c => ({ key: c.groupKey, name: c.groupName })), query);
@@ -205,10 +278,31 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     return <TrainingDocumentDialog endpoint={`/api/admin/clubs/${clubId}/training-plans/documents`} documentId={openDocument.documentId}
       coachGroupId={coachGroupId} previewHref={sessionUrl("documents", location, target, openDocument.documentId)}
       chooseHref={`${sessionUrl("documents", location, target, "choose")}&replace=${openDocument.documentId}`}
-      onNavigate={guardNavigation} onClose={() => setOpenDocument(undefined)} />;
+      onNavigate={guardNavigation} onRemove={() => removeDocument(selectedCycle.id, openDocument.rowId, openDocument.documentId)}
+      onClose={() => setOpenDocument(undefined)} />;
   }
-  return <main className={`tp-page mc-page${printAllowed ? " mc-print-allowed" : ""}`}>
+  async function removeDocument(cycleId: string, rowId: string, documentId: string) {
+    const params = new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(location)), cycleId, groupKey: selected, week, rowId, documentId });
+    const response = await fetch(`/api/admin/clubs/${clubId}/training-plans/microcycles/session?${params}`, { method: "DELETE", cache: "no-store" });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? "План-конспектът не може да бъде премахнат.");
+    // The training is free again, so it offers to add a plan.
+    setData(current => current && { ...current, cycles: current.cycles.map(cycle => cycle.id !== cycleId ? cycle
+      : { ...cycle, links: Object.fromEntries(Object.entries(cycle.links).filter(([key]) => key !== rowId)) }) });
+    setOpenDocument(undefined);
+  }
+  return <main className={`tp-page mc-page${printAllowed ? " mc-print-allowed" : ""}${bundle ? " mc-print-bundle-on" : ""}`}>
     {documentDialog()}
+    {printChoice && <PrintChoiceDialog pdf={printChoice.pdf} endpoint={`/api/admin/clubs/${clubId}/training-plans/documents`} coachGroupId={coachGroupId}
+      weekLabel={`${selectedName ?? ""} · ${range}`} trainings={printTrainings()}
+      onConfirm={choice => void exportChoice(printChoice.pdf, choice)} onClose={() => setPrintChoice(undefined)} />}
+    {bundle && <div ref={bundleRef} className="mc-print-bundle" aria-hidden="true" inert>
+      {bundle.week && <div className="mc-print-page mc-print-week">
+        <PaperSheet clubName={data?.club.name ?? ""} logoUrl={clubLogoUrl} week={week} content={content} />
+      </div>}
+      {bundle.documents.map(item => <div className="mc-print-page mc-print-doc" key={item.rowId}>
+        <DocumentSheet content={item.content} clubLogoUrl={clubLogoUrl} pending={false} printActions={false} />
+      </div>)}
+    </div>}
     <div className="tp-inner">
       <header className="tp-header">
         <BackLink className="tp-back-btn" href={`/admin/members?${location}`}><ArrowLeft size={16} aria-hidden="true" /> Назад</BackLink>

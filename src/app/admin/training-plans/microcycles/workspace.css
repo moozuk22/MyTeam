@@ -283,3 +283,54 @@ body:has(.mc-doc-dialog[open]) { overflow: hidden; }
 .mc-doc-dialog .tp-modal-header { flex-wrap: nowrap; align-items: flex-start; margin-bottom: 14px; }
 .mc-doc-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
 .mc-doc-dialog-actions > * { flex: 1 1 10rem; justify-content: center; }
+.mc-doc-dialog-error { margin: 0 14px 14px; }
+
+/* Choice of the pages to print: the week and the plans of the trainings. */
+.mc-print-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mc-print-dialog::backdrop { background: #08120ecc; }
+body:has(.mc-print-dialog[open]) { overflow: hidden; }
+.mc-print-dialog .tp-modal-header { flex-wrap: nowrap; align-items: flex-start; margin-bottom: 8px; }
+.mc-print-note { margin: 0 14px 10px; color: var(--plan-muted); font-size: .875rem; }
+.mc-print-all { margin: 0 14px 10px; }
+.mc-print-options { display: grid; gap: 6px; margin: 0 14px 12px; padding: 0; border: 0; min-width: 0; }
+.mc-print-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--plan-border);
+  border-radius: 10px;
+  background: var(--plan-card);
+  cursor: pointer;
+}
+.mc-print-option:has(input:checked) { border-color: var(--plan-accent); background: var(--plan-selected); }
+.mc-print-option:has(input:disabled) { cursor: default; opacity: .7; }
+.mc-print-option input { flex: none; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--plan-accent); }
+.mc-print-option > span { display: grid; gap: 2px; min-width: 0; }
+.mc-print-option small { color: var(--plan-muted); overflow-wrap: anywhere; }
+.mc-print-option .td-skeleton { width: 10rem; max-width: 100%; }
+.mc-print-error { margin: 0 14px 12px; }
+.mc-print-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 0 14px 14px; }
+.mc-print-actions > * { flex: 1 1 9rem; justify-content: center; }
+
+/* The chosen pages are prepared out of view. Only print shows them. */
+.mc-print-bundle { position: fixed; top: 0; left: -20000px; width: 1100px; pointer-events: none; }
+.mc-print-week { width: 1100px; background: #fff; color: #111; }
+@media print {
+  .mc-page.mc-print-bundle-on { margin: 0 !important; padding: 0 !important; min-height: 0 !important; background: #fff !important; }
+  .mc-print-bundle-on > :not(.mc-print-bundle) { display: none !important; }
+  .mc-print-bundle-on .mc-print-bundle, .mc-print-bundle-on .mc-print-bundle * { visibility: visible; }
+  .mc-print-bundle-on .mc-print-bundle { position: static; width: auto; }
+  .mc-print-week { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .mc-print-week .mcp-table tr { break-inside: avoid; }
+  .mc-print-page + .mc-print-page { break-before: page; }
+}
