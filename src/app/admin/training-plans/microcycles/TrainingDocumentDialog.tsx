@@ -7,7 +7,7 @@ import { summarizeDocument, type SavedDocument } from "@/lib/exercise/document";
 import { DocumentCardContent, formatUpdated } from "../documents/DocumentCard";
 import { documentRequest } from "../documents/documentRequest";
 
-type Loaded = { id: string; title: string; updatedAt: string; preview: ReturnType<typeof summarizeDocument> };
+type Loaded = { id: string; title: string; updatedAt: string; preview: ReturnType<typeof summarizeDocument>; usages: SavedDocument["usages"] };
 
 /** Shows the plan of a training as a card, with a link to its preview and a link to choose another plan. */
 export default function TrainingDocumentDialog({ endpoint, documentId, coachGroupId, previewHref, chooseHref, onNavigate, onClose }: {
@@ -35,7 +35,7 @@ export default function TrainingDocumentDialog({ endpoint, documentId, coachGrou
       .then(({ document }) => {
         if (abort.signal.aborted) return;
         const preview = summarizeDocument(document.content);
-        setDocument({ id: document.id, title: document.content.session.title.trim() || "План-конспект", updatedAt: document.updatedAt, preview });
+        setDocument({ id: document.id, title: document.content.session.title.trim() || "План-конспект", updatedAt: document.updatedAt, preview, usages: document.usages });
       })
       .catch((failure: Error) => { if (!abort.signal.aborted) setError(failure.message); });
     return () => abort.abort();

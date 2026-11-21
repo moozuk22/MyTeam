@@ -2,6 +2,8 @@
 
 import { Fragment, useId, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
+import { CalendarDays } from "lucide-react";
+import { TimeInput } from "@/components/TimeInput";
 import {
   documentBottomGroups, exerciseFields, sessionFields, sectionTitles,
   type DocumentSection, type DrawingSnapshot, type Merge, type PlanContent, type SessionFields,
@@ -25,7 +27,17 @@ function Field({ label, value, max, type, id: customId, heading, wrapHeading, re
     {max >= 250 || wrapHeading
       ? <textarea id={id} value={value} maxLength={max} rows={wrapHeading ? 1 : 2} readOnly={readOnly}
           placeholder={wrapHeading ? label : undefined} onChange={(event) => onChange(event.target.value)} />
-      : <input id={id} type={type ?? "text"} value={value} maxLength={max} readOnly={readOnly} placeholder={heading ? label : undefined}
+      : type === "time"
+        ? <TimeInput id={id} step={60} value={value} readOnly={readOnly} onValueChange={onChange} />
+        : type === "date"
+        ? <span className="td-date-field">
+            <span className={value ? "td-date-value" : "td-date-value td-date-empty"} aria-hidden="true">{value ? value.split("-").reverse().join(".") : "дд.мм.гггг"}</span>
+            <input id={id} type="date" value={value} readOnly={readOnly}
+              onClick={(event) => { try { event.currentTarget.showPicker(); } catch { /* Keep the native field editable where showPicker is unavailable. */ } }}
+              onChange={(event) => onChange(event.target.value)} />
+            <CalendarDays size={16} aria-hidden="true" />
+          </span>
+        : <input id={id} type={type ?? "text"} value={value} maxLength={max} readOnly={readOnly} placeholder={heading ? label : undefined}
           onChange={(event) => onChange(event.target.value)} />}
   </div>;
 }

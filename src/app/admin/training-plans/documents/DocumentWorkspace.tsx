@@ -33,8 +33,11 @@ function DocumentListSkeleton() {
 }
 
 /** Read-only preview of a plan before the coach links it to the training. */
-function DocumentChoice({ item, coach, endpoint, context, clubLogoUrl, editHref, linking, error, onUse, onBack }: {
-  item: DocumentSummary; coach: string | null; endpoint: string; context: string; clubLogoUrl?: string; editHref: string; linking: boolean; error: string; onUse: () => void; onBack: () => void;
+function DocumentChoice({ item, coach, endpoint, trainingUrl, context, clubLogoUrl, editHref, linking, error, onUse, onBack }: {
+  item: DocumentSummary; coach: string | null; endpoint: string;
+  /** Reads the training that the plan is for. The preview shows its group, season and numbers, as the editor does. */
+  trainingUrl: string;
+  context: string; clubLogoUrl?: string; editHref: string; linking: boolean; error: string; onUse: () => void; onBack: () => void;
 }) {
   const [document, setDocument] = useState<SavedDocument>();
   const [loadError, setLoadError] = useState("");
@@ -49,11 +52,16 @@ function DocumentChoice({ item, coach, endpoint, context, clubLogoUrl, editHref,
 
   useEffect(() => {
     const abort = new AbortController();
-    void documentRequest<{ document: SavedDocument }>(`${endpoint}/${item.id}`, "План-конспектът не може да се зареди.", { signal: abort.signal }, coach)
-      .then(({ document }) => { if (!abort.signal.aborted) setDocument(document); })
-      .catch((failure: Error) => { if (!abort.signal.aborted) setLoadError(failure.message); });
+    void Promise.all([
+      documentRequest<{ document: SavedDocument }>(`${endpoint}/${item.id}`, "План-конспектът не може да се зареди.", { signal: abort.signal }, coach),
+      documentRequest<TrainingReference>(trainingUrl, "Тренировката не може да се зареди.", { signal: abort.signal }),
+    ]).then(([{ document }, training]) => {
+      if (abort.signal.aborted) return;
+      const { group, season, halfSeason, microcycle, sessionNumber } = training;
+      setDocument({ ...document, content: { ...document.content, session: { ...document.content.session, group, season, halfSeason, microcycle, sessionNumber } } });
+    }).catch((failure: Error) => { if (!abort.signal.aborted) setLoadError(failure.message); });
     return () => abort.abort();
-  }, [endpoint, item.id, coach, attempt]);
+  }, [endpoint, trainingUrl, item.id, coach, attempt]);
 
   return <section aria-labelledby="td-choice-title">
     <header className="tp-header">
@@ -83,7 +91,7 @@ function DocumentChoice({ item, coach, endpoint, context, clubLogoUrl, editHref,
   </section>;
 }
 
-function DocumentList({ coach, endpoint, listHref, libraryHref, context, clubLogoUrl, location, target, replace }: { coach: string | null; endpoint: string; listHref: string; libraryHref: string; context: string; clubLogoUrl?: string; location: string; target?: SessionTarget; replace?: string }) {
+function DocumentList({ coach, endpoint, drawingEndpoint, listHref, libraryHref, context, clubLogoUrl, location, target, replace }: { coach: string | null; endpoint: string; drawingEndpoint: string; listHref: string; libraryHref: string; context: string; clubLogoUrl?: string; location: string; target?: SessionTarget; replace?: string }) {
   const dialogs = useBrowserDialogs();
   const [page, setPage] = useState<Page>();
   const [cursor, setCursor] = useState<string | null>(null);
@@ -143,7 +151,10 @@ function DocumentList({ coach, endpoint, listHref, libraryHref, context, clubLog
     }
   }
 
-  if (chosen && target) return <DocumentChoice item={chosen} coach={coach} endpoint={endpoint} context={context} clubLogoUrl={clubLogoUrl}
+  const trainingQuery = new URLSearchParams(location);
+  for (const [key, value] of Object.entries(target ?? {})) trainingQuery.set(key, value);
+  if (chosen && target) return <DocumentChoice item={chosen} coach={coach} endpoint={endpoint}
+    trainingUrl={`${drawingEndpoint}/microcycles/session?${trainingQuery}`} context={context} clubLogoUrl={clubLogoUrl}
     editHref={`${sessionUrl("documents", location, target, chosen.id)}&link=1${replaceQuery(replace)}`} linking={linking} error={error} onUse={() => void linkDocument(chosen.id)}
     onBack={() => { if (linking) return; setError(""); setChosen(undefined); }} />;
 
@@ -226,8 +237,8 @@ export default function DocumentWorkspace({ target, clubId, clubName, clubLogoUr
   const context = groupName ? `${clubName} · ${groupName}` : clubName;
   return <main className={`tp-page td-page${!selected || selected === "choose" ? " td-library" : ""}`}>
     <div className="tp-inner td-inner">
-      {!selected && <DocumentList coach={coach} endpoint={endpoint} listHref={listHref} libraryHref={libraryHref} context={context} location={location} />}
-      {selected === "choose" && target && <DocumentList target={target} coach={coach} endpoint={endpoint}
+      {!selected && <DocumentList coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint} listHref={listHref} libraryHref={libraryHref} context={context} location={location} />}
+      {selected === "choose" && target && <DocumentList target={target} coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint}
         listHref={`${sessionUrl("documents", location, target, "choose")}${replaceQuery(replace)}`} replace={replace}
         libraryHref={sessionUrl("microcycles", location, target)} context={context} clubLogoUrl={clubLogoUrl} location={location} />}
       {selected && selected !== "choose" && selected !== "new" && !loaded && <section aria-label="План-конспект">

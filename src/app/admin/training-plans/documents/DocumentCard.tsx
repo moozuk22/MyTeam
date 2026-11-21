@@ -3,6 +3,8 @@ import type { DocumentPreview, DocumentSummary } from "@/lib/exercise/document";
 
 const dateFormat = new Intl.DateTimeFormat("bg-BG", { dateStyle: "medium", timeZone: "Europe/Sofia" });
 
+const MAX_USAGE_TAGS = 2;
+
 const months = ["ЯНУ", "ФЕВ", "МАР", "АПР", "МАЙ", "ЮНИ", "ЮЛИ", "АВГ", "СЕП", "ОКТ", "НОЕ", "ДЕК"];
 
 /** Calendar tile with the training date, or a document icon when there is no valid date. */
@@ -24,12 +26,16 @@ export function formatUpdated(value: string) {
 }
 
 /** The inside of a plan card: title, tags, details and counts. The caller puts it in a link or a button. */
-export function DocumentCardContent({ item }: { item: Pick<DocumentSummary, "title" | "preview"> }) {
+export function DocumentCardContent({ item }: { item: Pick<DocumentSummary, "title" | "preview" | "usages"> }) {
   const preview = item.preview ?? null;
   const who = [preview?.day, preview?.group, preview?.coach].filter(Boolean).join(" · ");
+  // A linked plan shows the trainings that use it. The numbers come from the microcycles.
+  const usages = item.usages ?? [];
   const tags = [
-    preview?.sessionNumber && `Тренировка № ${preview.sessionNumber}`,
-    preview?.microcycle && `Микроцикъл ${preview.microcycle}`,
+    ...(usages.length
+      ? [...usages.slice(0, MAX_USAGE_TAGS).map(usage => `Микроцикъл ${usage.microcycle || "—"} · № ${usage.sessionNumber || "—"}`),
+        usages.length > MAX_USAGE_TAGS && `+${usages.length - MAX_USAGE_TAGS} тренировки`]
+      : [preview?.sessionNumber && `Тренировка № ${preview.sessionNumber}`, preview?.microcycle && `Микроцикъл ${preview.microcycle}`]),
     preview?.period,
   ].filter(Boolean) as string[];
   const stats = [

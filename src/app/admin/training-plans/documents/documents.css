@@ -339,6 +339,27 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
 .td-field textarea { resize: vertical; line-height: 1.45; }
 .td-field-wide textarea { min-height: 5.5em; }
 .td-page .td-field :is(input[type="date"], input[type="time"])::-webkit-calendar-picker-indicator { filter: none; }
+.td-date-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 36px 8px 10px;
+  border: 1px solid var(--plan-border);
+  border-radius: 10px;
+  color: var(--plan-text);
+  background: var(--plan-field);
+  font-size: 1rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.td-date-field .td-date-empty { color: var(--plan-muted); }
+.td-date-field > svg { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--plan-muted); pointer-events: none; }
+.td-field .td-date-field input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.td-date-field input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.td-date-field:has(input:focus-visible) { outline: 2px solid var(--plan-accent); outline-offset: 1px; }
+.td-date-field:has(input:disabled) { opacity: .6; }
+.td-date-field:has(input:disabled) input { cursor: default; }
 .td-field label { color: var(--plan-muted); }
 .td-field :is(input, textarea)::placeholder { color: var(--plan-muted); opacity: 1; }
 .td-edit-paper .td-field :focus-visible { outline-offset: 1px; }
@@ -626,3 +647,12 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
 .td-reference-training { color: var(--plan-muted); font-weight: 600; }
 .td-reference-note { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--plan-selected); color: var(--plan-accent); }
 @media print { .td-field-warning, .td-combo-options { display: none; } }
+
+/* The trainings that use the plan. The numbers come from the microcycles. */
+.td-usages { margin-block: 12px; padding: 12px; border: 1px solid var(--plan-border); border-radius: 12px; background: var(--plan-card); }
+.td-usages h2 { margin: 0 0 8px; display: flex; align-items: center; gap: 6px; font-size: 1rem; }
+.td-usages ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.td-usages li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.td-usages li span { font-weight: 600; }
+.td-usages small { color: var(--plan-muted); overflow-wrap: anywhere; }
+@media print { .td-usages { display: none; } }

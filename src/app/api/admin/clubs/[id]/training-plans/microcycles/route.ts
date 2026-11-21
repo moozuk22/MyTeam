@@ -15,7 +15,7 @@ async function scope(request: NextRequest, id: string, write = false) {
   if (coach !== undefined && (!UUID_RE.test(coach) || !await findTrainingPlanCoachGroup(id, coach))) return NextResponse.json({ error: "Невалидна група." }, { status: 404 });
   if (write && coach !== undefined) return NextResponse.json({ error: "Този изглед е само за четене." }, { status: 403 });
   const result = await microcycleGroups(id, coach);
-  return result ? { ...result, userId: auth.sub } : NextResponse.json({ error: "Няма такъв клуб." }, { status: 404 });
+  return result ?? NextResponse.json({ error: "Няма такъв клуб." }, { status: 404 });
 }
 export async function GET(request: NextRequest, { params }: Context) {
   const { id } = await params;
@@ -32,9 +32,8 @@ export async function GET(request: NextRequest, { params }: Context) {
     const modern = request.nextUrl.searchParams.get("version") === "2";
     const cycles = await prisma.trainingMicrocycle.findMany({ where: { clubId: id, week, ...(coach ? { groupKey: { in: result.groups.map(g => g.key) } } : {}) }, include: { documents: { select: { rowId: true, groupKey: true, document: { select: { id: true, ownerId: true } } } } } });
     const coachId = request.nextUrl.searchParams.get("coachGroupId");
-    const { userId, ...view } = result;
-    const active = new Set(view.groups.map(g => g.key));
-    return NextResponse.json({ ...view, cycles: cycles.map(({ documents, ...cycle }) => {
+    const active = new Set(result.groups.map(g => g.key));
+    return NextResponse.json({ ...result, cycles: cycles.map(({ documents, ...cycle }) => {
       const content = parseCycle(cycle.content);
       if (!modern) {
         const { rows, format, age, season, half, number, saturday, sunday } = content;
@@ -42,7 +41,8 @@ export async function GET(request: NextRequest, { params }: Context) {
       }
       const canLink = !!coachId && active.has(cycle.groupKey);
       const links = canLink ? Object.fromEntries(documents.filter(d => d.groupKey === cycle.groupKey)
-        .map(d => [d.rowId, (d.document.ownerId === coachAuthor(coachId!) || d.document.ownerId === userId) ? d.document.id : null])) : {};
+        // A plan of another author is hidden. The training shows only that it has a plan.
+        .map(d => [d.rowId, d.document.ownerId === coachAuthor(coachId!) ? d.document.id : null])) : {};
       return { ...cycle, content, canLink, links };
     }) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch { return NextResponse.json({ error: "Микроциклите не могат да бъдат заредени. Опитайте отново." }, { status: 500 }); }

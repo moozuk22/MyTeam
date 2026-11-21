@@ -1,4 +1,5 @@
 import type { Exercise } from "./model";
+import type { TrainingUsage } from "./trainingUsage";
 import { TRAINING_UUID_PATTERN } from "@/lib/trainingPlans";
 
 export const sessionFields = [
@@ -45,7 +46,10 @@ export type PlanContent = {
   sections: DocumentSection[];
   merge: Merge;
 };
-export type SavedDocument = { originKey?: string | null; id: string; content: PlanContent; revision: number; updatedAt: string };
+export type SavedDocument = { originKey?: string | null; id: string; content: PlanContent; revision: number; updatedAt: string;
+  /** The trainings that use the plan. */
+  usages?: TrainingUsage[];
+};
 export type DocumentPreview = {
   date: string; day: string; time: string; period: string; microcycle: string; sessionNumber: string;
   gameMoment: string; objective: string; group: string; coach: string; playerCount: string;
@@ -53,7 +57,7 @@ export type DocumentPreview = {
   duration: string;
   drawings: number;
 };
-export type DocumentSummary = { id: string; title: string; updatedAt: string; revision: number; preview: DocumentPreview | null };
+export type DocumentSummary = { id: string; title: string; updatedAt: string; revision: number; preview: DocumentPreview | null; usages?: TrainingUsage[] };
 export type DocumentInput = Omit<PlanContent, "sections"> & {
   sections: (SectionFields & { drawing: string | null })[];
 };

@@ -1,12 +1,12 @@
 import { canLinkTraining, linkTrainingDocument, replacedDocument, sessionTarget } from "@/lib/exercise/trainingSession";
-import { trainingReference } from "@/lib/exercise/trainingSessionAccess";
+import { documentOwnerFilter, trainingReference } from "@/lib/exercise/trainingSessionAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { currentCompetitionSeason, readDocumentInput, type PlanContent } from "@/lib/exercise/document";
 import { documentImageIds, removeUnusedImages, storeDocumentImages, syncDocumentImages, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
-import { documentOwnerFilter } from "@/lib/exercise/trainingSessionAccess";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
+import { documentUsages, hasTrainingLinks, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
 
 type Context = { params: Promise<{ id: string; documentId: string }> };
 
@@ -32,8 +32,11 @@ function conflict() {
 export async function GET(request: NextRequest, context: Context) {
   const where = await documentScope(request, context);
   if (where instanceof NextResponse) return where;
+  // A user can see only the plans of their author: the coach group, or the admin account.
   const document = await prisma.trainingPlanDocument.findFirst({ where, select: documentDetail });
-  return document ? NextResponse.json({ document }, { headers: { "Cache-Control": "private, no-store" } }) : missing();
+  if (!document) return missing();
+  const usages = (await documentUsages(prisma, where.clubId, [document.id])).get(document.id);
+  return NextResponse.json({ document: { ...document, usages } }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PUT(request: NextRequest, context: Context) {
@@ -61,16 +64,18 @@ export async function PUT(request: NextRequest, context: Context) {
     let linkTarget = false;
     let occupied = false;
     if (target) {
-      const reference = await trainingReference(tx, where.clubId, request.headers.get("x-coach-group"), target, true,
-        previous.ownerId.startsWith("coach-group:") ? undefined : previous.ownerId);
+      const reference = await trainingReference(tx, where.clubId, request.headers.get("x-coach-group"), target, true);
       linkTarget = link && reference.documentId !== where.id;
       occupied = reference.occupied;
       if (linkTarget && !canLinkTraining(reference, replace))
-        throw new TrainingImageError("За тренировката вече има план-конспект. Вашите промени са в редактора.", 409);
+        return NextResponse.json({ error: "За тренировката вече има план-конспект. Вашите промени са в редактора.",
+          ...(reference.documentId && { replaceDocumentId: reference.documentId }) }, { status: 409 });
       if (!linkTarget && reference.documentId !== where.id)
         throw new TrainingImageError("Връзката с тренировката е променена.", 409);
     }
     if (previous.revision !== body.revision) return conflict();
+    // Each training gives its own numbers, so a linked plan does not store them.
+    if (target || await hasTrainingLinks(tx, where.clubId, where.id)) Object.assign(input.session, withoutTrainingNumbers(input).session);
     if (target || previous.originKey) {
       const { season, halfSeason } = (previous.content as PlanContent).session;
       Object.assign(input.session, { season, halfSeason });
@@ -90,8 +95,9 @@ export async function PUT(request: NextRequest, context: Context) {
     if (target && linkTarget) await linkTrainingDocument(tx, where.clubId, target, where.id, occupied);
     await syncDocumentImages(tx, where.clubId, where.id, imageIds);
     await removeUnusedImages(tx, where.clubId, documentImageIds(previous.content as PlanContent));
+    const usages = (await documentUsages(tx, where.clubId, [where.id])).get(where.id);
     return NextResponse.json({
-      document: { id: where.id, revision: previous.revision + 1, content, updatedAt },
+      document: { id: where.id, revision: previous.revision + 1, content, updatedAt, usages },
     });
   });
 }

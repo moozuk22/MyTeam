@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const target = sessionTarget(Object.fromEntries(request.nextUrl.searchParams));
   if (!target) return NextResponse.json({ error: "Невалидна тренировка." }, { status: 400 });
   try {
-    return NextResponse.json(await trainingReference(prisma, id, request.nextUrl.searchParams.get("coachGroupId"), target, false, session.sub), { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(await trainingReference(prisma, id, request.nextUrl.searchParams.get("coachGroupId"), target, false), { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     if (error instanceof TrainingImageError) return NextResponse.json({ error: error.message }, { status: error.status });
     throw error;

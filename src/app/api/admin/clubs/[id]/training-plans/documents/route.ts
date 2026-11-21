@@ -8,6 +8,12 @@ import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage
 
 import { canLinkTraining, linkTrainingDocument, replacedDocument, sessionOrigin, sessionTarget } from "@/lib/exercise/trainingSession";
 import { coachAuthor, documentOwnerFilter, trainingReference } from "@/lib/exercise/trainingSessionAccess";
+import { documentUsages, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
+
+/** The training already has another plan. When the plan is the coach's own, the editor offers to replace it. */
+function occupiedTraining(error: string, documentId: string | null, extra?: object) {
+  return NextResponse.json({ error, ...extra, ...(documentId && { replaceDocumentId: documentId }) }, { status: 409 });
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: clubId } = await params;
@@ -27,7 +33,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     take: 26,
     select: { id: true, title: true, updatedAt: true, revision: true, content: true },
   });
-  const documents = rows.slice(0, 25).map(({ content, ...row }) => ({ ...row, preview: summarizeDocument(content) }));
+  const page = rows.slice(0, 25);
+  const usages = await documentUsages(prisma, clubId, page.map(row => row.id));
+  const documents = page.map(({ content, ...row }) => ({ ...row, preview: summarizeDocument(content), usages: usages.get(row.id) ?? [] }));
   return NextResponse.json({ documents, nextCursor: rows.length > 25 ? documents[24].id : null },
     { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -50,13 +58,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Невалидна тренировка или план-конспект." }, { status: 400 });
     const ownerId = await documentOwnerFilter(clubId, session.sub, coach);
     return withTrainingImages(clubId, async tx => {
-      const reference = await trainingReference(tx, clubId, coach, target, true, session.sub);
+      const reference = await trainingReference(tx, clubId, coach, target, true);
+      // A training can use only the plans of the coach.
       const source = await tx.trainingPlanDocument.findFirst({ where: { id, clubId, ownerId }, select: { id: true } });
       if (!source) throw new TrainingImageError("План-конспектът не е намерен.", 404);
-      if (reference.documentId === source.id) return NextResponse.json(source);
-      if (!canLinkTraining(reference, replace)) throw new TrainingImageError("За тренировката вече има план-конспект.", 409);
+      if (reference.documentId === source.id)
+        return NextResponse.json({ ...source, usages: (await documentUsages(tx, clubId, [source.id])).get(source.id) });
+      if (!canLinkTraining(reference, replace)) return occupiedTraining("За тренировката вече има план-конспект.", reference.documentId);
       await linkTrainingDocument(tx, clubId, target, source.id, reference.occupied);
-      return NextResponse.json(source, { status: 201 });
+      return NextResponse.json({ ...source, usages: (await documentUsages(tx, clubId, [source.id])).get(source.id) }, { status: 201 });
     });
   }
   const forkFrom = body?.forkFrom;
@@ -72,20 +82,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (body.target !== undefined && !target) return NextResponse.json({ error: "Невалидна тренировка." }, { status: 400 });
 
   const privateDraft = !target && body.privateCoachDraft === true;
-  if (privateDraft && !await findTrainingPlanCoachGroup(clubId, coach))
+  // With a coach link, the coach group is the author also of a plan that the coach makes in the library.
+  if ((privateDraft || (coach && !target)) && !await findTrainingPlanCoachGroup(clubId, coach))
     return NextResponse.json({ error: "Необходима е група на треньора." }, { status: 403 });
   const input = { ...parsedInput, session: { ...parsedInput.session, ...(!privateDraft && !forkFrom && currentCompetitionSeason()) } };
   const sourceOwner = forkFrom ? await documentOwnerFilter(clubId, session.sub, coach) : undefined;
   return withTrainingImages(clubId, async (tx) => {
     if (target && !coach) throw new TrainingImageError("Необходима е група на треньора.", 403);
-    const where = { id: body.id as string, clubId, ownerId: target || privateDraft ? coachAuthor(coach!) : session.sub };
+    const where = { id: body.id as string, clubId, ownerId: target || privateDraft || coach ? coachAuthor(coach!) : session.sub };
     const existing = await tx.trainingPlanDocument.findFirst({ where, select: documentDetail });
     let previous: PlanContent | undefined;
     let occupied = false;
     if (target) {
       let reference;
       try {
-        reference = await trainingReference(tx, clubId, coach, target, true, session.sub);
+        reference = await trainingReference(tx, clubId, coach, target, true);
       } catch (error) {
         if (error instanceof TrainingImageError && (error.status === 410 || error.status === 403)) {
           const committed = existing?.originKey === sessionOrigin(target);
@@ -98,18 +109,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         throw new TrainingImageError("Този запис вече съществува в библиотеката.", 409);
       occupied = reference.occupied;
       if (!existing && !forkFrom && !canLinkTraining(reference, replace))
-        return NextResponse.json({ error: "За тренировката вече има друг план-конспект. Вашият текст е в редактора.", recovery: "private" }, { status: 409 });
+        return occupiedTraining("За тренировката вече има друг план-конспект. Вашият текст е в редактора.", reference.documentId, { recovery: "private" });
       if (forkFrom && !existing) {
-        if (reference.documentId !== forkFrom && (!link || !canLinkTraining(reference, replace)))
-          throw new TrainingImageError(link ? "За тренировката вече има план-конспект. Вашите промени са в редактора."
-            : "Връзката с тренировката е променена. Вашите промени са в редактора.", 409);
+        if (reference.documentId !== forkFrom && !link)
+          throw new TrainingImageError("Връзката с тренировката е променена. Вашите промени са в редактора.", 409);
+        if (reference.documentId !== forkFrom && !canLinkTraining(reference, replace))
+          return occupiedTraining("За тренировката вече има план-конспект. Вашите промени са в редактора.", reference.documentId);
         const source = await tx.trainingPlanDocument.findFirst({ where: { id: forkFrom, clubId, ownerId: sourceOwner }, select: documentDetail });
         if (!source || source.revision !== body.sourceRevision)
           throw new TrainingImageError("Изходният план-конспект е променен. Вашите промени са в редактора.", 409);
         previous = source.content as unknown as PlanContent;
       }
       if (!forkFrom) Object.assign(input.session, { group: reference.group, season: reference.season, halfSeason: reference.halfSeason });
-      if (body.automaticNumber === true) input.session.sessionNumber = reference.sessionNumber;
+      // Each training gives its own numbers, so a linked plan does not store them.
+      Object.assign(input.session, withoutTrainingNumbers(input).session);
     }
     if (existing) return NextResponse.json({ document: existing, alreadyCreated: true });
     if (!await tx.club.findUnique({ where: { id: clubId }, select: { id: true } }))
@@ -128,6 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await linkTrainingDocument(tx, clubId, target, document.id, occupied);
     }
     if (inserted.count) await syncDocumentImages(tx, clubId, document.id, imageIds);
-    return NextResponse.json({ document, alreadyCreated: !inserted.count }, { status: inserted.count ? 201 : 200 });
+    const usages = target ? (await documentUsages(tx, clubId, [document.id])).get(document.id) : [];
+    return NextResponse.json({ document: { ...document, usages }, alreadyCreated: !inserted.count }, { status: inserted.count ? 201 : 200 });
   });
 }

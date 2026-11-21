@@ -6,6 +6,8 @@ import { blankDocument, currentCompetitionSeason } from "./document";
 import { EMPTY_EXERCISE } from "./model";
 
 const mocks = vi.hoisted(() => ({
+  usages: vi.fn<(id: string) => unknown[] | undefined>(),
+  linked: vi.fn<() => boolean | undefined>(),
   session: vi.fn(),
   club: vi.fn(),
   drawings: vi.fn(),
@@ -18,6 +20,11 @@ const mocks = vi.hoisted(() => ({
   syncImages: vi.fn(),
 }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
+vi.mock("@/lib/exercise/trainingUsage", async (original) => ({
+  ...await original<typeof import("./trainingUsage")>(),
+  documentUsages: async (_db: unknown, _club: string, ids: string[]) => new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])),
+  hasTrainingLinks: async () => mocks.linked?.() ?? false,
+}));
 vi.mock("@/lib/db", () => ({
   prisma: {
     $transaction: mocks.transaction,
@@ -106,6 +113,13 @@ describe("training plan documents", () => {
     mocks.delete.mockResolvedValue({ count: 0 });
     expect((await DELETE(request("DELETE", undefined, "?revision=1"), detail)).status).toBe(404);
     expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("does not list the plans of other authors for a club scope", async () => {
+    mocks.session.mockResolvedValue({ sub: ownerId, roles: ["admin"] });
+    mocks.list.mockResolvedValue([]);
+    await list(request("GET", undefined, "?scope=club"), collection);
+    expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({ where: { clubId, ownerId } }));
   });
 
   it("lists a small preview instead of the full document content", async () => {

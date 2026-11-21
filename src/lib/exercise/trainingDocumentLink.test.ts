@@ -3,6 +3,8 @@ import { NextRequest } from "next/server";
 import { blankDocument } from "./document";
 
 const mocks = vi.hoisted(() => ({
+  usages: vi.fn<(id: string) => unknown[] | undefined>(),
+  linked: vi.fn<() => boolean | undefined>(),
   session: vi.fn(),
   reference: vi.fn(),
   find: vi.fn(),
@@ -13,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   club: vi.fn(),
 }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
+vi.mock("@/lib/exercise/trainingUsage", async (original) => ({
+  ...await original<typeof import("./trainingUsage")>(),
+  documentUsages: async (_db: unknown, _club: string, ids: string[]) => new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])),
+  hasTrainingLinks: async () => mocks.linked?.() ?? false,
+}));
 vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: async () => ({ enabled: true, canSave: true, canPrint: true }) }));
 vi.mock("@/lib/exercise/trainingSessionAccess", () => ({
   coachAuthor: (id: string) => `coach-group:${id}`,
@@ -27,6 +34,8 @@ vi.mock("@/lib/exercise/imageStorage", async (original) => ({
 }));
 vi.mock("@/lib/db", () => ({
   prisma: {
+    trainingPlanDocument: { findFirst: mocks.find },
+    coachGroup: { findFirst: async ({ where }: { where: { id: string } }) => ({ id: where.id, name: "Треньор" }) },
     $transaction: (fn: (tx: unknown) => unknown) => fn({
       $executeRaw: vi.fn(),
       club: { findUnique: mocks.club },
@@ -38,7 +47,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { POST } from "@/app/api/admin/clubs/[id]/training-plans/documents/route";
-import { PUT } from "@/app/api/admin/clubs/[id]/training-plans/documents/[documentId]/route";
+import { GET, PUT } from "@/app/api/admin/clubs/[id]/training-plans/documents/[documentId]/route";
 
 const clubId = "11111111-1111-4111-8111-111111111111";
 const documentId = "22222222-2222-4222-8222-222222222222";
@@ -137,6 +146,16 @@ describe("saving an unlinked plan for a training", () => {
       expect(mocks.createLink).not.toHaveBeenCalled();
     });
 
+    it("does not copy a plan of another author", async () => {
+      mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: false });
+      // The source lookup is limited to the coach's plans, so it finds no plan of another author.
+      mocks.find.mockReset().mockResolvedValue(null);
+      expect((await fork({ link: true })).status).toBe(409);
+      expect(mocks.find).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: { id: documentId, clubId, ownerId: "owner" } }));
+      expect(mocks.createDocument).not.toHaveBeenCalled();
+      expect(mocks.createLink).not.toHaveBeenCalled();
+    });
+
     it("keeps rejecting a copy of an unlinked plan without the link request", async () => {
       mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: false });
       expect((await fork({})).status).toBe(409);
@@ -211,5 +230,123 @@ describe("saving an unlinked plan for a training", () => {
       expect((await put({ link: true, ...body })).status).toBe(400);
       expect(mocks.updateDocument).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("one plan for more than one training", () => {
+  const numbered = { ...content, session: { ...content.session, microcycle: "3", sessionNumber: "2" } };
+  const linkOnly = (body: object) => POST(request("POST", { target, linkDocumentId: documentId, ...body }), { params: Promise.resolve({ id: clubId }) });
+
+  it("adds a training to the plan without a copy or a content change", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: false });
+    mocks.find.mockResolvedValue({ id: documentId });
+    mocks.usages.mockReturnValue([{ microcycle: "3", sessionNumber: "2" }]);
+    const response = await linkOnly({});
+    expect(response.status).toBe(201);
+    expect((await response.json()).usages).toEqual([{ microcycle: "3", sessionNumber: "2" }]);
+    expect(mocks.createLink).toHaveBeenCalledWith({ data: { ...link, documentId } });
+    expect(mocks.createDocument).not.toHaveBeenCalled();
+    expect(mocks.updateDocument).not.toHaveBeenCalled();
+  });
+
+  it("gives the plan that the coach can replace when the training has another plan", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: current, occupied: true });
+    mocks.find.mockResolvedValue({ id: documentId });
+    const response = await linkOnly({});
+    expect(response.status).toBe(409);
+    expect((await response.json()).replaceDocumentId).toBe(current);
+    expect(mocks.createLink).not.toHaveBeenCalled();
+  });
+
+  it("does not offer to replace a plan that the coach cannot see", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: true });
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1, ownerId: "owner", originKey: null });
+    const response = await put({ link: true });
+    expect(response.status).toBe(409);
+    expect((await response.json()).replaceDocumentId).toBeUndefined();
+  });
+
+  it("gives the plan to replace when an edited plan is saved for an occupied training", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: current, occupied: true });
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1, ownerId: "owner", originKey: null });
+    const response = await put({ link: true });
+    expect(response.status).toBe(409);
+    expect((await response.json()).replaceDocumentId).toBe(current);
+    expect(mocks.updateDocument).not.toHaveBeenCalled();
+  });
+
+  it("does not store the training numbers in a linked plan", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: false });
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1, ownerId: "owner", originKey: null });
+    expect((await put({ content: numbered, link: true })).status).toBe(200);
+    const saved = mocks.updateDocument.mock.calls[0][0].data.content.session;
+    expect([saved.microcycle, saved.sessionNumber]).toEqual(["", ""]);
+  });
+
+  it("does not store the training numbers in a new plan for a training", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: false });
+    mocks.find.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: copyId, content, revision: 1 });
+    expect((await POST(request("POST", { id: copyId, content: numbered, target }), { params: Promise.resolve({ id: clubId }) })).status).toBe(201);
+    const saved = mocks.createDocument.mock.calls[0][0].data.content.session;
+    expect([saved.microcycle, saved.sessionNumber]).toEqual(["", ""]);
+  });
+
+  it("does not store the training numbers when a linked plan is saved in the library", async () => {
+    mocks.linked.mockReturnValue(true);
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1, ownerId: "owner", originKey: null });
+    const response = await PUT(request("PUT", { content: numbered, revision: 1 }), { params: Promise.resolve({ id: clubId, documentId }) });
+    expect(response.status).toBe(200);
+    expect(mocks.updateDocument.mock.calls[0][0].data.content.session.microcycle).toBe("");
+  });
+
+  it("keeps the numbers of a plan that no training uses", async () => {
+    mocks.linked.mockReturnValue(false);
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1, ownerId: "owner", originKey: null });
+    expect((await PUT(request("PUT", { content: numbered, revision: 1 }), { params: Promise.resolve({ id: clubId, documentId }) })).status).toBe(200);
+    expect(mocks.updateDocument.mock.calls[0][0].data.content.session.sessionNumber).toBe("2");
+  });
+});
+
+describe("a plan of another author", () => {
+  const read = () => GET(new NextRequest(`${base}/api/admin/clubs/${clubId}/training-plans/documents/${documentId}`, {
+    headers: { cookie: "admin_session=test", "x-coach-group": coach },
+  }), { params: Promise.resolve({ id: clubId, documentId }) });
+
+  it("cannot be opened by the coach", async () => {
+    mocks.find.mockResolvedValue(null);
+    expect((await read()).status).toBe(404);
+    expect(mocks.find).toHaveBeenCalledWith(expect.objectContaining({ where: { id: documentId, clubId, ownerId: "owner" } }));
+  });
+
+  it("cannot be used for a training of the coach", async () => {
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: false });
+    mocks.find.mockResolvedValue(null);
+    const response = await POST(request("POST", { target, linkDocumentId: documentId }), { params: Promise.resolve({ id: clubId }) });
+    expect(response.status).toBe(404);
+    expect(mocks.find).toHaveBeenCalledWith(expect.objectContaining({ where: { id: documentId, clubId, ownerId: "owner" } }));
+    expect(mocks.createLink).not.toHaveBeenCalled();
+  });
+
+  it("cannot be changed by the coach", async () => {
+    mocks.find.mockResolvedValue(null);
+    mocks.reference.mockResolvedValue({ ...reference, documentId: null, occupied: true });
+    expect((await put({})).status).toBe(404);
+    expect(mocks.updateDocument).not.toHaveBeenCalled();
+  });
+
+  it("does not hide the own plan of the coach", async () => {
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 3, updatedAt: new Date(0), originKey: null });
+    mocks.usages.mockReturnValue([]);
+    const body = await (await read()).json();
+    expect(body.document).toMatchObject({ id: documentId, usages: [] });
+  });
+});
+
+describe("the author of a plan", () => {
+  it("is the coach group when a coach makes a plan in the library", async () => {
+    mocks.find.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: copyId, content, revision: 1 });
+    const response = await POST(request("POST", { id: copyId, content }), { params: Promise.resolve({ id: clubId }) });
+    expect(response.status).toBe(201);
+    expect(mocks.createDocument).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ ownerId: `coach-group:${coach}` }) }));
   });
 });

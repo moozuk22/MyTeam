@@ -10,11 +10,12 @@ import { useRouter } from "next/navigation";
 import { sessionUrl, sessionOrigin, sessionTarget, type SessionTarget, type TrainingReference } from "@/lib/exercise/trainingSession";
 import { formatWeekRange } from "@/lib/exercise/microcycle";
 import { groupCycles, resolveTraining, type TrainingOptions } from "@/lib/exercise/trainingOptions";
+import { usageLabel, type TrainingUsage } from "@/lib/exercise/trainingUsage";
 import TrainingReferencePanel from "./TrainingReferencePanel";
 import TrainingCombobox from "./TrainingCombobox";
 import BackLink from "../BackLink";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Eye, FileText, PenLine } from "lucide-react";
+import { ArrowLeft, Check, Eye, FileText, Link2, PenLine } from "lucide-react";
 import {
   blankDocument,
   type CompetitionSeason, type DocumentInput, type DrawingSnapshot, type PlanContent, type SavedDocument,
@@ -29,13 +30,20 @@ const DocumentSheet = dynamic(() => import("./DocumentSheet"), {
 
 type Draft = {
   content: PlanContent; changes: Partial<Record<number, string | null>>; id: string;
-  pending: string | null; numberEdited: boolean; privateDraft: boolean; saved?: Pick<SavedDocument, "id" | "revision">;
+  pending: string | null; privateDraft: boolean; saved?: Pick<SavedDocument, "id" | "revision">;
   training?: Training;
 };
 /** The group and microcycle that the coach chose for "Микроцикъл" and "Тренировка №". */
 type Training = { groupKey?: string; cycleId?: string; chosen: boolean };
 
 const LEAVE_DIALOG = { title: "Незапазени промени", confirmLabel: "Излез" };
+
+/** The plan content without the fields that come from the training. */
+function withoutTraining(content: PlanContent) {
+  const session: Partial<PlanContent["session"]> = { ...content.session };
+  for (const key of ["microcycle", "sessionNumber", "group", "season", "halfSeason"] as const) delete session[key];
+  return JSON.stringify({ ...content, session });
+}
 
 export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, groupName, competitionSeason, context, endpoint, drawingEndpoint, location, listHref, link = false, replace }: {
   target?: SessionTarget; clubId: string; clubLogoUrl?: string; initial?: SavedDocument; groupName?: string; competitionSeason: CompetitionSeason; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
@@ -54,7 +62,10 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
   const [referenceError, setReferenceError] = useState<{ key: string; message: string }>();
   const [options, setOptions] = useState<TrainingOptions>();
   const [optionsError, setOptionsError] = useState("");
-  const [training, setTraining] = useState<Training>({ groupKey: target?.groupKey, cycleId: target?.cycleId, chosen: false });
+  // In the library, a plan that one training uses shows the numbers of that training.
+  const onlyUsage = !target && initial?.usages?.length === 1 ? initial.usages[0] : undefined;
+  const [training, setTraining] = useState<Training>({ groupKey: target?.groupKey ?? onlyUsage?.groupKey, cycleId: target?.cycleId ?? onlyUsage?.cycleId, chosen: false });
+  const [usages, setUsages] = useState<TrainingUsage[]>(initial?.usages ?? []);
   const [referenceChanged, setReferenceChanged] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [storageError, setStorageError] = useState(false);
@@ -62,7 +73,6 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
   const [privateDraft, setPrivateDraft] = useState(false);
   const leaving = useRef(false);
   const pending = useRef<string | null>(null);
-  const numberEdited = useRef(false);
   const initialized = useRef(!!initial);
   const lastCells = useRef("");
   const trainingChosen = useRef(false);
@@ -70,9 +80,14 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
   const subscription = useTrainingPlanAccess(clubId);
   const [content, setContent] = useState<PlanContent>(() => {
     const document = initial?.content ?? blankDocument(groupName);
+    // The links give the numbers. Older plans can still hold numbers that are no longer correct.
+    if (!target && initial?.usages?.length)
+      return { ...document, session: { ...document.session, microcycle: onlyUsage?.microcycle ?? "", sessionNumber: onlyUsage?.sessionNumber ?? "" } };
     return initial ? document : { ...document, session: { ...document.session, ...competitionSeason } };
   });
   const [saved, setSaved] = useState<Pick<SavedDocument, "id" | "revision"> | undefined>(initial);
+  /** The saved content. A change of only the training numbers adds a training to the plan and does not save the content. */
+  const baseline = useRef(initial?.content);
   const proposedId = useRef<string>(initial?.id ?? "");
   const [changes, setChanges] = useState<Partial<Record<number, string | null>>>({});
   const saveChoice = useRef<HTMLDialogElement>(null);
@@ -90,7 +105,7 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         const draft: Draft = JSON.parse(raw);
         setContent(draft.content); setChanges(draft.changes); setDirty(true);
         proposedId.current = draft.id; pending.current = draft.pending;
-        numberEdited.current = draft.numberEdited; initialized.current = true;
+        initialized.current = true;
         setPrivateDraft(draft.privateDraft);
         if (draft.saved) setSaved(draft.saved);
         if (draft.training) setTraining(draft.training);
@@ -123,6 +138,7 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
   const movedJson = training.chosen && choice.target && (!target || sessionOrigin(choice.target) !== sessionOrigin(target)) ? JSON.stringify(choice.target) : "";
   const moved = useMemo<SessionTarget | undefined>(() => movedJson ? JSON.parse(movedJson) : undefined, [movedJson]);
   const shownTraining = moved ?? target;
+  const targetKey = target ? sessionOrigin(target) : "";
   const referenceKey = shownTraining ? sessionOrigin(shownTraining) : "";
   const currentReference = reference?.key === referenceKey ? reference.value : undefined;
   const currentReferenceError = referenceError?.key === referenceKey ? referenceError.message : "";
@@ -153,6 +169,10 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
           initialized.current = true;
           setContent(current => ({ ...current, session: { ...current.session, group: value.group, season: value.season,
             halfSeason: value.halfSeason, microcycle: value.microcycle, sessionNumber: value.sessionNumber } }));
+        } else if (!trainingChosen.current && key === targetKey) {
+          // A linked plan does not store the numbers. The opened training gives them.
+          setContent(current => current.session.microcycle === value.microcycle && current.session.sessionNumber === value.sessionNumber
+            ? current : { ...current, session: { ...current.session, microcycle: value.microcycle, sessionNumber: value.sessionNumber } });
         } else if (trainingChosen.current) {
           // The coach chose this training. The printed group and season come from its microcycle.
           setContent(current => current.session.group === value.group && current.session.season === value.season && current.session.halfSeason === value.halfSeason
@@ -160,13 +180,13 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         }
       }).catch(failure => { if (!controller.signal.aborted) setReferenceError({ key, message: failure.message }); });
     return () => controller.abort();
-  }, [shownTraining, ready, drawingEndpoint, location, refresh]);
+  }, [shownTraining, targetKey, ready, drawingEndpoint, location, refresh]);
 
   const storeDraft = useCallback((submitted = pending.current, independent = privateDraft) => {
     if (!storageKey || leaving.current) return;
     try {
       const draft: Draft = { content, changes, saved, id: proposedId.current, pending: submitted,
-        numberEdited: numberEdited.current, privateDraft: independent, training };
+        privateDraft: independent, training };
       sessionStorage.setItem(storageKey, JSON.stringify(draft));
     } catch { setStorageError(true); }
   }, [storageKey, content, changes, saved, privateDraft, training]);
@@ -233,6 +253,50 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
     edit(current => session ? { ...current, session: { ...current.session, ...session } } : current);
   }
 
+  /** True when the coach changed only the training. The save then adds the training to the plan, without a copy. */
+  const numbersOnly = !!saved && !!moved && !pending.current && !Object.keys(changes).length && !!baseline.current &&
+    withoutTraining(content) === withoutTraining(baseline.current);
+  const chosenName = `тренировка №${content.session.sessionNumber.trim()} в микроцикъл ${choice.cycle?.number.trim() ?? content.session.microcycle.trim()}`;
+
+  /** Asks if the plan replaces the plan that the chosen training uses. Gives the ID of that plan, or undefined. */
+  async function confirmReplace(failure: unknown) {
+    if (!moved || !(failure instanceof DocumentRequestError) || failure.status !== 409 || !failure.replaceDocumentId) return undefined;
+    return await dialogs.confirm(`За ${chosenName} вече има друг план-конспект. Да го замените ли с този? Другият план-конспект остава в библиотеката.`,
+      { title: "Тренировката има план-конспект", confirmLabel: "Замени" }) ? failure.replaceDocumentId : undefined;
+  }
+
+  /** Links the saved plan to the chosen training. The plan content and the other trainings do not change. */
+  /** Links the saved plan to a training without saving its content. "replaceDocumentId" is the plan that the coach chose to replace. */
+  async function addTraining(to: SessionTarget, replaceDocumentId?: string) {
+    if (!saved || saving || leaving.current) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    const send = (replaceDocumentId?: string) => documentRequest<{ id: string; usages?: TrainingUsage[] }>(endpoint, "Тренировката не може да се добави.", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ target: to, linkDocumentId: saved.id, ...(replaceDocumentId && { replaceDocumentId }) }),
+    }, coach);
+    try {
+      let result;
+      try {
+        result = await send(replaceDocumentId);
+      } catch (failure) {
+        const other = await confirmReplace(failure);
+        if (!other) throw failure;
+        result = await send(other);
+      }
+      if (target) { returnToCycle(sessionUrl("microcycles", location, to)); return; }
+      setUsages(result.usages ?? []);
+      setTraining(current => ({ ...current, chosen: false }));
+      setDirty(false);
+      setNotice(`План-конспектът е добавен към ${chosenName}.`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Тренировката не може да се добави.");
+    } finally {
+      if (!leaving.current) setSaving(false);
+    }
+  }
+
   const groups = options?.groups ?? [];
   const cycleChoices = groupCycles(options, training.groupKey).filter(cycle => cycle.number.trim())
     .map(cycle => ({ key: cycle.id, value: cycle.number.trim(), label: `Микроцикъл ${cycle.number.trim()}`, hint: formatWeekRange(cycle.week) }));
@@ -241,8 +305,8 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
     if (!coach || (!options && !optionsError) || (key !== "microcycle" && key !== "sessionNumber")) return undefined;
     if (key === "sessionNumber") return <TrainingCombobox label="Тренировка №" max={40} value={content.session.sessionNumber} options={sessionChoices}
       warning={choice.sessionWarning} empty={choice.cycle ? "Няма тренировки в микроцикъла." : "Първо въведете микроцикъл."}
-      onChange={(value) => { numberEdited.current = true; chooseTraining({}, { sessionNumber: value }); }}
-      onPick={(option) => { numberEdited.current = true; chooseTraining({}, { sessionNumber: option.value }); }} />;
+      onChange={(value) => chooseTraining({}, { sessionNumber: value })}
+      onPick={(option) => chooseTraining({}, { sessionNumber: option.value })} />;
     return <>
       {!target && groups.length > 1 && <div className="td-field">
         <label htmlFor="td-training-group">Група</label>
@@ -287,26 +351,39 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         ...(saved && linkTo && { target: linkTo, link: true }),
         ...(target && saved && !linkTo && { target, ...(link && { link: true, ...(replace && { replaceDocumentId: replace }) }) }),
         ...(fork && { forkFrom: saved?.id, sourceRevision: saved?.revision }),
-        ...(!saved && linkTo && { target: linkTo, automaticNumber: true }),
-        ...(target && !saved && !linkTo && (independent ? { privateCoachDraft: true } : { target, automaticNumber: !numberEdited.current, ...(replace && { replaceDocumentId: replace }) })) });
+        ...(!saved && linkTo && { target: linkTo }),
+        ...(target && !saved && !linkTo && (independent ? { privateCoachDraft: true } : { target, ...(replace && { replaceDocumentId: replace }) })) });
       const submitted = target && creating ? pending.current ?? payload : payload;
       if (target && creating) {
         pending.current = submitted;
         setPrivateDraft(independent);
         storeDraft(submitted, independent);
       }
-      const result = await documentRequest<{ document: SavedDocument; alreadyCreated?: boolean }>(
+      const send = (body: string) => documentRequest<{ document: SavedDocument; alreadyCreated?: boolean }>(
         creating ? endpoint : `${endpoint}/${saved!.id}`, "План-конспектът не може да се запази.", {
           method: creating ? "POST" : "PUT",
           headers: { "content-type": "application/json" },
-          body: submitted,
+          body,
         }, coach,
       );
+      let body = submitted;
+      let result;
+      try {
+        result = await send(body);
+      } catch (failure) {
+        // The chosen training has another plan. The coach can replace it.
+        const other = linkTo && await confirmReplace(failure);
+        if (!other) throw failure;
+        body = JSON.stringify({ ...JSON.parse(body), replaceDocumentId: other });
+        if (target && creating) { pending.current = body; storeDraft(body, independent); }
+        result = await send(body);
+      }
       setSaved(result.document);
+      if (result.document.usages) setUsages(result.document.usages);
       pending.current = null;
       if (target) {
         if (submitted === payload || (initial && JSON.stringify(JSON.parse(submitted).content) === JSON.stringify(input))) {
-          const linked = sessionTarget(JSON.parse(submitted).target);
+          const linked = sessionTarget(JSON.parse(body).target);
           returnToCycle(linked ? sessionUrl("microcycles", location, linked) : undefined);
           return;
         }
@@ -319,7 +396,11 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       if (result.alreadyCreated) {
         setNotice("План-конспектът вече е създаден. Запазете отново, за да приложите текущите промени.");
       } else {
-        setContent(result.document.content);
+        baseline.current = result.document.content;
+        // A linked plan does not store the numbers. The editor keeps showing the numbers of the training.
+        setContent({ ...result.document.content, session: { ...result.document.content.session,
+          microcycle: content.session.microcycle, sessionNumber: content.session.sessionNumber } });
+        if (linkTo) setTraining(current => ({ ...current, chosen: false }));
         setChanges({});
         setDirty(false);
         setNotice("План-конспектът е запазен.");
@@ -344,6 +425,12 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       if (!leaving.current) setSaving(false);
     }
   }
+
+  // The coach chose this plan from the list for the training and did not change it. The save only links it.
+  const applying = Boolean(target && link && saved && !moved && !dirty && !pending.current);
+  const useOnly = applying || (numbersOnly && !!moved);
+  // The trainings other than the one that the save is for. A save over the plan changes them too.
+  const otherUsages = usages.filter(usage => !shownTraining || sessionOrigin(usage) !== sessionOrigin(shownTraining)).length;
 
   return <>
     <header className="tp-header td-editor-header">
@@ -370,9 +457,12 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         </div>
         <button type="button" className="tp-primary-btn" onClick={async () => {
           if (!await confirmTraining()) return;
-          if (target && saved && !pending.current) saveChoice.current?.showModal(); else void save();
+          if (applying) void addTraining(target!, replace);
+          else if (numbersOnly && moved) void addTraining(moved);
+          else if (target && saved && !pending.current) saveChoice.current?.showModal(); else void save();
         }} disabled={saving || !ready || (!!target && !initialized.current) || (!!subscription.access?.canSave && !!saved && !dirty && !link)}>
-          {saving ? "Записване…" : "Запази"}
+          {link && useOnly && <Check size={16} aria-hidden="true" />}
+          {saving ? (useOnly ? "Добавяне…" : "Записване…") : link ? (useOnly ? "Използвай този план-конспект" : "Запази и използвай") : "Запази"}
         </button>
       </div>
     </header>
@@ -381,7 +471,13 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       <div className="tp-modal-header">
         <h2 id="td-save-choice-title">Запазване на промените</h2>
       </div>
-      <p id="td-save-choice-description">Промените върху съществуващия план ще се виждат във всеки тренировъчен микроцикъл, в който се използва.</p>
+      <div id="td-save-choice-description">
+        {(link || moved) && <p>План-конспектът ще се използва за <strong>{usageLabel(content.session)}</strong>.</p>}
+        <p>{otherUsages
+          ? <>„Запази върху съществуващия“ променя плана и в още {otherUsages === 1 ? "1 тренировка" : `${otherUsages} тренировки`}, които го използват.</>
+          : "Планът не се използва в други тренировки."}</p>
+        <p>„Запази като нов план-конспект“ създава копие само за тази тренировка.</p>
+      </div>
       <div className="tp-modal-actions td-save-choice-actions">
         <button type="button" className="tp-primary-btn" onClick={() => { saveChoice.current?.close(); void save(false); }}>Запази върху съществуващия</button>
         <button type="button" className="tp-secondary-btn" onClick={() => { saveChoice.current?.close(); void save(false, true); }}>Запази като нов план-конспект</button>
@@ -391,15 +487,23 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
     {storageError && <p role="alert" className="td-feedback">Черновата е само в този раздел. Оставете го отворен до запазването.</p>}
     {shownTraining && !previewing && <TrainingReferencePanel reference={currentReference} error={currentReferenceError}
       changed={referenceChanged} refresh={() => setRefresh(value => value + 1)}
-      note={moved ? `${target ? "Тренировката е сменена. " : ""}При запазване план-конспектът ще се свърже с тази тренировка.` : undefined} />}
+      note={moved ? `${target ? "Тренировката е сменена. " : ""}${numbersOnly
+        ? `При запазване тази тренировка ще използва същия план-конспект, без копие.${target ? " Предишната тренировка го запазва." : ""}`
+        : "При запазване план-конспектът ще се свърже с тази тренировка."}` : undefined} />}
     {privateOption && <button type="button" className="tp-secondary-btn" disabled={saving} onClick={() => void save(true)}>Запази отделно в библиотеката</button>}
     {error && <div role="alert" className="td-feedback">{error}</div>}
     {notice && <div role="status" className="td-notice">{notice}</div>}
+    {!target && !previewing && !!usages.length && <section className="td-usages" aria-labelledby="td-usages-title">
+      <h2 id="td-usages-title"><Link2 size={16} aria-hidden="true" />Използва се в {usages.length === 1 ? "1 тренировка" : `${usages.length} тренировки`}</h2>
+      <ul>{usages.map(usage => <li key={`${usage.cycleId}/${usage.groupKey}/${usage.rowId}`}>
+        <span>{usageLabel(usage)}</span><small>{[usage.group, formatWeekRange(usage.week)].filter(Boolean).join(" · ")}</small>
+      </li>)}</ul>
+    </section>}
     <div className="td-workspace">
       {target && !initialized.current ? (!currentReferenceError && <FinanceSkeleton variant="form" />) : previewing
         ? <DocumentSheet content={visibleContent} clubLogoUrl={clubLogoUrl} pending={saving} canPrint={!!subscription.access?.canPrint} checkPrint={async () => (await subscription.refresh()).canPrint} />
         : <DocumentFields content={visibleContent} disabled={saving || !ready || (!!target && !initialized.current)} drawingEndpoint={drawingEndpoint} location={location} sessionSlot={sessionSlot}
-            onSession={(key, value) => { if (key === "sessionNumber") numberEdited.current = true; edit(current => ({ ...current, session: { ...current.session, [key]: value } })); }}
+            onSession={(key, value) => edit(current => ({ ...current, session: { ...current.session, [key]: value } }))}
             onSection={updateSection} onDrawing={attach} onMerge={(merge) => edit((current) => ({ ...current, merge }))} />}
     </div>
   </>;
