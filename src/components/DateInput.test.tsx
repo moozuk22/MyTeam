@@ -2,18 +2,19 @@ import { afterEach, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const hooks = vi.hoisted(() => ({ mockRefs: false }));
+const hooks = vi.hoisted(() => ({ mockRefs: false, typing: false, setTyping: (() => {}) as (value: boolean) => void }));
 vi.mock("react", async (original) => {
   const react = await original<typeof import("react")>();
   return {
     ...react,
     useRef: (initial: unknown) => hooks.mockRefs ? { current: initial } : react.useRef(initial),
+    useState: (initial: unknown) => hooks.mockRefs ? [hooks.typing, hooks.setTyping] : react.useState(initial),
     useLayoutEffect: (...args: Parameters<typeof react.useLayoutEffect>) => hooks.mockRefs ? undefined : react.useLayoutEffect(...args),
   };
 });
 import { DateInput, formatDateInputValue } from "./DateInput";
 
-afterEach(() => { hooks.mockRefs = false; });
+afterEach(() => { hooks.mockRefs = false; hooks.typing = false; hooks.setTyping = () => {}; });
 
 function find(node: ReactNode, predicate: (props: Record<string, unknown>) => boolean): ReactElement<Record<string, unknown>> {
   if (isValidElement<Record<string, unknown>>(node)) {
@@ -82,4 +83,35 @@ it("reports changes and opens the calendar instead of typing into hidden segment
   target.disabled = true;
   (input.props.onClick as (event: unknown) => void)({ currentTarget: target });
   expect(showPicker).toHaveBeenCalledTimes(2);
+});
+
+it("lets digits through and shows the native text when the calendar cannot open", () => {
+  hooks.mockRefs = true;
+  const setTyping = vi.fn();
+  hooks.setTyping = setTyping;
+  const input = find(DateInput({ value: "", onValueChange: () => {} }), (props) => props.type === "date");
+  const press = (target: Record<string, unknown>) => {
+    const event = { key: "5", currentTarget: { disabled: false, readOnly: false, ...target }, preventDefault: vi.fn() };
+    (input.props.onKeyDown as (event: unknown) => void)(event);
+    return event;
+  };
+
+  expect(press({ showPicker: undefined }).preventDefault).not.toHaveBeenCalled();
+  expect(press({ showPicker: () => { throw new Error("NotAllowedError"); } }).preventDefault).not.toHaveBeenCalled();
+  expect(setTyping).toHaveBeenCalledTimes(2);
+  expect(setTyping).toHaveBeenCalledWith(true);
+
+  press({ showPicker: undefined, readOnly: true });
+  expect(setTyping).toHaveBeenCalledTimes(2);
+
+  (input.props.onBlur as (event: unknown) => void)({});
+  expect(setTyping).toHaveBeenLastCalledWith(false);
+});
+
+it("shows the native text and hides the overlay in typing mode", () => {
+  hooks.mockRefs = true;
+  hooks.typing = true;
+  const html = renderToStaticMarkup(DateInput({ value: "2026-11-05", className: "field", onValueChange: () => {} }));
+  expect(html).toMatch(/<input[^>]*class="field "/);
+  expect(html).toMatch(/aria-hidden="true" hidden="">/);
 });

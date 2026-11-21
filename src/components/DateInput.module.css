@@ -18,4 +18,5 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+.overlay[hidden] { display: none; }
 .empty { opacity: .55; }

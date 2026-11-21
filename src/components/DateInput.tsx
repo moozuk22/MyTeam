@@ -1,7 +1,7 @@
 "use client";
 
 import styles from "./DateInput.module.css";
-import { useLayoutEffect, useRef, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type MouseEvent } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type MouseEvent } from "react";
 
 /** Formats an ISO date (yyyy-mm-dd) as dd.mm.yyyy. Returns "" for any other value. */
 export function formatDateInputValue(value: string): string {
@@ -19,9 +19,10 @@ type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "valu
 
 const px = (value: string) => Number.parseFloat(value) || 0;
 
-function openPicker(input: HTMLInputElement) {
-  if (input.disabled || input.readOnly) return;
-  try { input.showPicker(); } catch { /* Keep the native field usable where showPicker is unavailable. */ }
+/** Opens the native calendar. Returns false when the browser cannot open it. */
+function openPicker(input: HTMLInputElement): boolean {
+  if (input.disabled || input.readOnly || typeof input.showPicker !== "function") return false;
+  try { input.showPicker(); return true; } catch { return false; }
 }
 
 /**
@@ -32,6 +33,8 @@ function openPicker(input: HTMLInputElement) {
 export function DateInput({ value, onValueChange, wrapperClassName, wrapperStyle, className, onClick, onKeyDown, ...props }: DateInputProps) {
   const input = useRef<HTMLInputElement>(null);
   const overlay = useRef<HTMLSpanElement>(null);
+  // When the calendar cannot open, show the native text so that the user can type the date.
+  const [typing, setTyping] = useState(false);
 
   function sync() {
     const field = input.current;
@@ -62,17 +65,21 @@ export function DateInput({ value, onValueChange, wrapperClassName, wrapperStyle
 
   const display = formatDateInputValue(value);
   return <span className={`${styles.root} ${wrapperClassName ?? ""}`} style={wrapperStyle}>
-    <input {...props} ref={input} type="date" value={value} className={`${className ?? ""} ${styles.native}`}
+    <input {...props} ref={input} type="date" value={value} className={`${className ?? ""} ${typing ? "" : styles.native}`}
       onChange={(event) => onValueChange(event.target.value)}
       onFocus={(event) => { sync(); props.onFocus?.(event); }}
-      onBlur={(event) => { sync(); props.onBlur?.(event); }}
+      onBlur={(event) => { setTyping(false); sync(); props.onBlur?.(event); }}
       onClick={(event: MouseEvent<HTMLInputElement>) => { openPicker(event.currentTarget); onClick?.(event); }}
       onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
         // Typing would fill the hidden locale-specific segments, so open the calendar instead.
-        if (/^\d$/.test(event.key) || event.key === " ") { event.preventDefault(); openPicker(event.currentTarget); }
+        // If the calendar cannot open, let the key through and show the native text for typing.
+        if (/^\d$/.test(event.key) || event.key === " ") {
+          if (openPicker(event.currentTarget)) event.preventDefault();
+          else if (!event.currentTarget.disabled && !event.currentTarget.readOnly) setTyping(true);
+        }
         onKeyDown?.(event);
       }} />
-    <span ref={overlay} className={styles.overlay} aria-hidden="true">
+    <span ref={overlay} className={styles.overlay} aria-hidden="true" hidden={typing}>
       <span className={display ? undefined : styles.empty}>{display || "дд.мм.гггг"}</span>
     </span>
   </span>;
