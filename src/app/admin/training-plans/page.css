@@ -125,7 +125,69 @@
   }
 }
 
-.tp-document-nav { margin-bottom: 12px; }
+/* The three main pages of the training plans: one segmented bar under the page header. */
+.tp-section-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border: 1px solid var(--plan-border);
+  border-radius: 14px;
+  background: var(--plan-field);
+}
+
+.tp-page .tp-section-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  color: var(--plan-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.tp-page .tp-section-nav a[aria-current="page"] {
+  background: var(--plan-selected);
+  color: var(--plan-accent);
+  box-shadow: inset 0 0 0 1px var(--plan-accent-border);
+}
+
+.tp-page .tp-section-nav a:focus-visible {
+  outline: 2px solid var(--plan-accent);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) {
+  .tp-page .tp-section-nav a:not([aria-current="page"]):hover {
+    background: var(--plan-selected);
+    color: var(--plan-text);
+  }
+}
+
+@media (min-width: 640px) {
+  .tp-section-nav {
+    display: inline-grid;
+    grid-template-columns: repeat(3, auto);
+  }
+
+  .tp-page .tp-section-nav a {
+    flex-direction: row;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+  }
+}
 
 .tp-category-controls {
   display: grid;

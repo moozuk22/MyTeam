@@ -1,6 +1,7 @@
 "use client";
 
 import BackLink from "./BackLink";
+import SectionNav from "./SectionNav";
 
 import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
@@ -21,6 +22,7 @@ import {
   Trash2,
   UserRound,
   Waypoints,
+  Images,
 } from "lucide-react";
 import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
 import { useTrainingPlanAccess, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
@@ -313,7 +315,7 @@ export default function TrainingPlansClient({
             <span>Назад</span>
           </BackLink>
           <div className="tp-heading">
-            <h1 className="tp-title"><Waypoints aria-hidden="true" />Планове за тренировки</h1>
+            <h1 className="tp-title"><Images aria-hidden="true" />Библиотека с рисунки</h1>
             <p>{selectedClub?.name ?? "Няма избран отбор"}</p>
           </div>
           <button
@@ -334,13 +336,7 @@ export default function TrainingPlansClient({
           </div>
         )}
 
-        {selectedClubId && (
-          <nav className="tp-document-nav" aria-label="Тренировъчни документи">
-            <Link className="tp-secondary-btn" href={`/admin/training-plans/documents?${location}`}>
-              План-конспекти
-            </Link>
-          </nav>
-        )}
+        {selectedClubId && <SectionNav location={location.toString()} current="drawings" />}
 
         {selectedClubId && (
           <div className="tp-category-controls">

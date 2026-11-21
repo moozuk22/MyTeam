@@ -1,7 +1,5 @@
 /* Weekly microcycle page. Theme tokens and the page shell come from ../workspace.css and ../page.css. */
 .mc-page .tp-heading p { min-height: 1.5em; }
-.mc-links { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
-.mc-links > a { flex: 1 1 180px; }
 
 /* Week selector */
 .mc-week {
@@ -143,8 +141,6 @@
 @media (min-width: 640px) {
   .mc-page .tp-header { grid-template-columns: minmax(0, 1fr) auto; }
   .mc-page .tp-heading { grid-column: 1; }
-  .mc-links { grid-column: 2; align-self: end; justify-content: flex-end; }
-  .mc-links > a { flex: none; }
   .mc-week { grid-template-columns: auto auto auto 1fr; justify-content: start; }
   .mc-week-label { justify-items: start; text-align: left; min-width: 15rem; padding-inline: 6px; }
   .mc-week-today { grid-column: 4; justify-self: end; }

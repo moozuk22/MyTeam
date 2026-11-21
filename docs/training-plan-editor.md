@@ -14,7 +14,17 @@ Konva plan cards show a read-only preview of the saved pitch and drawing. Previe
 
 The plan review supports zoom and an expanded view of the saved pitch. **Детайли** brings the description, information, and equipment cards into focus. **Пособия** shows the total and a breakdown by type for items visible on the saved pitch. The description and equipment shortcuts open the corresponding panel in the editor.
 
-Admins and coaches can open **Планове за тренировки** from the club or a coach group. Opening it from a coach group carries that group through the list, editor, and back navigation. New plans and copies record the group's name at creation and the signed-in account when available. Creation from the club's main page displays **Администратор**. Older plans without recorded attribution display **Няма записан автор** in the review.
+Admins and coaches open **Тренировъчен план** from the club or a coach group. This button opens the weekly microcycle. Opening it from a coach group carries that group through all pages and back navigation.
+
+The weekly microcycle, the drawing library (**Библиотека с рисунки**), and the plan list (**План-конспекти**) are the three main pages. A bar below the page header links them: **Микроцикъл**, **Рисунки**, and **План-конспекти**. The bar marks the open page. On these three pages, **Назад** opens the club or group page. If the microcycle has unsaved changes, the bar and **Назад** ask for confirmation first.
+
+Each back button opens a fixed parent page and does not use the browser history:
+
+- The drawing review and the drawing editor open the library (**Към рисунките**).
+- The plan editor opens the plan list (**Към план-конспектите**).
+- Pages for the plan of a training open the microcycle (**Към тренировката**). The plan list for a training does not show the bar.
+
+After a coach adds a plan to a training, the microcycle replaces the plan list in the browser history. New plans and copies record the group's name at creation and the signed-in account when available. Creation from the club's main page displays **Администратор**. Older plans without recorded attribution display **Няма записан автор** in the review.
 
 Choose **Категория** in the editor. In Konva, **Запази** saves the category alongside the drawing, and local recovery preserves unsaved category changes. Every club starts with **Атака**, **Защита**, **Преход атака в защита**, **Преход защита в атака**, and **Статични положения**. Plans using a retired default keep that category as a club category. In the editor, **Нова категория** adds a category for the current club and selects it in the form. A plan can have one category or remain uncategorized. The list can filter by category, including **Без категория**, and copies retain their category. Plans without a category stay uncategorized.
 

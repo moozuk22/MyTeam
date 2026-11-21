@@ -2,6 +2,7 @@
 
 import { sessionUrl, type SessionTarget, type TrainingReference } from "@/lib/exercise/trainingSession";
 import BackLink from "../BackLink";
+import SectionNav from "../SectionNav";
 
 import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 
@@ -91,7 +92,9 @@ function DocumentChoice({ item, coach, endpoint, trainingUrl, context, clubLogoU
   </section>;
 }
 
-function DocumentList({ coach, endpoint, drawingEndpoint, listHref, libraryHref, context, clubLogoUrl, location, target, replace }: { coach: string | null; endpoint: string; drawingEndpoint: string; listHref: string; libraryHref: string; context: string; clubLogoUrl?: string; location: string; target?: SessionTarget; replace?: string }) {
+function DocumentList({ coach, endpoint, drawingEndpoint, listHref, backHref, context, clubLogoUrl, location, target, replace }: { coach: string | null; endpoint: string; drawingEndpoint: string; listHref: string;
+  /** The team page, or the training when the coach chooses a plan for it. */
+  backHref: string; context: string; clubLogoUrl?: string; location: string; target?: SessionTarget; replace?: string }) {
   const dialogs = useBrowserDialogs();
   const [page, setPage] = useState<Page>();
   const [cursor, setCursor] = useState<string | null>(null);
@@ -128,7 +131,8 @@ function DocumentList({ coach, endpoint, drawingEndpoint, listHref, libraryHref,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ target, linkDocumentId: id, ...(replace && { replaceDocumentId: replace }) }),
       }, coach);
-      window.location.assign(libraryHref);
+      // Replace the list in the history, so that the browser Back button does not open it again.
+      window.location.replace(backHref);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "План-конспектът не може да се свърже.");
       setLinking(false);
@@ -160,13 +164,14 @@ function DocumentList({ coach, endpoint, drawingEndpoint, listHref, libraryHref,
 
   return <>
     <header className="tp-header">
-      <BackLink className="tp-back-btn" href={libraryHref}><ArrowLeft size={16} aria-hidden="true" /> Назад</BackLink>
+      <BackLink className="tp-back-btn" href={backHref}><ArrowLeft size={16} aria-hidden="true" /> {choose ? "Към тренировката" : "Назад"}</BackLink>
       <div className="tp-heading">
         <h1 className="tp-title"><FileText aria-hidden="true" />План-конспекти</h1>
         <p>{context}</p>
       </div>
       <Link className="tp-primary-btn" href={choose ? listHref.replace("document=choose", "document=new") : `${listHref}&document=new`}><Plus size={16} aria-hidden="true" /> {choose ? "Създай нов план-конспект" : "Нов план-конспект"}</Link>
     </header>
+    {!choose && <SectionNav location={location} current="documents" />}
     {choose && <h2>{replace ? "Избери друг план-конспект" : "Избери съществуващ план-конспект"}</h2>}
     {error && <div role="alert" className="td-feedback">
       {error} <button type="button" className="tp-secondary-btn" onClick={() => navigate(null)}>Обнови списъка</button>
@@ -206,7 +211,6 @@ export default function DocumentWorkspace({ target, clubId, clubName, clubLogoUr
   const coach = new URLSearchParams(location).get("coachGroupId");
   const endpoint = `${drawingEndpoint}/documents`;
   const listHref = `/admin/training-plans/documents?${location}`;
-  const libraryHref = `/admin/training-plans?${location}`;
   const [loaded, setLoaded] = useState<SavedDocument>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -237,10 +241,10 @@ export default function DocumentWorkspace({ target, clubId, clubName, clubLogoUr
   const context = groupName ? `${clubName} · ${groupName}` : clubName;
   return <main className={`tp-page td-page${!selected || selected === "choose" ? " td-library" : ""}`}>
     <div className="tp-inner td-inner">
-      {!selected && <DocumentList coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint} listHref={listHref} libraryHref={libraryHref} context={context} location={location} />}
+      {!selected && <DocumentList coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint} listHref={listHref} backHref={`/admin/members?${location}`} context={context} location={location} />}
       {selected === "choose" && target && <DocumentList target={target} coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint}
         listHref={`${sessionUrl("documents", location, target, "choose")}${replaceQuery(replace)}`} replace={replace}
-        libraryHref={sessionUrl("microcycles", location, target)} context={context} clubLogoUrl={clubLogoUrl} location={location} />}
+        backHref={sessionUrl("microcycles", location, target)} context={context} clubLogoUrl={clubLogoUrl} location={location} />}
       {selected && selected !== "choose" && selected !== "new" && !loaded && <section aria-label="План-конспект">
         <header className="tp-header">
           {target

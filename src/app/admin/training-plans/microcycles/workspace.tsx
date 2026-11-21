@@ -1,11 +1,11 @@
 "use client";
 
 import { sessionUrl, type SessionTarget } from "@/lib/exercise/trainingSession";
-import BackLink from "../BackLink";
+import SectionNav from "../SectionNav";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
-import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, Images, Layers, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
+import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Layers, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
 import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 import { cycleColumns, emptyCycle, formatWeekDates, formatWeekRange, shiftWeek, type CycleContent } from "@/lib/exercise/microcycle";
 import type { CompetitionSeason } from "@/lib/exercise/document";
@@ -305,16 +305,13 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     </div>}
     <div className="tp-inner">
       <header className="tp-header">
-        <BackLink className="tp-back-btn" href={`/admin/members?${location}`}><ArrowLeft size={16} aria-hidden="true" /> Назад</BackLink>
+        <Link className="tp-back-btn" href={`/admin/members?${location}`} onNavigate={event => guardNavigation(event, `/admin/members?${location}`)}><ArrowLeft size={16} aria-hidden="true" /> Назад</Link>
         <div className="tp-heading">
           <h1 className="tp-title"><CalendarRange aria-hidden="true" />Седмичен микроцикъл</h1>
           {data ? <p>{data.club.name}</p> : <p aria-hidden="true"><span className="mc-line mc-line--title" /></p>}
         </div>
-        <nav className="mc-links" aria-label="Тренировъчни планове">
-          <Link className="tp-secondary-btn" href={`/admin/training-plans?${location}`}><Images size={16} aria-hidden="true" /> Библиотека с рисунки</Link>
-          <Link className="tp-secondary-btn" href={`/admin/training-plans/documents?${location}`}><FileText size={16} aria-hidden="true" /> План-конспекти</Link>
-        </nav>
       </header>
+      <SectionNav location={location} current="microcycles" onNavigate={guardNavigation} />
 
       <section className="mc-week" aria-label="Седмица">
         <button type="button" className="tp-icon-btn" disabled={busy} onClick={() => void goToWeek(shiftWeek(week, -7))} aria-label="Предишна седмица"><ChevronLeft size={20} aria-hidden="true" /></button>

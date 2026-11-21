@@ -1,6 +1,5 @@
 "use client";
 
-import { navigateBack } from "../../backNavigation";
 import { useTrainingPlanAccess, trainingSubscriptionMessage, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 import {
   useCallback,
@@ -1269,12 +1268,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     }
   }
 
-  const leaveBack = useRef(false);
-
-  function navigateAway(path: string, back = false) {
-    leaveBack.current = back;
+  function navigateAway(path: string) {
     if (dirty || recovery) setLeavePath(path);
-    else if (back) navigateBack(router, path, window.history.length);
     else router.push(path);
   }
 
@@ -1578,11 +1573,11 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
             <button
               type="button"
               className="ke-back"
-              aria-label="Към плановете"
-              onClick={() => navigateAway(`/admin/training-plans?${search}`, true)}
+              aria-label="Към рисунките"
+              onClick={() => navigateAway(`/admin/training-plans?${search}`)}
             >
-              <ArrowLeft size={18} />
-              <span>Към плановете</span>
+              <ArrowLeft size={18} aria-hidden="true" />
+              <span>Към рисунките</span>
             </button>
             <h1><Waypoints size={24} aria-hidden="true" />{planId ? "Редактор на план" : "Нов план"}</h1>
             <button
@@ -1651,8 +1646,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
               if (!leavePath) return;
               persistDraft();
               closeLeaveDialog();
-              if (leaveBack.current) navigateBack(router, leavePath, window.history.length);
-              else router.push(leavePath);
+              router.push(leavePath);
             }}>
               Напусни
             </button>

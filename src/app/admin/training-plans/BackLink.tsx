@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { navigateBack } from "./backNavigation";
 
+/** Opens the fixed parent page. It does not use the browser history, so the result is the same however the user came to the page. */
 export default function BackLink({ href, className, children, beforeBack }: {
   href: string;
   className?: string;
@@ -12,11 +12,10 @@ export default function BackLink({ href, className, children, beforeBack }: {
   beforeBack?: () => boolean | Promise<boolean>;
 }) {
   const router = useRouter();
-  return <Link href={href} className={className} onNavigate={(event) => {
+  return <Link href={href} className={className} onNavigate={beforeBack && ((event) => {
     event.preventDefault();
     void (async () => {
-      if (beforeBack && !await beforeBack()) return;
-      navigateBack(router, href, window.history.length);
+      if (await beforeBack()) router.push(href);
     })();
-  }}>{children}</Link>;
+  })}>{children}</Link>;
 }
