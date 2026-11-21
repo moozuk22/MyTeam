@@ -24,6 +24,7 @@ export async function getClubFinanceAnalysis(clubId: string, now = new Date()) {
           category_id AS "categoryId",kind,currency,sum(amount)::text AS amount
         FROM club_finance_entries
         WHERE club_id=${clubId}::uuid AND voided_at IS NULL
+          AND (kind <> 'revenue' OR amount <> 0 OR payment_reference IS NULL)
           AND occurred_at>=${period.gte} AND occurred_at<${period.lt}
         GROUP BY 1,category_id,kind,currency
       `),
@@ -71,7 +72,12 @@ export async function getClubFinance(clubId: string, params: URLSearchParams) {
   return prisma.$transaction(async tx => {
     const club = await tx.club.findUnique({ where: { id: clubId }, select: { financeStartedAt: true, paymentWorkflow: true, defaultPaymentAmount: true, overdueDay: true, overdueHour: true, overdueMinute: true } });
     if (!club) throw new FinanceError('Клубът не е намерен.',404);
-    const where = { clubId, voidedAt: null, ...(period ? { occurredAt: period } : {}) };
+    const where: Prisma.ClubFinanceEntryWhereInput = {
+      clubId,
+      voidedAt: null,
+      OR: [{ kind: { not: 'revenue' } }, { amount: { not: 0 } }, { paymentReference: null }],
+      ...(period ? { occurredAt: period } : {}),
+    };
     const listWhere = { ...where, ...(kind ? { kind } : {}), ...(category ? { categoryId: category } : {}) };
     const [categories, totals, entries, count, players] = await Promise.all([
       tx.clubFinanceCategory.findMany({ where: { clubId }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }, { id: 'asc' }] }),

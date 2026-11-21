@@ -197,8 +197,8 @@ export async function PUT(
         ? undefined
         : String(clubIdRaw).trim();
 
-    if (hasPaymentAmount && (!canAccessTrainingClub(session, existingPlayer.clubId) ||
-      (clubId && !canAccessTrainingClub(session, clubId)))) {
+    if (!canAccessTrainingClub(session, existingPlayer.clubId) ||
+      (clubId && !canAccessTrainingClub(session, clubId))) {
       return NextResponse.json({ error: "Нямате достъп до този клуб." }, { status: 403 });
     }
 
@@ -281,6 +281,12 @@ export async function PUT(
     const updatedPlayer = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM clubs WHERE id = ${existingPlayer.clubId}::uuid FOR UPDATE`;
       const current = await tx.player.findUniqueOrThrow({ where: { id }, include: { coachGroups: true, club: true } });
+      if (!canAccessTrainingClub(session, current.clubId)) {
+        throw new FeeSettingsError("Нямате достъп до този клуб.", 403);
+      }
+      if (current.clubId !== existingPlayer.clubId) {
+        throw new FeeSettingsError("Клубът на състезателя е променен. Опитайте отново.", 409);
+      }
       const targetClub = clubId && clubId !== current.clubId ? await tx.club.findUniqueOrThrow({ where: { id: clubId } }) : current.club;
       if (clubId && clubId !== current.clubId && current.coachGroups.length) throw new FeeSettingsError("Премахнете групите на състезателя преди смяна на клуба.");
       const proposedFee = resolveMemberFee({

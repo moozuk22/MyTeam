@@ -36,7 +36,7 @@ Pre-existing checkout rows have no exact date snapshot and retain their legacy r
 
 ## Rollout
 
-Apply `20261121120000_player_fee_exemptions` before serving the updated application. It adds the exemption flag with a default of false. It also excludes zero-fee records from new calculator entries and backfills.
+Apply `20261121120000_player_fee_exemptions` before serving the updated application. It adds the exemption flag with a default of false. It also excludes zero-fee records from new calculator entries and backfills. The calculator hides existing revenue entries linked to zero payments. It keeps the entries and payment records in the database.
 
 Migration: `20261016160000_coach_group_fees`.
 
