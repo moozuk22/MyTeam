@@ -7,6 +7,7 @@ import { XIcon } from "./members-page-icons";
 import { type ClubOption } from "../_types/members-page-types";
 import { type MemberManagement } from "../_hooks/useMemberManagement";
 import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceState";
+import { DateInput } from "@/components/DateInput";
 
 type MemberEditorDialogProps = {
   memberManagement: Pick<
@@ -160,11 +161,10 @@ export function MemberEditorDialog({
                 )}
                 <label className="amp-edit-field">
                   <span className="amp-lbl">Дата на раждане</span>
-                  <input
+                  <DateInput
                     className="amp-edit-input"
-                    type="date"
                     value={editForm.birthDate}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, birthDate: e.target.value }))}
+                    onValueChange={(value) => setEditForm((prev) => ({ ...prev, birthDate: value }))}
                   />
                 </label>
                 {!coachGroupId && (

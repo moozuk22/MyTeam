@@ -8,6 +8,7 @@ import Link from "next/link";
 import { uploadImage, validateImageFile } from "@/lib/uploadImage";
 import { extractUploadPathFromCloudinaryUrl } from "@/lib/cloudinaryImagePath";
 import "./page.css";
+import { DateInput } from "@/components/DateInput";
 
 interface ClubData {
   playerFields?: string[];
@@ -383,10 +384,9 @@ function AddMemberPageContent() {
             <div className="add-member-row">
               <div className="add-member-field">
                 <label className="add-member-label">Дата на раждане</label>
-                <input
-                  type="date"
+                <DateInput
                   value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
+                  onValueChange={setBirthDate}
                   className="add-member-input"
                 />
               </div>

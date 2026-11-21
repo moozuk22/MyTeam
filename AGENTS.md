@@ -54,6 +54,7 @@ These requirements apply to every frontend change:
     type="text"
   />
   ```
+- **Date fields:** do not use the browser's native `<input type="date">` directly. Use `DateInput` from `@/components/DateInput` on all viewports. It shows the date as `dd.mm.yyyy` (for example `05.11.2026`) and shows `дд.мм.гггг` when the field is empty, for all browser locales. The native input stays under the formatted text, so the input keeps its styles, validation, and native calendar. Give the ISO value (`yyyy-mm-dd`) in `value` and get changes from `onValueChange`. Put layout styles that the input had in its parent flex or grid, such as `flex`, on `wrapperStyle` or `wrapperClassName`. Do not build a new date picker or copy the formatting logic. To show a date as text, use the `dd.mm.yyyy` format.
 - **Minimum checks for every UI change:** verify the affected interface at at least one small-phone width of 320–375 px, one large-phone width of 390–430 px, and a desktop width of 1440 px (CSS pixels). Mobile compatibility is mandatory regardless of change size.
 - **Significant layout changes:** test the complete viewport matrix below for new pages, redesigned layouts, dashboards, complex forms, and major component changes. Pay special attention to 320–375 px widths:
 

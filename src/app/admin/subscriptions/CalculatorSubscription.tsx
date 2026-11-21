@@ -5,6 +5,7 @@ import { calculatorHasAccess, calculatorPrice, calculatorPurchase, type Calculat
 import { localToday, nextMonth, type ClubSubscriptionView } from '@/lib/clubSubscriptionDomain';
 import type { CalculatorAdminView } from '@/lib/calculatorSubscriptions';
 import styles from './subscriptions.module.css';
+import { DateInput } from '@/components/DateInput';
 const labels = {
   monthly: 'Месечно',
   yearly: 'Годишно',
@@ -317,7 +318,7 @@ function CalculatorPayment({
                 }).format(date)}<small>{paid ? 'Платено' : `${calculatorPrice(prices, data.prices, data.billingMode, month) ?? '—'} EUR`}</small></span></label>;
           })}</div><p>Избрани месеци: {selected.join(', ') || 'няма'}. Може да избирате от повече от една година.</p></> : <label htmlFor={`${id}-start`}>Начален месец<input id={`${id}-start`} type="month" min="2000-01" max={data.billingMode === 'yearly' ? '2199-01' : '2199-12'} required value={start} onChange={e => setStart(e.target.value)} /></label>}
       <p>{data.billingMode === 'yearly' ? 'Покрива 12 последователни календарни месеца.' : data.billingMode === 'lifetime' ? 'Безсрочен достъп от избрания месец.' : 'Избраните месеци се записват отделно.'} Автоматичните приходи за покритите периоди се възстановяват. Неплатените периоди остават празни.</p>
-      <label>Дата на плащане<input type="date" required min="2000-01-01" max={localToday()} value={paidOn} onChange={e => setPaidOn(e.target.value)} /></label>
+      <label>Дата на плащане<DateInput required min="2000-01-01" max={localToday()} value={paidOn} onValueChange={setPaidOn} /></label>
       <label>Бележка<textarea maxLength={1000} value={note} onChange={e => setNote(e.target.value)} /></label>
       <strong>Общо: {total} EUR</strong><button type="submit" className={styles.primary} disabled={!months.length || !!quoteError}>Потвърди плащане — {total} EUR</button>
     </fieldset>{(error || quoteError) && <p role="alert" className={styles.error}>{error || quoteError}</p>}

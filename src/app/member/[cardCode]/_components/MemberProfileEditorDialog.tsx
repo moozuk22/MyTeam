@@ -4,6 +4,7 @@ import PlayerExtraFields from "@/components/PlayerExtraFields";
 import { playerFieldEnabled } from "@/lib/playerFields";
 import { type MemberProfile } from "../_types/member-types";
 import { XIcon } from "./MemberIcons";
+import { DateInput } from "@/components/DateInput";
 
 type Props = {
   editModalOpen: boolean;
@@ -96,13 +97,12 @@ export function MemberProfileEditorDialog({
               </label>
               <label style={{ display: "grid", gap: "6px" }}>
                 <span className="pm-info-lbl">Дата на раждане</span>
-                <input
-                  type="date"
+                <DateInput
                   value={editForm.birthDate}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     setEditForm((prev) => ({
                       ...prev,
-                      birthDate: e.target.value,
+                      birthDate: value,
                     }))
                   }
                   style={{
