@@ -158,7 +158,7 @@ Run `npm run test:training-images:db` to check the complete save and deletion fl
 
 ## Weekly training microcycles
 
-**Тренировъчен план** opens the weekly cycle page. The page starts with the current Monday–Sunday week in `Europe/Sofia`. Use the week controls to select another week. Group cards show whether a saved cycle exists. Links open the drawing library and **План-конспекти**.
+**Тренировъчен план** opens the weekly cycle page. The page starts with the current Monday–Sunday week in `Europe/Sofia`. Use the week controls to select another week. Group cards show whether a saved cycle exists. From the club page, the **Без микроцикъл** toggle below the search shows only the groups without a cycle in the selected week. The toggle shows the number of these groups. The filter works with the search and with **По треньори**, and it stays on when you change the week. With the filter on, each coach with matching groups opens. Links open the drawing library and **План-конспекти**.
 
 Entry from the club page permits creation, changes, and deletion. Entry with `coachGroupId` shows that group's custom training groups in a read-only view. Save and print access use the existing training plan subscription checks. Each group has one cycle per week. Several groups can use the same cycle. Existing private documents retain their access rules.
 

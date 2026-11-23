@@ -46,6 +46,14 @@
 
 /* Search and "По треньори" view toggle above the group cards */
 .mc-filters { margin-bottom: 12px; }
+/* Quick filters: a row of pill toggles below the view buttons and the search. */
+.mc-quick-filters { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
+.mc-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 8px 6px 12px; border: 1px solid var(--plan-border); border-radius: 999px; background: transparent; color: var(--plan-muted); font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; }
+.mc-filter-chip > svg { flex: none; }
+.mc-filter-chip:hover { border-color: var(--plan-accent-border); color: var(--plan-text); }
+.mc-filter-chip[aria-pressed="true"] { border-color: var(--plan-accent-border); background: var(--plan-selected); color: var(--plan-accent); }
+.mc-filter-count { min-width: 24px; padding: 1px 7px; border-radius: 999px; background: #ffffff14; color: var(--plan-text); font-size: .8125rem; text-align: center; }
+.mc-filter-chip[aria-pressed="true"] .mc-filter-count { background: var(--plan-accent-border); color: #fff; }
 .mc-filters .tp-scope-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
 .mc-page .mc-search { margin: 0; }
 .mc-search > span { display: inline-flex; align-items: center; gap: 6px; }

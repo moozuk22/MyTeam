@@ -5,7 +5,7 @@ import SectionNav from "../SectionNav";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
-import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, History, Layers, Plus, Printer, Save, Search, Trash2, Users, X } from "lucide-react";
+import { Archive, ArrowLeft, CalendarCheck, CalendarRange, CalendarX, Check, ChevronDown, ChevronLeft, ChevronRight, Download, History, Layers, Plus, Printer, Save, Search, Trash2, Users, X } from "lucide-react";
 import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 import { cycleColumns, emptyCycle, formatWeekDates, formatWeekRange, reuseCycle, shiftWeek, type CycleContent } from "@/lib/exercise/microcycle";
 import type { CompetitionSeason } from "@/lib/exercise/document";
@@ -116,6 +116,8 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const [reload, setReload] = useState(0);
   const [query, setQuery] = useState("");
   const [byCoach, setByCoach] = useState(false);
+  // The methodist can show only the groups without a microcycle in the week.
+  const [missingOnly, setMissingOnly] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   // While searching, every matching coach opens; this set holds the ones the user closed again. It resets with each new query.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -264,10 +266,12 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const archived = filterGroups((data?.cycles.filter(c => !data.groups.some(g => g.key === c.groupKey)) ?? []).map(c => ({ key: c.groupKey, name: c.groupName })), query);
   const coachMode = Boolean(data?.coachView) && byCoach;
   const searching = query.trim() !== "";
-  const visibleGroups = data ? filterGroups(data.groups, query) : [];
-  const sections = data && coachMode ? coachSections(data.groups, query) : [];
+  const filteredGroups = data ? data.groups.filter(g => !missingOnly || !data.cycles.some(c => c.groupKey === g.key)) : [];
+  const missingCount = data ? data.groups.filter(g => !data.cycles.some(c => c.groupKey === g.key)).length : 0;
+  const visibleGroups = filterGroups(filteredGroups, query);
+  const sections = data && coachMode ? coachSections(filteredGroups, query) : [];
   const hasSaved = (key: string) => Boolean(data?.cycles.some(c => c.groupKey === key));
-  const toggleCoach = (id: string) => (searching ? setCollapsed : setExpanded)(current => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; });
+  const toggleCoach = (id: string) => (searching || missingOnly ? setCollapsed : setExpanded)(current => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; });
   const showByCoach = (value: boolean) => {
     setByCoach(value);
     // Open the coach of the selected group so the selection stays visible.
@@ -394,12 +398,20 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
           <span><Search size={16} aria-hidden="true" />Търсене</span>
           <input type="search" maxLength={200} value={query} placeholder={coachMode ? "Търси група или треньор" : "Търси група"} onChange={e => { setQuery(e.target.value); setCollapsed(new Set()); }} />
         </label>
+        {!readOnly && <div className="mc-quick-filters">
+          <button type="button" className="mc-filter-chip" aria-pressed={missingOnly}
+            onClick={() => { setMissingOnly(value => !value); setCollapsed(new Set()); }}>
+            {missingOnly ? <Check size={16} aria-hidden="true" /> : <CalendarX size={16} aria-hidden="true" />}
+            Без микроцикъл <span className="mc-filter-count">{missingCount}</span>
+          </button>
+        </div>}
       </div>}
-      {data && data.groups.length > 0 && (coachMode ? sections.length === 0 : visibleGroups.length === 0) && <div className="tp-empty">Няма групи, които отговарят на търсенето.</div>}
+      {data && data.groups.length > 0 && (coachMode ? sections.length === 0 : visibleGroups.length === 0) && <div className="tp-empty">{missingOnly && !searching ? "Всички групи имат микроцикъл за тази седмица." : "Няма групи, които отговарят на търсенето."}</div>}
       {data && !coachMode && visibleGroups.length > 0 && <div className="mc-groups">{visibleGroups.map(groupCard)}</div>}
       {coachMode && sections.length > 0 && <div className="mc-groups">
         {sections.map(section => {
-          const isOpen = searching ? !collapsed.has(section.id) : expanded.has(section.id);
+          // A search or the filter opens every coach that has matching groups.
+          const isOpen = searching || missingOnly ? !collapsed.has(section.id) : expanded.has(section.id);
           const saved = section.groups.filter(g => hasSaved(g.key)).length;
           const panel = `mc-coach-${section.id}`;
           return <div key={section.id} className={`mc-coach${isOpen ? " mc-coach--open" : ""}`}>
