@@ -315,7 +315,7 @@ export default function TrainingPlansClient({
             <span>Назад</span>
           </BackLink>
           <div className="tp-heading">
-            <h1 className="tp-title"><Images aria-hidden="true" />Библиотека с рисунки</h1>
+            <h1 className="tp-title"><Images aria-hidden="true" />Библиотека с упражнения</h1>
             <p>{selectedClub?.name ?? "Няма избран отбор"}</p>
           </div>
           <button

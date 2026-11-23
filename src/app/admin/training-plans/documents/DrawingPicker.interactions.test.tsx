@@ -79,9 +79,9 @@ it("opens on Mine and retains the search when switching filters", () => {
 it("shows separate messages for an empty scope and no search matches", async () => {
   hooks.request.mockResolvedValue({ plans: [], nextCursor: null });
   const picker = setup(); picker.render(); await flush();
-  expect(find(picker.render(), (props) => props.className === "td-muted").props.children).toBe("Няма запазени рисунки в избрания филтър.");
+  expect(find(picker.render(), (props) => props.className === "td-muted").props.children).toBe("Няма запазени упражнения в избрания филтър.");
   picker.search("липсва"); picker.render(); await flush();
-  expect(find(picker.render(), (props) => props.className === "td-muted").props.children).toBe("Няма рисунки, които отговарят на търсенето.");
+  expect(find(picker.render(), (props) => props.className === "td-muted").props.children).toBe("Няма упражнения, които отговарят на търсенето.");
 });
 
 it("starts on Mine with no search after an unmount and reopen", () => {
@@ -114,7 +114,7 @@ it("ignores an obsolete list response after a filter change", async () => {
   picker.click("Клубни"); picker.render(); await flush();
   expect(signal.aborted).toBe(true);
   resolveOld({ plans: [{ id: "old", title: "Old", layoutVersion: 2 }], nextCursor: null }); await flush();
-  expect(find(picker.render(), (props) => props.className === "td-muted").props.children).toBe("Няма запазени рисунки в избрания филтър.");
+  expect(find(picker.render(), (props) => props.className === "td-muted").props.children).toBe("Няма запазени упражнения в избрания филтър.");
 });
 
 it("gives each section a distinct picker key when switching within a merged cell", () => {
@@ -127,7 +127,7 @@ it("gives each section a distinct picker key when switching within a merged cell
   function buttons(node: ReactNode): ReactElement<Record<string, unknown>>[] {
     if (!isValidElement<Record<string, unknown>>(node)) return [];
     return [
-      ...(node.props.children === "Добави рисунка" ? [node] : []),
+      ...(node.props.children === "Добави упражнение" ? [node] : []),
       ...([node.props.children].flat(Infinity) as ReactNode[]).flatMap(buttons),
     ];
   }

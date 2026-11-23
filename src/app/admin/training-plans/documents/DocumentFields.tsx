@@ -100,7 +100,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
               <button type="button" className="tp-secondary-btn" aria-expanded={activePicker === index}
                 ref={(button) => { pickerButtons.current[index] = button; }}
                 onClick={() => setActivePicker(activePicker === index ? undefined : index)}>
-                {drawing ? "Смени рисунката" : "Добави рисунка"}
+                {drawing ? "Смени упражнението" : "Добави упражнение"}
               </button>
               {drawing && <button type="button" className="tp-secondary-btn" onClick={() => onDrawing(index, null)}>Премахни</button>}
             </div>;

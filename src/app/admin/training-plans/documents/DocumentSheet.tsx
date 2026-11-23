@@ -266,7 +266,7 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
     </p>}
     {printError && <div className="td-feedback" role="alert">{printError}</div>}
     {failed && <div className="td-feedback" role="alert">
-      Рисунките не могат да се подготвят за печат.
+      Упражненията не могат да се подготвят за печат.
       <button type="button" className="tp-secondary-btn" onClick={() => { setDrawings({}); setAttempt((value) => value + 1); }}>Опитай отново</button>
     </div>}
     {!failed && !ready && <div className="td-print-loading" role="status" aria-label="Зареждане" aria-busy="true"><span aria-hidden="true" /></div>}

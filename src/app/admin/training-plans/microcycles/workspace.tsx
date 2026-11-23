@@ -45,7 +45,7 @@ async function printPagesReady(root: HTMLElement, count: number) {
   const deadline = Date.now() + 30_000;
   let stable = 0;
   while (stable < 3) {
-    if (root.querySelector(".mc-print-doc [role=alert]")) throw new Error("Рисунките не могат да се подготвят за печат. Опитайте отново.");
+    if (root.querySelector(".mc-print-doc [role=alert]")) throw new Error("Упражненията не могат да се подготвят за печат. Опитайте отново.");
     if (Date.now() > deadline) throw new Error("Печатът не може да се подготви. Опитайте отново.");
     stable = root.querySelectorAll('.td-preview[data-print-ready="true"]').length === count ? stable + 1 : 0;
     await new Promise(resolve => setTimeout(resolve, 100));

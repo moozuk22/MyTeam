@@ -7,7 +7,7 @@ export type TrainingSection = "microcycles" | "drawings" | "documents";
 
 const SECTIONS: { key: TrainingSection; path: string; label: string; Icon: typeof Images }[] = [
   { key: "microcycles", path: "/admin/training-plans/microcycles", label: "Микроцикъл", Icon: CalendarRange },
-  { key: "drawings", path: "/admin/training-plans", label: "Рисунки", Icon: Images },
+  { key: "drawings", path: "/admin/training-plans", label: "Упражнения", Icon: Images },
   { key: "documents", path: "/admin/training-plans/documents", label: "План-конспекти", Icon: FileText },
 ];
 

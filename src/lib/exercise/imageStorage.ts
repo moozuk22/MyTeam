@@ -9,7 +9,7 @@ import { INLINE_IMAGE_PREFIX, readTrainingImageSource, trainingImageSource } fro
 export type TrainingImageTx = Omit<typeof prisma, "$extends" | "$transaction" | "$connect" | "$disconnect" | "$on" | "$use">;
 
 export class TrainingImageError extends Error {
-  constructor(message = "Изображението не е налично. Отворете рисунката отново.", public status = 400) {
+  constructor(message = "Изображението не е налично. Отворете упражнението отново.", public status = 400) {
     super(message);
   }
 }

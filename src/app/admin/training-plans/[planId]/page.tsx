@@ -112,7 +112,7 @@ export default async function TrainingPlanReview({
     <main className="tp-page tp-review">
       <div className="tp-inner">
         <BackLink className="tp-back-btn" href={listHref}>
-          <ArrowLeft size={16} aria-hidden="true" /> Към рисунките
+          <ArrowLeft size={16} aria-hidden="true" /> Към упражненията
         </BackLink>
         <header className="tp-review-heading">
           <h1 className="tp-title"><Layers aria-hidden="true" />{plan.title}</h1>

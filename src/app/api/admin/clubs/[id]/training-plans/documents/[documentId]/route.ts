@@ -82,7 +82,7 @@ export async function PUT(request: NextRequest, context: Context) {
     }
     const snapshot = await snapshotDocument(where.clubId, input, previous.content as PlanContent, tx);
     if (!snapshot)
-      return NextResponse.json({ error: "Изберете налична рисунка от този клуб." }, { status: 400 });
+      return NextResponse.json({ error: "Изберете налично упражнение от този клуб." }, { status: 400 });
     const { content, imageIds } = await storeDocumentImages(tx, where.clubId, previous.ownerId, snapshot);
     const updatedAt = new Date();
     const result = await tx.trainingPlanDocument.updateMany({

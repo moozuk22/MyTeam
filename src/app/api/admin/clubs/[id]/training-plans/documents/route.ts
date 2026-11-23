@@ -129,7 +129,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Клубът не е намерен." }, { status: 404 });
     const snapshot = await snapshotDocument(clubId, input, previous, tx);
     if (!snapshot)
-      return NextResponse.json({ error: "Изберете налична рисунка от този клуб." }, { status: 400 });
+      return NextResponse.json({ error: "Изберете налично упражнение от този клуб." }, { status: 400 });
     const { content, imageIds } = await storeDocumentImages(tx, clubId, where.ownerId, snapshot);
     const inserted = await tx.trainingPlanDocument.createMany({
       data: { ...where, ...(target ? { originKey: sessionOrigin(target) } : privateDraft ? { originKey: "private" } : {}), title: content.session.title.trim(), content }, skipDuplicates: true,

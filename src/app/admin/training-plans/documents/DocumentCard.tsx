@@ -40,7 +40,7 @@ export function DocumentCardContent({ item }: { item: Pick<DocumentSummary, "tit
   ].filter(Boolean) as string[];
   const stats = [
     preview?.duration && { icon: Clock, label: "Времетраене", value: `${preview.duration} мин.` },
-    preview && { icon: ImageIcon, label: "Рисунки", value: `${preview.drawings} от 5` },
+    preview && { icon: ImageIcon, label: "Упражнения", value: `${preview.drawings} от 5` },
     preview?.playerCount && { icon: Users, label: "Състезатели", value: preview.playerCount },
   ].filter(Boolean) as { icon: typeof Clock; label: string; value: string }[];
   return <>

@@ -2,7 +2,7 @@
 
 Konva is the training plan editor at `/admin/training-plans/[planId]/konva`. Selecting a plan card opens a read-only review at `/admin/training-plans/[planId]` with its saved pitch, category, description, and last update. **Редактирай** opens the editor from either the card or the review. Opening a plan requires the club ID in the query string and server-side club access. Invalid drawings display an error.
 
-**Нов план** opens a blank drawing editor. Enter a name in the editor and choose **Запази** to create the plan and its drawing together. Plans from the original HTML/CSS editor remain in the list with **Копирай в новия редактор** to create an editable copy. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error.
+**Ново упражнение** opens a blank drawing editor. Enter a name in the editor and choose **Запази** to create the plan and its drawing together. Plans from the original HTML/CSS editor remain in the list with **Копирай в новия редактор** to create an editable copy. Conversion preserves the original, object IDs and ordering. Legacy CSS dimensions are approximated against a fixed 1050 × 700 board. Unsupported geometry blocks conversion with an error.
 
 Open the sidebar’s **Детайли** tab to edit **Име на плана**, **Категория** and **Описание**, then choose **Запази**. New plans open on **Детайли** and saved plans open on **Инструменти**. Local draft recovery includes unsaved changes to these fields.
 
@@ -16,11 +16,11 @@ The plan review supports zoom and an expanded view of the saved pitch. **Дет�
 
 Admins and coaches open **Тренировъчен план** from the club or a coach group. This button opens the weekly microcycle. Opening it from a coach group carries that group through all pages and back navigation.
 
-The weekly microcycle, the drawing library (**Библиотека с рисунки**), and the plan list (**План-конспекти**) are the three main pages. A bar below the page header links them: **Микроцикъл**, **Рисунки**, and **План-конспекти**. The bar marks the open page. On these three pages, **Назад** opens the club or group page. If the microcycle has unsaved changes, the bar and **Назад** ask for confirmation first.
+The weekly microcycle, the drawing library (**Библиотека с упражнения**), and the plan list (**План-конспекти**) are the three main pages. A bar below the page header links them: **Микроцикъл**, **Упражнения**, and **План-конспекти**. The bar marks the open page. On these three pages, **Назад** opens the club or group page. If the microcycle has unsaved changes, the bar and **Назад** ask for confirmation first.
 
 Each back button opens a fixed parent page and does not use the browser history:
 
-- The drawing review and the drawing editor open the library (**Към рисунките**).
+- The drawing review and the drawing editor open the library (**Към упражненията**).
 - The plan editor opens the plan list (**Към план-конспектите**).
 - Pages for the plan of a training open the microcycle (**Към тренировката**). The plan list for a training does not show the bar.
 
@@ -125,7 +125,7 @@ Open **План-конспекти** from the drawing library. Documents are pri
 
 Browser Back and Forward use a custom dialog for navigation within the app. The dialog opens if the document has unsaved changes or a save is in progress. **Отказ** keeps the editor and its changes. **Потвърди** continues the requested navigation. **Към план-конспектите** uses the same warning. Reloading or closing the tab uses the browser warning. The history guard keeps the existing history entries and Next.js state.
 
-Use **Добави рисунка** to select a saved Konva drawing. The selection area opens with **Мои** active each time. **Мои** shows drawings from the signed-in account in this club. **Клубни** shows all drawings in this club. Use **Търсене по заглавие** to find titles in the active filter. Search ignores letter case and applies before pagination. The search text stays when you change the filter. Closing the selection area clears the filter and search text. Saving the document captures a copy of that drawing. Subsequent library edits and deletions leave the document’s copy available. Use **Смени рисунката** to attach a newer version. The document keeps its drawing data and references the shared image. It does not copy the image bytes. Deleting or changing the source drawing keeps the image while a saved document uses it. When the last drawing or document reference is removed, the same transaction deletes the unused image. An image that only documents use is available only to the author of those documents.
+Use **Добави упражнение** to select a saved Konva drawing. The selection area opens with **Мои** active each time. **Мои** shows drawings from the signed-in account in this club. **Клубни** shows all drawings in this club. Use **Търсене по заглавие** to find titles in the active filter. Search ignores letter case and applies before pagination. The search text stays when you change the filter. Closing the selection area clears the filter and search text. Saving the document captures a copy of that drawing. Subsequent library edits and deletions leave the document’s copy available. Use **Смени упражнението** to attach a newer version. The document keeps its drawing data and references the shared image. It does not copy the image bytes. Deleting or changing the source drawing keeps the image while a saved document uses it. When the last drawing or document reference is removed, the same transaction deletes the unused image. An image that only documents use is available only to the author of those documents.
 
 Choose **Преглед за печат** to check the A4 landscape layout, then **Към редакцията** to return to the editable plan. A taller pitch view turns 90° clockwise on this sheet. Players, equipment, and text keep their individual orientation while the background, arrows, and zones rotate with the pitch. The drawing editor and library keep their saved orientation. **Печат** opens the browser print dialog for one A4 landscape sheet or **Save as PDF**. The preview reduces the sheet’s scale if the entered content would otherwise exceed the page. All drawings on the sheet have the same size. Their height is the smallest space that a section has below its text.
 

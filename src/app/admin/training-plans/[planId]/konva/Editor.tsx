@@ -1573,13 +1573,13 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
             <button
               type="button"
               className="ke-back"
-              aria-label="Към рисунките"
+              aria-label="Към упражненията"
               onClick={() => navigateAway(`/admin/training-plans?${search}`)}
             >
               <ArrowLeft size={18} aria-hidden="true" />
-              <span>Към рисунките</span>
+              <span>Към упражненията</span>
             </button>
-            <h1><Waypoints size={24} aria-hidden="true" />{planId ? "Редактор на план" : "Нов план"}</h1>
+            <h1><Waypoints size={24} aria-hidden="true" />{planId ? "Редактор на упражнение" : "Ново упражнение"}</h1>
             <button
               type="button"
               className="ke-primary"

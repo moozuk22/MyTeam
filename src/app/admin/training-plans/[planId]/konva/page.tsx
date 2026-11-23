@@ -41,7 +41,7 @@ export default async function KonvaPage({
         <h1>Упражнението не може да се отвори</h1>
         <p>{error}</p>
         <BackLink href={`/admin/training-plans?${trainingPlanSearch(clubId, groupContext)}`}>
-          Към рисунките
+          Към упражненията
         </BackLink>
       </main>
     );
