@@ -10,7 +10,6 @@ export async function POST(
 ) {
   const { cardCode } = await params;
   const normalizedCardCode = cardCode.trim().toUpperCase();
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   try {
     const card = await prisma.card.findFirst({
@@ -25,41 +24,17 @@ export async function POST(
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    try {
-      const updated = await prisma.playerNotification.updateMany({
-        where: {
-          playerId: card.playerId,
-          readAt: null,
-          sentAt: {
-            gte: oneWeekAgo,
-          },
-        },
-        data: {
-          readAt: new Date(),
-        },
-      });
+    const updated = await prisma.playerNotification.updateMany({
+      where: {
+        playerId: card.playerId,
+        readAt: null,
+      },
+      data: {
+        readAt: new Date(),
+      },
+    });
 
-      return NextResponse.json({
-        success: true,
-        markedRead: updated.count,
-      });
-    } catch (notificationError) {
-      const code =
-        typeof notificationError === "object" &&
-        notificationError !== null &&
-        "code" in notificationError
-          ? String((notificationError as { code?: unknown }).code)
-          : "";
-
-      if (code !== "P2021") {
-        console.error("Mark notifications read failed:", notificationError);
-      }
-
-      return NextResponse.json({
-        success: true,
-        markedRead: 0,
-      });
-    }
+    return NextResponse.json({ success: true, markedRead: updated.count });
   } catch (error) {
     console.error("Notification read route error:", error);
     return NextResponse.json(

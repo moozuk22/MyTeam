@@ -14,8 +14,12 @@ import { buildMemberTrainingAttendanceRequest } from "@/lib/memberTrainingAttend
 import { parsePlayerWeight, playerFieldEnabled } from "@/lib/playerFields";
 import { getCompatiblePushSubscription } from "@/lib/push/browser";
 import { uploadImage } from "@/lib/uploadImage";
+import {
+  createMemberNotificationInbox,
+  type MemberNotification,
+} from "@/lib/memberNotificationInbox";
 import { useRouter, useSearchParams } from "next/navigation";
-import { use, useEffect, useRef, useState, type CSSProperties } from "react";
+import { use, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MemberBirthdayDialog } from "./_components/MemberBirthdayDialog";
 import { MemberDiscountDialog } from "./_components/MemberDiscountDialog";
 import { MemberDiscountsDialog } from "./_components/MemberDiscountsDialog";
@@ -126,20 +130,23 @@ export default function MemberCardPage({
 
   // Notifications
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
-  const [notifications, setNotifications] = useState<
-    Array<{
-      id: string;
-      type: string;
-      title: string;
-      body: string;
-      imageUrl?: string | null;
-      url?: string | null;
-      sentAt: string;
-      readAt: string | null;
-    }>
-  >([]);
+  const [notifications, setNotifications] = useState<MemberNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [notificationsError, setNotificationsError] = useState("");
+  const notificationInbox = useMemo(
+    () => createMemberNotificationInbox(normalizedCardCode, {
+      onData: (data) => {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      },
+      onLoading: setLoadingNotifications,
+      onError: setNotificationsError,
+    }),
+    [normalizedCardCode],
+  );
+
+  useEffect(() => () => notificationInbox.cancel(), [notificationInbox]);
   const [lastHandledPushOpenTs, setLastHandledPushOpenTs] = useState<
     string | null
   >(null);
@@ -468,52 +475,12 @@ export default function MemberCardPage({
     }
   };
 
-  // Fetch notifications
-  const fetchNotifications = async () => {
-    setLoadingNotifications(true);
-    try {
-      const response = await fetch(
-        `/api/members/${normalizedCardCode}/notifications`,
-        { cache: "no-store" },
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
-      }
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
-    } finally {
-      setLoadingNotifications(false);
-    }
-  };
-
   const handleNotificationsPanelOpen = async () => {
     if (isAdmin || isCoach) {
       return;
     }
     setNotificationsPanelOpen(true);
-    await fetchNotifications();
-
-    // Mark all as read when opening the panel
-    if (unreadCount > 0) {
-      try {
-        const response = await fetch(
-          `/api/members/${normalizedCardCode}/notifications/read`,
-          {
-            method: "POST",
-          },
-        );
-        if (response.ok) {
-          setNotifications((prev) =>
-            prev.map((n) => ({ ...n, readAt: new Date().toISOString() })),
-          );
-          setUnreadCount(0);
-        }
-      } catch (error) {
-        console.error("Failed to mark notifications as read:", error);
-      }
-    }
+    await notificationInbox.refresh(true);
   };
 
   const getOptOutDatesFromDays = (days: TrainingDayStatus[]) =>
@@ -907,29 +874,7 @@ export default function MemberCardPage({
       }
 
       if (type === "notification-created") {
-        void (async () => {
-          try {
-            const response = await fetch(
-              `/api/members/${normalizedCardCode}/notifications`,
-              {
-                cache: "no-store",
-              },
-            );
-            if (!response.ok) {
-              return;
-            }
-            const data = await response.json();
-            setUnreadCount(data.unreadCount || 0);
-            if (notificationsPanelOpen) {
-              setNotifications(data.notifications || []);
-            }
-          } catch (error) {
-            console.error(
-              "Failed to refresh notifications after event:",
-              error,
-            );
-          }
-        })();
+        void notificationInbox.refresh();
       }
     };
 
@@ -940,7 +885,7 @@ export default function MemberCardPage({
     return () => {
       source.close();
     };
-  }, [normalizedCardCode, notificationsPanelOpen]);
+  }, [normalizedCardCode, notificationInbox]);
 
   // Re-fetch dynamic data when app returns to foreground (SSE is lost while backgrounded on mobile).
   useEffect(() => {
@@ -1000,22 +945,8 @@ export default function MemberCardPage({
       return;
     }
 
-    const fetchUnreadCount = async () => {
-      try {
-        const response = await fetch(
-          `/api/members/${normalizedCardCode}/notifications`,
-          { cache: "no-store" },
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setUnreadCount(data.unreadCount || 0);
-        }
-      } catch (error) {
-        console.error("Failed to fetch unread count:", error);
-      }
-    };
-    void fetchUnreadCount();
-  }, [normalizedCardCode, isAdmin, isCoach]);
+    void notificationInbox.refresh();
+  }, [notificationInbox, isAdmin, isCoach]);
 
   useEffect(() => {
     // Foreground/SSE refreshes must not overwrite an open edit draft.
@@ -1095,41 +1026,7 @@ export default function MemberCardPage({
 
     if (shouldOpenBell) {
       setNotificationsPanelOpen(true);
-      void (async () => {
-        setLoadingNotifications(true);
-        try {
-          const response = await fetch(
-            `/api/members/${normalizedCardCode}/notifications`,
-            { cache: "no-store" },
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setNotifications(data.notifications || []);
-            setUnreadCount(data.unreadCount || 0);
-          }
-        } catch (error) {
-          console.error("Failed to fetch notifications:", error);
-        } finally {
-          setLoadingNotifications(false);
-        }
-
-        try {
-          const response = await fetch(
-            `/api/members/${normalizedCardCode}/notifications/read`,
-            {
-              method: "POST",
-            },
-          );
-          if (response.ok) {
-            setNotifications((prev) =>
-              prev.map((n) => ({ ...n, readAt: new Date().toISOString() })),
-            );
-            setUnreadCount(0);
-          }
-        } catch (error) {
-          console.error("Failed to mark notifications as read:", error);
-        }
-      })();
+      void notificationInbox.refresh(true);
     }
 
     const cleanedParams = new URLSearchParams(searchParams.toString());
@@ -1145,6 +1042,7 @@ export default function MemberCardPage({
     });
   }, [
     normalizedCardCode,
+    notificationInbox,
     lastHandledPushOpenTs,
     router,
     searchParams,
@@ -3035,6 +2933,8 @@ export default function MemberCardPage({
           notificationsPanelOpen={notificationsPanelOpen}
           setNotificationsPanelOpen={setNotificationsPanelOpen}
           loadingNotifications={loadingNotifications}
+          error={notificationsError}
+          onRetry={() => void notificationInbox.refresh(true)}
           notifications={notifications}
           setBirthdayCardOpen={setBirthdayCardOpen}
         />

@@ -9,6 +9,8 @@ type Props = {
   notificationsPanelOpen: boolean;
   setNotificationsPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
   loadingNotifications: boolean;
+  error: string;
+  onRetry: () => void;
   notifications: {
     id: string;
     type: string;
@@ -27,6 +29,8 @@ export function MemberNotificationsDialog({
   notificationsPanelOpen,
   setNotificationsPanelOpen,
   loadingNotifications,
+  error,
+  onRetry,
   notifications,
   setBirthdayCardOpen,
 }: Props) {
@@ -55,6 +59,14 @@ export function MemberNotificationsDialog({
             <div className="pm-divider" />
 
             <div className="member-notifications-scroll">
+              {error && !loadingNotifications && (
+                <div role="alert" style={{ padding: "12px", overflowWrap: "anywhere" }}>
+                  <p>{error}</p>
+                  <button type="button" className="pm-btn pm-btn--cancel" onClick={onRetry}>
+                    Опитай отново
+                  </button>
+                </div>
+              )}
               {loadingNotifications ? (
                 <div
                   style={{
@@ -65,7 +77,7 @@ export function MemberNotificationsDialog({
                 >
                   <SpinnerIcon size={24} />
                 </div>
-              ) : notifications.length === 0 ? (
+              ) : notifications.length === 0 && !error ? (
                 <div
                   style={{
                     textAlign: "center",
