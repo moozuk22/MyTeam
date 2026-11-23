@@ -30,6 +30,7 @@ import {
   Minimize2,
   Minus,
   MousePointer2,
+  ListChecks,
   NotebookText,
   Pencil,
   Plus,
@@ -91,7 +92,7 @@ import {
   sameExercise,
   type RecoveryDraft,
 } from "@/lib/exercise/drafts";
-import { MAX_ITEMS, MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_TITLE_LENGTH } from "@/lib/trainingPlans";
+import { MAX_ITEMS, MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_REQUIREMENTS_LENGTH, MAX_PLAN_TITLE_LENGTH } from "@/lib/trainingPlans";
 import Canvas from "./Canvas";
 import { EquipmentPreview } from "./Visuals";
 import { pitchView, pitchViewport } from "./pitchView";
@@ -415,6 +416,7 @@ export type EditorProps = {
     id: string | null;
     title: string;
     description?: string | null;
+    requirements?: string | null;
     categoryId?: string | null;
     layout: Exercise;
     updatedAt: string;
@@ -595,6 +597,9 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const initialDescription = plan.description ?? "";
   const [description, setDescription] = useState(initialDescription);
   const [savedDescription, setSavedDescription] = useState(initialDescription);
+  const initialRequirements = plan.requirements ?? "";
+  const [requirements, setRequirements] = useState(initialRequirements);
+  const [savedRequirements, setSavedRequirements] = useState(initialRequirements);
   const [recovery, setRecovery] = useState<RecoveryDraft | null>(null),
     [draftReady, setDraftReady] = useState(false);
   const recoveryDialog = useRef<HTMLDialogElement>(null);
@@ -666,6 +671,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const dirty = layoutDirty ||
     title.trim() !== savedTitle ||
     description.trim() !== savedDescription ||
+    requirements.trim() !== savedRequirements ||
     categoryId !== savedCategoryId;
   const object = visibleObjects.find((o) => o.id === selected);
   const batch = useMemo(
@@ -687,8 +693,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   const collectionEndpoint = `/api/admin/clubs/${clubId}/training-plans`;
   const endpoint = `${collectionEndpoint}/${planId}`;
   const lastWrittenDraft = useRef<string | null>(null);
-  const state = useRef({ layout, title, description, categoryId, dirty, revision, saved });
-  state.current = { layout, title, description, categoryId, dirty, revision, saved };
+  const state = useRef({ layout, title, description, requirements, categoryId, dirty, revision, saved });
+  state.current = { layout, title, description, requirements, categoryId, dirty, revision, saved };
   const savingRef = useRef(false);
   const change = useCallback((next: Exercise) => {
     const invalid = validateExercise(next);
@@ -903,12 +909,12 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
   useEffect(() => {
     try {
       const draft = readDraft(localStorage.getItem(initialDraftKey));
-      if (draft && !matchesDraft(draft, plan.layout, plan.title, initialDescription, initialCategoryId)) setRecovery(draft);
+      if (draft && !matchesDraft(draft, plan.layout, plan.title, initialDescription, initialCategoryId, initialRequirements)) setRecovery(draft);
     } catch {
       setStorageError(true);
     }
     setDraftReady(true);
-  }, [initialDraftKey, plan.layout, plan.title, initialDescription, initialCategoryId]);
+  }, [initialDraftKey, plan.layout, plan.title, initialDescription, initialCategoryId, initialRequirements]);
   useEffect(() => {
     if (recovery) recoveryDialog.current?.showModal();
   }, [recovery]);
@@ -934,6 +940,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
             layout,
             title,
             description,
+            requirements,
             categoryId,
             savedAt: Date.now(),
           } satisfies RecoveryDraft);
@@ -943,14 +950,14 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         // Remove only this editor's saved snapshot; another tab may have a newer draft.
         else {
           const d = readDraft(localStorage.getItem(key));
-          if (d && matchesDraft(d, saved, savedTitle, savedDescription, savedCategoryId)) localStorage.removeItem(key);
+          if (d && matchesDraft(d, saved, savedTitle, savedDescription, savedCategoryId, savedRequirements)) localStorage.removeItem(key);
         }
       } catch {
         setStorageError(true);
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [layout, title, description, categoryId, dirty, revision, saved, savedTitle, savedDescription, savedCategoryId, key, draftReady, recovery]);
+  }, [layout, title, description, requirements, categoryId, dirty, revision, saved, savedTitle, savedDescription, savedRequirements, savedCategoryId, key, draftReady, recovery]);
   const persistDraft = useCallback(() => {
     const current = state.current;
     if (!current.dirty || recovery) return;
@@ -960,6 +967,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         layout: current.layout,
         title: current.title,
         description: current.description,
+        requirements: current.requirements,
         categoryId: current.categoryId,
         savedAt: Date.now(),
       } satisfies RecoveryDraft);
@@ -1102,6 +1110,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
     setStatus("");
     const snapshot = state.current.layout,
       snapshotDescription = state.current.description.trim(),
+      snapshotRequirements = state.current.requirements.trim(),
       snapshotCategoryId = state.current.categoryId,
       base = state.current.revision;
     const creating = planId === null;
@@ -1114,6 +1123,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
           body: JSON.stringify({
             title: asCopy ? `${snapshotTitle.slice(0, 185)} — копие` : snapshotTitle,
             description: snapshotDescription,
+            requirements: snapshotRequirements,
             categoryId: snapshotCategoryId,
             layout: snapshot,
             ...(asCopy || creating ? { coachGroupId } : { expectedUpdatedAt: base }),
@@ -1142,6 +1152,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         setSavedTitle(snapshotTitle);
         setDescription(snapshotDescription);
         setSavedDescription(snapshotDescription);
+        setRequirements(snapshotRequirements);
+        setSavedRequirements(snapshotRequirements);
         setRevision(payload.plan.updatedAt);
         setSavedCategoryId(snapshotCategoryId);
         setConflict(false);
@@ -1150,7 +1162,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
           const storedDraft = localStorage.getItem(key);
           const d = readDraft(storedDraft);
           if ((creating && storedDraft && storedDraft === lastWrittenDraft.current) ||
-              (d && matchesDraft(d, snapshot, snapshotTitle, snapshotDescription, snapshotCategoryId)))
+              (d && matchesDraft(d, snapshot, snapshotTitle, snapshotDescription, snapshotCategoryId, snapshotRequirements)))
             localStorage.removeItem(key);
         } catch {
           setStorageError(true);
@@ -1196,6 +1208,8 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       setSavedTitle(data.plan.title);
       setDescription(data.plan.description ?? "");
       setSavedDescription(data.plan.description ?? "");
+      setRequirements(data.plan.requirements ?? "");
+      setSavedRequirements(data.plan.requirements ?? "");
       setRevision(data.plan.updatedAt);
       setConflict(false);
       closeConflict();
@@ -1222,6 +1236,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       change(recovery.layout);
       if (recovery.title !== undefined) setTitle(recovery.title);
       if (recovery.description !== undefined) setDescription(recovery.description);
+      if (recovery.requirements !== undefined) setRequirements(recovery.requirements);
       if (recovery.categoryId !== undefined) setCategoryId(recovery.categoryId);
       if (planId && recovery.baseRevision !== revision) {
         setConflict(true);
@@ -1988,6 +2003,22 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
                       disabled={saving || !!recovery}
                       onChange={(event) => {
                         setDescription(event.currentTarget.value);
+                        setStatus("");
+                      }}
+                    />
+                  </span>
+                </label>
+                <label className="ke-plan-description">
+                  Изисквания
+                  <span className="ke-field-icon">
+                    <ListChecks size={17} aria-hidden="true" />
+                    <textarea
+                      value={requirements}
+                      maxLength={MAX_PLAN_REQUIREMENTS_LENGTH}
+                      rows={6}
+                      disabled={saving || !!recovery}
+                      onChange={(event) => {
+                        setRequirements(event.currentTarget.value);
                         setStatus("");
                       }}
                     />

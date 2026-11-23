@@ -3,7 +3,7 @@ export const imageTestSchema = `
 CREATE TABLE clubs (id uuid PRIMARY KEY);
 CREATE TABLE training_plans (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), club_id uuid NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
-  title text NOT NULL, description text, category_id uuid, layout jsonb NOT NULL,
+  title text NOT NULL, description text, requirements text, category_id uuid, layout jsonb NOT NULL,
   created_by_user_id uuid, created_by_coach_group_id uuid, creator_name text, updated_by_user_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
 );

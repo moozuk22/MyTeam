@@ -234,7 +234,7 @@ describe("training plan access and persistence", () => {
       ...EMPTY_EXERCISE,
       objects: [createObject("ball", { x: 100, y: 100 }, "first-ball")],
     };
-    const details = { title: "Първи план", description: "Подавания", layout };
+    const details = { title: "Първи план", description: "Подавания", requirements: "Пас с два допира.", layout };
     const response = await POST(request("POST", details), params);
 
     expect(response.status).toBe(201);
@@ -312,7 +312,7 @@ describe("training plan access and persistence", () => {
     ).toBe(404);
     expect(mocks.findFirst).toHaveBeenCalledWith({
       where: { id, clubId: club },
-      select: { layout: true, categoryId: true },
+      select: { layout: true, categoryId: true, requirements: true },
     });
     expect(mocks.create).not.toHaveBeenCalled();
   });
@@ -607,6 +607,24 @@ describe("training plan categories", () => {
     expect(mocks.create.mock.calls[0][0].data.categoryId).toBe(category.id);
     expect((await POST(request("POST", { ...body, categoryId: null }), params)).status).toBe(201);
     expect(mocks.create.mock.calls[1][0].data.categoryId).toBeNull();
+  });
+
+  it("copies the source requirements unless the copy request gives its own", async () => {
+    mocks.findFirst.mockResolvedValue({ layout: DEFAULT_LAYOUT, categoryId: null, requirements: "Висока интензивност." });
+    const body = { title: "Копие", sourcePlanId: id, editorVersion: 2 };
+    expect((await POST(request("POST", body), params)).status).toBe(201);
+    expect(mocks.create.mock.calls[0][0].data.requirements).toBe("Висока интензивност.");
+    expect((await POST(request("POST", { ...body, requirements: " " }), params)).status).toBe(201);
+    expect(mocks.create.mock.calls[1][0].data.requirements).toBeNull();
+  });
+
+  it("saves trimmed requirements and rejects requirements over 700 characters", async () => {
+    expect((await POST(request("POST", { title: "План", requirements: "а".repeat(701) }), params)).status).toBe(400);
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect((await PUT(request("PUT", { requirements: "а".repeat(701), expectedUpdatedAt: revision }), params)).status).toBe(400);
+    mocks.updateMany.mockClear();
+    expect((await PUT(request("PUT", { requirements: " Без контакт. ", expectedUpdatedAt: revision }), params)).status).toBe(200);
+    expect(mocks.updateMany.mock.calls.at(-1)?.[0].data.requirements).toBe("Без контакт.");
   });
 });
 

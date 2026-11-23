@@ -1,5 +1,5 @@
 import BackLink from "../BackLink";
-import { ArrowLeft, Box, Edit2, Ellipsis, History, Info, Layers, Plus, UserRound } from "lucide-react";
+import { ArrowLeft, Box, Edit2, Ellipsis, History, Info, Layers, ListChecks, Plus, UserRound } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -33,6 +33,7 @@ export default async function TrainingPlanReview({
     select: {
       title: true,
       description: true,
+      requirements: true,
       creatorName: true,
       updatedAt: true,
       layout: true,
@@ -71,6 +72,17 @@ export default async function TrainingPlanReview({
           )}
         </header>
         <p className="tp-review-description">{plan.description || "Без описание"}</p>
+      </section>
+      <section className="tp-review-detail-card" aria-labelledby="plan-requirements">
+        <header>
+          <h2 id="plan-requirements"><ListChecks size={22} aria-hidden="true" /> Изисквания</h2>
+          {layout && (
+            <Link className="tp-icon-btn" href={`${editorHref}&panel=description`} aria-label="Редактирай изискванията">
+              <Edit2 size={17} aria-hidden="true" />
+            </Link>
+          )}
+        </header>
+        <p className="tp-review-description">{plan.requirements || "Без изисквания"}</p>
       </section>
       <section className="tp-review-detail-card" aria-labelledby="plan-information">
         <h2 id="plan-information"><Layers size={22} aria-hidden="true" /> Информация</h2>

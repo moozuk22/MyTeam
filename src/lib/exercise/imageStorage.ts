@@ -127,7 +127,7 @@ export async function readEditableTrainingPlan(clubId: string, planId: string) {
     const plan = await tx.trainingPlan.findFirst({
       where: { id: planId, clubId },
       select: {
-        id: true, clubId: true, title: true, description: true, categoryId: true,
+        id: true, clubId: true, title: true, description: true, requirements: true, categoryId: true,
         layout: true, updatedAt: true, createdAt: true,
       },
     });

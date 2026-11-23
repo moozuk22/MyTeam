@@ -13,7 +13,7 @@ type DrawingSummary = { id: string; title: string; creatorName: string | null; l
 type DrawingPage = { plans: DrawingSummary[]; nextCursor: string | null };
 
 export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
-  endpoint: string; location: string; onPick: (drawing: DrawingSnapshot) => void; onClose: () => void;
+  endpoint: string; location: string; onPick: (drawing: DrawingSnapshot, requirements: string) => void; onClose: () => void;
 }) {
   const searchId = useId();
   const [scope, setScope] = useState<"mine" | "club">("mine");
@@ -23,6 +23,7 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<string>();
   const [preview, setPreview] = useState<DrawingSnapshot>();
+  const [requirements, setRequirements] = useState("");
   const [listError, setListError] = useState("");
   const [previewError, setPreviewError] = useState("");
 
@@ -39,12 +40,13 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
   useEffect(() => {
     if (!selection) return;
     const abort = new AbortController();
-    void documentRequest<{ plan: { id: string; title: string; layout: Exercise } }>(
+    void documentRequest<{ plan: { id: string; title: string; requirements?: string | null; layout: Exercise } }>(
       `${endpoint}/${selection}`, "Упражнението не може да се зареди.", { signal: abort.signal },
     ).then(({ plan }) => {
       if (abort.signal.aborted) return;
       if (plan.layout?.version !== 2) throw new Error("Първо копирайте упражнението в новия редактор.");
       setPreview({ sourceId: plan.id, title: plan.title, layout: plan.layout });
+      setRequirements(plan.requirements ?? "");
     }).catch((error: Error) => { if (!abort.signal.aborted) setPreviewError(error.message); });
     return () => abort.abort();
   }, [endpoint, selection]);
@@ -111,7 +113,7 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
     {preview && <div className="td-picker-preview">
       <h4>{preview.title}</h4>
       <div className="td-picker-pitch"><PlanPreview exercise={preview.layout} /></div>
-      <button type="button" className="tp-primary-btn" onClick={() => onPick(preview)}>Използвай упражнението</button>
+      <button type="button" className="tp-primary-btn" onClick={() => onPick(preview, requirements)}>Използвай упражнението</button>
     </div>}
   </section>;
 }

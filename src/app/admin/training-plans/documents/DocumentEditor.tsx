@@ -22,6 +22,7 @@ import {
 } from "@/lib/exercise/document";
 import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
 import DocumentFields from "./DocumentFields";
+import { requirementsFill } from "./requirementsFill";
 import { documentRequest, DocumentRequestError, withCoachImages } from "./documentRequest";
 
 const DocumentSheet = dynamic(() => import("./DocumentSheet"), {
@@ -235,9 +236,15 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
     }));
   }
 
-  function attach(index: number, drawing: DrawingSnapshot | null) {
+  async function attach(index: number, drawing: DrawingSnapshot | null, requirements = "") {
     setChanges((previous) => ({ ...previous, [index]: drawing?.sourceId ?? null }));
     updateSection(index, { drawing });
+    const fill = drawing ? requirementsFill(content.sections[index].coaching, requirements) : "skip";
+    if (fill === "skip") return;
+    if (fill === "ask" && !await dialogs.confirm("Полето „Изисквания“ вече има текст. Да го заменим ли с изискванията от упражнението?", {
+      title: "Замяна на изискванията", confirmLabel: "Замени",
+    })) return;
+    updateSection(index, { coaching: requirements.trim() });
   }
 
   const trainingWarning = choice.microcycleWarning ?? choice.sessionWarning;

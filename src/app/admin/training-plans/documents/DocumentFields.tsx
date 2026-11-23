@@ -55,7 +55,8 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
   sessionSlot?: (key: keyof SessionFields) => ReactNode;
   onSession: (key: keyof SessionFields, value: string) => void;
   onSection: (index: number, patch: Partial<DocumentSection>) => void;
-  onDrawing: (index: number, drawing: DrawingSnapshot | null) => void;
+  /** `requirements` holds the exercise requirements when the coach picks an exercise. */
+  onDrawing: (index: number, drawing: DrawingSnapshot | null, requirements?: string) => void;
   onMerge: (merge: Merge) => void;
 }) {
   const [activePicker, setActivePicker] = useState<number>();
@@ -114,7 +115,7 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
           })}
         </div>
         {activePicker !== undefined && indices.includes(activePicker) && <DrawingPicker key={activePicker} endpoint={drawingEndpoint} location={location}
-          onPick={(drawing) => { onDrawing(activePicker, drawing); closePicker(activePicker); }} onClose={() => closePicker(activePicker)} />}
+          onPick={(drawing, requirements) => { onDrawing(activePicker, drawing, requirements); closePicker(activePicker); }} onClose={() => closePicker(activePicker)} />}
       </div>
       <div className="td-edit-split td-edit-footer">
         {indices.map((index) => <div key={index} className="td-fields">

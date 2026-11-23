@@ -459,6 +459,7 @@ model TrainingPlan {
   clubId          String   @map("club_id") @db.Uuid
   title           String
   description     String?
+  requirements    String?
   categoryId      String?  @map("category_id") @db.Uuid
   layout          Json
   backgroundImageId String? @map("background_image_id") @db.Uuid
