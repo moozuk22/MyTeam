@@ -13,7 +13,7 @@ export const sessionFields = [
   ["objective", "Цел на тренировката", 500],
   ["tasks", "Задачи", 700],
   ["date", "Дата", 10, "date"],
-  ["day", "Ден", 50],
+  ["day", "Ден", 50, "weekday"],
   ["time", "Час", 5, "time"],
   ["playerCount", "Състезатели", 30],
   ["duration", "Времетраене (мин.)", 30],
@@ -23,6 +23,8 @@ export const sessionFields = [
   ["coach", "Треньор", 100],
   ["group", "Група", 100],
 ] as const;
+
+export const weekDays = ["Понеделник", "Вторник", "Сряда", "Четвъртък", "Петък", "Събота", "Неделя"] as const;
 
 export const exerciseFields = [
   ["title", "Заглавие на секцията", 120],

@@ -12,8 +12,9 @@ import { blankDocument } from "@/lib/exercise/document";
 
 afterEach(() => { viewport.desktop = false; });
 
-function render(date = "") {
+function render(date = "", day = "") {
   const content = blankDocument();
+  content.session.day = day;
   content.session.time = "18:30";
   content.session.date = date;
   return renderToStaticMarkup(<DocumentFields content={content} disabled={false} drawingEndpoint="/drawings" location="clubId=club"
@@ -45,4 +46,16 @@ it("shows the session date as dd.mm.yyyy and keeps the ISO value for the date pi
 
 it("shows a Bulgarian date placeholder when the session date is empty", () => {
   expect(render()).toContain('<span class="td-date-value td-date-empty" aria-hidden="true">дд.мм.гггг</span>');
+});
+
+it("offers the days from Monday to Sunday for the session day", () => {
+  const field = render("", "Сряда").match(/<label for="[^"]+">Ден<\/label><select[^>]*>.*?<\/select>/)?.[0] ?? "";
+  expect([...field.matchAll(/<option value="([^"]*)"/g)].map((match) => match[1]))
+    .toEqual(["", "Понеделник", "Вторник", "Сряда", "Четвъртък", "Петък", "Събота", "Неделя"]);
+  expect(field).toContain('<option value="Сряда" selected="">');
+});
+
+it("keeps a free-text day from an older plan as the selected option", () => {
+  const field = render("", "Понеделиник").match(/<label for="[^"]+">Ден<\/label><select[^>]*>.*?<\/select>/)?.[0] ?? "";
+  expect(field).toContain('<option value="Понеделиник" selected="">Понеделиник</option>');
 });

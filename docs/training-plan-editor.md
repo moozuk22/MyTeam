@@ -123,7 +123,7 @@ Direct manipulation was additionally checked at all seven viewport sizes: mouse 
 
 ## План-конспект
 
-Open **План-конспекти** from the drawing library. Documents are private to the signed-in account within the selected club. Open **Нов план-конспект** to edit the session details and the five exercise sections directly on the plan. Use **Подредба на долния ред** directly above the lower row to give two neighboring sections a shared diagram area. Splitting the sections again keeps their individual fields and drawings.
+Open **План-конспекти** from the drawing library. Documents are private to the signed-in account within the selected club. Open **Нов план-конспект** to edit the session details and the five exercise sections directly on the plan. Select the session day in **Ден** from a list of the days from **Понеделник** to **Неделя**. A plan saved with a typed day shows that text as the selected option until you select a day from the list. Use **Подредба на долния ред** directly above the lower row to give two neighboring sections a shared diagram area. Splitting the sections again keeps their individual fields and drawings.
 
 Browser Back and Forward use a custom dialog for navigation within the app. The dialog opens if the document has unsaved changes or a save is in progress. **Отказ** keeps the editor and its changes. **Потвърди** continues the requested navigation. **Към план-конспектите** uses the same warning. Reloading or closing the tab uses the browser warning. The history guard keeps the existing history entries and Next.js state.
 

@@ -6,7 +6,7 @@ import { CalendarDays } from "lucide-react";
 import { TimeInput } from "@/components/TimeInput";
 import {
   documentBottomGroups, exerciseFields, sessionFields, sectionTitles,
-  type DocumentSection, type DrawingSnapshot, type Merge, type PlanContent, type SessionFields,
+  type DocumentSection, type DrawingSnapshot, weekDays, type Merge, type PlanContent, type SessionFields,
 } from "@/lib/exercise/document";
 import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
 import DrawingPicker from "./DrawingPicker";
@@ -27,6 +27,13 @@ function Field({ label, value, max, type, id: customId, heading, wrapHeading, re
     {max >= 250 || wrapHeading
       ? <textarea id={id} value={value} maxLength={max} rows={wrapHeading ? 1 : 2} readOnly={readOnly}
           placeholder={wrapHeading ? label : undefined} onChange={(event) => onChange(event.target.value)} />
+      : type === "weekday"
+        ? <select id={id} value={value} disabled={readOnly} onChange={(event) => onChange(event.target.value)}>
+            <option value="">Изберете ден</option>
+            {/* Keep a free-text day from older plans until the coach picks a weekday. */}
+            {value && !(weekDays as readonly string[]).includes(value) && <option value={value}>{value}</option>}
+            {weekDays.map((day) => <option key={day} value={day}>{day}</option>)}
+          </select>
       : type === "time"
         ? <TimeInput id={id} step={60} value={value} readOnly={readOnly} onValueChange={onChange} />
         : type === "date"
