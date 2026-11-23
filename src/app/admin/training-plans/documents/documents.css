@@ -337,6 +337,26 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
   background: var(--plan-field);
 }
 .td-field textarea { resize: vertical; line-height: 1.45; }
+/* "Групи": a select-like field that opens a list of checkboxes. */
+.td-training-groups { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.td-multi { position: relative; }
+.td-field .td-multi-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--plan-border); border-radius: 10px; background: var(--plan-field); color: var(--plan-text); font: inherit; font-size: 1rem; font-weight: 400; text-align: left; cursor: pointer; }
+.td-multi-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-multi-trigger > svg { flex: none; color: var(--plan-muted); transition: transform .15s; }
+.td-multi-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.td-multi-trigger:focus-visible { outline: 2px solid var(--plan-accent); outline-offset: 2px; }
+.td-multi-placeholder { color: var(--plan-muted); }
+.td-multi-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; display: grid; gap: 2px; max-height: min(320px, 50vh); margin: 4px 0 0; padding: 6px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--plan-border); border-radius: 10px; background: var(--plan-card, #10201b); box-shadow: 0 12px 28px #0008; }
+.td-multi-option { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 10px; border-radius: 8px; color: var(--plan-text); font-size: 1rem; font-weight: 400; cursor: pointer; }
+.td-multi-option:hover, .td-multi-option:has(input:focus-visible) { background: var(--plan-selected); }
+.td-field .td-multi-option input { flex: none; width: 20px; height: 20px; min-height: 0; margin: 0; padding: 0; accent-color: var(--plan-accent); }
+.td-multi-option span { min-width: 0; overflow-wrap: anywhere; }
+.td-multi-option:has(input:disabled) { cursor: default; }
+.td-multi-option small { color: var(--plan-muted); font-size: .8125rem; }
+/* The microcycle and training of each extra checked group. */
+.td-extra-training { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 10px; min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--plan-border); border-radius: 10px; }
+.td-extra-training legend { padding: 0 6px; color: var(--plan-accent); font-size: .875rem; font-weight: 700; overflow-wrap: anywhere; }
+.td-training-groups-warning { color: #f3d68a; font-size: .8125rem; font-weight: 600; }
 .td-field-wide textarea { min-height: 5.5em; }
 .td-page .td-field :is(input[type="date"], input[type="time"])::-webkit-calendar-picker-indicator { filter: none; }
 .td-date-field {
@@ -757,6 +777,11 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
   overflow-wrap: anywhere;
 }
 .td-field-warning svg { flex: none; margin-top: 1px; }
+.td-reference-group { display: grid; gap: 8px; }
+.td-reference-group + .td-reference-group { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--plan-border); }
+.td-reference-group-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; color: var(--plan-muted); font-size: .9375rem; font-weight: 600; }
+.td-reference-group-title strong { color: var(--plan-accent); overflow-wrap: anywhere; }
+.td-reference-group-title small { color: var(--plan-muted); font-size: .8125rem; font-weight: 500; }
 .td-reference-note { padding: 8px 10px; border-radius: 8px; background: var(--plan-selected); color: var(--plan-accent); }
 @media print { .td-field-warning, .td-combo-options { display: none; } }
 

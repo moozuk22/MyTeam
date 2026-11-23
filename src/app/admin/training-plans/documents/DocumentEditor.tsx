@@ -5,7 +5,7 @@ import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 
 import { useTrainingPlanAccess, trainingSubscriptionMessage, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { sessionUrl, sessionOrigin, sessionTarget, type SessionTarget, type TrainingReference } from "@/lib/exercise/trainingSession";
 import { formatWeekRange } from "@/lib/exercise/microcycle";
@@ -24,6 +24,7 @@ import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
 import DocumentFields from "./DocumentFields";
 import { requirementsFill } from "./requirementsFill";
 import { documentRequest, DocumentRequestError, withCoachImages } from "./documentRequest";
+import GroupMultiSelect from "./GroupMultiSelect";
 
 const DocumentSheet = dynamic(() => import("./DocumentSheet"), {
   ssr: false, loading: () => <FinanceSkeleton variant="form" />,
@@ -35,7 +36,14 @@ type Draft = {
   training?: Training;
 };
 /** The group and microcycle that the coach chose for "Микроцикъл" and "Тренировка №". */
-type Training = { groupKey?: string; cycleId?: string; chosen: boolean };
+type Training = {
+  groupKey?: string; cycleId?: string; chosen: boolean;
+  /** More groups. The plan is also linked to the same microcycle number and training number of each group. */
+  alsoGroups?: string[];
+  /** The microcycle and training that the coach chose for an extra group. Without a choice, the group uses the numbers of the main fields. */
+  extra?: Record<string, ExtraTraining>;
+};
+type ExtraTraining = { microcycle: string; sessionNumber: string; cycleId?: string };
 
 const LEAVE_DIALOG = { title: "Незапазени промени", confirmLabel: "Излез" };
 
@@ -135,6 +143,21 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
 
   const choice = useMemo(() => resolveTraining(options, training.groupKey, content.session.microcycle, content.session.sessionNumber, training.cycleId),
     [options, training.groupKey, training.cycleId, content.session.microcycle, content.session.sessionNumber]);
+  const alsoGroups = useMemo(() => training.alsoGroups ?? [], [training.alsoGroups]);
+  // Each extra group has its own microcycle and training. A change of the main fields does not change them.
+  const extraChoices = useMemo(() => alsoGroups.map(groupKey => {
+    const selection: ExtraTraining = training.extra?.[groupKey] ?? { microcycle: "", sessionNumber: "" };
+    return { groupKey, selection, choice: resolveTraining(options, groupKey, selection.microcycle, selection.sessionNumber, selection.cycleId) };
+  }), [alsoGroups, training.extra, options]);
+  const linkedOrigins = new Set(usages.map(usage => sessionOrigin(usage)));
+  /** The trainings of the extra groups that do not use the plan yet, with a label for messages. */
+  const extraTargets = training.chosen ? extraChoices.flatMap(({ choice, selection }) => choice.target && !linkedOrigins.has(sessionOrigin(choice.target))
+    ? [{ target: choice.target, label: `тренировка №${selection.sessionNumber.trim()} в микроцикъл ${choice.cycle?.number.trim() ?? selection.microcycle.trim()}` }] : []) : [];
+  const optionGroupName = (key: string) => options?.groups.find(group => group.key === key)?.name ?? "";
+  const missingGroups = training.chosen ? extraChoices.filter(({ choice }) => !choice.target).map(({ groupKey }) => optionGroupName(groupKey)) : [];
+  const extraWarning = missingGroups.length
+    ? `За ${missingGroups.join(", ")} няма избрана съществуваща тренировка. Там план-конспектът няма да се свърже.`
+    : undefined;
   // The plan moves to another training only after the coach changes the fields.
   const movedJson = training.chosen && choice.target && (!target || sessionOrigin(choice.target) !== sessionOrigin(target)) ? JSON.stringify(choice.target) : "";
   const moved = useMemo<SessionTarget | undefined>(() => movedJson ? JSON.parse(movedJson) : undefined, [movedJson]);
@@ -182,6 +205,25 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       }).catch(failure => { if (!controller.signal.aborted) setReferenceError({ key, message: failure.message }); });
     return () => controller.abort();
   }, [shownTraining, targetKey, ready, drawingEndpoint, location, refresh]);
+
+  // The instructions of the trainings of the extra groups, by training.
+  const [extraReferences, setExtraReferences] = useState<Record<string, { value?: TrainingReference; error?: string }>>({});
+  const extraTargetsJson = JSON.stringify(extraChoices.flatMap(({ choice }) => choice.target ? [choice.target] : []));
+  useEffect(() => {
+    const list: SessionTarget[] = JSON.parse(extraTargetsJson);
+    if (!list.length || !ready) return;
+    const controller = new AbortController();
+    // A coach has a small number of groups, so the number of requests is bounded.
+    for (const item of list) {
+      const params = new URLSearchParams(location);
+      for (const [key, value] of Object.entries(item)) params.set(key, value);
+      const key = sessionOrigin(item);
+      void documentRequest<TrainingReference>(`${drawingEndpoint}/microcycles/session?${params}`, "Указанията не могат да се заредят.", { signal: controller.signal })
+        .then(value => { if (!controller.signal.aborted) setExtraReferences(current => ({ ...current, [key]: { value } })); })
+        .catch(failure => { if (!controller.signal.aborted) setExtraReferences(current => ({ ...current, [key]: { error: failure.message } })); });
+    }
+    return () => controller.abort();
+  }, [extraTargetsJson, ready, drawingEndpoint, location, refresh]);
 
   const storeDraft = useCallback((submitted = pending.current, independent = privateDraft) => {
     if (!storageKey || leaving.current) return;
@@ -247,7 +289,7 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
     updateSection(index, { coaching: requirements.trim() });
   }
 
-  const trainingWarning = choice.microcycleWarning ?? choice.sessionWarning;
+  const trainingWarning = choice.microcycleWarning ?? choice.sessionWarning ?? extraWarning;
   /** Warns about a microcycle or training that does not exist. The coach can still save. */
   async function confirmTraining() {
     if (!trainingWarning) return true;
@@ -261,7 +303,7 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
   }
 
   /** True when the coach changed only the training. The save then adds the training to the plan, without a copy. */
-  const numbersOnly = !!saved && !!moved && !pending.current && !Object.keys(changes).length && !!baseline.current &&
+  const numbersOnly = !!saved && (!!moved || extraTargets.length > 0) && !pending.current && !Object.keys(changes).length && !!baseline.current &&
     withoutTraining(content) === withoutTraining(baseline.current);
   const chosenName = `тренировка №${content.session.sessionNumber.trim()} в микроцикъл ${choice.cycle?.number.trim() ?? content.session.microcycle.trim()}`;
 
@@ -272,9 +314,35 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       { title: "Тренировката има план-конспект", confirmLabel: "Замени" }) ? failure.replaceDocumentId : undefined;
   }
 
-  /** Links the saved plan to the chosen training. The plan content and the other trainings do not change. */
+  /**
+   * Links the plan to the trainings of the extra groups, one after the other. A training with another plan asks first.
+   * It gives the latest usages and the names of the groups that did not get the plan.
+   */
+  async function linkGroups(documentId: string, targets: { target: SessionTarget; label: string }[]) {
+    let latest: TrainingUsage[] | undefined;
+    const failed: string[] = [];
+    for (const { target: to, label } of targets) {
+      const send = (replaceDocumentId?: string) => documentRequest<{ usages?: TrainingUsage[] }>(endpoint, "Тренировката не може да се добави.", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target: to, linkDocumentId: documentId, ...(replaceDocumentId && { replaceDocumentId }) }),
+      }, coach);
+      try {
+        try {
+          latest = (await send()).usages ?? latest;
+        } catch (failure) {
+          if (!(failure instanceof DocumentRequestError) || failure.status !== 409 || !failure.replaceDocumentId ||
+              !await dialogs.confirm(`За ${label} на ${optionGroupName(to.groupKey)} вече има друг план-конспект. Да го замените ли с този? Другият план-конспект остава в библиотеката.`,
+                { title: "Тренировката има план-конспект", confirmLabel: "Замени" })) throw failure;
+          latest = (await send(failure.replaceDocumentId)).usages ?? latest;
+        }
+      } catch { failed.push(optionGroupName(to.groupKey)); }
+    }
+    return { usages: latest, failed };
+  }
+  const notLinked = (failed: string[]) => `План-конспектът не е добавен за ${failed.join(", ")}. Опитайте отново.`;
+
   /** Links the saved plan to a training without saving its content. "replaceDocumentId" is the plan that the coach chose to replace. */
-  async function addTraining(to: SessionTarget, replaceDocumentId?: string) {
+  async function addTraining(to: SessionTarget | undefined, replaceDocumentId?: string) {
     if (!saved || saving || leaving.current) return;
     setSaving(true);
     setError("");
@@ -284,19 +352,21 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       body: JSON.stringify({ target: to, linkDocumentId: saved.id, ...(replaceDocumentId && { replaceDocumentId }) }),
     }, coach);
     try {
-      let result;
-      try {
+      let result: { usages?: TrainingUsage[] } = { usages };
+      if (to) try {
         result = await send(replaceDocumentId);
       } catch (failure) {
         const other = await confirmReplace(failure);
         if (!other) throw failure;
         result = await send(other);
       }
-      if (target) { returnToCycle(sessionUrl("microcycles", location, to)); return; }
-      setUsages(result.usages ?? []);
+      const extra = await linkGroups(saved.id, extraTargets);
+      if (target && !extra.failed.length) { returnToCycle(sessionUrl("microcycles", location, to ?? target)); return; }
+      setUsages(extra.usages ?? result.usages ?? []);
       setTraining(current => ({ ...current, chosen: false }));
       setDirty(false);
-      setNotice(`План-конспектът е добавен към ${chosenName}.`);
+      if (extra.failed.length) setError(notLinked(extra.failed));
+      else setNotice(`План-конспектът е добавен към ${chosenName}${extraTargets.length ? ` за ${extraTargets.length + (to ? 1 : 0)} групи` : ""}.`);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Тренировката не може да се добави.");
     } finally {
@@ -305,29 +375,81 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
   }
 
   const groups = options?.groups ?? [];
-  const cycleChoices = groupCycles(options, training.groupKey).filter(cycle => cycle.number.trim())
+  /** The suggestions for "Микроцикъл" of a group. */
+  const cycleOptions = (groupKey: string | undefined) => groupCycles(options, groupKey).filter(cycle => cycle.number.trim())
     .map(cycle => ({ key: cycle.id, value: cycle.number.trim(), label: `Микроцикъл ${cycle.number.trim()}`, hint: formatWeekRange(cycle.week) }));
-  const sessionChoices = choice.cycle?.rows.map((rowId, index) => ({ key: rowId, value: String(index + 1), label: `Тренировка ${index + 1}` })) ?? [];
+  const rowOptions = (cycle?: { rows: string[] }) => cycle?.rows.map((rowId, index) => ({ key: rowId, value: String(index + 1), label: `Тренировка ${index + 1}` })) ?? [];
+
+  /** "Микроцикъл" and "Тренировка №" of one group. With more groups checked, each group has a box with its name. */
+  function trainingFields({ name, microcycle, sessionNumber, found, cycles, microcycleEmpty, onMicrocycle, onSession }: {
+    name?: string; microcycle: string; sessionNumber: string; found: ReturnType<typeof resolveTraining>;
+    cycles: ReturnType<typeof cycleOptions>; microcycleEmpty: string;
+    onMicrocycle: (value: string, cycleId?: string) => void; onSession: (value: string) => void;
+  }) {
+    const suffix = name ? ` – ${name}` : "";
+    const fields = <>
+      <TrainingCombobox label={`Микроцикъл${suffix}`} max={40} value={microcycle} options={cycles} warning={found.microcycleWarning}
+        empty={microcycleEmpty} onChange={(value) => onMicrocycle(value)} onPick={(option) => onMicrocycle(option.value, option.key)} />
+      <TrainingCombobox label={`Тренировка №${suffix}`} max={40} value={sessionNumber} options={rowOptions(found.cycle)}
+        warning={found.sessionWarning} empty={found.cycle ? "Няма тренировки в микроцикъла." : "Първо въведете микроцикъл."}
+        onChange={onSession} onPick={(option) => onSession(option.value)} />
+    </>;
+    return name ? <fieldset className="td-field-wide td-extra-training"><legend>{name}</legend>{fields}</fieldset> : fields;
+  }
+
   function sessionSlot(key: keyof PlanContent["session"]) {
     if (!coach || (!options && !optionsError) || (key !== "microcycle" && key !== "sessionNumber")) return undefined;
-    if (key === "sessionNumber") return <TrainingCombobox label="Тренировка №" max={40} value={content.session.sessionNumber} options={sessionChoices}
-      warning={choice.sessionWarning} empty={choice.cycle ? "Няма тренировки в микроцикъла." : "Първо въведете микроцикъл."}
-      onChange={(value) => chooseTraining({}, { sessionNumber: value })}
-      onPick={(option) => chooseTraining({}, { sessionNumber: option.value })} />;
+    // Both fields render in the "Микроцикъл" slot, so the boxes of the groups stay together.
+    if (key === "sessionNumber") return null;
+    const boxes = alsoGroups.length > 0;
     return <>
-      {!target && groups.length > 1 && <div className="td-field">
-        <label htmlFor="td-training-group">Група</label>
-        <select id="td-training-group" value={training.groupKey ?? ""}
-          onChange={(event) => chooseTraining({ groupKey: event.target.value || undefined, cycleId: undefined })}>
-          <option value="">Без група</option>
-          {groups.map(group => <option key={group.key} value={group.key}>{group.name}</option>)}
-        </select>
+      {groups.length > 1 && <div className={`td-training-groups${boxes ? " td-field-wide" : ""}`}>
+        <GroupMultiSelect label="Групи" groups={groups} checked={[training.groupKey ?? "", ...alsoGroups]} onToggle={toggleGroup}
+          locked={target ? [target.groupKey] : []} />
+        {extraWarning && <small className="td-training-groups-warning">{extraWarning}</small>}
       </div>}
-      <TrainingCombobox label="Микроцикъл" max={40} value={content.session.microcycle} options={cycleChoices} warning={choice.microcycleWarning}
-        empty={optionsError || (training.groupKey ? "Няма микроцикли за групата." : groups.length ? "Първо изберете група." : "Няма групи за треньора.")}
-        onChange={(value) => chooseTraining({}, { microcycle: value })}
-        onPick={(option) => chooseTraining({ cycleId: option.key }, { microcycle: option.value })} />
+      {trainingFields({
+        name: boxes ? optionGroupName(training.groupKey ?? "") : undefined,
+        microcycle: content.session.microcycle, sessionNumber: content.session.sessionNumber, found: choice, cycles: cycleOptions(training.groupKey),
+        microcycleEmpty: optionsError || (training.groupKey ? "Няма микроцикли за групата." : groups.length ? "Първо изберете група." : "Няма групи за треньора."),
+        onMicrocycle: (value, cycleId) => chooseTraining(cycleId ? { cycleId } : {}, { microcycle: value }),
+        onSession: (value) => chooseTraining({}, { sessionNumber: value }),
+      })}
+      {extraChoices.map(({ groupKey, selection, choice: extra }) => <Fragment key={groupKey}>{trainingFields({
+        name: optionGroupName(groupKey), microcycle: selection.microcycle, sessionNumber: selection.sessionNumber, found: extra,
+        cycles: cycleOptions(groupKey), microcycleEmpty: "Няма микроцикли за групата.",
+        onMicrocycle: (value, cycleId) => chooseExtra(groupKey, selection, { microcycle: value, cycleId }),
+        onSession: (value) => chooseExtra(groupKey, selection, { sessionNumber: value }),
+      })}</Fragment>)}
     </>;
+  }
+
+  /** Saves the microcycle or training that the coach chose for an extra group. */
+  function chooseExtra(groupKey: string, current: ExtraTraining, patch: Partial<ExtraTraining>) {
+    chooseTraining({ extra: { ...training.extra, [groupKey]: { ...current, ...patch } } });
+  }
+
+  /**
+   * The main group stays the main group while it is checked. From a training, its group cannot be unchecked.
+   * A newly checked group starts with a copy of the main numbers. After that, each group keeps its own microcycle and training.
+   */
+  function toggleGroup(key: string) {
+    if (target && key === target.groupKey) return;
+    if (!training.groupKey) { chooseTraining({ groupKey: key, cycleId: undefined }); return; }
+    if (key === training.groupKey) {
+      // The next checked group becomes the main group, with its own microcycle and training.
+      const [next, ...rest] = alsoGroups;
+      if (!next) { chooseTraining({ groupKey: undefined, cycleId: undefined }); return; }
+      const selection = training.extra?.[next] ?? { microcycle: "", sessionNumber: "" };
+      chooseTraining({ groupKey: next, alsoGroups: rest, cycleId: selection.cycleId },
+        { microcycle: selection.microcycle, sessionNumber: selection.sessionNumber });
+      return;
+    }
+    if (alsoGroups.includes(key)) { chooseTraining({ alsoGroups: alsoGroups.filter(value => value !== key) }); return; }
+    chooseTraining({
+      alsoGroups: groups.map(group => group.key).filter(value => value === key || alsoGroups.includes(value)),
+      extra: { ...training.extra, [key]: { microcycle: content.session.microcycle, sessionNumber: content.session.sessionNumber } },
+    });
   }
 
   async function save(independent = privateDraft, fork = false) {
@@ -391,6 +513,18 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       if (target) {
         if (submitted === payload || (initial && JSON.stringify(JSON.parse(submitted).content) === JSON.stringify(input))) {
           const linked = sessionTarget(JSON.parse(body).target);
+          // The checked extra groups use the same plan. A failed link keeps the editor open with an error.
+          const extra = independent ? { usages: undefined, failed: [] } : await linkGroups(result.document.id, extraTargets);
+          if (extra.failed.length) {
+            setSaved(result.document);
+            if (extra.usages) setUsages(extra.usages);
+            setTraining(current => ({ ...current, chosen: false }));
+            baseline.current = result.document.content;
+            setChanges({});
+            setDirty(false);
+            setError(notLinked(extra.failed));
+            return;
+          }
           returnToCycle(linked ? sessionUrl("microcycles", location, linked) : undefined);
           return;
         }
@@ -407,10 +541,13 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         // A linked plan does not store the numbers. The editor keeps showing the numbers of the training.
         setContent({ ...result.document.content, session: { ...result.document.content.session,
           microcycle: content.session.microcycle, sessionNumber: content.session.sessionNumber } });
+        const extra = linkTo ? await linkGroups(result.document.id, extraTargets) : { usages: undefined, failed: [] };
+        if (extra.usages) setUsages(extra.usages);
         if (linkTo) setTraining(current => ({ ...current, chosen: false }));
         setChanges({});
         setDirty(false);
-        setNotice("План-конспектът е запазен.");
+        if (extra.failed.length) setError(notLinked(extra.failed));
+        else setNotice("План-конспектът е запазен.");
       }
     } catch (failure) {
       if (failure instanceof DocumentRequestError && [400, 403, 404, 409, 410].includes(failure.status)) {
@@ -435,7 +572,7 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
 
   // The coach chose this plan from the list for the training and did not change it. The save only links it.
   const applying = Boolean(target && link && saved && !moved && !dirty && !pending.current);
-  const useOnly = applying || (numbersOnly && !!moved);
+  const useOnly = applying || numbersOnly;
   // The trainings other than the one that the save is for. A save over the plan changes them too.
   const otherUsages = usages.filter(usage => !shownTraining || sessionOrigin(usage) !== sessionOrigin(shownTraining)).length;
 
@@ -465,7 +602,8 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         <button type="button" className="tp-primary-btn" onClick={async () => {
           if (!await confirmTraining()) return;
           if (applying) void addTraining(target!, replace);
-          else if (numbersOnly && moved) void addTraining(moved);
+          // From a training chosen in the list, the training itself also needs the link.
+          else if (numbersOnly) void addTraining(moved ?? (target && link ? target : undefined), !moved && link ? replace : undefined);
           else if (target && saved && !pending.current) saveChoice.current?.showModal(); else void save();
         }} disabled={saving || !ready || (!!target && !initialized.current) || (!!subscription.access?.canSave && !!saved && !dirty && !link)}>
           {link && useOnly && <Check size={16} aria-hidden="true" />}
@@ -483,7 +621,8 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         <p>{otherUsages
           ? <>„Запази върху съществуващия“ променя плана и в още {otherUsages === 1 ? "1 тренировка" : `${otherUsages} тренировки`}, които го използват.</>
           : "Планът не се използва в други тренировки."}</p>
-        <p>„Запази като нов план-конспект“ създава копие само за тази тренировка.</p>
+        <p>„Запази като нов план-конспект“ създава копие само за тази тренировка{extraTargets.length ? " и избраните групи" : ""}.</p>
+        {extraTargets.length > 0 && <p>План-конспектът ще се използва и за: <strong>{extraTargets.map(item => `${optionGroupName(item.target.groupKey)} (${item.label})`).join(", ")}</strong>.</p>}
       </div>
       <div className="tp-modal-actions td-save-choice-actions">
         <button type="button" className="tp-primary-btn" onClick={() => { saveChoice.current?.close(); void save(false); }}>Запази върху съществуващия</button>
@@ -493,6 +632,11 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
     </dialog>
     {storageError && <p role="alert" className="td-feedback">Черновата е само в този раздел. Оставете го отворен до запазването.</p>}
     {shownTraining && !previewing && <TrainingReferencePanel reference={currentReference} error={currentReferenceError}
+      group={optionGroupName(shownTraining.groupKey)}
+      others={extraChoices.map(({ groupKey, choice: extra }) => {
+        const loaded = extra.target ? extraReferences[sessionOrigin(extra.target)] : undefined;
+        return { group: optionGroupName(groupKey), reference: loaded?.value, error: loaded?.error, missing: !extra.target };
+      })}
       changed={referenceChanged} refresh={() => setRefresh(value => value + 1)}
       note={moved ? `${target ? "Тренировката е сменена. " : ""}${numbersOnly
         ? `При запазване тази тренировка ще използва същия план-конспект, без копие.${target ? " Предишната тренировка го запазва." : ""}`
