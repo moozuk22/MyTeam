@@ -160,11 +160,28 @@ Run `npm run test:training-images:db` to check the complete save and deletion fl
 
 **Тренировъчен план** opens the weekly cycle page. The page starts with the current Monday–Sunday week in `Europe/Sofia`. Use the week controls to select another week. Group cards show whether a saved cycle exists. Links open the drawing library and **План-конспекти**.
 
-Entry from the club page permits creation, changes, and deletion. Entry with `coachGroupId` shows that group's custom training groups in a read-only view. Save and print access use the existing training plan subscription checks. Each group has one shared cycle per week. Existing private documents retain their access rules.
+Entry from the club page permits creation, changes, and deletion. Entry with `coachGroupId` shows that group's custom training groups in a read-only view. Save and print access use the existing training plan subscription checks. Each group has one cycle per week. Several groups can use the same cycle. Existing private documents retain their access rules.
 
 Choose a group to open its cycle. Use **Добави тренировка** to add a row. Enter text in the warm-up field and the four main-part fields. Each field changes its height to fit its text. On screens 640 px or wider, all fields of a training have the height of the tallest field. Use **Запази** to save changes. Concurrent changes produce an error instead of replacing the saved revision.
 
 The `20261119200000_training_microcycles` migration creates a separate table. Apply and verify this migration in development before deployment. No production migration has been run during this change.
+
+### One microcycle for several groups
+
+Use **Използвай и за други групи** to select more groups for the same week. The dialog shows the coach of each group and marks a group that already has a microcycle. After **Запази**, all selected groups use one microcycle. If a selected group already has a microcycle in this week, a confirmation dialog opens first. The save replaces that microcycle for the group and removes the plan links of that group. The plans stay in the library. A microcycle that no group uses is deleted. The group card shows **Общ микроцикъл с N групи**, and the editor shows the other groups.
+
+When you change the text of a shared microcycle, select where the change applies:
+
+- **Само за <group>** (the default) makes a copy for the open group. The other groups keep the old text. The copy keeps the training IDs, so the plan links of the group stay.
+- **Всички групи (N)** changes the microcycle for every group that uses it.
+
+If you only add groups and do not change the text, the save makes no copy. **Изтрий** in a shared microcycle removes it only from the open group. The other groups keep it. The microcycle is deleted when no group uses it.
+
+The `training_microcycles` table holds the content and the revision. The `training_microcycle_groups` table holds one row for each group and week (`club_id`, `group_key`, `week`). Each plan link in `training_session_documents` refers to a group of its microcycle. When the group moves to a copy, PostgreSQL moves its links too (`ON UPDATE CASCADE`). When the group stops using the microcycle, PostgreSQL deletes its links. The `20261123120000_shared_training_microcycles` migration moves each existing microcycle to its group. It deletes links of a group that does not use the microcycle, because no page can open these links. A coach view does not show the other groups of a shared microcycle.
+
+### Use a past microcycle
+
+Use **Използвай предишен микроцикъл** to open the microcycles of earlier weeks, the newest first. In each week, the microcycles of the open group come first and show **Тази група**. Search by group name. The list shows 20 items. Use **Покажи още** to show more. Select a microcycle to put its content in the editor. If the editor has content, a confirmation dialog opens first. The trainings get new IDs, so the plan links stay with the past week. **Сезон** and **Полусезон** stay from the current week. Select **Запази** to save the content. `GET …/training-plans/microcycles/history?week=&groupKey=&q=&offset=` gives the list, and `GET …/history?cycleId=` gives the content of one microcycle. A coach view cannot use this endpoint.
 
 ### Plan-documents for individual training sessions
 

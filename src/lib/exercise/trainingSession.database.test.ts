@@ -33,7 +33,7 @@ describe.skipIf(process.env.TRAINING_SESSION_DB_TEST !== "1")("training document
     await prisma.club.create({ data: { id: clubId, name: "Тест", trainingGroupMode: "custom_group" } });
     await prisma.coachGroup.createMany({ data: [coach, other].map(id => ({ id, clubId, name: "Треньор" })) });
     await prisma.clubCustomTrainingGroup.create({ data: { id: group, clubId, coachGroupId: coach, name: "Група" } });
-    await prisma.trainingMicrocycle.create({ data: { id: cycleId, clubId, week, groupKey, groupName: "Група", content } });
+    await prisma.trainingMicrocycle.create({ data: { id: cycleId, clubId, week, content, groups: { create: { groupKey, groupName: "Група" } } } });
   });
   afterEach(async () => {
     const url = new URL(process.env.DATABASE_URL!);

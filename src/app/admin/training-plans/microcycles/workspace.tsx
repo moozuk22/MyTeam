@@ -5,19 +5,22 @@ import SectionNav from "../SectionNav";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
-import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, Layers, Plus, Printer, Save, Search, Trash2, Users } from "lucide-react";
+import { Archive, ArrowLeft, CalendarCheck, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Download, History, Layers, Plus, Printer, Save, Search, Trash2, Users, X } from "lucide-react";
 import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
-import { cycleColumns, emptyCycle, formatWeekDates, formatWeekRange, shiftWeek, type CycleContent } from "@/lib/exercise/microcycle";
+import { cycleColumns, emptyCycle, formatWeekDates, formatWeekRange, reuseCycle, shiftWeek, type CycleContent } from "@/lib/exercise/microcycle";
 import type { CompetitionSeason } from "@/lib/exercise/document";
 import { coachSections, filterGroups, NO_COACH_ID, type FilterGroup } from "@/lib/exercise/microcycleGroupFilter";
 import TrainingDocumentDialog from "./TrainingDocumentDialog";
 import PrintChoiceDialog, { type PrintChoice, type PrintTraining } from "./PrintChoiceDialog";
+import GroupShareDialog from "./GroupShareDialog";
+import PastCycleDialog from "./PastCycleDialog";
 import dynamic from "next/dynamic";
 import { withCoachImages } from "../documents/documentRequest";
 import { fitTextareas } from "./fitTextareas";
 import "../documents/documents.css";
 import "./workspace.css";
-type Cycle = { id: string; canLink: boolean; links: Record<string, string | null>; groupKey: string; groupName: string; content: CycleContent; revision: number };
+/** `shared` lists the other groups that use the same microcycle in the week. */
+type Cycle = { id: string; canLink: boolean; links: Record<string, string | null>; groupKey: string; groupName: string; content: CycleContent; revision: number; shared?: { key: string; name: string }[] };
 type Data = { club: { name: string }; groups: FilterGroup[]; coachView?: boolean; cycles: Cycle[] };
 const groupCount = (n: number) => `${n} ${n === 1 ? "група" : "групи"}`;
 const headerFields = [["format", "Формат"], ["age", "Възраст"], ["season", "Сезон"], ["half", "Полусезон"], ["number", "Микроцикъл №"]] as const;
@@ -99,6 +102,12 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const [content, setContent] = useState(emptyCycle);
   const [revision, setRevision] = useState(0);
   const [dirty, setDirty] = useState(false);
+  // Groups that get the same microcycle on the next save.
+  const [addGroups, setAddGroups] = useState<string[]>([]);
+  // For a shared microcycle: "group" saves a copy for the selected group only, "all" changes it for all its groups.
+  const [saveScope, setSaveScope] = useState<"group" | "all">("group");
+  const [cycleDialog, setCycleDialog] = useState<"share" | "past">();
+  const unsaved = dirty || addGroups.length > 0;
   const [busy, setBusy] = useState(false);
   const [printAllowed, setPrintAllowed] = useState(false);
   const [paper, setPaper] = useState(false);
@@ -137,10 +146,10 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     return () => controller.abort();
   }, [endpoint, reload]);
   useEffect(() => {
-    const guard = (e: BeforeUnloadEvent) => { if (dirty || busy) e.preventDefault(); };
+    const guard = (e: BeforeUnloadEvent) => { if (unsaved || busy) e.preventDefault(); };
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
-  }, [dirty, busy]);
+  }, [unsaved, busy]);
   useEffect(() => {
     const target = pendingRestore.current;
     if (!target || selected !== target.groupKey) return;
@@ -150,18 +159,32 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     row.scrollIntoView({ block: "start" });
     pendingRestore.current = undefined;
   }, [selected, data]);
-  const navigate = async (fn: () => void) => { if (busy) return; if (!dirty || await dialogs.confirm("Да се отхвърлят ли незапазените промени?")) fn(); };
-  const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); setDirty(false); });
-  const open = (key: string) => navigate(() => { const cycle = data?.cycles.find(c => c.groupKey === key); setSelected(key); setContent(cycle?.content ?? { ...emptyCycle(), season: competitionSeason.season, half: competitionSeason.halfSeason }); setRevision(cycle?.revision ?? 0); setDirty(false); });
+  const navigate = async (fn: () => void) => { if (busy) return; if (!unsaved || await dialogs.confirm("Да се отхвърлят ли незапазените промени?")) fn(); };
+  const reset = () => { setDirty(false); setAddGroups([]); setSaveScope("group"); };
+  const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); reset(); });
+  const open = (key: string) => navigate(() => { const cycle = data?.cycles.find(c => c.groupKey === key); setSelected(key); setContent(cycle?.content ?? { ...emptyCycle(), season: competitionSeason.season, half: competitionSeason.halfSeason }); setRevision(cycle?.revision ?? 0); reset(); });
   const change = (next: CycleContent) => { setContent(next); setDirty(true); };
   async function save(remove = false) {
+    const replaced = addGroups.filter(key => hasSaved(key)).map(key => data?.groups.find(g => g.key === key)?.name ?? key);
+    if (!remove && replaced.length && !await dialogs.confirm(
+      `Групите ${replaced.join(", ")} вече имат микроцикъл за тази седмица. Той ще бъде заменен, а връзките към план-конспекти на тези групи ще бъдат премахнати. План-конспектите остават в библиотеката.`,
+      { title: "Замяна на микроцикли", confirmLabel: "Замени" })) return;
     setBusy(true); setError("");
     try {
-      const r = await fetch(endpoint, { method: remove ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ week, groupKey: selected, revision, content }) });
+      // Without changes in the text, added groups join the same microcycle. No copy is necessary.
+      const body = { week, groupKey: selected, revision, content, addGroups, scope: dirty ? saveScope : "all" };
+      const r = await fetch(endpoint, { method: remove ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const value = await r.json(); if (!r.ok) throw new Error(value.error);
       if (!remove) setContent(value.content);
-      setRevision(remove ? 0 : value.revision); setDirty(false); if (remove) setSelected(""); setReload(v => v + 1);
+      setRevision(remove ? 0 : value.revision); reset(); if (remove) setSelected(""); setReload(v => v + 1);
     } catch (e) { setError(e instanceof Error ? e.message : "Грешка при запис."); } finally { setBusy(false); }
+  }
+  async function applyPast(past: CycleContent) {
+    // The list closes first, so the confirmation is the only open dialog.
+    setCycleDialog(undefined);
+    const filled = content.rows.length > 0 || headerFields.some(([key]) => key !== "season" && key !== "half" && content[key].trim());
+    if (filled && !await dialogs.confirm("Текущото съдържание на микроцикъла ще бъде заменено с избрания микроцикъл.", { title: "Замяна на съдържанието", confirmLabel: "Замени" })) return;
+    change(reuseCycle(past, content));
   }
   async function exportCycle(pdf: boolean) {
     setBusy(true); setError("");
@@ -248,10 +271,11 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     if (value && selected) setExpanded(current => new Set(current).add(coach?.id ?? NO_COACH_ID));
   };
   const groupCard = (g: FilterGroup) => {
-    const exists = hasSaved(g.key);
-    return <button type="button" className="mc-group" disabled={busy || (readOnly && !exists)} key={g.key} aria-pressed={g.key === selected} onClick={() => void open(g.key)}>
+    const cycle = data?.cycles.find(c => c.groupKey === g.key);
+    const shared = cycle?.shared?.length ?? 0;
+    return <button type="button" className="mc-group" disabled={busy || (readOnly && !cycle)} key={g.key} aria-pressed={g.key === selected} onClick={() => void open(g.key)}>
       <strong>{g.name}</strong>
-      <span className={`mc-chip${exists ? " mc-chip--saved" : ""}`}>{exists ? "Има микроцикъл" : readOnly ? "Няма микроцикъл" : "Създай микроцикъл"}</span>
+      <span className={`mc-chip${cycle ? " mc-chip--saved" : ""}`}>{cycle ? shared ? `Общ микроцикъл с ${groupCount(shared)}` : "Има микроцикъл" : readOnly ? "Няма микроцикъл" : "Създай микроцикъл"}</span>
     </button>;
   };
   const selectedName = data?.groups.find(g => g.key === selected)?.name ?? data?.cycles.find(c => c.groupKey === selected)?.groupName;
@@ -271,6 +295,8 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   }, [content.rows, selected, paper]);
 
   const selectedCycle = data?.cycles.find(c => c.groupKey === selected);
+  const sharedWith = selectedCycle?.shared ?? [];
+  const shareCandidates = data?.groups.filter(g => g.key !== selected && !sharedWith.some(s => s.key === g.key)) ?? [];
   function documentAction(rowId: string) {
     if (!selectedCycle?.canLink || !selectedCycle.content.rows.some(row => row.id === rowId)) return null;
     const linked = selectedCycle.links[rowId];
@@ -283,7 +309,7 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     </Link>;
   }
   function guardNavigation(event: { preventDefault: () => void }, href: string) {
-    if (dirty || busy) { event.preventDefault(); void navigate(() => window.location.assign(href)); }
+    if (unsaved || busy) { event.preventDefault(); void navigate(() => window.location.assign(href)); }
   }
   function documentDialog() {
     if (!openDocument || !selectedCycle) return null;
@@ -305,6 +331,10 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   }
   return <main className={`tp-page mc-page${printAllowed ? " mc-print-allowed" : ""}${bundle ? " mc-print-bundle-on" : ""}`}>
     {documentDialog()}
+    {cycleDialog === "share" && <GroupShareDialog groups={shareCandidates} chosen={addGroups} hasCycle={hasSaved}
+      onConfirm={keys => { setAddGroups(keys); setCycleDialog(undefined); }} onClose={() => setCycleDialog(undefined)} />}
+    {cycleDialog === "past" && <PastCycleDialog endpoint={`/api/admin/clubs/${clubId}/training-plans/microcycles/history?${location}`} week={week} groupKey={selected}
+      onPick={past => void applyPast(past)} onClose={() => setCycleDialog(undefined)} />}
     {printChoice && <PrintChoiceDialog pdf={printChoice.pdf} endpoint={`/api/admin/clubs/${clubId}/training-plans/documents`} coachGroupId={coachGroupId}
       weekLabel={`${selectedName ?? ""} · ${range}`} trainings={printTrainings()}
       onConfirm={choice => void exportChoice(printChoice.pdf, choice)} onClose={() => setPrintChoice(undefined)} />}
@@ -402,6 +432,32 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
             </label>)}
           </div>
 
+          {!readOnly && <section className="mc-share" aria-label="Групи на микроцикъла">
+            {sharedWith.length > 0 && <p className="mc-share-text"><Users size={16} aria-hidden="true" />
+              <span>Общ микроцикъл и с: <strong>{sharedWith.map(g => g.name).join(", ")}</strong></span></p>}
+            {addGroups.length > 0 && <div className="mc-share-added">
+              <span>След запазване и за:</span>
+              <ul>{addGroups.map(key => <li key={key} className="mc-chip mc-chip--saved">
+                {data?.groups.find(g => g.key === key)?.name}
+                <button type="button" className="mc-chip-remove" disabled={busy} aria-label={`Премахни ${data?.groups.find(g => g.key === key)?.name ?? ""}`}
+                  onClick={() => setAddGroups(current => current.filter(item => item !== key))}><X size={14} aria-hidden="true" /></button>
+              </li>)}</ul>
+            </div>}
+            {sharedWith.length > 0 && revision > 0 && <fieldset className="mc-share-scope" disabled={busy}>
+              <legend>Запази промените в текста за</legend>
+              <label><input type="radio" name="mc-save-scope" checked={saveScope === "group"} onChange={() => setSaveScope("group")} />
+                <span>Само за {selectedName} <small>Групата получава свое копие.</small></span></label>
+              <label><input type="radio" name="mc-save-scope" checked={saveScope === "all"} onChange={() => setSaveScope("all")} />
+                <span>Всички групи ({sharedWith.length + 1}) <small>Промяната важи за всяка група с този микроцикъл.</small></span></label>
+            </fieldset>}
+            <div className="mc-share-actions">
+              <button type="button" className="tp-secondary-btn" disabled={busy || shareCandidates.length === 0} aria-haspopup="dialog" onClick={() => setCycleDialog("share")}>
+                <Users size={16} aria-hidden="true" /> Използвай и за други групи</button>
+              <button type="button" className="tp-secondary-btn" disabled={busy} aria-haspopup="dialog" onClick={() => setCycleDialog("past")}>
+                <History size={16} aria-hidden="true" /> Използвай предишен микроцикъл</button>
+            </div>
+          </section>}
+
           <div className="mc-table">
             <table>
               <thead>
@@ -432,12 +488,14 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
         <div className="mc-actions">
           {!readOnly && <>
             <button type="button" className="tp-primary-btn" disabled={busy} onClick={() => void save()}><Save size={16} aria-hidden="true" /> {busy ? "Записване…" : "Запази"}</button>
-            {dirty && !busy && <span className="mc-dirty">Незапазени промени</span>}
+            {unsaved && !busy && <span className="mc-dirty">Незапазени промени</span>}
           </>}
           <span className="mc-actions-spacer" />
           <button type="button" className="tp-secondary-btn" disabled={busy} onClick={() => void exportCycle(false)}><Printer size={16} aria-hidden="true" /> Печат</button>
           <button type="button" className="tp-secondary-btn" disabled={busy} onClick={() => void exportCycle(true)}><Download size={16} aria-hidden="true" /> Изтегли PDF</button>
-          {!readOnly && revision > 0 && <button type="button" className="tp-danger-btn" disabled={busy} onClick={async () => { if (await dialogs.confirm("Да се изтрие ли микроцикълът?")) void save(true); }}><Trash2 size={16} aria-hidden="true" /> Изтрий</button>}
+          {!readOnly && revision > 0 && <button type="button" className="tp-danger-btn" disabled={busy} onClick={async () => { if (await dialogs.confirm(sharedWith.length
+            ? `Микроцикълът ще бъде премахнат само за ${selectedName}. ${sharedWith.map(g => g.name).join(", ")} продължават да го използват.`
+            : "Да се изтрие ли микроцикълът?", sharedWith.length ? { title: "Премахване от групата", confirmLabel: "Премахни" } : undefined)) void save(true); }}><Trash2 size={16} aria-hidden="true" /> Изтрий</button>}
         </div>
       </section>}
     </div>

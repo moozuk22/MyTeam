@@ -1179,19 +1179,34 @@ model TrainingDocumentImage {
   @@map("training_document_images")
 }
 
+/// The content of a weekly microcycle. One or more groups of the same week use it (TrainingMicrocycleGroup).
 model TrainingMicrocycle {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   clubId String @map("club_id") @db.Uuid
-  groupKey String @map("group_key")
-  groupName String @map("group_name")
   week String
   content Json
   revision Int @default(1)
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  groups TrainingMicrocycleGroup[]
   documents TrainingSessionDocument[]
   @@unique([id, clubId])
-  @@unique([clubId, groupKey, week])
+  @@unique([id, clubId, week])
+  @@index([clubId, week])
   @@map("training_microcycles")
+}
+
+/// A group that uses a microcycle in a week. A group has one microcycle per week.
+model TrainingMicrocycleGroup {
+  cycleId String @map("cycle_id") @db.Uuid
+  clubId String @map("club_id") @db.Uuid
+  groupKey String @map("group_key")
+  groupName String @map("group_name")
+  week String
+  cycle TrainingMicrocycle @relation(fields: [cycleId, clubId, week], references: [id, clubId, week], onDelete: Cascade, onUpdate: Cascade)
+  documents TrainingSessionDocument[]
+  @@id([clubId, groupKey, week])
+  @@unique([cycleId, groupKey])
+  @@map("training_microcycle_groups")
 }
 
 model TrainingSessionDocument {
@@ -1201,6 +1216,7 @@ model TrainingSessionDocument {
   rowId String @map("row_id") @db.Uuid
   documentId String @map("document_id") @db.Uuid
   cycle TrainingMicrocycle @relation(fields: [cycleId, clubId], references: [id, clubId], onDelete: Cascade)
+  usage TrainingMicrocycleGroup @relation(fields: [cycleId, groupKey], references: [cycleId, groupKey], onDelete: Cascade, onUpdate: Cascade)
   document TrainingPlanDocument @relation(fields: [documentId, clubId], references: [id, clubId], onDelete: Cascade)
   @@id([cycleId, groupKey, rowId])
   @@index([documentId, clubId])

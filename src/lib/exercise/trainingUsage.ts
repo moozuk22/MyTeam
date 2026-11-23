@@ -20,10 +20,11 @@ export async function documentUsages(db: Pick<TrainingImageTx, "$queryRaw">, clu
   if (!documentIds.length) return usages;
   const rows = await db.$queryRaw<Row[]>`
     SELECT l.document_id::text AS document_id, l.cycle_id::text AS cycle_id, l.group_key, l.row_id::text AS row_id,
-      c.week, c.group_name, c.content->>'number' AS number,
+      c.week, g.group_name, c.content->>'number' AS number,
       (SELECT r.n FROM jsonb_array_elements(c.content->'rows') WITH ORDINALITY AS r(item, n) WHERE r.item->>'id' = l.row_id::text LIMIT 1) AS position
     FROM training_session_documents l
     JOIN training_microcycles c ON c.id = l.cycle_id AND c.club_id = l.club_id
+    JOIN training_microcycle_groups g ON g.cycle_id = l.cycle_id AND g.group_key = l.group_key
     WHERE l.club_id = ${clubId}::uuid AND l.document_id = ANY(${documentIds}::uuid[])
     ORDER BY c.week DESC, position ASC
     LIMIT ${MAX_USAGES}`;

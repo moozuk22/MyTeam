@@ -26,10 +26,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const keys = groups.map(group => group.key);
   const from = shiftWeek(monday(new Date().toISOString().slice(0, 10)), -7 * HISTORY_WEEKS);
   const rows = keys.length ? await prisma.$queryRaw<Row[]>`
-    SELECT id::text AS id, group_key, week, content->'number' AS number, jsonb_path_query_array(content, '$.rows[*].id') AS rows
-    FROM training_microcycles
-    WHERE club_id = ${id}::uuid AND group_key = ANY(${keys}) AND week >= ${from}
-    ORDER BY week DESC
+    SELECT c.id::text AS id, g.group_key, c.week, c.content->'number' AS number, jsonb_path_query_array(c.content, '$.rows[*].id') AS rows
+    FROM training_microcycle_groups g
+    JOIN training_microcycles c ON c.id = g.cycle_id AND c.club_id = g.club_id
+    WHERE g.club_id = ${id}::uuid AND g.group_key = ANY(${keys}) AND g.week >= ${from}
+    ORDER BY c.week DESC
     LIMIT ${MAX_CYCLES}` : [];
   const cycles: CycleOption[] = rows.flatMap(row => {
     if (typeof row.number !== "string" || row.number.length > 40 || !Array.isArray(row.rows)) return [];

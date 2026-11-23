@@ -2,6 +2,12 @@ import { TRAINING_UUID_PATTERN } from "@/lib/trainingPlans";
 export const cycleColumns = ["Загрявка", "Фаза №1", "Фаза №2", "Фаза №3", "Физическа подготовка"];
 export type CycleRow = { id: string; cells: string[] };
 export type CycleContent = { version: 2; format: string; age: string; season: string; half: string; number: string; saturday: string; sunday: string; rows: CycleRow[] };
+/** A microcycle of an earlier week in the list "Избери предишен микроцикъл". `own` is true when the current group used it. */
+export type PastCycle = { id: string; week: string; number: string; format: string; age: string; trainings: number; groups: string[]; own: boolean };
+/** Content of a past microcycle for a new week. The trainings get new IDs, so the plan links of the past week stay there. The season stays from the current week. */
+export function reuseCycle(past: CycleContent, current: Pick<CycleContent, "season" | "half">, newId: () => string = () => crypto.randomUUID()): CycleContent {
+  return { ...past, season: current.season, half: current.half, rows: past.rows.map(row => ({ id: newId(), cells: [...row.cells] })) };
+}
 export const emptyCycle = (): CycleContent => ({ version: 2, format: "", age: "", season: "", half: "", number: "", saturday: "", sunday: "", rows: [] });
 export function monday(date: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Невалидна дата.");

@@ -26,7 +26,7 @@ export async function trainingReference(db: TrainingImageTx, clubId: string, coa
   });
   if (!group) throw new TrainingImageError("Тази група не е налична за треньора.", 403);
   const cycle = await db.trainingMicrocycle.findFirst({
-    where: { id: target.cycleId, clubId, groupKey: target.groupKey, week: target.week },
+    where: { id: target.cycleId, clubId, week: target.week, groups: { some: { groupKey: target.groupKey } } },
     select: { content: true, documents: { where: { groupKey: target.groupKey, rowId: target.rowId }, select: { document: { select: { id: true, ownerId: true } } } } },
   });
   const content = cycle && parseCycle(cycle.content);
