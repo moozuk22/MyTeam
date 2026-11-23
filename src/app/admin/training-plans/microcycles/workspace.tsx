@@ -108,6 +108,8 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   // Opens when the text of a shared microcycle changes, so the methodist chooses where the change applies.
   const [askScope, setAskScope] = useState(false);
   const [cycleDialog, setCycleDialog] = useState<"share" | "past">();
+  // The week of the past microcycle whose number was copied. "Микроцикъл №" shows a warning until the methodist changes or saves it.
+  const [numberCopiedFrom, setNumberCopiedFrom] = useState("");
   const unsaved = dirty || addGroups.length > 0;
   const [busy, setBusy] = useState(false);
   const [printAllowed, setPrintAllowed] = useState(false);
@@ -163,7 +165,7 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     pendingRestore.current = undefined;
   }, [selected, data]);
   const navigate = async (fn: () => void) => { if (busy) return; if (!unsaved || await dialogs.confirm("Да се отхвърлят ли незапазените промени?")) fn(); };
-  const reset = () => { setDirty(false); setAddGroups([]); };
+  const reset = () => { setDirty(false); setAddGroups([]); setNumberCopiedFrom(""); };
   const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); reset(); });
   const open = (key: string) => navigate(() => { const cycle = data?.cycles.find(c => c.groupKey === key); setSelected(key); setContent(cycle?.content ?? { ...emptyCycle(), season: competitionSeason.season, half: competitionSeason.halfSeason }); setRevision(cycle?.revision ?? 0); reset(); });
   const change = (next: CycleContent) => { setContent(next); setDirty(true); };
@@ -185,12 +187,15 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
       setRevision(remove ? 0 : value.revision); reset(); if (remove) setSelected(""); setReload(v => v + 1);
     } catch (e) { setError(e instanceof Error ? e.message : "Грешка при запис."); } finally { setBusy(false); }
   }
-  async function applyPast(past: CycleContent) {
+  async function applyPast(past: CycleContent, pastWeek: string) {
     // The list closes first, so the confirmation is the only open dialog.
     setCycleDialog(undefined);
     const filled = content.rows.length > 0 || headerFields.some(([key]) => key !== "season" && key !== "half" && content[key].trim());
     if (filled && !await dialogs.confirm("Текущото съдържание на микроцикъла ще бъде заменено с избрания микроцикъл.", { title: "Замяна на съдържанието", confirmLabel: "Замени" })) return;
     change(reuseCycle(past, content));
+    setNumberCopiedFrom(pastWeek || "copied");
+    // The methodist checks the copied number first.
+    requestAnimationFrame(() => document.getElementById("mc-cycle-number")?.focus());
   }
   async function exportCycle(pdf: boolean) {
     setBusy(true); setError("");
@@ -350,7 +355,7 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     {askScope && <SaveScopeDialog groupName={selectedName ?? ""} groups={[selectedName ?? "", ...sharedWith.map(g => g.name)]}
       onChoose={scope => void save(false, scope)} onClose={() => setAskScope(false)} />}
     {cycleDialog === "past" && <PastCycleDialog endpoint={`/api/admin/clubs/${clubId}/training-plans/microcycles/history?${location}`} week={week} groupKey={selected}
-      onPick={past => void applyPast(past)} onClose={() => setCycleDialog(undefined)} />}
+      onPick={(past, pastWeek) => void applyPast(past, pastWeek)} onClose={() => setCycleDialog(undefined)} />}
     {printChoice && <PrintChoiceDialog pdf={printChoice.pdf} endpoint={`/api/admin/clubs/${clubId}/training-plans/documents`} coachGroupId={coachGroupId}
       weekLabel={`${selectedName ?? ""} · ${range}`} trainings={printTrainings()}
       onConfirm={choice => void exportChoice(printChoice.pdf, choice)} onClose={() => setPrintChoice(undefined)} />}
@@ -450,10 +455,19 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
           </header>
 
           <div className="mc-fields">
-            {headerFields.map(([key, label]) => <label className="mc-field" key={key}>
-              <span>{label}</span>
-              <input value={content[key]} maxLength={2000} readOnly={readOnly || busy || key === "season" || key === "half"} onChange={e => change({ ...content, [key]: e.target.value })} />
-            </label>)}
+            {headerFields.map(([key, label]) => {
+              const warn = key === "number" && !!numberCopiedFrom && !readOnly;
+              return <label className={`mc-field${warn ? " mc-field--warning" : ""}`} key={key}>
+                <span>{label}</span>
+                <input id={key === "number" ? "mc-cycle-number" : undefined} value={content[key]} maxLength={2000}
+                  aria-describedby={warn ? "mc-cycle-number-warning" : undefined} aria-invalid={warn || undefined}
+                  readOnly={readOnly || busy || key === "season" || key === "half"}
+                  onChange={e => { change({ ...content, [key]: e.target.value }); if (key === "number") setNumberCopiedFrom(""); }} />
+                {warn && <small id="mc-cycle-number-warning" className="mc-field-warning">
+                  Номерът е копиран{numberCopiedFrom !== "copied" ? ` от седмицата ${formatWeekRange(numberCopiedFrom)}` : ""}. Проверете дали е правилен за тази седмица.
+                </small>}
+              </label>;
+            })}
           </div>
 
           {!readOnly && <section className="mc-share" aria-label="Групи на микроцикъла">

@@ -17,7 +17,8 @@ async function read<T>(url: string, fallback: string, signal?: AbortSignal): Pro
 export default function PastCycleDialog({ endpoint, week, groupKey, onPick, onClose }: {
   /** The history endpoint with the club location. */
   endpoint: string; week: string; groupKey: string;
-  onPick: (content: CycleContent) => void; onClose: () => void;
+  /** `week` is the Monday of the chosen microcycle. */
+  onPick: (content: CycleContent, week: string) => void; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState("");
@@ -67,7 +68,7 @@ export default function PastCycleDialog({ endpoint, week, groupKey, onPick, onCl
     setPicking(id); setError("");
     try {
       const { content } = await read<{ content: CycleContent }>(`${endpoint}&${new URLSearchParams({ cycleId: id })}`, "Микроцикълът не може да бъде зареден.");
-      onPick(content);
+      onPick(content, cycles?.find(cycle => cycle.id === id)?.week ?? "");
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Грешка при зареждане."); setPicking(""); }
   }
 
@@ -95,10 +96,13 @@ export default function PastCycleDialog({ endpoint, week, groupKey, onPick, onCl
       {cycles.map(cycle => <button type="button" key={cycle.id} className="mc-print-option mc-past-option" disabled={!!picking}
         aria-busy={picking === cycle.id || undefined} onClick={() => void pick(cycle.id)}>
         <span>
-          <strong>{formatWeekRange(cycle.week)}</strong>
+          <span className="mc-past-title">
+            <strong>{cycle.number ? `Микроцикъл №${cycle.number}` : "Микроцикъл без номер"}</strong>
+            <span>{formatWeekRange(cycle.week)}</span>
+          </span>
           <small>{cycle.groups.join(", ")}</small>
           <small>
-            {[cycle.own && "Тази група", cycle.number && `Микроцикъл №${cycle.number}`, [cycle.format, cycle.age].filter(Boolean).join(" · "), trainingCount(cycle.trainings)]
+            {[cycle.own && "Тази група", [cycle.format, cycle.age].filter(Boolean).join(" · "), trainingCount(cycle.trainings)]
               .filter(Boolean).join(" · ")}
           </small>
         </span>
