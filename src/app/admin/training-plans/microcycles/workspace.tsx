@@ -14,6 +14,7 @@ import TrainingDocumentDialog from "./TrainingDocumentDialog";
 import PrintChoiceDialog, { type PrintChoice, type PrintTraining } from "./PrintChoiceDialog";
 import GroupShareDialog from "./GroupShareDialog";
 import PastCycleDialog from "./PastCycleDialog";
+import SaveScopeDialog from "./SaveScopeDialog";
 import dynamic from "next/dynamic";
 import { withCoachImages } from "../documents/documentRequest";
 import { fitTextareas } from "./fitTextareas";
@@ -104,8 +105,8 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const [dirty, setDirty] = useState(false);
   // Groups that get the same microcycle on the next save.
   const [addGroups, setAddGroups] = useState<string[]>([]);
-  // For a shared microcycle: "group" saves a copy for the selected group only, "all" changes it for all its groups.
-  const [saveScope, setSaveScope] = useState<"group" | "all">("group");
+  // Opens when the text of a shared microcycle changes, so the methodist chooses where the change applies.
+  const [askScope, setAskScope] = useState(false);
   const [cycleDialog, setCycleDialog] = useState<"share" | "past">();
   const unsaved = dirty || addGroups.length > 0;
   const [busy, setBusy] = useState(false);
@@ -160,11 +161,14 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     pendingRestore.current = undefined;
   }, [selected, data]);
   const navigate = async (fn: () => void) => { if (busy) return; if (!unsaved || await dialogs.confirm("Да се отхвърлят ли незапазените промени?")) fn(); };
-  const reset = () => { setDirty(false); setAddGroups([]); setSaveScope("group"); };
+  const reset = () => { setDirty(false); setAddGroups([]); };
   const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); reset(); });
   const open = (key: string) => navigate(() => { const cycle = data?.cycles.find(c => c.groupKey === key); setSelected(key); setContent(cycle?.content ?? { ...emptyCycle(), season: competitionSeason.season, half: competitionSeason.halfSeason }); setRevision(cycle?.revision ?? 0); reset(); });
   const change = (next: CycleContent) => { setContent(next); setDirty(true); };
-  async function save(remove = false) {
+  /** `scope` "group" saves a copy for the open group only, "all" changes the shared microcycle for all its groups. */
+  async function save(remove = false, scope?: "group" | "all") {
+    if (!remove && !scope && dirty && revision > 0 && sharedWith.length > 0) { setAskScope(true); return; }
+    setAskScope(false);
     const replaced = addGroups.filter(key => hasSaved(key)).map(key => data?.groups.find(g => g.key === key)?.name ?? key);
     if (!remove && replaced.length && !await dialogs.confirm(
       `Групите ${replaced.join(", ")} вече имат микроцикъл за тази седмица. Той ще бъде заменен, а връзките към план-конспекти на тези групи ще бъдат премахнати. План-конспектите остават в библиотеката.`,
@@ -172,7 +176,7 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     setBusy(true); setError("");
     try {
       // Without changes in the text, added groups join the same microcycle. No copy is necessary.
-      const body = { week, groupKey: selected, revision, content, addGroups, scope: dirty ? saveScope : "all" };
+      const body = { week, groupKey: selected, revision, content, addGroups, scope: scope ?? "all" };
       const r = await fetch(endpoint, { method: remove ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const value = await r.json(); if (!r.ok) throw new Error(value.error);
       if (!remove) setContent(value.content);
@@ -275,7 +279,13 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     const shared = cycle?.shared?.length ?? 0;
     return <button type="button" className="mc-group" disabled={busy || (readOnly && !cycle)} key={g.key} aria-pressed={g.key === selected} onClick={() => void open(g.key)}>
       <strong>{g.name}</strong>
-      <span className={`mc-chip${cycle ? " mc-chip--saved" : ""}`}>{cycle ? shared ? `Общ микроцикъл с ${groupCount(shared)}` : "Има микроцикъл" : readOnly ? "Няма микроцикъл" : "Създай микроцикъл"}</span>
+      <span className="mc-group-chips">
+        <span className={`mc-chip${cycle ? " mc-chip--saved" : ""}`}>{cycle ? "Има микроцикъл" : readOnly ? "Няма микроцикъл" : "Създай микроцикъл"}</span>
+        {/* A small badge: the number of groups that use the same microcycle. */}
+        {shared > 0 && <span className="mc-shared-badge" title={`Общ микроцикъл за ${groupCount(shared + 1)}`}>
+          <Users size={14} aria-hidden="true" />{shared + 1}<span className="td-sr-only"> групи с общ микроцикъл</span>
+        </span>}
+      </span>
     </button>;
   };
   const selectedName = data?.groups.find(g => g.key === selected)?.name ?? data?.cycles.find(c => c.groupKey === selected)?.groupName;
@@ -333,6 +343,8 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     {documentDialog()}
     {cycleDialog === "share" && <GroupShareDialog groups={shareCandidates} chosen={addGroups} hasCycle={hasSaved}
       onConfirm={keys => { setAddGroups(keys); setCycleDialog(undefined); }} onClose={() => setCycleDialog(undefined)} />}
+    {askScope && <SaveScopeDialog groupName={selectedName ?? ""} groups={[selectedName ?? "", ...sharedWith.map(g => g.name)]}
+      onChoose={scope => void save(false, scope)} onClose={() => setAskScope(false)} />}
     {cycleDialog === "past" && <PastCycleDialog endpoint={`/api/admin/clubs/${clubId}/training-plans/microcycles/history?${location}`} week={week} groupKey={selected}
       onPick={past => void applyPast(past)} onClose={() => setCycleDialog(undefined)} />}
     {printChoice && <PrintChoiceDialog pdf={printChoice.pdf} endpoint={`/api/admin/clubs/${clubId}/training-plans/documents`} coachGroupId={coachGroupId}
@@ -443,13 +455,6 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
                   onClick={() => setAddGroups(current => current.filter(item => item !== key))}><X size={14} aria-hidden="true" /></button>
               </li>)}</ul>
             </div>}
-            {sharedWith.length > 0 && revision > 0 && <fieldset className="mc-share-scope" disabled={busy}>
-              <legend>Запази промените в текста за</legend>
-              <label><input type="radio" name="mc-save-scope" checked={saveScope === "group"} onChange={() => setSaveScope("group")} />
-                <span>Само за {selectedName} <small>Групата получава свое копие.</small></span></label>
-              <label><input type="radio" name="mc-save-scope" checked={saveScope === "all"} onChange={() => setSaveScope("all")} />
-                <span>Всички групи ({sharedWith.length + 1}) <small>Промяната важи за всяка група с този микроцикъл.</small></span></label>
-            </fieldset>}
             <div className="mc-share-actions">
               <button type="button" className="tp-secondary-btn" disabled={busy || shareCandidates.length === 0} aria-haspopup="dialog" onClick={() => setCycleDialog("share")}>
                 <Users size={16} aria-hidden="true" /> Използвай и за други групи</button>

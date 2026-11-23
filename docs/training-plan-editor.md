@@ -168,12 +168,14 @@ The `20261119200000_training_microcycles` migration creates a separate table. Ap
 
 ### One microcycle for several groups
 
-Use **Използвай и за други групи** to select more groups for the same week. The dialog shows the coach of each group and marks a group that already has a microcycle. After **Запази**, all selected groups use one microcycle. If a selected group already has a microcycle in this week, a confirmation dialog opens first. The save replaces that microcycle for the group and removes the plan links of that group. The plans stay in the library. A microcycle that no group uses is deleted. The group card shows **Общ микроцикъл с N групи**, and the editor shows the other groups.
+Use **Използвай и за други групи** to select more groups for the same week. The dialog shows the coach of each group and marks a group that already has a microcycle. After **Запази**, all selected groups use one microcycle. If a selected group already has a microcycle in this week, a confirmation dialog opens first. The save replaces that microcycle for the group and removes the plan links of that group. The plans stay in the library. A microcycle that no group uses is deleted. The group card shows **Има микроцикъл** and a small badge with a group icon and the number of groups that use the microcycle. The editor shows the other groups.
 
-When you change the text of a shared microcycle, select where the change applies:
+When you change the text of a shared microcycle, **Запази** opens the dialog **Къде да запазим промените?**. Select where the change applies:
 
-- **Само за <group>** (the default) makes a copy for the open group. The other groups keep the old text. The copy keeps the training IDs, so the plan links of the group stay.
-- **Всички групи (N)** changes the microcycle for every group that uses it.
+- **Само за <group>** makes a copy for the open group. The other groups keep the old text. The copy keeps the training IDs, so the plan links of the group stay.
+- **За всички групи (N)** changes the microcycle for every group that uses it. The option shows the names of the groups, the open group first. When more than 5 groups use the microcycle, select **Покажи всички (N)** to show all names.
+
+**Отказ** closes the dialog and does not save.
 
 If you only add groups and do not change the text, the save makes no copy. **Изтрий** in a shared microcycle removes it only from the open group. The other groups keep it. The microcycle is deleted when no group uses it.
 
