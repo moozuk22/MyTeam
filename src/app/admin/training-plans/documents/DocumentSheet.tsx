@@ -51,7 +51,7 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
       {indices.map((index) => <div key={index}>
         <h3 className={index === 3 ? "td-printed-section-heading-long" : undefined}>{sections[index].title}</h3>
         <div className="td-printed-text">
-          <PrintedValue label="Цели / Насоки" value={sections[index].coaching} />
+          <PrintedValue label="Изисквания" value={sections[index].coaching} />
         </div>
       </div>)}
     </div>

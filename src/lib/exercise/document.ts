@@ -27,7 +27,7 @@ export const sessionFields = [
 export const exerciseFields = [
   ["title", "Заглавие на секцията", 120],
   ["organization", "Организация (играчи, пространство, пособия)", 500],
-  ["coaching", "Цели / Насоки / Методически изисквания", 700],
+  ["coaching", "Изисквания", 700],
   ["repetitions", "Повторения", 60],
   ["duration", "Времетраене (мин.)", 30],
 ] as const;
