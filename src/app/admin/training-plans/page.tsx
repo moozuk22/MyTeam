@@ -16,6 +16,7 @@ type TrainingPlansSearchParams = {
   coachGroupId?: string | string[];
   sort?: string | string[];
   view?: string | string[];
+  q?: string | string[];
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -66,10 +67,11 @@ export default async function TrainingPlansPage({
   const requestedCoach = firstParam(resolvedSearchParams.coachId).toLowerCase();
   const coachFilter = scope === "club" && UUID_RE.test(requestedCoach) ? requestedCoach : "";
   const requestedCoachGroupId = firstParam(resolvedSearchParams.coachGroupId);
+  const search = firstParam(resolvedSearchParams.q).slice(0, 200);
   const [categories, result, coachGroup, coaches, scopeCounts] = defaultClubId
     ? await Promise.all([
         listTrainingPlanCategories(defaultClubId),
-        listTrainingPlans(defaultClubId, null, categoryFilter, scope === "mine" ? session.sub : undefined, coachFilter, oldestFirst),
+        listTrainingPlans(defaultClubId, null, categoryFilter, scope === "mine" ? session.sub : undefined, coachFilter, oldestFirst, search),
         findTrainingPlanCoachGroup(defaultClubId, requestedCoachGroupId),
         scope === "club" ? listTrainingPlanCoaches(defaultClubId) : [],
         countTrainingPlansByScope(defaultClubId, session.sub),
@@ -86,6 +88,7 @@ export default async function TrainingPlansPage({
     if (coachFilter && !invalidCoach) params.set("coachId", coachFilter);
     if (oldestFirst) params.set("sort", "oldest");
     if (listView) params.set("view", "list");
+    if (search) params.set("q", search);
     redirect(`/admin/training-plans?${params}`);
   }
   const { plans: initialPlans, nextCursor } = result;
@@ -96,6 +99,7 @@ export default async function TrainingPlansPage({
       coaches={coaches}
       coachFilter={coachFilter}
       scope={scope}
+      search={search}
       oldestFirst={oldestFirst}
       scopeCounts={scopeCounts}
       coachGroupId={coachGroup?.id}

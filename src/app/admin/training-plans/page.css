@@ -1207,3 +1207,13 @@ body:has(.tp-review-dialog[open]) {
     min-width: 123px;
   }
 }
+
+.tp-library .tp-search {
+  grid-column: 1 / -1;
+}
+
+.tp-library .tp-search input {
+  border-radius: 10px;
+  background: var(--plan-field);
+  color: var(--plan-text);
+}

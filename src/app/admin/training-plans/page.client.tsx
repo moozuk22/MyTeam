@@ -23,6 +23,7 @@ import {
   UserRound,
   Waypoints,
   Images,
+  Search,
 } from "lucide-react";
 import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
 import { useTrainingPlanAccess, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
@@ -64,6 +65,7 @@ export default function TrainingPlansClient({
   initialCategories,
   categoryFilter = "",
   scope,
+  search = "",
   scopeCounts,
   coaches,
   coachFilter,
@@ -77,6 +79,7 @@ export default function TrainingPlansClient({
   initialCategories: readonly CategoryOption[];
   categoryFilter?: string;
   scope: "mine" | "club";
+  search?: string;
   scopeCounts?: { mine: number; club: number };
   coaches: readonly (ClubOption & { _count?: { trainingPlans: number } })[];
   coachFilter: string;
@@ -100,6 +103,7 @@ export default function TrainingPlansClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const gridRef = useRef<HTMLElement>(null);
   const [previews, setPreviews] = useState<Record<string, Exercise | null>>({});
+  const [query, setQuery] = useState(search);
 
   if (serverPlans !== initialPlans) {
     setServerPlans(initialPlans);
@@ -162,8 +166,16 @@ export default function TrainingPlansClient({
     return observePreviews(host, selectedClubId, setPreviews);
   }, [plans, categoryFilter, selectedClubId, isFiltering, listView]);
 
+  const runSearch = useEffectEvent((text: string) => {
+    if (text !== search) changeFilter({ text }, true);
+  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => runSearch(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   function changeFilter(
-    { category = categoryFilter, nextScope = scope, coach = coachFilter, oldest = oldestFirst } = {},
+    { category = categoryFilter, nextScope = scope, coach = coachFilter, oldest = oldestFirst, text = query.trim() } = {},
     replace = false,
   ) {
     const params = trainingPlanSearch(selectedClubId, coachGroupId);
@@ -172,6 +184,7 @@ export default function TrainingPlansClient({
     else if (coach) params.set("coachId", coach);
     if (oldest) params.set("sort", "oldest");
     if (listView) params.set("view", "list");
+    if (text) params.set("q", text);
     startFiltering(() => {
       const url = `/admin/training-plans?${params}`;
       if (replace) router.replace(url, { scroll: false });
@@ -206,6 +219,7 @@ export default function TrainingPlansClient({
     else if (coachFilter) params.set("coachId", coachFilter);
     if (categoryFilter) params.set("category", categoryFilter);
     if (oldestFirst) params.set("sort", "oldest");
+    if (search) params.set("search", search);
     setLoadingMore(true);
     setError("");
     try {
@@ -340,6 +354,17 @@ export default function TrainingPlansClient({
 
         {selectedClubId && (
           <div className="tp-category-controls">
+            <label className="tp-field tp-category-filter tp-search">
+              <span><Search size={17} aria-hidden="true" />Търсене по заглавие</span>
+              <input
+                type="search"
+                maxLength={200}
+                value={query}
+                placeholder="Търси упражнение"
+                enterKeyHint="search"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
             <div className="tp-scope-controls" role="group" aria-label="Автор на плана">
               {(["mine", "club"] as const).map((option) => (
                 <button
@@ -422,7 +447,7 @@ export default function TrainingPlansClient({
           ) : visiblePlans.length === 0 ? (
             <div className="tp-empty">
               <ClipboardList size={28} />
-              <p>{scope === "mine"
+              <p>{search ? "Няма упражнения, които отговарят на търсенето." : scope === "mine"
                 ? categoryFilter ? "Нямате планове в тази категория." : "Все още нямате създадени планове."
                 : coachFilter ? "Няма планове на този треньор за избрания филтър."
                 : categoryFilter ? "Няма планове в тази категория." : "Все още няма планове за този отбор."}</p>
