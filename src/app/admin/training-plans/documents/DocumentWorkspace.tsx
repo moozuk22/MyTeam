@@ -11,7 +11,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Check, Eye, FileText, PenLine, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { type CompetitionSeason, type DocumentSummary, type SavedDocument } from "@/lib/exercise/document";
-import { DocumentCardContent, formatUpdated } from "./DocumentCard";
+import { deleteQuestion, DocumentCardContent, formatUpdated } from "./DocumentCard";
 import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
 import DocumentEditor from "./DocumentEditor";
 import { documentRequest, withCoachImages } from "./documentRequest";
@@ -140,7 +140,7 @@ function DocumentList({ coach, endpoint, drawingEndpoint, listHref, backHref, co
   }
 
   async function remove(item: DocumentSummary) {
-    if (deleting || !await dialogs.confirm(`Да изтрием ли „${item.title}“?`)) return;
+    if (deleting || !await dialogs.confirm(deleteQuestion(item))) return;
     setDeleting(item.id);
     setError("");
     try {

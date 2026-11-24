@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { blankDocument } from "./document";
+import { blankDocument, currentCompetitionSeason } from "./document";
 
 const mocks = vi.hoisted(() => ({
   usages: vi.fn<(id: string) => unknown[] | undefined>(),
   linked: vi.fn<() => boolean | undefined>(),
+  otherGroup: vi.fn<() => boolean | undefined>(),
   session: vi.fn(),
   reference: vi.fn(),
   find: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/lib/exercise/trainingUsage", async (original) => ({
     usages: new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])), totals: new Map(ids.map(id => [id, mocks.usages?.(id)?.length ?? 0])),
   }),
   hasTrainingLinks: async () => mocks.linked?.() ?? false,
+  linkedInOtherGroup: async () => mocks.otherGroup?.() ?? false,
 }));
 vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: async () => ({ enabled: true, canSave: true, canPrint: true }) }));
 vi.mock("@/lib/exercise/trainingSessionAccess", () => ({
@@ -308,6 +310,42 @@ describe("one plan for more than one training", () => {
     mocks.find.mockResolvedValue({ id: documentId, content, revision: 1, ownerId: "owner", originKey: null });
     expect((await PUT(request("PUT", { content: numbered, revision: 1 }), { params: Promise.resolve({ id: clubId, documentId }) })).status).toBe(200);
     expect(mocks.updateDocument.mock.calls[0][0].data.content.session.sessionNumber).toBe("2");
+  });
+});
+
+describe("the group and season of a saved plan", () => {
+  const stale = { ...content, session: { ...content.session, group: "Стара група", season: "2001/2002", halfSeason: "Есенен полусезон" } };
+  const training = { ...reference, group: "Група", season: "2026/2027", halfSeason: "Пролетен полусезон" };
+
+  it("gives a copy the group and season of its training", async () => {
+    mocks.reference.mockResolvedValue({ ...training, documentId, occupied: true });
+    mocks.find.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: documentId, content, revision: 1, originKey: null })
+      .mockResolvedValueOnce({ id: copyId, content, revision: 1 });
+    expect((await fork({ content: stale })).status).toBe(201);
+    expect(mocks.createDocument.mock.calls[0][0].data.content.session)
+      .toMatchObject({ group: "Група", season: "2026/2027", halfSeason: "Пролетен полусезон" });
+  });
+
+  it("gives a private draft the current season, not the season that the browser sent", async () => {
+    mocks.find.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: copyId, content, revision: 1 });
+    const response = await POST(request("POST", { id: copyId, content: stale, privateCoachDraft: true }), { params: Promise.resolve({ id: clubId }) });
+    expect(response.status).toBe(201);
+    expect(mocks.createDocument.mock.calls[0][0].data.content.session).toMatchObject(currentCompetitionSeason());
+  });
+
+  it("gives a plan saved from a training the group of the training", async () => {
+    mocks.reference.mockResolvedValue({ ...training, documentId, occupied: true });
+    mocks.find.mockResolvedValue({ id: documentId, content, revision: 1, ownerId: "owner", originKey: null });
+    expect((await put({ content: stale })).status).toBe(200);
+    expect(mocks.updateDocument.mock.calls[0][0].data.content.session.group).toBe("Група");
+  });
+
+  it("keeps the stored group of a plan that trainings of other groups use", async () => {
+    mocks.reference.mockResolvedValue({ ...training, documentId, occupied: true });
+    mocks.otherGroup.mockReturnValue(true);
+    mocks.find.mockResolvedValue({ id: documentId, content: stale, revision: 1, ownerId: "owner", originKey: null });
+    expect((await put({ content: { ...stale, session: { ...stale.session, group: "Друга" } } })).status).toBe(200);
+    expect(mocks.updateDocument.mock.calls[0][0].data.content.session.group).toBe("Стара група");
   });
 });
 

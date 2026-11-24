@@ -18,10 +18,17 @@ export type CycleSave = {
   /** "group" makes a copy for this group when other groups use the same microcycle. "all" changes it for all groups. */
   scope: "group" | "all";
   addGroups: AddedGroup[];
+  /** The number of plan links on removed trainings that the user accepted to remove. A higher number stops the save again. */
+  confirmedLinks?: number;
 };
 
 export class CycleConflict extends Error {
   constructor() { super("Микроцикълът е променен. Презаредете страницата."); }
+}
+
+/** Removed trainings have plan links, and the user did not accept their removal. The save rolls back. */
+export class RemovedLinks extends Error {
+  constructor(readonly count: number) { super("Изтритите тренировки имат план-конспекти."); }
 }
 
 /** Removes one group from the microcycle that it uses in the week. A microcycle without groups is deleted. */
@@ -102,30 +109,39 @@ export async function saveCycle(tx: Tx, input: CycleSave) {
   let revision = input.revision + 1;
   if (input.scope === "group" && previous.groups.length > 1) {
     // Copy on write: the group gets its own microcycle. The row IDs stay, so the plan links of the group stay too.
+    // The other groups keep the microcycle. A change of the revision tells the other open editors to reload.
+    // It also locks the microcycle before the group moves, so a plan link to the old microcycle waits for this save.
+    const changed = await tx.trainingMicrocycle.updateMany({ where: { id: previous.id, revision: input.revision }, data: { revision: { increment: 1 } } });
+    if (!changed.count) throw new CycleConflict();
     const copy = await tx.trainingMicrocycle.create({ data: { clubId, week, content }, select: { id: true, revision: true } });
     await tx.trainingMicrocycleGroup.update({
       where: { clubId_groupKey_week: { clubId, groupKey: group.key, week } }, data: { cycleId: copy.id },
     });
-    // The other groups keep the microcycle. A change of the revision tells the other open editors to reload.
-    const changed = await tx.trainingMicrocycle.updateMany({ where: { id: previous.id, revision: input.revision }, data: { revision: { increment: 1 } } });
-    if (!changed.count) throw new CycleConflict();
     id = copy.id; revision = copy.revision;
   } else {
     const changed = await tx.trainingMicrocycle.updateMany({ where: { id, revision: input.revision }, data: { content, revision: { increment: 1 } } });
     if (!changed.count) throw new CycleConflict();
   }
-  await tx.trainingSessionDocument.deleteMany({ where: { cycleId: id, rowId: { notIn: content.rows.map(row => row.id) } } });
+  // The plan links of removed trainings are deleted. The plans stay in the library.
+  const removedRows = { cycleId: id, rowId: { notIn: content.rows.map(row => row.id) } };
+  // A link made after the confirmation is not removed silently: the user sees the new number.
+  const linked = await tx.trainingSessionDocument.count({ where: removedRows });
+  if (linked > (input.confirmedLinks ?? 0)) throw new RemovedLinks(linked);
+  await tx.trainingSessionDocument.deleteMany({ where: removedRows });
   await addGroups(tx, clubId, week, id, input.addGroups);
   return { id, revision, content };
 }
 
 /** Removes the microcycle from one group. The other groups keep it. The last group deletes it. */
-export async function removeCycle(tx: Tx, clubId: string, week: string, groupKey: string, cycleId: string, revision: number) {
+/** `confirmedLinks` is the number of plan links of the group that the user accepted to remove. A higher number stops the delete. */
+export async function removeCycle(tx: Tx, clubId: string, week: string, groupKey: string, cycleId: string, revision: number, confirmedLinks = 0) {
   const usage = await tx.trainingMicrocycleGroup.findUnique({
     where: { clubId_groupKey_week: { clubId, groupKey, week } }, select: { cycle: { select: { id: true, revision: true } } },
   });
   if (!usage || usage.cycle.id !== cycleId || usage.cycle.revision !== revision) throw new CycleConflict();
   const changed = await tx.trainingMicrocycle.updateMany({ where: { id: usage.cycle.id, revision }, data: { revision: { increment: 1 } } });
   if (!changed.count) throw new CycleConflict();
+  const linked = await tx.trainingSessionDocument.count({ where: { cycleId: usage.cycle.id, groupKey } });
+  if (linked > confirmedLinks) throw new RemovedLinks(linked);
   await release(tx, clubId, week, groupKey, usage.cycle.id);
 }

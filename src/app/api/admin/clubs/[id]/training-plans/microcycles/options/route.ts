@@ -4,6 +4,7 @@ import { authorizeTraining, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/ex
 import { microcycleGroups } from "@/lib/exercise/microcycleGroups";
 import { monday, shiftWeek } from "@/lib/exercise/microcycle";
 import { TRAINING_UUID_PATTERN } from "@/lib/trainingPlans";
+import { getTodayIsoDateInTimeZone } from "@/lib/training";
 import type { CycleOption, TrainingOptions } from "@/lib/exercise/trainingOptions";
 
 /** Microcycles from the last year and later. The editor shows them as options for "Микроцикъл". */
@@ -24,7 +25,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!scope) return NextResponse.json({ error: "Няма такъв клуб." }, { status: 404 });
   const groups = scope.groups.filter(group => group.key.startsWith("custom:")).map(({ key, name }) => ({ key, name }));
   const keys = groups.map(group => group.key);
-  const from = shiftWeek(monday(new Date().toISOString().slice(0, 10)), -7 * HISTORY_WEEKS);
+  // Weeks start on Monday in Sofia, as on the microcycle page.
+  const from = shiftWeek(monday(getTodayIsoDateInTimeZone("Europe/Sofia")), -7 * HISTORY_WEEKS);
   const rows = keys.length ? await prisma.$queryRaw<Row[]>`
     SELECT c.id::text AS id, g.group_key, c.week, c.content->'number' AS number, jsonb_path_query_array(c.content, '$.rows[*].id') AS rows
     FROM training_microcycle_groups g

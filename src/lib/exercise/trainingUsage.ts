@@ -64,6 +64,11 @@ export async function hasTrainingLinks(db: Pick<TrainingImageTx, "trainingSessio
   return !!await db.trainingSessionDocument.findFirst({ where: { clubId, documentId }, select: { documentId: true } });
 }
 
+/** True when a training of a group other than `groupKey` uses the plan. Such a plan keeps its stored group. */
+export async function linkedInOtherGroup(db: Pick<TrainingImageTx, "trainingSessionDocument">, clubId: string, documentId: string, groupKey: string) {
+  return !!await db.trainingSessionDocument.findFirst({ where: { clubId, documentId, groupKey: { not: groupKey } }, select: { documentId: true } });
+}
+
 /** A linked plan does not store "Микроцикъл" and "Тренировка №". Each training gives its own numbers. */
 export function withoutTrainingNumbers<T extends Pick<PlanContent, "session">>(content: T): T {
   return { ...content, session: { ...content.session, microcycle: "", sessionNumber: "" } };

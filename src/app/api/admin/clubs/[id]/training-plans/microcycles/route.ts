@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { authorizeTraining, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/exercise/access";
 import { microcycleGroups } from "@/lib/exercise/microcycleGroups";
 import { monday, parseCycle } from "@/lib/exercise/microcycle";
-import { CycleConflict, removeCycle, saveCycle } from "@/lib/exercise/microcycleStore";
+import { CycleConflict, RemovedLinks, removeCycle, saveCycle } from "@/lib/exercise/microcycleStore";
 type Context = { params: Promise<{ id: string }> };
 /** A club has fewer groups than this. The limit keeps one save bounded. */
 const MAX_ADDED_GROUPS = 200;
@@ -72,14 +72,19 @@ async function mutate(request: NextRequest, { params }: Context, remove: boolean
   const { id } = await params;
   const result = await scope(request, id, true);
   if (result instanceof NextResponse) return result;
+  // The request is checked before the transaction. An error after this point is not an error in the data.
+  let stored = false;
   try {
     const body = await request.json();
     const week = monday(body.week);
     if (week !== body.week || typeof body.groupKey !== "string" || !Number.isInteger(body.revision) || body.revision < 0) throw new Error("Невалидни данни.");
     // The editor sends the microcycle that it opened, so a replaced microcycle with the same revision gives a conflict.
     if (body.revision > 0 && (typeof body.cycleId !== "string" || !UUID_RE.test(body.cycleId))) throw new Error("Невалидни данни.");
+    // The number of plan links that the user accepted to remove, after a 409 with `removedLinks`.
+    if (body.removedLinks !== undefined && (!Number.isSafeInteger(body.removedLinks) || body.removedLinks < 0)) throw new Error("Невалидни данни.");
     if (remove) {
-      await prisma.$transaction(tx => removeCycle(tx, id, week, body.groupKey, body.cycleId, body.revision));
+      stored = true;
+      await prisma.$transaction(tx => removeCycle(tx, id, week, body.groupKey, body.cycleId, body.revision, body.removedLinks ?? 0));
       return NextResponse.json({ ok: true });
     }
     const group = result.groups.find(g => g.key === body.groupKey);
@@ -95,13 +100,21 @@ async function mutate(request: NextRequest, { params }: Context, remove: boolean
     });
     if (addGroups.length !== added.length) return NextResponse.json({ error: "Някоя от избраните групи вече не е налична." }, { status: 404 });
     const content = parseCycle(body.content);
+    stored = true;
     const saved = await prisma.$transaction(tx => saveCycle(tx, {
       clubId: id, week, group, revision: body.revision, cycleId: body.cycleId, content, scope: body.scope ?? "all", addGroups,
+      confirmedLinks: body.removedLinks ?? 0,
     }));
     return NextResponse.json(saved, { status: body.revision === 0 ? 201 : 200 });
   } catch (error) {
     if (error instanceof CycleConflict) return NextResponse.json({ error: error.message }, { status: 409 });
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return NextResponse.json({ error: "Вече има микроцикъл за тази група и седмица. Презаредете страницата." }, { status: 409 });
+    if (error instanceof RemovedLinks)
+      return NextResponse.json({ error: "Изтритите тренировки имат план-конспекти. Потвърдете, за да премахнете връзките.", removedLinks: error.count }, { status: 409 });
+    if (stored) {
+      console.error("Microcycle save failed", error instanceof Prisma.PrismaClientKnownRequestError ? error.code : error instanceof Error ? error.name : "unknown");
+      return NextResponse.json({ error: "Микроцикълът не може да бъде записан. Опитайте отново." }, { status: 500 });
+    }
     return NextResponse.json({ error: error instanceof SyntaxError ? "Невалидни данни." : "Микроцикълът не може да бъде записан. Проверете данните." }, { status: 400 });
   }
 }

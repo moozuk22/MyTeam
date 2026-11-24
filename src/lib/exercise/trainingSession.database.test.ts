@@ -84,7 +84,11 @@ describe.skipIf(process.env.TRAINING_SESSION_DB_TEST !== "1")("training document
     // The plan does not store the training number. The link gives it from the current row position.
     expect(createdDocument.content.session).toMatchObject({ sessionNumber: "", microcycle: "", group: "Група", date: "", coach: "", season: content.season });
     expect(createdDocument.usages).toMatchObject([{ rowId: rows[2].id, sessionNumber: "4", group: "Група" }]);
-    expect((await saveCycle(request("POST", { week, groupKey, cycleId, revision: 2, content: { ...updated, rows: [] } }), context)).status).toBe(200);
+    const unconfirmed = await saveCycle(request("POST", { week, groupKey, cycleId, revision: 2, content: { ...updated, rows: [] } }), context);
+    expect(unconfirmed.status).toBe(409);
+    expect(await unconfirmed.json()).toMatchObject({ removedLinks: 1 });
+    expect(await prisma.trainingSessionDocument.count({ where: { cycleId } })).toBe(1);
+    expect((await saveCycle(request("POST", { week, groupKey, cycleId, revision: 2, content: { ...updated, rows: [] }, removedLinks: 1 }), context)).status).toBe(200);
     expect((await save(rows[3].id)).status).toBe(410);
     expect((await save(rows[2].id, id)).status).toBe(410);
     expect(await prisma.trainingSessionDocument.count({ where: { cycleId } })).toBe(0);

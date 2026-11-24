@@ -14,6 +14,7 @@ import TrainingDocumentDialog from "./TrainingDocumentDialog";
 import PrintChoiceDialog, { type PrintChoice, type PrintTraining } from "./PrintChoiceDialog";
 import GroupShareDialog from "./GroupShareDialog";
 import PastCycleDialog from "./PastCycleDialog";
+import { deletedCycleLinksQuestion, removedLinksQuestion } from "./removedLinks";
 import SaveScopeDialog from "./SaveScopeDialog";
 import dynamic from "next/dynamic";
 import { withCoachImages } from "../documents/documentRequest";
@@ -171,15 +172,20 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); reset(); });
   const open = (key: string) => navigate(() => { const cycle = data?.cycles.find(c => c.groupKey === key); setSelected(key); setContent(cycle?.content ?? { ...emptyCycle(), season: competitionSeason.season, half: competitionSeason.halfSeason }); setRevision(cycle?.revision ?? 0); setCycleId(cycle?.id); reset(); });
   const change = (next: CycleContent) => { setContent(next); setDirty(true); };
-  /** `scope` "group" saves a copy for the open group only, "all" changes the shared microcycle for all its groups. */
-  async function save(remove = false, scope?: "group" | "all") {
-    if (!remove && !scope && dirty && revision > 0 && sharedWith.length > 0) { setAskScope(true); return; }
+  /**
+   * `scope` "group" saves a copy for the open group only, "all" changes the shared microcycle for all its groups.
+   * `confirmedLinks` is the number of plan links that the user accepted to remove. The retry with it does not ask the first questions again.
+   */
+  async function save(remove = false, scope?: "group" | "all", confirmedLinks?: number) {
+    const retry = confirmedLinks !== undefined;
+    if (!remove && !retry && !scope && dirty && revision > 0 && sharedWith.length > 0) { setAskScope(true); return; }
     setAskScope(false);
     const replaced = addGroups.filter(key => hasSaved(key)).map(key => data?.groups.find(g => g.key === key)?.name ?? key);
-    if (!remove && replaced.length && !await dialogs.confirm(
+    if (!remove && !retry && replaced.length && !await dialogs.confirm(
       `Групите ${replaced.join(", ")} вече имат микроцикъл за тази седмица. Той ще бъде заменен, а връзките към план-конспекти на тези групи ще бъдат премахнати. План-конспектите остават в библиотеката.`,
       { title: "Замяна на микроцикли", confirmLabel: "Замени" })) return;
     setBusy(true); setError("");
+    let removedLinks = 0;
     try {
       // Without changes in the text, added groups join the same microcycle. No copy is necessary.
       // The server compares the microcycles that this page shows with the stored ones, so a change by another user gives a conflict.
@@ -187,12 +193,20 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
         const current = data?.cycles.find(c => c.groupKey === key);
         return { key, cycleId: current?.id ?? null, ...(current && { revision: current.revision }) };
       });
-      const body = { week, groupKey: selected, cycleId, revision, content, addGroups: added, scope: scope ?? "all" };
+      const body = { week, groupKey: selected, cycleId, revision, content, addGroups: added, scope: scope ?? "all", ...(retry && { removedLinks: confirmedLinks }) };
       const r = await fetch(endpoint, { method: remove ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const value = await r.json(); if (!r.ok) throw new Error(value.error);
-      if (!remove) setContent(value.content);
-      setRevision(remove ? 0 : value.revision); setCycleId(remove ? undefined : value.id); reset(); if (remove) setSelected(""); setReload(v => v + 1);
+      const value = await r.json();
+      // The server found plan links that the save or delete removes. It waits for the confirmation below.
+      if (r.status === 409 && typeof value.removedLinks === "number") removedLinks = value.removedLinks;
+      else {
+        if (!r.ok) throw new Error(value.error);
+        if (!remove) setContent(value.content);
+        setRevision(remove ? 0 : value.revision); setCycleId(remove ? undefined : value.id); reset(); if (remove) setSelected(""); setReload(v => v + 1);
+      }
     } catch (e) { setError(e instanceof Error ? e.message : "Грешка при запис."); } finally { setBusy(false); }
+    if (removedLinks && await dialogs.confirm(remove ? deletedCycleLinksQuestion(removedLinks) : removedLinksQuestion(removedLinks),
+      remove ? { title: "Изтриване на микроцикъл", confirmLabel: "Изтрий" } : { title: "Изтриване на тренировки", confirmLabel: "Запази" }))
+      await save(remove, scope ?? "all", removedLinks);
   }
   async function applyPast(past: CycleContent, pastWeek: string) {
     // The list closes first, so the confirmation is the only open dialog.

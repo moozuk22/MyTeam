@@ -85,7 +85,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // With a coach link, the coach group is the author also of a plan that the coach makes in the library.
   if ((privateDraft || (coach && !target)) && !await findTrainingPlanCoachGroup(clubId, coach))
     return NextResponse.json({ error: "Необходима е група на треньора." }, { status: 403 });
-  const input = { ...parsedInput, session: { ...parsedInput.session, ...(!privateDraft && !forkFrom && currentCompetitionSeason()) } };
+  // The server sets the season. A plan for a training gets the season of the training below.
+  const input = { ...parsedInput, session: { ...parsedInput.session, ...currentCompetitionSeason() } };
   const sourceOwner = forkFrom ? await documentOwnerFilter(clubId, session.sub, coach) : undefined;
   return withTrainingImages(clubId, async (tx) => {
     if (target && !coach) throw new TrainingImageError("Необходима е група на треньора.", 403);
@@ -120,7 +121,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           throw new TrainingImageError("Изходният план-конспект е променен. Вашите промени са в редактора.", 409);
         previous = source.content as unknown as PlanContent;
       }
-      if (!forkFrom) Object.assign(input.session, { group: reference.group, season: reference.season, halfSeason: reference.halfSeason });
+      // A copy also gets the group and season of its training, not the values that the browser sent.
+      Object.assign(input.session, { group: reference.group, season: reference.season, halfSeason: reference.halfSeason });
       // Each training gives its own numbers, so a linked plan does not store them.
       Object.assign(input.session, withoutTrainingNumbers(input).session);
     }

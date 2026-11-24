@@ -7,7 +7,7 @@ vi.mock("@/lib/exercise/microcycleGroups", () => ({ microcycleGroups: vi.fn().mo
 vi.mock("@/lib/exercise/microcycleStore", async (original) => ({ ...await original(), saveCycle: mocks.saveCycle, removeCycle: mocks.removeCycle }));
 import { DELETE, GET, POST } from "@/app/api/admin/clubs/[id]/training-plans/microcycles/route";
 import { emptyCycle } from "@/lib/exercise/microcycle";
-import { CycleConflict } from "@/lib/exercise/microcycleStore";
+import { CycleConflict, RemovedLinks } from "@/lib/exercise/microcycleStore";
 beforeEach(() => vi.clearAllMocks());
 const context = { params: Promise.resolve({ id: "club" }) };
 const get = (week: string) => GET(new NextRequest(`http://localhost/api?week=${week}`), context);
@@ -47,7 +47,39 @@ it("requires the opened microcycle for a save or delete of a saved microcycle", 
 it("returns a conflict for an old revision", async () => {
   mocks.removeCycle.mockRejectedValue(new CycleConflict());
   expect((await send("DELETE", {})).status).toBe(409);
-  expect(mocks.removeCycle).toHaveBeenCalledWith("tx", "club", "2026-11-16", "custom:a", "c", 2);
+  expect(mocks.removeCycle).toHaveBeenCalledWith("tx", "club", "2026-11-16", "custom:a", "c", 2, 0);
   mocks.saveCycle.mockRejectedValue(new CycleConflict());
   expect((await send("POST", {})).status).toBe(409);
+});
+it("asks before it removes the plan links of deleted trainings", async () => {
+  mocks.saveCycle.mockRejectedValueOnce(new RemovedLinks(3));
+  const response = await send("POST", {});
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ removedLinks: 3 });
+  expect(mocks.saveCycle).toHaveBeenCalledWith("tx", expect.objectContaining({ confirmedLinks: 0 }));
+  mocks.saveCycle.mockResolvedValue({ id: "c", revision: 3, content: emptyCycle() });
+  expect((await send("POST", { removedLinks: 3 })).status).toBe(200);
+  expect(mocks.saveCycle).toHaveBeenLastCalledWith("tx", expect.objectContaining({ confirmedLinks: 3 }));
+  for (const removedLinks of [true, "3", -1, 1.5]) expect((await send("POST", { removedLinks })).status).toBe(400);
+});
+it("asks before a delete removes the plan links of the group", async () => {
+  mocks.removeCycle.mockRejectedValueOnce(new RemovedLinks(2));
+  const response = await send("DELETE", {});
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ removedLinks: 2 });
+  mocks.removeCycle.mockResolvedValue(undefined);
+  expect((await send("DELETE", { removedLinks: 2 })).status).toBe(200);
+  expect(mocks.removeCycle).toHaveBeenLastCalledWith("tx", "club", "2026-11-16", "custom:a", "c", 2, 2);
+  expect((await send("DELETE", { removedLinks: "2" })).status).toBe(400);
+});
+it("does not ask to check the data when the database fails", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  mocks.saveCycle.mockRejectedValueOnce(Object.assign(new Error("Timed out"), { code: "P2024" }));
+  const saved = await send("POST", {});
+  expect(saved.status).toBe(500);
+  expect((await saved.json()).error).toBe("Микроцикълът не може да бъде записан. Опитайте отново.");
+  mocks.removeCycle.mockRejectedValueOnce(new Error("Timed out"));
+  expect((await send("DELETE", {})).status).toBe(500);
+  // An error in the request data stays a 400.
+  expect((await send("POST", { week: "2026-02-30" })).status).toBe(400);
 });

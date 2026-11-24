@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { emptyCycle, reuseCycle, type CycleContent } from "./microcycle";
-import { CycleConflict, removeCycle, saveCycle, type CycleSave } from "./microcycleStore";
+import { CycleConflict, RemovedLinks, removeCycle, saveCycle, type CycleSave } from "./microcycleStore";
 import type { TrainingImageTx } from "./imageStorage";
 
 const row = (id: string, text = "") => ({ id, cells: [text, "", "", "", ""] });
@@ -12,7 +12,7 @@ const other = { key: "custom:b", name: "Група Б", expected: null };
 const tx = {
   trainingMicrocycle: { create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
   trainingMicrocycleGroup: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
-  trainingSessionDocument: { deleteMany: vi.fn() },
+  trainingSessionDocument: { count: vi.fn(), deleteMany: vi.fn() },
 };
 const db = tx as unknown as TrainingImageTx;
 
@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   tx.trainingMicrocycle.updateMany.mockResolvedValue({ count: 1 });
   tx.trainingMicrocycleGroup.findMany.mockResolvedValue([]);
+  tx.trainingSessionDocument.count.mockResolvedValue(0);
 });
 
 it("gives the group its own copy when it changes a shared microcycle for itself", async () => {
@@ -41,6 +42,48 @@ it("gives the group its own copy when it changes a shared microcycle for itself"
   // The other group keeps the old text. Only its revision changes.
   expect(tx.trainingMicrocycle.updateMany).toHaveBeenCalledWith({ where: { id: "shared", revision: 3 }, data: { revision: { increment: 1 } } });
   expect(tx.trainingSessionDocument.deleteMany).toHaveBeenCalledWith({ where: { cycleId: "copy", rowId: { notIn: [ROW] } } });
+});
+
+it("locks the shared microcycle before the group moves to its copy", async () => {
+  usage([group.key, other.key]);
+  tx.trainingMicrocycle.create.mockResolvedValue({ id: "copy", revision: 1 });
+  await saveCycle(db, input({ scope: "group" }));
+  // A plan link locks the old microcycle. The lock comes first, so the link waits and then sees the moved group.
+  expect(tx.trainingMicrocycle.updateMany.mock.invocationCallOrder[0]).toBeLessThan(tx.trainingMicrocycleGroup.update.mock.invocationCallOrder[0]);
+});
+
+it("does not copy when the shared microcycle changed after the check", async () => {
+  usage([group.key, other.key]);
+  tx.trainingMicrocycle.updateMany.mockResolvedValue({ count: 0 });
+  await expect(saveCycle(db, input({ scope: "group" }))).rejects.toBeInstanceOf(CycleConflict);
+  expect(tx.trainingMicrocycle.create).not.toHaveBeenCalled();
+  expect(tx.trainingMicrocycleGroup.update).not.toHaveBeenCalled();
+});
+
+it("stops before it removes the plan links of deleted trainings", async () => {
+  usage([group.key, other.key]);
+  tx.trainingSessionDocument.count.mockResolvedValue(2);
+  const failure = await saveCycle(db, input({ scope: "all", content: { ...stored, rows: [] } })).catch(error => error);
+  expect(failure).toBeInstanceOf(RemovedLinks);
+  expect(failure.count).toBe(2);
+  expect(tx.trainingSessionDocument.count).toHaveBeenCalledWith({ where: { cycleId: "shared", rowId: { notIn: [] } } });
+  expect(tx.trainingSessionDocument.deleteMany).not.toHaveBeenCalled();
+});
+
+it("removes the plan links of deleted trainings after the user accepts it", async () => {
+  usage([group.key, other.key]);
+  tx.trainingSessionDocument.count.mockResolvedValue(2);
+  await saveCycle(db, input({ scope: "all", content: { ...stored, rows: [] }, confirmedLinks: 2 }));
+  expect(tx.trainingSessionDocument.deleteMany).toHaveBeenCalledWith({ where: { cycleId: "shared", rowId: { notIn: [] } } });
+});
+
+it("stops again when more plan links exist than the user accepted", async () => {
+  usage([group.key, other.key]);
+  tx.trainingSessionDocument.count.mockResolvedValue(3);
+  const failure = await saveCycle(db, input({ scope: "all", content: { ...stored, rows: [] }, confirmedLinks: 2 })).catch(error => error);
+  expect(failure).toBeInstanceOf(RemovedLinks);
+  expect(failure.count).toBe(3);
+  expect(tx.trainingSessionDocument.deleteMany).not.toHaveBeenCalled();
 });
 
 it("changes the shared microcycle for all its groups", async () => {
@@ -139,6 +182,20 @@ it("removes the microcycle only from the selected group", async () => {
   // A stale delete does not remove a microcycle that replaced the opened one, also at the same revision.
   tx.trainingMicrocycleGroup.findUnique.mockResolvedValue({ cycle: { id: "replaced", revision: 3 } });
   await expect(removeCycle(db, "club", "2026-11-23", group.key, "shared", 3)).rejects.toBeInstanceOf(CycleConflict);
+});
+
+it("stops a delete that removes more plan links than the user accepted", async () => {
+  tx.trainingMicrocycleGroup.findUnique.mockResolvedValue({ cycle: { id: "shared", revision: 3 } });
+  tx.trainingMicrocycleGroup.deleteMany.mockResolvedValue({ count: 1 });
+  tx.trainingSessionDocument.count.mockResolvedValue(2);
+  const failure = await removeCycle(db, "club", "2026-11-23", group.key, "shared", 3, 1).catch(error => error);
+  expect(failure).toBeInstanceOf(RemovedLinks);
+  expect(failure.count).toBe(2);
+  // Only the links of the selected group are counted. The other groups keep theirs.
+  expect(tx.trainingSessionDocument.count).toHaveBeenCalledWith({ where: { cycleId: "shared", groupKey: group.key } });
+  expect(tx.trainingMicrocycleGroup.deleteMany).not.toHaveBeenCalled();
+  await removeCycle(db, "club", "2026-11-23", group.key, "shared", 3, 2);
+  expect(tx.trainingMicrocycleGroup.deleteMany).toHaveBeenCalledOnce();
 });
 
 it("reuses a past microcycle with new training IDs and the current season", () => {

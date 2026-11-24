@@ -6,7 +6,7 @@ import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { currentCompetitionSeason, readDocumentInput, type PlanContent } from "@/lib/exercise/document";
 import { documentImageIds, removeUnusedImages, storeDocumentImages, syncDocumentImages, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
-import { documentUsageSummary, hasTrainingLinks, usageOf, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
+import { documentUsageSummary, hasTrainingLinks, linkedInOtherGroup, usageOf, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
 
 type Context = { params: Promise<{ id: string; documentId: string }> };
 
@@ -66,6 +66,10 @@ export async function PUT(request: NextRequest, context: Context) {
     let occupied = false;
     if (target) {
       const reference = await trainingReference(tx, where.clubId, request.headers.get("x-coach-group"), target, true);
+      // The group comes from the training, as it does when the plan is created from a training.
+      // A plan that trainings of other groups also use keeps its stored group, so one group cannot change it for all.
+      input.session.group = await linkedInOtherGroup(tx, where.clubId, where.id, target.groupKey)
+        ? (previous.content as PlanContent).session.group : reference.group;
       linkTarget = link && reference.documentId !== where.id;
       occupied = reference.occupied;
       if (linkTarget && !canLinkTraining(reference, replace))

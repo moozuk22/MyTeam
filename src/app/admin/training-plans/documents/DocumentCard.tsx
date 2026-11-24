@@ -25,6 +25,14 @@ export function formatUpdated(value: string) {
   return dateFormat.format(new Date(value));
 }
 
+/** The question before a plan is deleted. A delete also removes the plan from all trainings that use it. */
+export function deleteQuestion(item: Pick<DocumentSummary, "title" | "usages" | "usageCount">) {
+  const count = Math.max(item.usageCount ?? 0, item.usages?.length ?? 0);
+  const question = `Да изтрием ли „${item.title}“?`;
+  if (!count) return question;
+  return `${question} Използва се в ${count === 1 ? "1 тренировка" : `${count} тренировки`}. Изтриването го премахва и от ${count === 1 ? "нея" : "тях"}.`;
+}
+
 /** The inside of a plan card: title, tags, details and counts. The caller puts it in a link or a button. */
 export function DocumentCardContent({ item }: { item: Pick<DocumentSummary, "title" | "preview" | "usages" | "usageCount"> }) {
   const preview = item.preview ?? null;
