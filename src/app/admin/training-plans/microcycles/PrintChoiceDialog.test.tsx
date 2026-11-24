@@ -89,3 +89,31 @@ it("does not print when nothing is selected", () => {
   (button(tree, "Печат").props.onClick as () => void)();
   expect(onConfirm).not.toHaveBeenCalled();
 });
+
+it("keeps the selected plans when the user retries a plan that failed", () => {
+  (checkboxes(render().tree)[0].props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: false } });
+  (checkboxes(render().tree)[4].props.onChange as () => void)();
+  hooks.values[LOADED] = { d1: { error: "Грешка" }, d4: { content: plan("Удари") } };
+  (button(render().tree, "Опитай отново").props.onClick as () => void)();
+  expect(hooks.values[LOADED]).toEqual({ d4: { content: plan("Удари") } });
+  const { tree, onConfirm } = render();
+  expect(text(button(tree, "Печат"))).toContain("(1)");
+  (button(tree, "Печат").props.onClick as () => void)();
+  expect(onConfirm).toHaveBeenCalledWith({ week: false, documents: [expect.objectContaining({ rowId: "r4" })] });
+});
+
+it("keeps a plan that still loads in the selection of all pages", () => {
+  hooks.values[LOADED] = { d1: { content: plan("Пасове") } };
+  (button(render().tree, "Избери всички").props.onClick as () => void)();
+  let { tree, onConfirm } = render();
+  // The print waits for the plan of training 4.
+  expect(button(tree, "Печат").props.disabled).toBe(true);
+  (button(tree, "Печат").props.onClick as () => void)();
+  expect(onConfirm).not.toHaveBeenCalled();
+  expect(checkboxes(tree)[4].props.checked).toBe(true);
+  hooks.values[LOADED] = { d1: { content: plan("Пасове") }, d4: { content: plan("Удари") } };
+  ({ tree, onConfirm } = render());
+  expect(text(button(tree, "Печат"))).toContain("(3)");
+  (button(tree, "Печат").props.onClick as () => void)();
+  expect(onConfirm).toHaveBeenCalledWith({ week: true, documents: [expect.objectContaining({ rowId: "r1" }), expect.objectContaining({ rowId: "r4" })] });
+});

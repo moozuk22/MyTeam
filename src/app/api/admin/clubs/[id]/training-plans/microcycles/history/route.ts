@@ -53,6 +53,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       id: row.id, week: row.week, number: (row.number ?? "").slice(0, 40), format: (row.format ?? "").slice(0, 100),
       age: (row.age ?? "").slice(0, 100), trainings: row.trainings ?? 0, groups: row.groups.map(name => name.slice(0, 100)), own: row.own,
     }));
-    return NextResponse.json({ cycles, more: rows.length > PAGE }, { headers });
+    // The next page starts at offset + PAGE. The list stops when that offset is above the limit.
+    return NextResponse.json({ cycles, more: rows.length > PAGE && offset + PAGE <= MAX_OFFSET }, { headers });
   } catch { return NextResponse.json({ error: "Предишните микроцикли не могат да бъдат заредени. Опитайте отново." }, { status: 500 }); }
 }

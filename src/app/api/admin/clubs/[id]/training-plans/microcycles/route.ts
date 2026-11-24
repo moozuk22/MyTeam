@@ -57,6 +57,17 @@ export async function GET(request: NextRequest, { params }: Context) {
     }) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch { return NextResponse.json({ error: "Микроциклите не могат да бъдат заредени. Опитайте отново." }, { status: 500 }); }
 }
+/** Each added group has its key and the microcycle that the editor showed for it (`cycleId` null when it had none). */
+function parseAddedGroups(value: unknown) {
+  if (!Array.isArray(value) || value.length > MAX_ADDED_GROUPS) throw new Error("Невалидни данни.");
+  return value.map(item => {
+    const { key, cycleId, revision } = item ?? {};
+    if (typeof key !== "string") throw new Error("Невалидни данни.");
+    if (cycleId === null) return { key, expected: null };
+    if (typeof cycleId !== "string" || !UUID_RE.test(cycleId) || !Number.isInteger(revision) || revision < 1) throw new Error("Невалидни данни.");
+    return { key, expected: { id: cycleId, revision: revision as number } };
+  });
+}
 async function mutate(request: NextRequest, { params }: Context, remove: boolean) {
   const { id } = await params;
   const result = await scope(request, id, true);
@@ -65,22 +76,27 @@ async function mutate(request: NextRequest, { params }: Context, remove: boolean
     const body = await request.json();
     const week = monday(body.week);
     if (week !== body.week || typeof body.groupKey !== "string" || !Number.isInteger(body.revision) || body.revision < 0) throw new Error("Невалидни данни.");
+    // The editor sends the microcycle that it opened, so a replaced microcycle with the same revision gives a conflict.
+    if (body.revision > 0 && (typeof body.cycleId !== "string" || !UUID_RE.test(body.cycleId))) throw new Error("Невалидни данни.");
     if (remove) {
-      await prisma.$transaction(tx => removeCycle(tx, id, week, body.groupKey, body.revision));
+      await prisma.$transaction(tx => removeCycle(tx, id, week, body.groupKey, body.cycleId, body.revision));
       return NextResponse.json({ ok: true });
     }
     const group = result.groups.find(g => g.key === body.groupKey);
     if (!group) return NextResponse.json({ error: "Групата вече не е налична." }, { status: 404 });
     if (body.content?.version !== 2) return NextResponse.json({ error: "Презаредете страницата, за да редактирате микроцикъла." }, { status: 409 });
-    const added = body.addGroups ?? [];
-    if (!Array.isArray(added) || added.length > MAX_ADDED_GROUPS || added.some(key => typeof key !== "string") ||
-        new Set(added).size !== added.length || added.includes(group.key) || (body.scope !== undefined && body.scope !== "group" && body.scope !== "all"))
+    const added = parseAddedGroups(body.addGroups ?? []);
+    const keys = added.map(item => item.key);
+    if (new Set(keys).size !== keys.length || keys.includes(group.key) || (body.scope !== undefined && body.scope !== "group" && body.scope !== "all"))
       throw new Error("Невалидни данни.");
-    const addGroups = result.groups.filter(g => added.includes(g.key));
+    const addGroups = added.flatMap(item => {
+      const known = result.groups.find(g => g.key === item.key);
+      return known ? [{ ...known, expected: item.expected }] : [];
+    });
     if (addGroups.length !== added.length) return NextResponse.json({ error: "Някоя от избраните групи вече не е налична." }, { status: 404 });
     const content = parseCycle(body.content);
     const saved = await prisma.$transaction(tx => saveCycle(tx, {
-      clubId: id, week, group, revision: body.revision, content, scope: body.scope ?? "all", addGroups,
+      clubId: id, week, group, revision: body.revision, cycleId: body.cycleId, content, scope: body.scope ?? "all", addGroups,
     }));
     return NextResponse.json(saved, { status: body.revision === 0 ? 201 : 200 });
   } catch (error) {

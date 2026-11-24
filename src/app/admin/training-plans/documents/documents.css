@@ -183,6 +183,8 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
 }
 .td-skeleton--title { width: 65%; height: 18px; }
 .td-skeleton--meta { width: 45%; height: 14px; }
+.td-skeleton--field { width: 100%; height: 44px; border-radius: 10px; }
+.td-field-label { color: var(--plan-muted); }
 @media (prefers-reduced-motion: reduce) { .td-skeleton::after { animation: none; } }
 
 @media (min-width: 640px) {
@@ -378,6 +380,9 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
 .td-field .td-date-field input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
 .td-date-field input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .td-date-field:has(input:focus-visible) { outline: 2px solid var(--plan-accent); outline-offset: 1px; }
+/* With keyboard focus, the native date segments show the active segment and the typed digits. The formatted date returns on blur. */
+.td-field .td-date-field input:focus-visible { padding: 8px 36px 8px 10px; background: transparent; color: var(--plan-text); font: inherit; opacity: 1; outline: none; }
+.td-date-field:has(input:focus-visible) .td-date-value { visibility: hidden; }
 .td-date-field:has(input:disabled) { opacity: .6; }
 .td-date-field:has(input:disabled) input { cursor: default; }
 .td-field label { color: var(--plan-muted); }

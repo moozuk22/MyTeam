@@ -29,12 +29,19 @@ export default function PastCycleDialog({ endpoint, week, groupKey, onPick, onCl
   const [attempt, setAttempt] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [picking, setPicking] = useState("");
+  // The microcycle that failed to load. "Опитай отново" loads it again.
+  const [failedPick, setFailedPick] = useState("");
+  // Requests that stop when the search changes or the dialog closes, so a late response does not change the list or the editor.
+  const pageRequest = useRef<AbortController>(undefined);
+  const pickRequest = useRef<AbortController>(undefined);
 
   useEffect(() => {
     const element = dialog.current;
     const trigger = globalThis.document.activeElement;
     element?.showModal();
     return () => {
+      pageRequest.current?.abort();
+      pickRequest.current?.abort();
       element?.close();
       if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true });
     };
@@ -48,7 +55,10 @@ export default function PastCycleDialog({ endpoint, week, groupKey, onPick, onCl
   const listUrl = (offset: number) => `${endpoint}&${new URLSearchParams({ week, groupKey, q: search, offset: String(offset) })}`;
   useEffect(() => {
     const abort = new AbortController();
-    setCycles(undefined); setError("");
+    // A page of the previous search must not join the new list.
+    pageRequest.current?.abort();
+    setLoadingMore(false);
+    setCycles(undefined); setError(""); setFailedPick("");
     read<{ cycles: PastCycle[]; more: boolean }>(listUrl(0), "Предишните микроцикли не могат да бъдат заредени.", abort.signal)
       .then(value => { if (!abort.signal.aborted) { setCycles(value.cycles); setMore(value.more); } })
       .catch((failure: Error) => { if (!abort.signal.aborted) setError(failure.message); });
@@ -57,19 +67,31 @@ export default function PastCycleDialog({ endpoint, week, groupKey, onPick, onCl
   }, [endpoint, week, groupKey, search, attempt]);
 
   async function loadMore() {
-    setLoadingMore(true); setError("");
+    pageRequest.current?.abort();
+    const abort = new AbortController();
+    pageRequest.current = abort;
+    setLoadingMore(true); setError(""); setFailedPick("");
     try {
-      const value = await read<{ cycles: PastCycle[]; more: boolean }>(listUrl(cycles?.length ?? 0), "Предишните микроцикли не могат да бъдат заредени.");
+      const value = await read<{ cycles: PastCycle[]; more: boolean }>(listUrl(cycles?.length ?? 0), "Предишните микроцикли не могат да бъдат заредени.", abort.signal);
+      if (abort.signal.aborted) return;
       setCycles(current => [...current ?? [], ...value.cycles.filter(c => !current?.some(item => item.id === c.id))]); setMore(value.more);
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Грешка при зареждане."); } finally { setLoadingMore(false); }
+    } catch (failure) {
+      if (!abort.signal.aborted) setError(failure instanceof Error ? failure.message : "Грешка при зареждане.");
+    } finally { if (!abort.signal.aborted) setLoadingMore(false); }
   }
 
   async function pick(id: string) {
-    setPicking(id); setError("");
+    pickRequest.current?.abort();
+    const abort = new AbortController();
+    pickRequest.current = abort;
+    setPicking(id); setError(""); setFailedPick("");
     try {
-      const { content } = await read<{ content: CycleContent }>(`${endpoint}&${new URLSearchParams({ cycleId: id })}`, "Микроцикълът не може да бъде зареден.");
-      onPick(content, cycles?.find(cycle => cycle.id === id)?.week ?? "");
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Грешка при зареждане."); setPicking(""); }
+      const { content } = await read<{ content: CycleContent }>(`${endpoint}&${new URLSearchParams({ cycleId: id })}`, "Микроцикълът не може да бъде зареден.", abort.signal);
+      // A closed dialog does not fill the editor.
+      if (!abort.signal.aborted) onPick(content, cycles?.find(cycle => cycle.id === id)?.week ?? "");
+    } catch (failure) {
+      if (!abort.signal.aborted) { setError(failure instanceof Error ? failure.message : "Грешка при зареждане."); setPicking(""); setFailedPick(id); }
+    }
   }
 
   return <dialog ref={dialog} className="tp-modal mc-print-dialog" aria-labelledby="mc-past-dialog-title"
@@ -84,7 +106,7 @@ export default function PastCycleDialog({ endpoint, week, groupKey, onPick, onCl
       <input type="search" maxLength={200} value={query} placeholder="Търси група" onChange={e => setQuery(e.target.value)} />
     </label>
     {error && <div role="alert" className="td-feedback mc-print-error">{error}
-      <button type="button" className="tp-secondary-btn" onClick={() => cycles ? void loadMore() : setAttempt(v => v + 1)}>Опитай отново</button>
+      <button type="button" className="tp-secondary-btn" onClick={() => failedPick ? void pick(failedPick) : cycles ? void loadMore() : setAttempt(v => v + 1)}>Опитай отново</button>
     </div>}
     {!cycles && !error && <div className="mc-print-options" role="status" aria-label="Зареждане" aria-busy="true">
       {[0, 1, 2].map(i => <div key={i} className="mc-print-option" aria-hidden="true">

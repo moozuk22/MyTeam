@@ -6,7 +6,7 @@ import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { currentCompetitionSeason, readDocumentInput, type PlanContent } from "@/lib/exercise/document";
 import { documentImageIds, removeUnusedImages, storeDocumentImages, syncDocumentImages, TrainingImageError, withTrainingImages } from "@/lib/exercise/imageStorage";
 import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage";
-import { documentUsages, hasTrainingLinks, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
+import { documentUsageSummary, hasTrainingLinks, usageOf, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
 
 type Context = { params: Promise<{ id: string; documentId: string }> };
 
@@ -35,8 +35,9 @@ export async function GET(request: NextRequest, context: Context) {
   // A user can see only the plans of their author: the coach group, or the admin account.
   const document = await prisma.trainingPlanDocument.findFirst({ where, select: documentDetail });
   if (!document) return missing();
-  const usages = (await documentUsages(prisma, where.clubId, [document.id])).get(document.id);
-  return NextResponse.json({ document: { ...document, usages } }, { headers: { "Cache-Control": "private, no-store" } });
+  // The detail gives at most 100 trainings and the exact number, which the overwrite confirmation shows.
+  const usages = usageOf(await documentUsageSummary(prisma, where.clubId, [document.id]), document.id);
+  return NextResponse.json({ document: { ...document, ...usages } }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PUT(request: NextRequest, context: Context) {
@@ -95,9 +96,9 @@ export async function PUT(request: NextRequest, context: Context) {
     if (target && linkTarget) await linkTrainingDocument(tx, where.clubId, target, where.id, occupied);
     await syncDocumentImages(tx, where.clubId, where.id, imageIds);
     await removeUnusedImages(tx, where.clubId, documentImageIds(previous.content as PlanContent));
-    const usages = (await documentUsages(tx, where.clubId, [where.id])).get(where.id);
+    const usages = usageOf(await documentUsageSummary(tx, where.clubId, [where.id]), where.id);
     return NextResponse.json({
-      document: { id: where.id, revision: previous.revision + 1, content, updatedAt, usages },
+      document: { id: where.id, revision: previous.revision + 1, content, updatedAt, ...usages },
     });
   });
 }

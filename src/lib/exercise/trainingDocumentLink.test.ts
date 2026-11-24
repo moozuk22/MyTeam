@@ -18,7 +18,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
 vi.mock("@/lib/exercise/trainingUsage", async (original) => ({
   ...await original<typeof import("./trainingUsage")>(),
-  documentUsages: async (_db: unknown, _club: string, ids: string[]) => new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])),
+  documentUsageSummary: async (_db: unknown, _club: string, ids: string[]) => ({
+    usages: new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])), totals: new Map(ids.map(id => [id, mocks.usages?.(id)?.length ?? 0])),
+  }),
   hasTrainingLinks: async () => mocks.linked?.() ?? false,
 }));
 vi.mock("@/lib/trainingPlanSubscriptions", () => ({ trainingPlanCapabilities: async () => ({ enabled: true, canSave: true, canPrint: true }) }));

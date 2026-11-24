@@ -102,6 +102,8 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const [selected, setSelected] = useState("");
   const [content, setContent] = useState(emptyCycle);
   const [revision, setRevision] = useState(0);
+  // The microcycle that the editor content comes from. A reload of the list does not change it, so a save cannot apply old content to a replacement.
+  const [cycleId, setCycleId] = useState<string>();
   const [dirty, setDirty] = useState(false);
   // Groups that get the same microcycle on the next save.
   const [addGroups, setAddGroups] = useState<string[]>([]);
@@ -142,7 +144,7 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
       const target = pendingRestore.current;
       if (!target) return;
       const cycle = value.cycles.find(c => c.id === target.cycleId && c.groupKey === target.groupKey);
-      if (cycle) { setSelected(cycle.groupKey); setContent(cycle.content); setRevision(cycle.revision); }
+      if (cycle) { setSelected(cycle.groupKey); setContent(cycle.content); setRevision(cycle.revision); setCycleId(cycle.id); }
       if (!cycle?.content.rows.some(row => row.id === target.rowId)) {
         setError("Тренировката вече не е налична.");
         pendingRestore.current = undefined;
@@ -167,7 +169,7 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const navigate = async (fn: () => void) => { if (busy) return; if (!unsaved || await dialogs.confirm("Да се отхвърлят ли незапазените промени?")) fn(); };
   const reset = () => { setDirty(false); setAddGroups([]); setNumberCopiedFrom(""); };
   const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); reset(); });
-  const open = (key: string) => navigate(() => { const cycle = data?.cycles.find(c => c.groupKey === key); setSelected(key); setContent(cycle?.content ?? { ...emptyCycle(), season: competitionSeason.season, half: competitionSeason.halfSeason }); setRevision(cycle?.revision ?? 0); reset(); });
+  const open = (key: string) => navigate(() => { const cycle = data?.cycles.find(c => c.groupKey === key); setSelected(key); setContent(cycle?.content ?? { ...emptyCycle(), season: competitionSeason.season, half: competitionSeason.halfSeason }); setRevision(cycle?.revision ?? 0); setCycleId(cycle?.id); reset(); });
   const change = (next: CycleContent) => { setContent(next); setDirty(true); };
   /** `scope` "group" saves a copy for the open group only, "all" changes the shared microcycle for all its groups. */
   async function save(remove = false, scope?: "group" | "all") {
@@ -180,11 +182,16 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     setBusy(true); setError("");
     try {
       // Without changes in the text, added groups join the same microcycle. No copy is necessary.
-      const body = { week, groupKey: selected, revision, content, addGroups, scope: scope ?? "all" };
+      // The server compares the microcycles that this page shows with the stored ones, so a change by another user gives a conflict.
+      const added = addGroups.map(key => {
+        const current = data?.cycles.find(c => c.groupKey === key);
+        return { key, cycleId: current?.id ?? null, ...(current && { revision: current.revision }) };
+      });
+      const body = { week, groupKey: selected, cycleId, revision, content, addGroups: added, scope: scope ?? "all" };
       const r = await fetch(endpoint, { method: remove ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const value = await r.json(); if (!r.ok) throw new Error(value.error);
       if (!remove) setContent(value.content);
-      setRevision(remove ? 0 : value.revision); reset(); if (remove) setSelected(""); setReload(v => v + 1);
+      setRevision(remove ? 0 : value.revision); setCycleId(remove ? undefined : value.id); reset(); if (remove) setSelected(""); setReload(v => v + 1);
     } catch (e) { setError(e instanceof Error ? e.message : "Грешка при запис."); } finally { setBusy(false); }
   }
   async function applyPast(past: CycleContent, pastWeek: string) {
@@ -197,12 +204,16 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     // The methodist checks the copied number first.
     requestAnimationFrame(() => document.getElementById("mc-cycle-number")?.focus());
   }
+  /** The subscription or the access can end while a dialog is open, so each print checks it again. */
+  async function checkPrintAccess() {
+    const r = await fetch(`/api/admin/clubs/${clubId}/training-plans/access?operation=print`, { cache: "no-store" });
+    const access = await r.json().catch(() => null);
+    if (!r.ok || !access?.canPrint) throw new Error("Необходим е активен абонамент за печат.");
+  }
   async function exportCycle(pdf: boolean) {
     setBusy(true); setError("");
     try {
-      const r = await fetch(`/api/admin/clubs/${clubId}/training-plans/access?operation=print`);
-      const access = await r.json();
-      if (!r.ok || !access.canPrint) throw new Error("Необходим е активен абонамент за печат.");
+      await checkPrintAccess();
       // When the trainings have plans, the user chooses what to print.
       if (printTrainings().some(training => training.documentId)) { setPrintChoice({ pdf }); setBusy(false); return; }
       await exportWeek(pdf);
@@ -236,10 +247,12 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     setPrintChoice(undefined);
     setBusy(true); setError("");
     try {
+      await checkPrintAccess();
       if (!choice.documents.length) { await exportWeek(pdf); return; }
       const documents = choice.documents.map(item => ({ ...item, content: withCoachImages({ ...item.content, session: {
-        // A linked plan does not store the numbers. The training gives them.
-        ...item.content.session, microcycle: content.number, sessionNumber: String(item.number) } }, coachGroupId ?? null) }));
+        // A linked plan does not store the numbers. The training gives them, and also the group and season, as in the plan preview.
+        ...item.content.session, group: selectedName ?? item.content.session.group, season: content.season, halfSeason: content.half,
+        microcycle: content.number, sessionNumber: String(item.number) } }, coachGroupId ?? null) }));
       flushSync(() => setBundle({ week: choice.week, documents }));
       const root = bundleRef.current!;
       await printPagesReady(root, documents.length);
@@ -253,22 +266,20 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
       const [{ default: html2canvas }, { jsPDF }, { addDocumentPages, releaseCanvases }] = await Promise.all([
         import("html2canvas-pro"), import("jspdf"), import("../documents/documentPdf")]);
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
-      const canvases: HTMLCanvasElement[] = [];
-      try {
-        if (weekPage) {
-          const canvas = await html2canvas(weekPage, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-          canvases.push(canvas);
-          addWeekPage(doc, canvas);
-        }
-        for (const [index, paper] of papers.entries()) await addDocumentPages(doc, paper, canvases, index === 0 && !weekPage);
-        doc.save(`microcycle-${week}.pdf`);
-      } finally { releaseCanvases(canvases); }
+      if (weekPage) {
+        const canvas = await html2canvas(weekPage, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+        // Each canvas is released after its page is added, so a long export keeps one page canvas in memory.
+        try { addWeekPage(doc, canvas); } finally { releaseCanvases([canvas]); }
+      }
+      for (const [index, paper] of papers.entries()) await addDocumentPages(doc, paper, index === 0 && !weekPage);
+      doc.save(`microcycle-${week}.pdf`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Грешка при печат.");
     } finally { setBundle(undefined); setBusy(false); }
   }
 
-  const archived = filterGroups((data?.cycles.filter(c => !data.groups.some(g => g.key === c.groupKey)) ?? []).map(c => ({ key: c.groupKey, name: c.groupName })), query);
+  // Archived groups have a saved microcycle, so the filter "Без микроцикъл" hides them.
+  const archived = missingOnly ? [] : filterGroups((data?.cycles.filter(c => !data.groups.some(g => g.key === c.groupKey)) ?? []).map(c => ({ key: c.groupKey, name: c.groupName })), query);
   const coachMode = Boolean(data?.coachView) && byCoach;
   const searching = query.trim() !== "";
   const filteredGroups = data ? data.groups.filter(g => !missingOnly || !data.cycles.some(c => c.groupKey === g.key)) : [];
@@ -344,7 +355,8 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     const response = await fetch(`/api/admin/clubs/${clubId}/training-plans/microcycles/session?${params}`, { method: "DELETE", cache: "no-store" });
     if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? "План-конспектът не може да бъде премахнат.");
     // The training is free again, so it offers to add a plan.
-    setData(current => current && { ...current, cycles: current.cycles.map(cycle => cycle.id !== cycleId ? cycle
+    // Other groups can use the same microcycle and row with a different plan. Only the open group changes.
+    setData(current => current && { ...current, cycles: current.cycles.map(cycle => cycle.id !== cycleId || cycle.groupKey !== selected ? cycle
       : { ...cycle, links: Object.fromEntries(Object.entries(cycle.links).filter(([key]) => key !== rowId)) }) });
     setOpenDocument(undefined);
   }

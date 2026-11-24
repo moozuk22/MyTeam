@@ -8,7 +8,7 @@ import { documentDetail, snapshotDocument } from "@/lib/exercise/documentStorage
 
 import { canLinkTraining, linkTrainingDocument, replacedDocument, sessionOrigin, sessionTarget } from "@/lib/exercise/trainingSession";
 import { coachAuthor, documentOwnerFilter, trainingReference } from "@/lib/exercise/trainingSessionAccess";
-import { documentUsages, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
+import { documentUsageSummary, usageOf, withoutTrainingNumbers } from "@/lib/exercise/trainingUsage";
 
 /** The training already has another plan. When the plan is the coach's own, the editor offers to replace it. */
 function occupiedTraining(error: string, documentId: string | null, extra?: object) {
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     select: { id: true, title: true, updatedAt: true, revision: true, content: true },
   });
   const page = rows.slice(0, 25);
-  const usages = await documentUsages(prisma, clubId, page.map(row => row.id));
-  const documents = page.map(({ content, ...row }) => ({ ...row, preview: summarizeDocument(content), usages: usages.get(row.id) ?? [] }));
+  const { usages, totals } = await documentUsageSummary(prisma, clubId, page.map(row => row.id));
+  const documents = page.map(({ content, ...row }) => ({ ...row, preview: summarizeDocument(content), usages: usages.get(row.id) ?? [], usageCount: totals.get(row.id) ?? 0 }));
   return NextResponse.json({ documents, nextCursor: rows.length > 25 ? documents[24].id : null },
     { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -63,10 +63,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const source = await tx.trainingPlanDocument.findFirst({ where: { id, clubId, ownerId }, select: { id: true } });
       if (!source) throw new TrainingImageError("План-конспектът не е намерен.", 404);
       if (reference.documentId === source.id)
-        return NextResponse.json({ ...source, usages: (await documentUsages(tx, clubId, [source.id])).get(source.id) });
+        return NextResponse.json({ ...source, ...usageOf(await documentUsageSummary(tx, clubId, [source.id]), source.id) });
       if (!canLinkTraining(reference, replace)) return occupiedTraining("За тренировката вече има план-конспект.", reference.documentId);
       await linkTrainingDocument(tx, clubId, target, source.id, reference.occupied);
-      return NextResponse.json({ ...source, usages: (await documentUsages(tx, clubId, [source.id])).get(source.id) }, { status: 201 });
+      return NextResponse.json({ ...source, ...usageOf(await documentUsageSummary(tx, clubId, [source.id]), source.id) }, { status: 201 });
     });
   }
   const forkFrom = body?.forkFrom;
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await linkTrainingDocument(tx, clubId, target, document.id, occupied);
     }
     if (inserted.count) await syncDocumentImages(tx, clubId, document.id, imageIds);
-    const usages = target ? (await documentUsages(tx, clubId, [document.id])).get(document.id) : [];
-    return NextResponse.json({ document: { ...document, usages }, alreadyCreated: !inserted.count }, { status: inserted.count ? 201 : 200 });
+    const usages = target ? usageOf(await documentUsageSummary(tx, clubId, [document.id]), document.id) : { usages: [], usageCount: 0 };
+    return NextResponse.json({ document: { ...document, ...usages }, alreadyCreated: !inserted.count }, { status: inserted.count ? 201 : 200 });
   });
 }

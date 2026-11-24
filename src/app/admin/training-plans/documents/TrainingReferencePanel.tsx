@@ -53,19 +53,21 @@ function ReferenceSkeleton() {
 }
 
 /** The methodist's instructions for the training from the weekly microcycle. They help the coach to fill in the plan. */
-export default function TrainingReferencePanel({ reference, error, refresh, changed, note, group, others = [] }: {
+export default function TrainingReferencePanel({ reference, error, refresh, changed, note, group, missing, others = [] }: {
   reference?: TrainingReference; error: string; refresh: () => void; changed: boolean;
   /** Tells the coach that the plan will be linked to another training. */
   note?: string;
   /** The group of `reference`. It is necessary only when other groups are checked. */
   group?: string;
+  /** True when the group of `reference` has no chosen training. Only the other groups then have instructions. */
+  missing?: boolean;
   /** The instructions of the other checked groups. */
   others?: GroupReference[];
 }) {
   const [open, setOpen] = useState(true);
   const body = useId();
   const title = useId();
-  const entries = others.length ? mergeReferences([{ group: group ?? "", reference, error: error || undefined }, ...others]) : [];
+  const entries = others.length ? mergeReferences([{ group: group ?? "", reference, error: error || undefined, missing }, ...others]) : [];
   const shared = entries.length === 1 && !!entries[0].reference;
   return <section className="td-reference" aria-labelledby={title}>
     <header className="td-reference-header">

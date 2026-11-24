@@ -102,6 +102,8 @@ export default function TrainingPlansClient({
   const [copying, setCopying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const gridRef = useRef<HTMLElement>(null);
+  // A page of the previous filter or search must not join the new list.
+  const pageRequest = useRef<AbortController>(undefined);
   const [previews, setPreviews] = useState<Record<string, Exercise | null>>({});
   const [query, setQuery] = useState(search);
 
@@ -166,6 +168,13 @@ export default function TrainingPlansClient({
     return observePreviews(host, selectedClubId, setPreviews);
   }, [plans, categoryFilter, selectedClubId, isFiltering, listView]);
 
+  // Back and forward navigation also change the filter. The pending page of the old list then stops.
+  useEffect(() => () => {
+    pageRequest.current?.abort();
+    pageRequest.current = undefined;
+    setLoadingMore(false);
+  }, [search, categoryFilter, scope, coachFilter, oldestFirst, selectedClubId]);
+
   const runSearch = useEffectEvent((text: string) => {
     if (text !== search) changeFilter({ text }, true);
   });
@@ -185,11 +194,18 @@ export default function TrainingPlansClient({
     if (oldest) params.set("sort", "oldest");
     if (listView) params.set("view", "list");
     if (text) params.set("q", text);
+    cancelPage();
     startFiltering(() => {
       const url = `/admin/training-plans?${params}`;
       if (replace) router.replace(url, { scroll: false });
       else router.push(url, { scroll: false });
     });
+  }
+
+  function cancelPage() {
+    pageRequest.current?.abort();
+    pageRequest.current = undefined;
+    setLoadingMore(false);
   }
 
   function changeView(list: boolean) {
@@ -209,7 +225,7 @@ export default function TrainingPlansClient({
     setPlans((current) => current.map((plan) =>
       plan.categoryId === id ? { ...plan, categoryId: null } : plan));
     if (categoryFilter === id) changeFilter({ category: "" }, true);
-    else if (categoryFilter === "uncategorized") startFiltering(() => router.refresh());
+    else if (categoryFilter === "uncategorized") { cancelPage(); startFiltering(() => router.refresh()); }
   }
 
   async function loadMore() {
@@ -220,14 +236,17 @@ export default function TrainingPlansClient({
     if (categoryFilter) params.set("category", categoryFilter);
     if (oldestFirst) params.set("sort", "oldest");
     if (search) params.set("search", search);
+    const abort = new AbortController();
+    pageRequest.current = abort;
     setLoadingMore(true);
     setError("");
     try {
       const res = await fetch(
         `/api/admin/clubs/${selectedClubId}/training-plans?${params}`,
-        { cache: "no-store" },
+        { cache: "no-store", signal: abort.signal },
       );
       const payload = await res.json();
+      if (abort.signal.aborted) return;
       if (!res.ok) throw new Error(payload.error || "Грешка при зареждане.");
       setPlans((prev) => [
         ...prev,
@@ -238,9 +257,9 @@ export default function TrainingPlansClient({
       ]);
       setNextCursor(payload.nextCursor ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Грешка при зареждане.");
+      if (!abort.signal.aborted) setError(err instanceof Error ? err.message : "Грешка при зареждане.");
     } finally {
-      setLoadingMore(false);
+      if (!abort.signal.aborted) setLoadingMore(false);
     }
   }
 

@@ -79,7 +79,7 @@ function PrintedHeader({ content }: { content: PlanContent }) {
   </header>;
 }
 
-function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: {
+export function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: {
   content: PlanContent; clubLogoUrl?: string; monochrome: boolean; onReport: DrawingReport; attempt: number;
 }) {
   return <div className="td-printed-row" key={`top:${attempt}:${monochrome}`}>
@@ -89,7 +89,7 @@ function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: 
       <h3>Данни за тренировката</h3>
       <div className="td-printed-session-grid">
         <div className="td-printed-text td-printed-session-period">
-          {([["period", "Период"], ["microcycle", "Микроцикъл"], ["sessionNumber", "Тренировка №"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
+          {([["group", "Група"], ["period", "Период"], ["microcycle", "Микроцикъл"], ["sessionNumber", "Тренировка №"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
         </div>
         <div className="td-printed-session-side">
           <div className="td-printed-session-logo">{clubLogoUrl && <img src={clubLogoUrl} alt="" />}</div>

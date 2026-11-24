@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
-import { mergeReferences } from "./TrainingReferencePanel";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import TrainingReferencePanel, { mergeReferences } from "./TrainingReferencePanel";
 import type { TrainingReference } from "@/lib/exercise/trainingSession";
 
 const reference = (cells: string[], microcycle = "15", sessionNumber = "1"): TrainingReference => ({
@@ -25,4 +27,14 @@ it("shows different instructions, loading groups, and groups without a training 
   ]);
   expect(entries.map(entry => entry.groups)).toEqual([["Група 1", "Група 3"], ["Група 2"], ["Група 4"], ["Група 5"]]);
   expect(entries[3].missing).toBe(true);
+});
+
+it("shows the instructions of an extra group when the main group has no training", () => {
+  const html = renderToStaticMarkup(createElement(TrainingReferencePanel, {
+    error: "", refresh: () => {}, changed: false, group: "Група 1", missing: true,
+    others: [{ group: "Група 2", reference: reference(["Пасове", "", "", "", ""]) }],
+  }));
+  expect(html).toContain("Няма избрана тренировка за групата.");
+  expect(html).toContain("Пасове");
+  expect(html).not.toContain("aria-busy");
 });

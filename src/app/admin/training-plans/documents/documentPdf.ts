@@ -7,18 +7,16 @@ export function documentPdfFilename(title: string) {
 }
 
 export async function createDocumentPdf(paper: HTMLElement): Promise<Blob> {
-  const canvases: HTMLCanvasElement[] = [];
-  try {
-    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
-    await addDocumentPages(pdf, paper, canvases, true);
-    return pdf.output("blob");
-  } finally {
-    releaseCanvases(canvases);
-  }
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+  await addDocumentPages(pdf, paper, true);
+  return pdf.output("blob");
 }
 
-/** Adds the pages of one plan to the PDF. The first page goes on the current PDF page when `first` is true. */
-export async function addDocumentPages(pdf: jsPDF, paper: HTMLElement, canvases: HTMLCanvasElement[], first = false) {
+/**
+ * Adds the pages of one plan to the PDF. The first page goes on the current PDF page when `first` is true.
+ * Each canvas is released after its page is added, so a long export keeps only one page canvas in memory.
+ */
+export async function addDocumentPages(pdf: jsPDF, paper: HTMLElement, first = false) {
   const pageElements = paper.querySelectorAll?.<HTMLElement>(".td-print-page");
   const pages = pageElements?.length ? Array.from(pageElements) : [paper];
   const margin = 8;
@@ -50,9 +48,13 @@ export async function addDocumentPages(pdf: jsPDF, paper: HTMLElement, canvases:
         }
       },
     });
-    canvases.push(canvas);
-    if (index > 0 || !first) pdf.addPage();
-    pdf.addImage(canvas, "PNG", margin, margin, width, height, undefined, "FAST");
+    try {
+      if (index > 0 || !first) pdf.addPage();
+      // jsPDF reads the pixels during addImage, so the canvas is not necessary after it.
+      pdf.addImage(canvas, "PNG", margin, margin, width, height, undefined, "FAST");
+    } finally {
+      releaseCanvases([canvas]);
+    }
   }
 }
 

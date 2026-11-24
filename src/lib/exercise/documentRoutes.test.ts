@@ -22,7 +22,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
 vi.mock("@/lib/exercise/trainingUsage", async (original) => ({
   ...await original<typeof import("./trainingUsage")>(),
-  documentUsages: async (_db: unknown, _club: string, ids: string[]) => new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])),
+  documentUsageSummary: async (_db: unknown, _club: string, ids: string[]) => ({
+    usages: new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])), totals: new Map(ids.map(id => [id, mocks.usages?.(id)?.length ?? 0])),
+  }),
   hasTrainingLinks: async () => mocks.linked?.() ?? false,
 }));
 vi.mock("@/lib/db", () => ({
@@ -131,7 +133,16 @@ describe("training plan documents", () => {
     const body = await (await list(request("GET"), collection)).json();
     expect(body.documents[0]).not.toHaveProperty("content");
     expect(body.documents[0].preview).toMatchObject({ date: "2026-11-19" });
+    expect(body.documents[0]).toMatchObject({ usages: [], usageCount: 0 });
     expect(JSON.stringify(body)).not.toContain("objects");
+  });
+
+  it("gives the exact number of trainings with the plan detail", async () => {
+    mocks.session.mockResolvedValue({ sub: ownerId, roles: ["admin"] });
+    mocks.find.mockResolvedValue({ id: documentId, content: blankDocument("U12"), revision: 2, updatedAt: new Date(0) });
+    mocks.usages.mockReturnValue([{ cycleId: "c", groupKey: "g", rowId: "r", week: "2026-11-23", group: "U12", microcycle: "1", sessionNumber: "1" }]);
+    const body = await (await GET(request("GET"), detail)).json();
+    expect(body.document).toMatchObject({ usageCount: 1, usages: [expect.objectContaining({ rowId: "r" })] });
   });
 
   it("rejects a cross-club coach, untrusted origin and forged drawing before writing", async () => {

@@ -9,30 +9,54 @@ export type TrainingUsage = {
   sessionNumber: string;
 };
 
-/** A plan is linked to a small number of trainings. This limit keeps a list request bounded. */
-const MAX_USAGES = 500;
+/** The examples of trainings for each plan. A plan with more trainings gives the total in `totals`. */
+const MAX_USAGES_PER_DOCUMENT = 100;
 
-type Row = { document_id: string; cycle_id: string; group_key: string; row_id: string; week: string; group_name: string; number: string | null; position: bigint | number | null };
+type Row = { document_id: string; cycle_id: string; group_key: string; row_id: string; week: string; group_name: string; number: string | null; position: bigint | number | null; total: bigint | number };
 
-/** Reads the trainings that use each plan, the latest week first. */
-export async function documentUsages(db: Pick<TrainingImageTx, "$queryRaw">, clubId: string, documentIds: string[]) {
+/**
+ * Reads the trainings that use each plan, the latest week first. The limit applies to each plan separately,
+ * so a plan with many trainings does not hide the trainings of other plans. `totals` gives the exact number for each plan.
+ */
+export async function documentUsageSummary(db: Pick<TrainingImageTx, "$queryRaw">, clubId: string, documentIds: string[]) {
   const usages = new Map<string, TrainingUsage[]>(documentIds.map(id => [id, []]));
-  if (!documentIds.length) return usages;
+  const totals = new Map<string, number>(documentIds.map(id => [id, 0]));
+  if (!documentIds.length) return { usages, totals };
   const rows = await db.$queryRaw<Row[]>`
-    SELECT l.document_id::text AS document_id, l.cycle_id::text AS cycle_id, l.group_key, l.row_id::text AS row_id,
-      c.week, g.group_name, c.content->>'number' AS number,
-      (SELECT r.n FROM jsonb_array_elements(c.content->'rows') WITH ORDINALITY AS r(item, n) WHERE r.item->>'id' = l.row_id::text LIMIT 1) AS position
-    FROM training_session_documents l
-    JOIN training_microcycles c ON c.id = l.cycle_id AND c.club_id = l.club_id
-    JOIN training_microcycle_groups g ON g.cycle_id = l.cycle_id AND g.group_key = l.group_key
-    WHERE l.club_id = ${clubId}::uuid AND l.document_id = ANY(${documentIds}::uuid[])
-    ORDER BY c.week DESC, position ASC
-    LIMIT ${MAX_USAGES}`;
-  for (const row of rows) usages.get(row.document_id)?.push({
-    cycleId: row.cycle_id, groupKey: row.group_key, rowId: row.row_id, week: row.week, group: row.group_name.slice(0, 100),
-    microcycle: (row.number ?? "").slice(0, 40), sessionNumber: row.position === null ? "" : String(row.position),
-  });
-  return usages;
+    WITH links AS (
+      SELECT l.document_id, l.cycle_id::text AS cycle_id, l.group_key, l.row_id::text AS row_id,
+        c.week, g.group_name, c.content->>'number' AS number,
+        (SELECT r.n FROM jsonb_array_elements(c.content->'rows') WITH ORDINALITY AS r(item, n) WHERE r.item->>'id' = l.row_id::text LIMIT 1) AS position
+      FROM training_session_documents l
+      JOIN training_microcycles c ON c.id = l.cycle_id AND c.club_id = l.club_id
+      JOIN training_microcycle_groups g ON g.cycle_id = l.cycle_id AND g.group_key = l.group_key
+      WHERE l.club_id = ${clubId}::uuid AND l.document_id = ANY(${documentIds}::uuid[])
+    ), ranked AS (
+      SELECT links.*, ROW_NUMBER() OVER (PARTITION BY document_id ORDER BY week DESC, position ASC NULLS LAST, cycle_id, row_id) AS n,
+        COUNT(*) OVER (PARTITION BY document_id) AS total
+      FROM links
+    )
+    SELECT document_id::text AS document_id, cycle_id, group_key, row_id, week, group_name, number, position, total
+    FROM ranked WHERE n <= ${MAX_USAGES_PER_DOCUMENT}
+    ORDER BY document_id, n`;
+  for (const row of rows) {
+    totals.set(row.document_id, Number(row.total));
+    usages.get(row.document_id)?.push({
+      cycleId: row.cycle_id, groupKey: row.group_key, rowId: row.row_id, week: row.week, group: row.group_name.slice(0, 100),
+      microcycle: (row.number ?? "").slice(0, 40), sessionNumber: row.position === null ? "" : String(row.position),
+    });
+  }
+  return { usages, totals };
+}
+
+/** The trainings of one plan from a summary: at most 100 examples and the exact number. */
+export function usageOf(summary: Awaited<ReturnType<typeof documentUsageSummary>>, documentId: string) {
+  return { usages: summary.usages.get(documentId) ?? [], usageCount: summary.totals.get(documentId) ?? 0 };
+}
+
+/** Reads the trainings that use each plan, the latest week first, at most 100 for each plan. */
+export async function documentUsages(db: Pick<TrainingImageTx, "$queryRaw">, clubId: string, documentIds: string[]) {
+  return (await documentUsageSummary(db, clubId, documentIds)).usages;
 }
 
 /** True when at least one training uses the plan. */

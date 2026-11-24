@@ -7,7 +7,7 @@ const row = (id: string, text = "") => ({ id, cells: [text, "", "", "", ""] });
 const ROW = "11111111-1111-4111-8111-111111111111";
 const stored: CycleContent = { ...emptyCycle(), season: "2026/2027", half: "Есенен", rows: [row(ROW, "Старо")] };
 const group = { key: "custom:a", name: "Група А" };
-const other = { key: "custom:b", name: "Група Б" };
+const other = { key: "custom:b", name: "Група Б", expected: null };
 
 const tx = {
   trainingMicrocycle: { create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
@@ -20,7 +20,7 @@ function usage(groups: string[], revision = 3) {
   tx.trainingMicrocycleGroup.findUnique.mockResolvedValue({ cycle: { id: "shared", revision, content: stored, groups: groups.map(groupKey => ({ groupKey })) } });
 }
 const input = (values: Partial<CycleSave>): CycleSave => ({
-  clubId: "club", week: "2026-11-23", group, revision: 3, scope: "group", addGroups: [],
+  clubId: "club", week: "2026-11-23", group, cycleId: "shared", revision: 3, scope: "group", addGroups: [],
   content: { ...stored, rows: [row(ROW, "Ново")] }, ...values,
 });
 
@@ -67,16 +67,55 @@ it("rejects a save from an old revision", async () => {
 
 it("adds groups and replaces their own microcycle of the week", async () => {
   usage([group.key]);
-  tx.trainingMicrocycleGroup.findMany.mockResolvedValue([{ cycleId: "old", groupKey: other.key }]);
-  await saveCycle(db, input({ addGroups: [other] }));
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: { id: "old", revision: 2 } }]);
+  tx.trainingMicrocycleGroup.deleteMany.mockResolvedValue({ count: 1 });
+  await saveCycle(db, input({ addGroups: [{ ...other, expected: { id: "old", revision: 2 } }] }));
 
-  expect(tx.trainingMicrocycleGroup.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { clubId: "club", week: "2026-11-23", groupKey: { in: [other.key] }, cycleId: { not: "shared" } } }));
-  expect(tx.trainingMicrocycleGroup.deleteMany).toHaveBeenCalledWith({ where: { clubId: "club", week: "2026-11-23", groupKey: { in: [other.key] } } });
+  // The revision update locks the replaced microcycle at the checked revision.
+  expect(tx.trainingMicrocycle.updateMany).toHaveBeenCalledWith({ where: { id: "old", clubId: "club", revision: 2 }, data: { revision: { increment: 1 } } });
+  // Only the checked membership is deleted.
+  expect(tx.trainingMicrocycleGroup.deleteMany).toHaveBeenCalledWith({ where: { clubId: "club", week: "2026-11-23", cycleId: "old", groupKey: { in: [other.key] } } });
   // The old microcycle is deleted only when no group uses it.
   expect(tx.trainingMicrocycle.deleteMany).toHaveBeenCalledWith({ where: { clubId: "club", id: { in: ["old"] }, groups: { none: {} } } });
   expect(tx.trainingMicrocycleGroup.createMany).toHaveBeenCalledWith({
-    data: [{ cycleId: "shared", clubId: "club", week: "2026-11-23", groupKey: other.key, groupName: other.name }], skipDuplicates: true,
+    data: [{ cycleId: "shared", clubId: "club", week: "2026-11-23", groupKey: other.key, groupName: other.name }],
   });
+});
+
+it("stops when a replaced microcycle changes after the check", async () => {
+  usage([group.key]);
+  const expected = { id: "old", revision: 2 };
+  // Another save changed the microcycle between the check and the lock.
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: expected }]);
+  tx.trainingMicrocycle.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+  await expect(saveCycle(db, input({ addGroups: [{ ...other, expected }] }))).rejects.toBeInstanceOf(CycleConflict);
+  expect(tx.trainingMicrocycleGroup.deleteMany).not.toHaveBeenCalled();
+  // The group moved to another microcycle, so the delete finds no membership.
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: expected }]);
+  tx.trainingMicrocycleGroup.deleteMany.mockResolvedValueOnce({ count: 0 });
+  await expect(saveCycle(db, input({ addGroups: [{ ...other, expected }] }))).rejects.toBeInstanceOf(CycleConflict);
+  expect(tx.trainingMicrocycleGroup.createMany).not.toHaveBeenCalled();
+});
+
+it("stops when an added group got another microcycle after the editor loaded the week", async () => {
+  usage([group.key]);
+  // The editor showed no microcycle for the group, so it gave no replacement warning.
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: { id: "new-b", revision: 1 } }]);
+  await expect(saveCycle(db, input({ addGroups: [other] }))).rejects.toBeInstanceOf(CycleConflict);
+  // A changed revision of the expected microcycle also stops the save.
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: { id: "old", revision: 3 } }]);
+  await expect(saveCycle(db, input({ addGroups: [{ ...other, expected: { id: "old", revision: 2 } }] }))).rejects.toBeInstanceOf(CycleConflict);
+  // The expected microcycle was deleted.
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([]);
+  await expect(saveCycle(db, input({ addGroups: [{ ...other, expected: { id: "old", revision: 2 } }] }))).rejects.toBeInstanceOf(CycleConflict);
+  expect(tx.trainingMicrocycleGroup.deleteMany).not.toHaveBeenCalled();
+  expect(tx.trainingMicrocycleGroup.createMany).not.toHaveBeenCalled();
+});
+
+it("rejects a save when the group now uses another microcycle with the same revision", async () => {
+  usage([group.key, other.key], 3);
+  await expect(saveCycle(db, input({ cycleId: "replaced", scope: "all" }))).rejects.toBeInstanceOf(CycleConflict);
+  expect(tx.trainingMicrocycle.updateMany).not.toHaveBeenCalled();
 });
 
 it("creates one microcycle for the group and the added groups", async () => {
@@ -90,13 +129,16 @@ it("creates one microcycle for the group and the added groups", async () => {
 
 it("removes the microcycle only from the selected group", async () => {
   tx.trainingMicrocycleGroup.findUnique.mockResolvedValue({ cycle: { id: "shared", revision: 3 } });
-  tx.trainingMicrocycleGroup.findMany.mockResolvedValue([{ cycleId: "shared", groupKey: group.key }]);
-  await removeCycle(db, "club", "2026-11-23", group.key, 3);
+  tx.trainingMicrocycleGroup.deleteMany.mockResolvedValue({ count: 1 });
+  await removeCycle(db, "club", "2026-11-23", group.key, "shared", 3);
 
-  expect(tx.trainingMicrocycleGroup.deleteMany).toHaveBeenCalledWith({ where: { clubId: "club", week: "2026-11-23", groupKey: { in: [group.key] } } });
-  expect(tx.trainingMicrocycle.deleteMany).toHaveBeenCalledWith({ where: { clubId: "club", id: { in: ["shared"] }, groups: { none: {} } } });
+  expect(tx.trainingMicrocycleGroup.deleteMany).toHaveBeenCalledWith({ where: { clubId: "club", week: "2026-11-23", groupKey: group.key, cycleId: "shared" } });
+  expect(tx.trainingMicrocycle.deleteMany).toHaveBeenCalledWith({ where: { clubId: "club", id: "shared", groups: { none: {} } } });
   tx.trainingMicrocycleGroup.findUnique.mockResolvedValue({ cycle: { id: "shared", revision: 4 } });
-  await expect(removeCycle(db, "club", "2026-11-23", group.key, 3)).rejects.toBeInstanceOf(CycleConflict);
+  await expect(removeCycle(db, "club", "2026-11-23", group.key, "shared", 3)).rejects.toBeInstanceOf(CycleConflict);
+  // A stale delete does not remove a microcycle that replaced the opened one, also at the same revision.
+  tx.trainingMicrocycleGroup.findUnique.mockResolvedValue({ cycle: { id: "replaced", revision: 3 } });
+  await expect(removeCycle(db, "club", "2026-11-23", group.key, "shared", 3)).rejects.toBeInstanceOf(CycleConflict);
 });
 
 it("reuses a past microcycle with new training IDs and the current season", () => {

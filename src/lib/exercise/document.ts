@@ -49,8 +49,8 @@ export type PlanContent = {
   merge: Merge;
 };
 export type SavedDocument = { originKey?: string | null; id: string; content: PlanContent; revision: number; updatedAt: string;
-  /** The trainings that use the plan. */
-  usages?: TrainingUsage[];
+  /** At most 100 trainings that use the plan. `usageCount` gives the exact number. */
+  usages?: TrainingUsage[]; usageCount?: number;
 };
 export type DocumentPreview = {
   date: string; day: string; time: string; period: string; microcycle: string; sessionNumber: string;
@@ -59,7 +59,10 @@ export type DocumentPreview = {
   duration: string;
   drawings: number;
 };
-export type DocumentSummary = { id: string; title: string; updatedAt: string; revision: number; preview: DocumentPreview | null; usages?: TrainingUsage[] };
+export type DocumentSummary = { id: string; title: string; updatedAt: string; revision: number; preview: DocumentPreview | null;
+  /** Examples of the trainings that use the plan. `usageCount` gives the exact number. */
+  usages?: TrainingUsage[]; usageCount?: number;
+};
 export type DocumentInput = Omit<PlanContent, "sections"> & {
   sections: (SectionFields & { drawing: string | null })[];
 };

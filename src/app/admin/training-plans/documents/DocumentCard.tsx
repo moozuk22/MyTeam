@@ -26,15 +26,17 @@ export function formatUpdated(value: string) {
 }
 
 /** The inside of a plan card: title, tags, details and counts. The caller puts it in a link or a button. */
-export function DocumentCardContent({ item }: { item: Pick<DocumentSummary, "title" | "preview" | "usages"> }) {
+export function DocumentCardContent({ item }: { item: Pick<DocumentSummary, "title" | "preview" | "usages" | "usageCount"> }) {
   const preview = item.preview ?? null;
   const who = [preview?.day, preview?.group, preview?.coach].filter(Boolean).join(" · ");
   // A linked plan shows the trainings that use it. The numbers come from the microcycles.
   const usages = item.usages ?? [];
+  // The list gives only examples. The count is exact.
+  const usageCount = Math.max(item.usageCount ?? 0, usages.length);
   const tags = [
     ...(usages.length
       ? [...usages.slice(0, MAX_USAGE_TAGS).map(usage => `Микроцикъл ${usage.microcycle || "—"} · № ${usage.sessionNumber || "—"}`),
-        usages.length > MAX_USAGE_TAGS && `+${usages.length - MAX_USAGE_TAGS} тренировки`]
+        usageCount > MAX_USAGE_TAGS && `+${usageCount - MAX_USAGE_TAGS} тренировки`]
       : [preview?.sessionNumber && `Тренировка № ${preview.sessionNumber}`, preview?.microcycle && `Микроцикъл ${preview.microcycle}`]),
     preview?.period,
   ].filter(Boolean) as string[];

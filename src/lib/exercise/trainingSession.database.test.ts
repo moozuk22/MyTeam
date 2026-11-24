@@ -73,7 +73,7 @@ describe.skipIf(process.env.TRAINING_SESSION_DB_TEST !== "1")("training document
   });
   it("follows the row after insertion, then unlinks deleted rows without deleting saved documents", async () => {
     const inserted = row();
-    const response = await saveCycle(request("POST", { week, groupKey, revision: 1,
+    const response = await saveCycle(request("POST", { week, groupKey, cycleId, revision: 1,
       content: { ...content, rows: [inserted, ...rows] } }), context);
     expect(response.status).toBe(200);
     const updated = parseCycle((await response.json()).content);
@@ -84,7 +84,7 @@ describe.skipIf(process.env.TRAINING_SESSION_DB_TEST !== "1")("training document
     // The plan does not store the training number. The link gives it from the current row position.
     expect(createdDocument.content.session).toMatchObject({ sessionNumber: "", microcycle: "", group: "Група", date: "", coach: "", season: content.season });
     expect(createdDocument.usages).toMatchObject([{ rowId: rows[2].id, sessionNumber: "4", group: "Група" }]);
-    expect((await saveCycle(request("POST", { week, groupKey, revision: 2, content: { ...updated, rows: [] } }), context)).status).toBe(200);
+    expect((await saveCycle(request("POST", { week, groupKey, cycleId, revision: 2, content: { ...updated, rows: [] } }), context)).status).toBe(200);
     expect((await save(rows[3].id)).status).toBe(410);
     expect((await save(rows[2].id, id)).status).toBe(410);
     expect(await prisma.trainingSessionDocument.count({ where: { cycleId } })).toBe(0);

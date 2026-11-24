@@ -4,34 +4,71 @@ import { currentCompetitionSeason } from "./document";
 import { parseCycle, type CycleContent } from "./microcycle";
 import type { FilterGroup } from "./microcycleGroupFilter";
 
+/**
+ * A group that also gets the saved microcycle. `expected` is the microcycle that the editor showed for the group
+ * (null when the group had none). The save stops when the group now has a different microcycle.
+ */
+export type AddedGroup = FilterGroup & { expected: { id: string; revision: number } | null };
+
 /** A save request. Groups in `addGroups` also use the saved microcycle. Their own microcycle for the week is replaced. */
 export type CycleSave = {
   clubId: string; week: string; group: FilterGroup; revision: number; content: CycleContent;
+  /** The microcycle that the editor opened. It is necessary when `revision` is more than 0. */
+  cycleId?: string;
   /** "group" makes a copy for this group when other groups use the same microcycle. "all" changes it for all groups. */
   scope: "group" | "all";
-  addGroups: FilterGroup[];
+  addGroups: AddedGroup[];
 };
 
 export class CycleConflict extends Error {
   constructor() { super("Микроцикълът е променен. Презаредете страницата."); }
 }
 
-/** Removes the groups from the microcycles that they use in the week, except `keep`. A microcycle without groups is deleted. */
-async function release(tx: Tx, clubId: string, week: string, keys: string[], keep?: string) {
-  if (!keys.length) return;
-  const old = await tx.trainingMicrocycleGroup.findMany({
-    where: { clubId, week, groupKey: { in: keys }, ...(keep ? { cycleId: { not: keep } } : {}) }, select: { cycleId: true, groupKey: true },
-  });
-  if (!old.length) return;
-  // The plan links of these groups are deleted with the group (ON DELETE CASCADE). The plans stay in the library.
-  await tx.trainingMicrocycleGroup.deleteMany({ where: { clubId, week, groupKey: { in: old.map(g => g.groupKey) } } });
-  await tx.trainingMicrocycle.deleteMany({ where: { clubId, id: { in: [...new Set(old.map(g => g.cycleId))] }, groups: { none: {} } } });
+/** Removes one group from the microcycle that it uses in the week. A microcycle without groups is deleted. */
+async function release(tx: Tx, clubId: string, week: string, groupKey: string, cycleId: string) {
+  // The plan links of the group are deleted with the group (ON DELETE CASCADE). The plans stay in the library.
+  const removed = await tx.trainingMicrocycleGroup.deleteMany({ where: { clubId, week, groupKey, cycleId } });
+  if (!removed.count) throw new CycleConflict();
+  await tx.trainingMicrocycle.deleteMany({ where: { clubId, id: cycleId, groups: { none: {} } } });
 }
 
-async function addGroups(tx: Tx, clubId: string, week: string, cycleId: string, groups: FilterGroup[]) {
-  await release(tx, clubId, week, groups.map(g => g.key), cycleId);
+/**
+ * Gives the groups the microcycle `cycleId`. Each change of the groups of a microcycle also increments its revision.
+ * The conditional revision update locks a replaced microcycle, so a save of another user cannot change its groups
+ * between the check and the replacement.
+ */
+async function addGroups(tx: Tx, clubId: string, week: string, cycleId: string, groups: AddedGroup[]) {
+  if (!groups.length) return;
+  // Another user can give a group a microcycle (and plan links) after this editor loaded the week.
+  // The replacement warning was then not shown, so the save stops.
+  const current = await tx.trainingMicrocycleGroup.findMany({
+    where: { clubId, week, groupKey: { in: groups.map(g => g.key) } }, select: { groupKey: true, cycle: { select: { id: true, revision: true } } },
+  });
+  const replaced = new Map<string, { revision: number; keys: string[] }>();
+  const joined: AddedGroup[] = [];
+  for (const group of groups) {
+    const actual = current.find(item => item.groupKey === group.key)?.cycle;
+    if (actual?.id === cycleId) continue;
+    if (!actual ? group.expected !== null : actual.id !== group.expected?.id || actual.revision !== group.expected.revision) throw new CycleConflict();
+    if (actual) {
+      const entry = replaced.get(actual.id) ?? { revision: actual.revision, keys: [] };
+      entry.keys.push(group.key);
+      replaced.set(actual.id, entry);
+    }
+    joined.push(group);
+  }
+  for (const [id, { revision, keys }] of replaced) {
+    const changed = await tx.trainingMicrocycle.updateMany({ where: { id, clubId, revision }, data: { revision: { increment: 1 } } });
+    if (!changed.count) throw new CycleConflict();
+    // The plan links of these groups are deleted with the group (ON DELETE CASCADE). The plans stay in the library.
+    const removed = await tx.trainingMicrocycleGroup.deleteMany({ where: { clubId, week, cycleId: id, groupKey: { in: keys } } });
+    if (removed.count !== keys.length) throw new CycleConflict();
+  }
+  if (replaced.size) await tx.trainingMicrocycle.deleteMany({ where: { clubId, id: { in: [...replaced.keys()] }, groups: { none: {} } } });
+  if (!joined.length) return;
+  // A group that got a microcycle after the check gives a unique key error (P2002), and the save rolls back.
   await tx.trainingMicrocycleGroup.createMany({
-    data: groups.map(g => ({ cycleId, clubId, week, groupKey: g.key, groupName: g.name })), skipDuplicates: true,
+    data: joined.map(g => ({ cycleId, clubId, week, groupKey: g.key, groupName: g.name })),
   });
 }
 
@@ -55,7 +92,8 @@ export async function saveCycle(tx: Tx, input: CycleSave) {
     select: { cycle: { select: { id: true, revision: true, content: true, groups: { select: { groupKey: true } } } } },
   });
   const previous = usage?.cycle;
-  if (!previous || previous.revision !== input.revision) throw new CycleConflict();
+  // Another user can replace the microcycle of the group with one at the same revision. The ID shows the change.
+  if (!previous || previous.id !== input.cycleId || previous.revision !== input.revision) throw new CycleConflict();
   const stored = parseCycle(previous.content);
   content.season = stored.season; content.half = stored.half;
   const existing = new Set(stored.rows.map(row => row.id));
@@ -82,12 +120,12 @@ export async function saveCycle(tx: Tx, input: CycleSave) {
 }
 
 /** Removes the microcycle from one group. The other groups keep it. The last group deletes it. */
-export async function removeCycle(tx: Tx, clubId: string, week: string, groupKey: string, revision: number) {
+export async function removeCycle(tx: Tx, clubId: string, week: string, groupKey: string, cycleId: string, revision: number) {
   const usage = await tx.trainingMicrocycleGroup.findUnique({
     where: { clubId_groupKey_week: { clubId, groupKey, week } }, select: { cycle: { select: { id: true, revision: true } } },
   });
-  if (!usage || usage.cycle.revision !== revision) throw new CycleConflict();
+  if (!usage || usage.cycle.id !== cycleId || usage.cycle.revision !== revision) throw new CycleConflict();
   const changed = await tx.trainingMicrocycle.updateMany({ where: { id: usage.cycle.id, revision }, data: { revision: { increment: 1 } } });
   if (!changed.count) throw new CycleConflict();
-  await release(tx, clubId, week, [groupKey]);
+  await release(tx, clubId, week, groupKey, usage.cycle.id);
 }
