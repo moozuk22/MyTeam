@@ -134,6 +134,8 @@ export default function Workspace({ restore, openGroup, clubId, coachGroupId, in
   const bundleRef = useRef<HTMLDivElement>(null);
   const pendingRestore = useRef(restore);
   const pendingOpen = useRef(restore ? undefined : openGroup);
+  // After a link opens a group, the page scrolls to its microcycle. On a phone the sheet is below the group list.
+  const [scrollToSheet, setScrollToSheet] = useState(false);
   const sheet = useRef<HTMLDivElement>(null);
   const location = new URLSearchParams({ clubId, ...(coachGroupId ? { coachGroupId } : {}) }).toString();
   const endpoint = `/api/admin/clubs/${clubId}/training-plans/microcycles?${location}&week=${week}&version=2`;
@@ -148,7 +150,7 @@ export default function Workspace({ restore, openGroup, clubId, coachGroupId, in
       pendingOpen.current = undefined;
       if (linked) {
         const cycle = value.cycles.find(c => c.groupKey === linked.groupKey);
-        if (cycle) { setSelected(cycle.groupKey); setContent(cycle.content); setRevision(cycle.revision); setCycleId(cycle.id); }
+        if (cycle) { setSelected(cycle.groupKey); setContent(cycle.content); setRevision(cycle.revision); setCycleId(cycle.id); setScrollToSheet(true); }
         else setError(value.groups.some(g => g.key === linked.groupKey) ? "Групата вече няма микроцикъл за тази седмица." : "Групата вече не е налична.");
       }
       const target = pendingRestore.current;
@@ -176,6 +178,11 @@ export default function Workspace({ restore, openGroup, clubId, coachGroupId, in
     row.scrollIntoView({ block: "start" });
     pendingRestore.current = undefined;
   }, [selected, data]);
+  useEffect(() => {
+    if (!scrollToSheet || !selected) return;
+    sheet.current?.closest("section")?.scrollIntoView({ block: "start" });
+    setScrollToSheet(false);
+  }, [scrollToSheet, selected]);
   const navigate = async (fn: () => void) => { if (busy) return; if (!unsaved || await dialogs.confirm("Да се отхвърлят ли незапазените промени?")) fn(); };
   const reset = () => { setDirty(false); setAddGroups([]); setNumberCopiedFrom(""); };
   const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); reset(); });
