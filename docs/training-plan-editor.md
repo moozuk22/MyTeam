@@ -181,6 +181,19 @@ If you only add groups and do not change the text, the save makes no copy. **И�
 
 The `training_microcycles` table holds the content and the revision. The `training_microcycle_groups` table holds one row for each group and week (`club_id`, `group_key`, `week`). Each plan link in `training_session_documents` refers to a group of its microcycle. When the group moves to a copy, PostgreSQL moves its links too (`ON UPDATE CASCADE`). Before the group moves, the save locks the old microcycle with its revision update. A plan link to the old microcycle locks the same row, so the link waits for the save and then gets a conflict, not a database error. When the group stops using the microcycle, PostgreSQL deletes its links. The `20261123120000_shared_training_microcycles` migration moves each existing microcycle to its group. It deletes links of a group that does not use the microcycle, because no page can open these links. A coach view does not show the other groups of a shared microcycle.
 
+### Coach notifications
+
+When a group gets its first microcycle for a week, the coaches of the group get a notification. This occurs for a new save, a save of a past microcycle, and a group that **Използвай и за други групи** adds without a microcycle. A change of a saved microcycle, a replaced microcycle, and a delete do not send a notification.
+
+Only custom training groups have a coach group, so team schedule groups send no notification. Each coach group gets one notification for each save. The title is **Нов микроцикъл**. The text shows the names of the new groups of the coach group and the week, for example `Група 2, Група 10 · 16 – 22 ноември 2026 г.`. The notification has the type `training_microcycle` and the `coachGroupId` of the coach group:
+
+- The notification is in the bell list of the coach group page. The club page does not show it.
+- The coach group gets a push notification on each device that enabled coach notifications for this coach group.
+
+**Отвори микроцикъла** in the bell list and a click on the push notification open `/admin/training-plans/microcycles?clubId=&coachGroupId=&week=&groupKey=`. The page opens the week and the microcycle of the first group in the read-only coach view. If the group has no microcycle in that week any more, the page shows **Групата вече няма микроцикъл за тази седмица.**
+
+The server sends the notifications after the response (`after()` from `next/server`), one coach group at a time. A failed notification is logged and does not change the saved microcycle.
+
 ### Use a past microcycle
 
 Use **Използвай предишен микроцикъл** to open the microcycles of earlier weeks, the newest first. Each item starts with **Микроцикъл №<number>** (or **Микроцикъл без номер**) and the week. In each week, the microcycles of the open group come first and show **Тази група**. Search by group name. The list shows 20 items. Use **Покажи още** to show more, up to offset 1000. A new search stops a pending **Покажи още** request. **Отказ** stops a pending selection, so a late response does not fill the editor. When a selection fails, **Опитай отново** loads the same microcycle again. Select a microcycle to put its content in the editor. If the editor has content, a confirmation dialog opens first. The trainings get new IDs, so the plan links stay with the past week. **Сезон** and **Полусезон** stay from the current week. **Микроцикъл №** gets the number of the past microcycle. The field then shows a warning color, gets the focus, and shows the week that the number came from. The warning goes away when you change the number, save, or open another group or week. Select **Запази** to save the content. `GET …/training-plans/microcycles/history?week=&groupKey=&q=&offset=` gives the list, and `GET …/history?cycleId=` gives the content of one microcycle. A coach view cannot use this endpoint.

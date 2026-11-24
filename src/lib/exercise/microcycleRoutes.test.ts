@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-const mocks = vi.hoisted(() => ({ findMany: vi.fn(), saveCycle: vi.fn(), removeCycle: vi.fn() }));
+const mocks = vi.hoisted(() => ({ findMany: vi.fn(), saveCycle: vi.fn(), removeCycle: vi.fn(), after: vi.fn(), notify: vi.fn() }));
+vi.mock("next/server", async (original) => ({ ...await original(), after: mocks.after }));
+vi.mock("@/lib/push/microcycleNotifications", () => ({ notifyNewMicrocycle: mocks.notify }));
 vi.mock("@/lib/db", () => ({ prisma: { trainingMicrocycleGroup: { findMany: mocks.findMany }, $transaction: (work: (tx: unknown) => unknown) => work("tx") } }));
 vi.mock("@/lib/exercise/access", () => ({ authorizeTraining: vi.fn().mockResolvedValue({ roles: ["admin"] }), findTrainingPlanCoachGroup: vi.fn(), UUID_RE: /./ }));
 vi.mock("@/lib/exercise/microcycleGroups", () => ({ microcycleGroups: vi.fn().mockResolvedValue({ club: { name: "Club" }, groups: [{ key: "custom:a", name: "А" }, { key: "custom:b", name: "Б" }] }) }));
@@ -82,4 +84,19 @@ it("does not ask to check the data when the database fails", async () => {
   expect((await send("DELETE", {})).status).toBe(500);
   // An error in the request data stays a 400.
   expect((await send("POST", { week: "2026-02-30" })).status).toBe(400);
+});
+it("notifies the coaches only of the groups that get their first microcycle", async () => {
+  mocks.saveCycle.mockResolvedValue({ id: "c", revision: 1, content: emptyCycle() });
+  expect((await send("POST", { revision: 0, cycleId: undefined, addGroups: [none("custom:b")] })).status).toBe(201);
+  expect(mocks.after).toHaveBeenCalledTimes(1);
+  await mocks.after.mock.calls[0][0]();
+  expect(mocks.notify).toHaveBeenCalledWith("club", "2026-11-16", ["custom:a", "custom:b"]);
+  // A change of a saved microcycle and a replaced microcycle of an added group send nothing.
+  mocks.after.mockClear();
+  expect((await send("POST", { addGroups: [{ key: "custom:b", cycleId: "old", revision: 4 }] })).status).toBe(200);
+  expect(mocks.after).not.toHaveBeenCalled();
+  // A failed save sends nothing.
+  mocks.saveCycle.mockRejectedValueOnce(new CycleConflict());
+  expect((await send("POST", { revision: 0, cycleId: undefined })).status).toBe(409);
+  expect(mocks.after).not.toHaveBeenCalled();
 });

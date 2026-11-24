@@ -11,6 +11,9 @@ const prismaAdmin = prisma as unknown as {
   };
 };
 
+/** These notifications of a coach group are shown only on the page of that coach group, not in the club view. */
+const COACH_PAGE_ONLY_TYPES = ["admin_message", "myteam_message", "weekly_birthdays", "daily_birthdays", "training_microcycle"];
+
 export async function saveAdminNotificationHistory(input: {
   clubId: string;
   type: string;
@@ -50,7 +53,7 @@ export async function getClubAdminNotifications(input: {
 }) {
   const where: Record<string, unknown> = { clubId: input.clubId };
   if (!input.coachGroupId) {
-    where.NOT = { type: { in: ["admin_message", "myteam_message", "weekly_birthdays", "daily_birthdays"] }, coachGroupId: { not: null } };
+    where.NOT = { type: { in: COACH_PAGE_ONLY_TYPES }, coachGroupId: { not: null } };
   }
   if (input.playerId) {
     where.playerId = input.playerId;
@@ -91,7 +94,7 @@ export async function getClubAdminUnreadCount(input: {
 }) {
   const where: Record<string, unknown> = { clubId: input.clubId, readAt: null };
   if (!input.coachGroupId) {
-    where.NOT = { type: { in: ["admin_message", "myteam_message", "weekly_birthdays", "daily_birthdays"] }, coachGroupId: { not: null } };
+    where.NOT = { type: { in: COACH_PAGE_ONLY_TYPES }, coachGroupId: { not: null } };
   }
   if (input.playerId) {
     where.playerId = input.playerId;
@@ -115,7 +118,7 @@ export async function markClubAdminNotificationsRead(input: {
 }) {
   const where: Record<string, unknown> = { clubId: input.clubId, readAt: null };
   if (!input.coachGroupId) {
-    where.NOT = { type: { in: ["admin_message", "myteam_message", "weekly_birthdays", "daily_birthdays"] }, coachGroupId: { not: null } };
+    where.NOT = { type: { in: COACH_PAGE_ONLY_TYPES }, coachGroupId: { not: null } };
   }
   if (input.playerId) {
     where.playerId = input.playerId;

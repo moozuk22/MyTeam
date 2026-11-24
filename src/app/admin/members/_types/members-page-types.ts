@@ -256,6 +256,7 @@ interface AttendanceReportData {
 
 interface MemberNotification {
   imageUrl?: string | null;
+  url?: string | null;
   id: string;
   type: string;
   title: string;
