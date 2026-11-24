@@ -1,5 +1,8 @@
 "use client";
 
+import BackLink from "./BackLink";
+import SectionNav from "./SectionNav";
+
 import { useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,6 +22,8 @@ import {
   Trash2,
   UserRound,
   Waypoints,
+  Images,
+  Search,
 } from "lucide-react";
 import FinanceSkeleton from "@/app/admin/members/_components/FinanceSkeleton";
 import { useTrainingPlanAccess, trainingSubscriptionInactiveMessage } from "@/lib/exercise/useTrainingPlanAccess";
@@ -60,6 +65,7 @@ export default function TrainingPlansClient({
   initialCategories,
   categoryFilter = "",
   scope,
+  search = "",
   scopeCounts,
   coaches,
   coachFilter,
@@ -73,6 +79,7 @@ export default function TrainingPlansClient({
   initialCategories: readonly CategoryOption[];
   categoryFilter?: string;
   scope: "mine" | "club";
+  search?: string;
   scopeCounts?: { mine: number; club: number };
   coaches: readonly (ClubOption & { _count?: { trainingPlans: number } })[];
   coachFilter: string;
@@ -95,7 +102,10 @@ export default function TrainingPlansClient({
   const [copying, setCopying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const gridRef = useRef<HTMLElement>(null);
+  // A page of the previous filter or search must not join the new list.
+  const pageRequest = useRef<AbortController>(undefined);
   const [previews, setPreviews] = useState<Record<string, Exercise | null>>({});
+  const [query, setQuery] = useState(search);
 
   if (serverPlans !== initialPlans) {
     setServerPlans(initialPlans);
@@ -158,8 +168,23 @@ export default function TrainingPlansClient({
     return observePreviews(host, selectedClubId, setPreviews);
   }, [plans, categoryFilter, selectedClubId, isFiltering, listView]);
 
+  // Back and forward navigation also change the filter. The pending page of the old list then stops.
+  useEffect(() => () => {
+    pageRequest.current?.abort();
+    pageRequest.current = undefined;
+    setLoadingMore(false);
+  }, [search, categoryFilter, scope, coachFilter, oldestFirst, selectedClubId]);
+
+  const runSearch = useEffectEvent((text: string) => {
+    if (text !== search) changeFilter({ text }, true);
+  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => runSearch(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   function changeFilter(
-    { category = categoryFilter, nextScope = scope, coach = coachFilter, oldest = oldestFirst } = {},
+    { category = categoryFilter, nextScope = scope, coach = coachFilter, oldest = oldestFirst, text = query.trim() } = {},
     replace = false,
   ) {
     const params = trainingPlanSearch(selectedClubId, coachGroupId);
@@ -168,11 +193,19 @@ export default function TrainingPlansClient({
     else if (coach) params.set("coachId", coach);
     if (oldest) params.set("sort", "oldest");
     if (listView) params.set("view", "list");
+    if (text) params.set("q", text);
+    cancelPage();
     startFiltering(() => {
       const url = `/admin/training-plans?${params}`;
       if (replace) router.replace(url, { scroll: false });
       else router.push(url, { scroll: false });
     });
+  }
+
+  function cancelPage() {
+    pageRequest.current?.abort();
+    pageRequest.current = undefined;
+    setLoadingMore(false);
   }
 
   function changeView(list: boolean) {
@@ -192,7 +225,7 @@ export default function TrainingPlansClient({
     setPlans((current) => current.map((plan) =>
       plan.categoryId === id ? { ...plan, categoryId: null } : plan));
     if (categoryFilter === id) changeFilter({ category: "" }, true);
-    else if (categoryFilter === "uncategorized") startFiltering(() => router.refresh());
+    else if (categoryFilter === "uncategorized") { cancelPage(); startFiltering(() => router.refresh()); }
   }
 
   async function loadMore() {
@@ -202,14 +235,18 @@ export default function TrainingPlansClient({
     else if (coachFilter) params.set("coachId", coachFilter);
     if (categoryFilter) params.set("category", categoryFilter);
     if (oldestFirst) params.set("sort", "oldest");
+    if (search) params.set("search", search);
+    const abort = new AbortController();
+    pageRequest.current = abort;
     setLoadingMore(true);
     setError("");
     try {
       const res = await fetch(
         `/api/admin/clubs/${selectedClubId}/training-plans?${params}`,
-        { cache: "no-store" },
+        { cache: "no-store", signal: abort.signal },
       );
       const payload = await res.json();
+      if (abort.signal.aborted) return;
       if (!res.ok) throw new Error(payload.error || "Грешка при зареждане.");
       setPlans((prev) => [
         ...prev,
@@ -220,9 +257,9 @@ export default function TrainingPlansClient({
       ]);
       setNextCursor(payload.nextCursor ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Грешка при зареждане.");
+      if (!abort.signal.aborted) setError(err instanceof Error ? err.message : "Грешка при зареждане.");
     } finally {
-      setLoadingMore(false);
+      if (!abort.signal.aborted) setLoadingMore(false);
     }
   }
 
@@ -306,12 +343,12 @@ export default function TrainingPlansClient({
     <main className="tp-page tp-library">
       <div className="tp-inner">
         <header className="tp-header">
-          <Link className="tp-back-btn" href={membersHref}>
+          <BackLink className="tp-back-btn" href={membersHref}>
             <ArrowLeft size={16} />
             <span>Назад</span>
-          </Link>
+          </BackLink>
           <div className="tp-heading">
-            <h1 className="tp-title"><Waypoints aria-hidden="true" />Планове за тренировки</h1>
+            <h1 className="tp-title"><Images aria-hidden="true" />Библиотека с упражнения</h1>
             <p>{selectedClub?.name ?? "Няма избран отбор"}</p>
           </div>
           <button
@@ -332,16 +369,21 @@ export default function TrainingPlansClient({
           </div>
         )}
 
-        {selectedClubId && (
-          <nav className="tp-document-nav" aria-label="Тренировъчни документи">
-            <Link className="tp-secondary-btn" href={`/admin/training-plans/documents?${location}`}>
-              План-конспекти
-            </Link>
-          </nav>
-        )}
+        {selectedClubId && <SectionNav location={location.toString()} current="drawings" />}
 
         {selectedClubId && (
           <div className="tp-category-controls">
+            <label className="tp-field tp-category-filter tp-search">
+              <span><Search size={17} aria-hidden="true" />Търсене по заглавие</span>
+              <input
+                type="search"
+                maxLength={200}
+                value={query}
+                placeholder="Търси упражнение"
+                enterKeyHint="search"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
             <div className="tp-scope-controls" role="group" aria-label="Автор на плана">
               {(["mine", "club"] as const).map((option) => (
                 <button
@@ -424,7 +466,7 @@ export default function TrainingPlansClient({
           ) : visiblePlans.length === 0 ? (
             <div className="tp-empty">
               <ClipboardList size={28} />
-              <p>{scope === "mine"
+              <p>{search ? "Няма упражнения, които отговарят на търсенето." : scope === "mine"
                 ? categoryFilter ? "Нямате планове в тази категория." : "Все още нямате създадени планове."
                 : coachFilter ? "Няма планове на този треньор за избрания филтър."
                 : categoryFilter ? "Няма планове в тази категория." : "Все още няма планове за този отбор."}</p>

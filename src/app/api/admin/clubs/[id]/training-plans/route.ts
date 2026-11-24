@@ -12,7 +12,7 @@ import {
 import { isTrainingPlanCategoryAvailable } from "@/lib/exercise/categories";
 import { listTrainingPlans } from "@/lib/exercise/queries";
 import type { PlanLayout } from "@/lib/trainingPlans";
-import { DEFAULT_LAYOUT } from "@/lib/trainingPlans";
+import { DEFAULT_LAYOUT, MAX_PLAN_REQUIREMENTS_LENGTH } from "@/lib/trainingPlans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,6 +104,13 @@ export async function POST(
       { status: 400 },
     );
   }
+  let requirements = normalizeDescription(body.requirements);
+  if (requirements && requirements.length > MAX_PLAN_REQUIREMENTS_LENGTH) {
+    return NextResponse.json(
+      { error: "Изискванията са твърде дълги." },
+      { status: 400 },
+    );
+  }
 
   let categoryId: string | null = null;
   if (body.categoryId !== undefined && body.categoryId !== null) {
@@ -134,7 +141,7 @@ export async function POST(
         );
       const source = await tx.trainingPlan.findFirst({
         where: { id: body.sourcePlanId, clubId: id },
-        select: { layout: true, categoryId: true },
+        select: { layout: true, categoryId: true, requirements: true },
       });
       if (!source)
         return NextResponse.json(
@@ -142,6 +149,7 @@ export async function POST(
           { status: 404 },
         );
       if (!Object.hasOwn(body, "categoryId")) categoryId = source.categoryId;
+      if (!Object.hasOwn(body, "requirements")) requirements = source.requirements;
       const sourceError = validateSavedLayout(source.layout);
       if (sourceError)
         return NextResponse.json({ error: sourceError }, { status: 400 });
@@ -173,6 +181,7 @@ export async function POST(
         clubId: id,
         title,
         description,
+        requirements,
         categoryId,
         layout: stored.layout,
         backgroundImageId: stored.backgroundImageId,
@@ -185,6 +194,7 @@ export async function POST(
         id: true,
         title: true,
         description: true,
+        requirements: true,
         categoryId: true,
         creatorName: true,
         updatedAt: true,

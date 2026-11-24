@@ -14,7 +14,7 @@ vi.mock("react", async (original) => ({
 import { BrowserDialogProvider } from "./BrowserDialogProvider";
 
 type Request = { finish: (result: boolean | string | null | undefined) => void };
-type Open = (kind: "alert" | "confirm" | "prompt", message: string, initial: string, signal: AbortSignal) => Promise<unknown>;
+type Open = (kind: "alert" | "confirm" | "prompt", message: string, initial: string, signal: AbortSignal, options?: { title?: string; confirmLabel?: string }) => Promise<unknown>;
 function setup() {
   const provider = BrowserDialogProvider({ children: null });
   const open = (provider.props as { value: Open }).value;
@@ -79,4 +79,12 @@ it("cancels active and queued requests when the provider is removed", async () =
   await expect(first).resolves.toBeUndefined();
   await expect(second).resolves.toBeUndefined();
   expect(current()).toBeNull();
+});
+
+it("keeps custom confirmation labels on the request", async () => {
+  const { open, signal, current } = setup();
+  const result = open("confirm", "Да излезете ли?", "", signal, { title: "Незапазени промени", confirmLabel: "Излез" });
+  expect(current()).toMatchObject({ options: { title: "Незапазени промени", confirmLabel: "Излез" } });
+  current()!.finish(true);
+  await expect(result).resolves.toBe(true);
 });

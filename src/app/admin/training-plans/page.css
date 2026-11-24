@@ -98,9 +98,9 @@
 }
 
 .tp-page .tp-danger-btn {
-  color: #ffd3d1;
-  background: #582f31;
-  border-color: #985658;
+  color: var(--plan-danger-text);
+  background: var(--plan-danger-bg);
+  border-color: var(--plan-danger-border);
 }
 
 .tp-page .tp-icon-btn {
@@ -125,7 +125,69 @@
   }
 }
 
-.tp-document-nav { margin-bottom: 12px; }
+/* The three main pages of the training plans: one segmented bar under the page header. */
+.tp-section-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border: 1px solid var(--plan-border);
+  border-radius: 14px;
+  background: var(--plan-field);
+}
+
+.tp-page .tp-section-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  color: var(--plan-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.tp-page .tp-section-nav a[aria-current="page"] {
+  background: var(--plan-selected);
+  color: var(--plan-accent);
+  box-shadow: inset 0 0 0 1px var(--plan-accent-border);
+}
+
+.tp-page .tp-section-nav a:focus-visible {
+  outline: 2px solid var(--plan-accent);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) {
+  .tp-page .tp-section-nav a:not([aria-current="page"]):hover {
+    background: var(--plan-selected);
+    color: var(--plan-text);
+  }
+}
+
+@media (min-width: 640px) {
+  .tp-section-nav {
+    display: inline-grid;
+    grid-template-columns: repeat(3, auto);
+  }
+
+  .tp-page .tp-section-nav a {
+    flex-direction: row;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+  }
+}
 
 .tp-category-controls {
   display: grid;
@@ -503,57 +565,38 @@ body:has(.tp-overlay, .tp-category-manager[open]) {
 
 }
 
-/* Training plans library */
-.tp-page:is(.tp-library, .tp-review, .td-page) {
-  --plan-bg: radial-gradient(ellipse at 91% 79%, #10241c 0%, transparent 37%), #0a1412;
-  --plan-panel: #13221d;
-  --plan-card: #0e1c18;
-  --plan-field: #0b1714;
-  --plan-border: #2b4138;
-  --plan-text: #f3f7f4;
-  --plan-muted: #c5d0ca;
-  --plan-accent: #b9f5b5;
-  --plan-accent-border: #2b8539;
-  --plan-selected: #173b25;
+/* Shared page shell for every training-plan page. */
+.tp-page {
   padding: 18px 14px 44px;
 }
 
-:is(.tp-library, .td-page) .tp-inner {
-  width: 100%;
+.tp-page .tp-inner {
+  width: min(1280px, 100%);
 }
 
-:is(.tp-library, .td-page) .tp-header {
-  padding-bottom: 5px;
+.tp-page .tp-header {
+  padding-bottom: 14px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--plan-border);
 }
 
-:is(.tp-library, .td-page) .tp-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: none;
-  color: var(--plan-text);
+.tp-page .tp-heading::after {
+  display: none;
+}
+
+.tp-page .tp-title {
   font-size: clamp(1.4rem, 3vw, 2.125rem);
-  font-weight: 750;
 }
 
-:is(.tp-library, .td-page) .tp-title svg {
-  flex: none;
-  width: 1.05em;
-  height: 1.05em;
-  color: #68db68;
-}
-
-:is(.tp-library, .td-page) .tp-heading p {
+.tp-page .tp-heading p {
   color: var(--plan-text);
   font-size: 1rem;
   font-weight: 600;
 }
 
-.tp-page:is(.tp-library, .tp-review, .td-page) .tp-primary-btn {
-  background: #11421d;
-  color: #dcfbd8;
+.tp-page .tp-primary-btn {
+  background: var(--plan-primary-bg);
+  color: var(--plan-primary-text);
 }
 
 .tp-library .tp-category-controls {
@@ -891,10 +934,6 @@ body:has(.tp-overlay, .tp-category-manager[open]) {
   }
 }
 
-.tp-review .tp-inner {
-  width: 100%;
-}
-
 .tp-review-heading {
   display: grid;
   justify-items: start;
@@ -903,22 +942,6 @@ body:has(.tp-overlay, .tp-category-manager[open]) {
   padding-block: 12px 10px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--plan-border);
-}
-
-.tp-review-heading .tp-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  color: var(--plan-text);
-  background: none;
-}
-
-.tp-review-heading .tp-title svg {
-  flex: none;
-  width: 1.15em;
-  height: 1.15em;
-  color: #65dd65;
 }
 
 .tp-review-heading .tp-category-label {
@@ -1183,4 +1206,14 @@ body:has(.tp-review-dialog[open]) {
   .tp-review-tabs button {
     min-width: 123px;
   }
+}
+
+.tp-library .tp-search {
+  grid-column: 1 / -1;
+}
+
+.tp-library .tp-search input {
+  border-radius: 10px;
+  background: var(--plan-field);
+  color: var(--plan-text);
 }

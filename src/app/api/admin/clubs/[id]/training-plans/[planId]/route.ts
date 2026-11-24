@@ -5,6 +5,7 @@ import { readEditableTrainingPlan, removeUnusedImages, storeDrawingImage, Traini
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 import { isTrainingPlanCategoryAvailable } from "@/lib/exercise/categories";
 import { isV2, layoutVersion, validateSavedLayout } from "@/lib/exercise/model";
+import { MAX_PLAN_REQUIREMENTS_LENGTH } from "@/lib/trainingPlans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ export async function GET(
         clubId: true,
         title: true,
         description: true,
+        requirements: true,
         categoryId: true,
         layout: true,
         updatedAt: true,
@@ -85,6 +87,7 @@ export async function PUT(
   const data: {
     title?: string;
     description?: string | null;
+    requirements?: string | null;
     categoryId?: string | null;
     layout?: Prisma.InputJsonValue;
     updatedByUserId: string | null;
@@ -116,6 +119,17 @@ export async function PUT(
       );
     }
     data.description = description;
+  }
+
+  if (Object.hasOwn(body, "requirements")) {
+    const requirements = normalizeDescription(body.requirements);
+    if (requirements && requirements.length > MAX_PLAN_REQUIREMENTS_LENGTH) {
+      return NextResponse.json(
+        { error: "Изискванията са твърде дълги." },
+        { status: 400 },
+      );
+    }
+    data.requirements = requirements;
   }
 
   if (Object.hasOwn(body, "categoryId")) {
@@ -181,6 +195,7 @@ export async function PUT(
         id: true,
         title: true,
         description: true,
+        requirements: true,
         categoryId: true,
         layout: true,
         createdAt: true,

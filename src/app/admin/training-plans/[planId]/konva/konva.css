@@ -2,16 +2,7 @@
 
 
 .ke-page {
-  --plan-bg: #0b1111;
-  --plan-panel: #131c1c;
-  --plan-card: #101818;
-  --plan-field: #151f1f;
-  --plan-border: #2b3939;
-  --plan-muted: #b6c2bf;
-  --plan-accent: #a9ef99;
-  --plan-accent-border: #67b758;
-  --plan-selected: #19361d;
-  --ke-save: #83ee70;
+  --ke-save: var(--plan-icon);
   min-height: 100dvh;
   padding: 10px;
   box-sizing: border-box;
@@ -43,7 +34,7 @@
   gap: 6px;
   min-height: 44px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--plan-border);
   background: var(--plan-field);
   cursor: pointer;
@@ -61,16 +52,18 @@
   color: var(--plan-accent);
 }
 .ke-page button.ke-primary {
-  background: var(--ke-save);
-  color: #0b210d;
-  border-color: var(--ke-save);
+  background: var(--plan-primary-bg);
+  color: var(--plan-primary-text);
+  border-color: var(--plan-accent-border);
   font-weight: 700;
 }
 .ke-page button.ke-primary:disabled {
-  background: #345b32;
-  border-color: #456c42;
-  color: #dae9d7;
-  opacity: 1;
+  opacity: 0.55;
+}
+@media (hover: hover) {
+  .ke-page button.ke-primary:not(:disabled):hover {
+    background: rgba(50, 205, 50, 0.28);
+  }
 }
 @media (hover: hover) {
   .ke-page button:not(:disabled):not([aria-pressed]):not(.ke-primary):hover {
@@ -122,9 +115,6 @@
   line-height: 1.15;
   letter-spacing: -0.02em;
   font-weight: 750;
-}
-.ke-header-bar h1 svg {
-  color: var(--ke-save);
 }
 .ke-page .ke-back {
   justify-self: start;
@@ -238,7 +228,7 @@
   margin: 6px 0;
 }
 .ke-page a {
-  color: #c4fa82;
+  color: var(--plan-accent);
 }
 .ke-error {
   color: #ffaaaa;
@@ -859,7 +849,7 @@ body:has(:is(.ke-dialog, .ke-tools-sheet)[open]) {
   }
   .ke-plan-details {
     flex: 1;
-    grid-template-rows: auto auto minmax(min-content, 1fr);
+    grid-template-rows: auto auto repeat(2, minmax(min-content, 1fr));
   }
   .ke-plan-description {
     grid-template-rows: auto 1fr;

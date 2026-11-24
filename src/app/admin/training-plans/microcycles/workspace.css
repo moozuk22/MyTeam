@@ -1,0 +1,380 @@
+/* Weekly microcycle page. Theme tokens and the page shell come from ../workspace.css and ../page.css. */
+.mc-page .tp-heading p { min-height: 1.5em; }
+
+/* Week selector */
+.mc-week {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--plan-border);
+  border-radius: 16px;
+  background: var(--plan-card);
+}
+.mc-week-label { display: grid; justify-items: center; text-align: center; min-width: 0; }
+.mc-week-label span { color: var(--plan-muted); font-size: .8125rem; font-weight: 600; }
+.mc-week-label strong { font-size: 1.0625rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.mc-week-today { grid-column: 1 / -1; }
+
+.mc-section-title { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; color: var(--plan-muted); font-size: .875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Group cards */
+.mc-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 10px; }
+.mc-page .mc-group {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 10px;
+  min-height: 88px;
+  padding: 14px;
+  border: 1px solid var(--plan-border);
+  border-radius: 12px;
+  background: var(--plan-card);
+  color: var(--plan-text);
+  text-align: left;
+  cursor: pointer;
+}
+.mc-group strong { font-size: 1.0625rem; line-height: 1.35; overflow-wrap: anywhere; }
+.mc-page .mc-group[aria-pressed="true"] { border-color: var(--plan-accent-border); background: linear-gradient(120deg, #134c22, #17602a); box-shadow: inset 0 0 0 1px var(--plan-accent-border); }
+@media (hover: hover) { .mc-page .mc-group:not(:disabled):not([aria-pressed="true"]):hover { border-color: var(--plan-accent-border); } }
+.mc-chip { display: inline-flex; align-items: center; min-height: 26px; padding: 2px 10px; border: 1px dashed var(--plan-border); border-radius: 999px; color: var(--plan-muted); font-size: .8125rem; font-weight: 600; }
+.mc-chip--saved { border-style: solid; border-color: var(--plan-accent-border); background: var(--plan-selected); color: var(--plan-accent); }
+.mc-group[aria-pressed="true"] .mc-chip { background: #0d2f17; }
+.mc-group-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mc-shared-badge { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 2px 8px; border-radius: 999px; background: #ffffff10; color: var(--plan-muted); font-size: .8125rem; font-weight: 700; }
+
+/* Search and "По треньори" view toggle above the group cards */
+.mc-filters { margin-bottom: 12px; }
+/* Quick filters: a row of pill toggles below the view buttons and the search. */
+.mc-quick-filters { display: flex; flex-wrap: wrap; gap: 8px; grid-column: 1 / -1; }
+.mc-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 8px 6px 12px; border: 1px solid var(--plan-border); border-radius: 999px; background: transparent; color: var(--plan-muted); font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; }
+.mc-filter-chip > svg { flex: none; }
+.mc-filter-chip:hover { border-color: var(--plan-accent-border); color: var(--plan-text); }
+.mc-filter-chip[aria-pressed="true"] { border-color: var(--plan-accent-border); background: var(--plan-selected); color: var(--plan-accent); }
+.mc-filter-count { min-width: 24px; padding: 1px 7px; border-radius: 999px; background: #ffffff14; color: var(--plan-text); font-size: .8125rem; text-align: center; }
+.mc-filter-chip[aria-pressed="true"] .mc-filter-count { background: var(--plan-accent-border); color: #fff; }
+.mc-filters .tp-scope-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+.mc-page .mc-search { margin: 0; }
+.mc-search > span { display: inline-flex; align-items: center; gap: 6px; }
+@media (min-width: 720px) {
+  .mc-filters:has(.tp-scope-controls) { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+/* Coach cards. An open card stays in its grid column and shows the coach's groups inside it.
+   Cards align to the top, so a closed card does not grow to the height of an open card in the same row. */
+.mc-groups:has(> .mc-coach) { align-items: start; }
+.mc-coach { min-width: 0; border: 1px solid var(--plan-border); border-radius: 12px; background: var(--plan-card); }
+.mc-coach--open { border-color: var(--plan-accent-border); }
+.mc-page .mc-coach-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 88px;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--plan-text);
+  text-align: left;
+  cursor: pointer;
+}
+.mc-coach-text { display: grid; justify-items: start; gap: 10px; min-width: 0; }
+.mc-coach-text strong { font-size: 1.0625rem; line-height: 1.35; overflow-wrap: anywhere; }
+.mc-coach-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mc-coach-icon { flex: none; color: var(--plan-muted); transition: transform .2s ease; }
+.mc-coach--open .mc-coach-icon { transform: rotate(180deg); }
+.mc-coach-groups { padding: 0 14px 14px; }
+@media (hover: hover) { .mc-coach:not(.mc-coach--open):hover { border-color: var(--plan-accent-border); } }
+@media (prefers-reduced-motion: reduce) { .mc-coach-icon { transition: none; } }
+
+/* Skeleton */
+.mc-group--skeleton { cursor: default; }
+.mc-line { position: relative; display: block; overflow: hidden; height: 14px; border: 1px solid rgba(148, 174, 141, .14); border-radius: 999px; background: rgba(148, 174, 141, .12); }
+.mc-line::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(201, 222, 187, .09) 50%, transparent 80%); transform: translateX(-100%); animation: tp-shimmer 1.8s ease-in-out infinite; }
+.mc-line--name { width: 60%; height: 18px; }
+.mc-line--chip { width: 45%; height: 26px; }
+.mc-line--title { display: inline-block; width: 12rem; max-width: 70%; height: 16px; vertical-align: middle; }
+@media (prefers-reduced-motion: reduce) { .mc-line::after { animation: none; } }
+
+/* Editor */
+.mc-editor { margin-top: 22px; }
+.mc-sheet { padding: clamp(12px, 2vw, 20px); border: 1px solid var(--plan-border); border-radius: 16px; background: var(--plan-panel); color: var(--plan-text); }
+.mc-sheet-header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 6px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--plan-border); }
+.mc-sheet-header h2 { margin: 0; font-size: clamp(1.15rem, 2.4vw, 1.5rem); overflow-wrap: anywhere; }
+.mc-sheet-club { margin: 0 0 2px; color: var(--plan-muted); font-size: .875rem; font-weight: 600; overflow-wrap: anywhere; }
+.mc-sheet-week { margin: 0; color: var(--plan-accent); font-weight: 700; }
+
+.mc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; margin-top: 14px; }
+.mc-field { display: grid; align-content: start; gap: 5px; min-width: 0; }
+/* A copied "Микроцикъл №" asks the methodist to check it, like a warning. */
+.mc-page .mc-sheet .mc-field--warning input { border-color: var(--plan-warning-border); background: var(--plan-warning-bg); box-shadow: 0 0 0 1px var(--plan-warning-border); }
+.mc-field--warning > span { color: var(--plan-warning-text); }
+.mc-field-warning { color: var(--plan-warning-text); font-size: .8125rem; font-weight: 600; line-height: 1.35; }
+.mc-field > span, .mc-cell-label { color: var(--plan-muted); font-size: .8125rem; font-weight: 600; }
+.mc-page .mc-sheet :is(input, textarea) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--plan-border);
+  border-radius: 10px;
+  background: var(--plan-field);
+  color: var(--plan-text);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.mc-sheet textarea { resize: vertical; }
+
+/* Groups that use the microcycle, and the tools that fill it from another group or week. */
+.mc-share { display: grid; gap: 10px; margin-top: 14px; padding: 12px; border: 1px solid var(--plan-border); border-radius: 12px; background: var(--plan-card); }
+.mc-share-text { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: var(--plan-muted); font-size: .875rem; overflow-wrap: anywhere; }
+.mc-share-text svg { flex: none; margin-top: 2px; color: var(--plan-accent); }
+.mc-share-text strong { color: var(--plan-text); }
+.mc-share-added { display: grid; gap: 6px; color: var(--plan-muted); font-size: .875rem; font-weight: 600; }
+.mc-share-added ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.mc-share-added .mc-chip { gap: 2px; padding-right: 2px; overflow-wrap: anywhere; }
+.mc-chip-remove { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -4px 0; padding: 0; border: 0; border-radius: 999px; background: none; color: inherit; cursor: pointer; }
+.mc-chip-remove:hover { background: #ffffff14; }
+.mc-chip-remove:focus-visible { outline: 2px solid var(--plan-accent); outline-offset: -2px; }
+.mc-page .mc-sheet .mc-share-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mc-share-actions > * { flex: 1 1 14rem; justify-content: center; }
+.mc-dialog-search { margin: 0 14px 10px !important; }
+.mc-past-option { width: 100%; align-items: center; color: var(--plan-text); font: inherit; text-align: left; cursor: pointer; }
+.mc-print-option.mc-scope-all { display: grid; gap: 10px; }
+.mc-scope-choice { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: -10px -12px 0; padding: 10px 12px; width: calc(100% + 24px); border: 0; border-radius: 10px 10px 0 0; background: none; color: var(--plan-text); font: inherit; text-align: left; cursor: pointer; }
+.mc-scope-choice > svg { flex: none; color: var(--plan-accent); }
+.mc-scope-choice > span { display: grid; gap: 2px; min-width: 0; }
+.mc-scope-choice small { color: var(--plan-muted); overflow-wrap: anywhere; }
+.mc-scope-choice:focus-visible { outline: 2px solid var(--plan-accent); outline-offset: -2px; }
+.mc-scope-all:has(.mc-scope-choice:hover) { border-color: var(--plan-accent-border); }
+.mc-scope-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.mc-scope-groups .mc-chip { overflow-wrap: anywhere; }
+.mc-scope-more { justify-self: start; }
+.mc-past-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.mc-past-title strong { color: var(--plan-accent); }
+.mc-past-title span { color: var(--plan-text); font-weight: 600; }
+.mc-past-option > svg { flex: none; color: var(--plan-accent); }
+.mc-past-option:hover:not(:disabled) { border-color: var(--plan-accent-border); }
+.mc-past-option:focus-visible { outline: 2px solid var(--plan-accent); outline-offset: 2px; }
+.mc-past-option[aria-busy="true"] { border-color: var(--plan-accent); background: var(--plan-selected); }
+.mc-sheet :is(input, textarea):read-only { border-color: transparent; }
+
+.mc-table { margin-top: 16px; overflow-x: auto; border: 1px solid var(--plan-border); border-radius: 12px; }
+.mc-table table { width: 100%; min-width: 900px; border-collapse: collapse; }
+.mc-table :is(th, td) { padding: 8px; border: 1px solid var(--plan-border); vertical-align: top; }
+.mc-table thead th { background: var(--plan-selected); color: var(--plan-accent); font-size: .875rem; text-align: center; }
+.mc-table tr > :first-child { border-left: 0; }
+.mc-table tr > :last-child { border-right: 0; }
+.mc-table thead tr:first-child > * { border-top: 0; }
+.mc-table tbody tr:last-child > * { border-bottom: 0; }
+.mc-table tbody th { background: var(--plan-card); }
+.mc-col-num { width: 64px; }
+.mc-row-title { display: block; text-align: center; font-weight: 750; font-size: 1.0625rem; }
+.mc-row-label { display: none; }
+.mc-page .mc-remove { margin: 8px auto 0; color: var(--plan-danger-text); }
+/* The script sets the height of the fields to the height of their text. */
+.mc-page .mc-table td textarea { min-height: 72px; overflow: hidden; resize: none; }
+.mc-cell-label { display: none; }
+.mc-empty-row td { padding: 28px 16px; color: var(--plan-muted); text-align: center; }
+.mc-page .mc-add { margin-top: 12px; width: 100%; border-style: dashed; }
+
+.mc-actions { position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, #0a1412 30%); }
+.mc-actions-spacer { flex: 1 1 0; }
+.mc-dirty { color: #f3d68a; font-size: .875rem; font-weight: 600; }
+
+@media (min-width: 640px) {
+  .mc-page .tp-header { grid-template-columns: minmax(0, 1fr) auto; }
+  .mc-page .tp-heading { grid-column: 1; }
+  .mc-week { grid-template-columns: auto auto auto 1fr; justify-content: start; }
+  .mc-week-label { justify-items: start; text-align: left; min-width: 15rem; padding-inline: 6px; }
+  .mc-week-today { grid-column: 4; justify-self: end; }
+}
+
+/* Phones: each training becomes a card with labelled fields. */
+@media (max-width: 639px) {
+  .mc-table { border: 0; overflow: visible; }
+  .mc-table table { min-width: 0; }
+  .mc-table :is(table, tbody, tr, td, th) { display: block; width: auto; }
+  .mc-table thead { display: none; }
+  .mc-table tbody tr { margin-bottom: 12px; border: 1px solid var(--plan-border); border-radius: 12px; overflow: hidden; background: var(--plan-card); }
+  .mc-table tbody :is(th, td) { border: 0; }
+  .mc-table tbody th { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 12px; background: var(--plan-selected); }
+  .mc-row-title { text-align: left; font-size: 1rem; }
+  .mc-row-label { display: inline; }
+  .mc-page .mc-remove { margin: 0; }
+  .mc-table td { display: grid; gap: 5px; }
+  .mc-cell-label { display: block; }
+  .mc-page .mc-table td textarea { min-height: 52px; }
+  .mc-empty-row { background: transparent !important; border-style: dashed !important; }
+  .mc-actions > :is(.tp-primary-btn) { flex: 1 1 100%; }
+  .mc-actions > .tp-secondary-btn, .mc-actions > .tp-danger-btn { flex: 1 1 calc(50% - 4px); }
+  .mc-actions-spacer { display: none; }
+}
+
+/* Paper sheet for print and PDF export, matching the club's printed microcycle form. */
+.mc-sheet.mc-paper { width: 1100px; padding: 0; border: 0; border-radius: 0; background: #fff; color: #111; }
+.mcp-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-family: Georgia, "Times New Roman", serif; color: #111; }
+.mcp-table :is(th, td) { padding: 4px 6px; border: 1.5px solid #333; text-align: center; vertical-align: middle; line-height: 1.3; }
+.mcp-col-label { width: 13%; }
+.mcp-col-warmup { width: 16%; }
+.mcp-logo { height: 96px; background: #fff; }
+.mcp-logo img { display: block; max-width: 100%; max-height: 88px; margin: 0 auto; object-fit: contain; }
+.mcp-format { background: #fff; font-size: 20px; font-weight: 700; }
+.mcp-format span { display: block; overflow-wrap: anywhere; }
+.mcp-format span + span { margin-top: 10px; }
+.mcp-club { padding: 3px 8px; background: #fff; font-size: 15px; font-weight: 700; }
+.mcp-title { background: #c9daf8; font-size: 14px; font-weight: 400; }
+.mcp-title > * { display: block; overflow-wrap: anywhere; }
+.mcp-title strong { font-weight: 700; }
+.mcp-number { margin-top: 6px; }
+.mcp-label { background: #d9d9d9; }
+.mcp-parts { font-size: 13px; font-weight: 400; vertical-align: top; }
+.mcp-parts span { display: block; }
+.mcp-parts span + span { margin-top: 10px; }
+.mcp-head { background: #dae5f3; font-size: 13px; font-weight: 700; }
+.mcp-phase { height: 40px; }
+.mcp-row { height: 96px; font-size: 14px; font-style: italic; font-weight: 700; }
+.mcp-table td { background: #dae5f3; font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; font-style: italic; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Read-only coach view: the paper layout in the site colours. */
+.mc-sheet.mc-view { padding: 0; overflow: hidden; }
+.mc-view .mcp-table { font-family: inherit; color: var(--plan-text); }
+.mc-view .mcp-table :is(th, td) { border: 1px solid var(--plan-border); background: var(--plan-card); color: var(--plan-text); }
+.mc-view .mcp-table tr > :first-child { border-left: 0; }
+.mc-view .mcp-table tr > :last-child { border-right: 0; }
+.mc-view .mcp-table thead tr:first-child > * { border-top: 0; }
+.mc-view .mcp-table tbody tr:last-child > * { border-bottom: 0; }
+.mc-view .mcp-logo { background: var(--plan-panel); }
+.mc-view .mcp-format { color: var(--plan-accent); }
+.mc-view .mcp-club { background: var(--plan-panel); }
+.mc-view .mcp-title { background: var(--plan-selected); }
+.mc-view .mcp-title em { color: var(--plan-muted); }
+.mc-view .mcp-number { color: var(--plan-accent); }
+.mc-view .mcp-table .mcp-label { background: var(--plan-panel); }
+.mc-view .mcp-parts { color: var(--plan-muted); }
+.mc-view .mcp-table .mcp-head { background: var(--plan-selected); color: var(--plan-accent); }
+.mc-view .mcp-table td { font-family: inherit; line-height: 1.45; }
+.mc-view .mcp-empty td { padding: 28px 16px; color: var(--plan-muted); font-style: normal; }
+
+@media (min-width: 640px) {
+  .mc-sheet.mc-view { overflow-x: auto; }
+  .mc-view .mcp-table { min-width: 900px; }
+}
+
+/* Phones: the title block stacks and each training becomes a card with labelled fields. */
+@media (max-width: 639px) {
+  .mc-sheet.mc-view { padding: 12px; }
+  .mc-view .mcp-table, .mc-view .mcp-table :is(thead, tbody, tr, th, td) { display: block; width: auto; height: auto; border: 0; }
+  .mc-view .mcp-table colgroup, .mc-view .mcp-heads { display: none; }
+  .mc-view .mcp-top:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .mc-view .mcp-logo { flex: none; padding: 0; background: none; }
+  .mc-view .mcp-logo:empty { display: none; }
+  .mc-view .mcp-logo img { width: 56px; height: 56px; }
+  .mc-view .mcp-format { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0; background: none; font-size: 1.125rem; text-align: left; }
+  .mc-view .mcp-format span + span { margin: 0; }
+  .mc-view .mcp-club { flex: 1 1 100%; padding: 0; background: none; color: var(--plan-muted); font-size: .875rem; text-align: left; }
+  .mc-view .mcp-title { margin-top: 10px; padding: 12px; border: 1px solid var(--plan-accent-border); border-radius: 12px; font-size: .9375rem; }
+  .mc-view .mcp-table tbody tr { margin-top: 12px; border: 1px solid var(--plan-border); border-radius: 12px; overflow: hidden; background: var(--plan-card); }
+  .mc-view .mcp-table tbody .mcp-label { padding: 8px 12px; background: var(--plan-selected); color: var(--plan-accent); font-size: 1rem; text-align: left; }
+  .mc-view .mcp-row br { display: none; }
+  .mc-view .mcp-table td { padding: 8px 12px; border-top: 1px solid var(--plan-border); text-align: left; font-size: 1rem; }
+  .mc-view .mcp-table td:empty { display: none; }
+  .mc-view .mcp-table td::before { content: attr(data-label); display: block; margin-bottom: 2px; color: var(--plan-muted); font-size: .8125rem; font-style: normal; font-weight: 600; }
+  .mc-view .mcp-empty td { border-top: 0; text-align: center; }
+  .mc-view .mcp-empty td::before { content: none; }
+}
+
+@media print {
+  body * { visibility: hidden; }
+  .mc-print-allowed .mc-sheet, .mc-print-allowed .mc-sheet * { visibility: visible; }
+  .mc-sheet { position: absolute; inset: 0 auto auto 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .mcp-table tr { break-inside: avoid; }
+  @page { size: A4 landscape; margin: 10mm; }
+}
+
+.mc-page .mc-doc-action {
+  display: block;
+  margin: 6px auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: .875rem;
+  text-align: center;
+}
+@media (max-width: 639px) {
+  .mc-table tbody th { flex-wrap: wrap; }
+  .mc-page .mc-doc-action { margin-inline: 0; }
+}
+@media print {
+  .mc-page .mc-doc-action { display: none; }
+}
+
+/* Plan of a training: one card with its actions in a modal dialog. */
+.mc-doc-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(460px, calc(100% - 32px));
+  margin: auto;
+  overscroll-behavior: contain;
+}
+.mc-doc-dialog::backdrop { background: #08120ecc; }
+body:has(.mc-doc-dialog[open]) { overflow: hidden; }
+.mc-doc-dialog .tp-modal-header { flex-wrap: nowrap; align-items: flex-start; margin-bottom: 14px; }
+.mc-doc-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
+.mc-doc-dialog-actions > * { flex: 1 1 10rem; justify-content: center; }
+.mc-doc-dialog-error { margin: 0 14px 14px; }
+
+/* Choice of the pages to print: the week and the plans of the trainings. */
+.mc-print-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mc-print-dialog::backdrop { background: #08120ecc; }
+body:has(.mc-print-dialog[open]) { overflow: hidden; }
+.mc-print-dialog .tp-modal-header { flex-wrap: nowrap; align-items: flex-start; margin-bottom: 8px; }
+.mc-print-note { margin: 0 14px 10px; color: var(--plan-muted); font-size: .875rem; }
+.mc-print-all { margin: 0 14px 10px; }
+.mc-print-options { display: grid; gap: 6px; margin: 0 14px 12px; padding: 0; border: 0; min-width: 0; }
+.mc-print-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--plan-border);
+  border-radius: 10px;
+  background: var(--plan-card);
+  cursor: pointer;
+}
+.mc-print-option:has(input:checked) { border-color: var(--plan-accent); background: var(--plan-selected); }
+.mc-print-option:has(input:disabled) { cursor: default; opacity: .7; }
+.mc-print-option input { flex: none; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--plan-accent); }
+.mc-print-option > span { display: grid; gap: 2px; min-width: 0; }
+.mc-print-option small { color: var(--plan-muted); overflow-wrap: anywhere; }
+.mc-print-option .td-skeleton { width: 10rem; max-width: 100%; }
+.mc-print-error { margin: 0 14px 12px; }
+.mc-print-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 0 14px 14px; }
+.mc-print-actions > * { flex: 1 1 9rem; justify-content: center; }
+
+/* The chosen pages are prepared out of view. Only print shows them. */
+.mc-print-bundle { position: fixed; top: 0; left: -20000px; width: 1100px; pointer-events: none; }
+.mc-print-week { width: 1100px; background: #fff; color: #111; }
+@media print {
+  .mc-page.mc-print-bundle-on { margin: 0 !important; padding: 0 !important; min-height: 0 !important; background: #fff !important; }
+  .mc-print-bundle-on > :not(.mc-print-bundle) { display: none !important; }
+  .mc-print-bundle-on .mc-print-bundle, .mc-print-bundle-on .mc-print-bundle * { visibility: visible; }
+  .mc-print-bundle-on .mc-print-bundle { position: static; width: auto; }
+  .mc-print-week { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .mc-print-week .mcp-table tr { break-inside: avoid; }
+  .mc-print-page + .mc-print-page { break-before: page; }
+}

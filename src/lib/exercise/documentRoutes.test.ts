@@ -6,6 +6,8 @@ import { blankDocument, currentCompetitionSeason } from "./document";
 import { EMPTY_EXERCISE } from "./model";
 
 const mocks = vi.hoisted(() => ({
+  usages: vi.fn<(id: string) => unknown[] | undefined>(),
+  linked: vi.fn<() => boolean | undefined>(),
   session: vi.fn(),
   club: vi.fn(),
   drawings: vi.fn(),
@@ -18,6 +20,13 @@ const mocks = vi.hoisted(() => ({
   syncImages: vi.fn(),
 }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
+vi.mock("@/lib/exercise/trainingUsage", async (original) => ({
+  ...await original<typeof import("./trainingUsage")>(),
+  documentUsageSummary: async (_db: unknown, _club: string, ids: string[]) => ({
+    usages: new Map(ids.map(id => [id, mocks.usages?.(id) ?? []])), totals: new Map(ids.map(id => [id, mocks.usages?.(id)?.length ?? 0])),
+  }),
+  hasTrainingLinks: async () => mocks.linked?.() ?? false,
+}));
 vi.mock("@/lib/db", () => ({
   prisma: {
     $transaction: mocks.transaction,
@@ -99,13 +108,41 @@ describe("training plan documents", () => {
     expect((await list(request("GET"), collection)).status).toBe(200);
     expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({
       where: { clubId, ownerId }, take: 26,
-      select: { id: true, title: true, updatedAt: true, revision: true },
+      select: { id: true, title: true, updatedAt: true, revision: true, content: true },
     }));
     expect((await GET(request("GET"), detail)).status).toBe(404);
     expect(mocks.find).toHaveBeenCalledWith(expect.objectContaining({ where: scope }));
     mocks.delete.mockResolvedValue({ count: 0 });
     expect((await DELETE(request("DELETE", undefined, "?revision=1"), detail)).status).toBe(404);
     expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("does not list the plans of other authors for a club scope", async () => {
+    mocks.session.mockResolvedValue({ sub: ownerId, roles: ["admin"] });
+    mocks.list.mockResolvedValue([]);
+    await list(request("GET", undefined, "?scope=club"), collection);
+    expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({ where: { clubId, ownerId } }));
+  });
+
+  it("lists a small preview instead of the full document content", async () => {
+    mocks.session.mockResolvedValue({ sub: ownerId, roles: ["admin"] });
+    const content = blankDocument("U12");
+    content.session.date = "2026-11-19";
+    content.sections[1] = { ...content.sections[1], duration: "15", drawing: { sourceId: documentId, title: "Рисунка", layout: EMPTY_EXERCISE } };
+    mocks.list.mockResolvedValue([{ id: documentId, title: "План", updatedAt: new Date(0), revision: 2, content }]);
+    const body = await (await list(request("GET"), collection)).json();
+    expect(body.documents[0]).not.toHaveProperty("content");
+    expect(body.documents[0].preview).toMatchObject({ date: "2026-11-19" });
+    expect(body.documents[0]).toMatchObject({ usages: [], usageCount: 0 });
+    expect(JSON.stringify(body)).not.toContain("objects");
+  });
+
+  it("gives the exact number of trainings with the plan detail", async () => {
+    mocks.session.mockResolvedValue({ sub: ownerId, roles: ["admin"] });
+    mocks.find.mockResolvedValue({ id: documentId, content: blankDocument("U12"), revision: 2, updatedAt: new Date(0) });
+    mocks.usages.mockReturnValue([{ cycleId: "c", groupKey: "g", rowId: "r", week: "2026-11-23", group: "U12", microcycle: "1", sessionNumber: "1" }]);
+    const body = await (await GET(request("GET"), detail)).json();
+    expect(body.document).toMatchObject({ usageCount: 1, usages: [expect.objectContaining({ rowId: "r" })] });
   });
 
   it("rejects a cross-club coach, untrusted origin and forged drawing before writing", async () => {

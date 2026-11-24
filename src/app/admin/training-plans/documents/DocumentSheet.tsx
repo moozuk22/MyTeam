@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { documentBottomGroups, type DocumentSection, type PlanContent } from "@/lib/exercise/document";
 import type { Exercise } from "@/lib/exercise/model";
 import PrintDrawing, { type DrawingReport, type DrawingStatus } from "./PrintDrawing";
+import { equalDrawings } from "./equalDrawings";
 
 const WIDTH = 1060;
 const HEIGHT = 730;
@@ -50,7 +51,7 @@ function PrintedSections({ indices, sections, monochrome, onReport }: {
       {indices.map((index) => <div key={index}>
         <h3 className={index === 3 ? "td-printed-section-heading-long" : undefined}>{sections[index].title}</h3>
         <div className="td-printed-text">
-          <PrintedValue label="Цели / Насоки" value={sections[index].coaching} />
+          <PrintedValue label="Изисквания" value={sections[index].coaching} />
         </div>
       </div>)}
     </div>
@@ -78,7 +79,7 @@ function PrintedHeader({ content }: { content: PlanContent }) {
   </header>;
 }
 
-function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: {
+export function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: {
   content: PlanContent; clubLogoUrl?: string; monochrome: boolean; onReport: DrawingReport; attempt: number;
 }) {
   return <div className="td-printed-row" key={`top:${attempt}:${monochrome}`}>
@@ -88,7 +89,7 @@ function PrintedTopRow({ content, clubLogoUrl, monochrome, onReport, attempt }: 
       <h3>Данни за тренировката</h3>
       <div className="td-printed-session-grid">
         <div className="td-printed-text td-printed-session-period">
-          {([["period", "Период"], ["microcycle", "Микроцикъл"], ["sessionNumber", "Тренировка №"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
+          {([["group", "Група"], ["period", "Период"], ["microcycle", "Микроцикъл"], ["sessionNumber", "Тренировка №"]] as const).map(([key, label]) => <PrintedValue key={key} label={label} value={content.session[key]} />)}
         </div>
         <div className="td-printed-session-side">
           <div className="td-printed-session-logo">{clubLogoUrl && <img src={clubLogoUrl} alt="" />}</div>
@@ -115,8 +116,8 @@ function PrintedBottomRow({ content, monochrome, onReport, attempt }: {
   </div>;
 }
 
-export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint = false, checkPrint }: {
-  content: PlanContent; clubLogoUrl?: string; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>;
+export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint = false, checkPrint, printActions = true }: {
+  content: PlanContent; clubLogoUrl?: string; pending: boolean; canPrint?: boolean; checkPrint?: () => Promise<boolean>; printActions?: boolean;
 }) {
   const [printError, setPrintError] = useState("");
   const [checkingPrint, setCheckingPrint] = useState(false);
@@ -229,6 +230,10 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
     setMultiPage(fit.multiPage);
     if (fit.multiPage) setDrawings({});
   }, [drawingsReady]);
+  // Runs after the sheet fits the page, so the space of each section is final.
+  useLayoutEffect(() => {
+    if (preview.current) equalDrawings(preview.current);
+  }, [content, fonts, drawingsReady, multiPage, scale]);
   const failed = assetStates.includes("failed");
   const ready = !pending && fonts && scale > 0 && assetStates.every((status) => status === "ready");
   const previewHeight = multiPage ? HEIGHT * 2 + 12 : HEIGHT;
@@ -240,8 +245,8 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
 
   return <section className="td-print-area" id="td-print-preview" aria-label="Преглед за печат">
     <div className="td-print-toolbar">
-      <h2>Преглед за печат <small>A4 · хоризонтално</small></h2>
-      <div className="td-print-actions">
+      <h2>{printActions ? "Преглед за печат" : "Преглед"} <small>A4 · хоризонтално</small></h2>
+      {printActions && <div className="td-print-actions">
         <label className="td-print-mode">
           <input type="checkbox" checked={monochrome} disabled={checkingPrint} onChange={(event) => {
             setDrawings({});
@@ -253,15 +258,15 @@ export default function DocumentSheet({ content, clubLogoUrl, pending, canPrint 
         <button className="tp-secondary-btn" type="button" disabled={checkingPrint || (canPrint && !ready)} onClick={() => void print(true)}>
           {exportingPdf ? "Подготовка на PDF…" : "Изтегли PDF"}
         </button>
-      </div>
+      </div>}
     </div>
-    <p className="td-muted">За печат от телефон изтеглете PDF файла и го отворете. Изберете „Печат“ от менюто на телефона или приложението на принтера.</p>
+    {printActions && <p className="td-muted">За печат от телефон изтеглете PDF файла и го отворете. Изберете „Печат“ от менюто на телефона или приложението на принтера.</p>}
     {pdf && <p className="td-muted" role="status">
       PDF файлът е готов. <a className="tp-secondary-btn" href={pdf.url} target="_blank" rel="noopener">Отвори PDF</a>
     </p>}
     {printError && <div className="td-feedback" role="alert">{printError}</div>}
     {failed && <div className="td-feedback" role="alert">
-      Рисунките не могат да се подготвят за печат.
+      Упражненията не могат да се подготвят за печат.
       <button type="button" className="tp-secondary-btn" onClick={() => { setDrawings({}); setAttempt((value) => value + 1); }}>Опитай отново</button>
     </div>}
     {!failed && !ready && <div className="td-print-loading" role="status" aria-label="Зареждане" aria-busy="true"><span aria-hidden="true" /></div>}

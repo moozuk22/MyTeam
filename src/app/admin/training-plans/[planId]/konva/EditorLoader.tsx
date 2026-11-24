@@ -15,7 +15,7 @@ function EditorSkeleton() {
       >
         <header className="ke-header">
           <div className="ke-header-bar">
-            <h1><Waypoints size={24} aria-hidden="true" />Редактор на план</h1>
+            <h1><Waypoints size={24} aria-hidden="true" />Редактор на упражнение</h1>
           </div>
         </header>
         <div className="ke-workspace" aria-hidden="true">

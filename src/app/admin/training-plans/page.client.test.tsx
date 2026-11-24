@@ -66,3 +66,11 @@ it("renders plan timestamps in Sofia time even when the server uses UTC", () => 
     vi.unstubAllEnvs();
   }
 });
+
+it("shows the current search and a search-specific empty result", () => {
+  const html = renderToStaticMarkup(<TrainingPlansClient {...props} coaches={[]} search="пресиране" />);
+
+  expect(html).toContain('type="search"');
+  expect(html).toContain('value="пресиране"');
+  expect(html).toContain("Няма упражнения, които отговарят на търсенето.");
+});

@@ -28,4 +28,4 @@ export async function snapshotDocument(
   return { ...input, sections };
 }
 
-export const documentDetail = { id: true, content: true, revision: true, updatedAt: true } as const;
+export const documentDetail = { originKey: true, id: true, content: true, revision: true, updatedAt: true } as const;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { documentOwnerFilter } from "@/lib/exercise/trainingSessionAccess";
 import { authorizeTraining, UUID_RE } from "@/lib/exercise/access";
 
 export const runtime = "nodejs";
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const image = await prisma.trainingImage.findFirst({
     where: { id: imageId, clubId, OR: [
       { plans: { some: {} } },
-      { documents: { some: { document: { ownerId: session.sub } } } },
+      { documents: { some: { document: { ownerId: await documentOwnerFilter(clubId, session.sub, request.nextUrl.searchParams.get("coachGroupId")) } } } },
     ] },
     select: { bytes: true },
   });

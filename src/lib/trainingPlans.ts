@@ -3,6 +3,8 @@ export const TRAINING_UUID_PATTERN =
 
 export const MAX_PLAN_TITLE_LENGTH = 200;
 export const MAX_PLAN_DESCRIPTION_LENGTH = 1000;
+/** Matches the length of the section requirements in a plan document. */
+export const MAX_PLAN_REQUIREMENTS_LENGTH = 700;
 
 export const ALLOWED_EQUIPMENT_TYPES = [
   "cone",

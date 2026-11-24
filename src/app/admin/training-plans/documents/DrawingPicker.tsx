@@ -13,7 +13,7 @@ type DrawingSummary = { id: string; title: string; creatorName: string | null; l
 type DrawingPage = { plans: DrawingSummary[]; nextCursor: string | null };
 
 export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
-  endpoint: string; location: string; onPick: (drawing: DrawingSnapshot) => void; onClose: () => void;
+  endpoint: string; location: string; onPick: (drawing: DrawingSnapshot, requirements: string) => void; onClose: () => void;
 }) {
   const searchId = useId();
   const [scope, setScope] = useState<"mine" | "club">("mine");
@@ -23,6 +23,7 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<string>();
   const [preview, setPreview] = useState<DrawingSnapshot>();
+  const [requirements, setRequirements] = useState("");
   const [listError, setListError] = useState("");
   const [previewError, setPreviewError] = useState("");
 
@@ -30,7 +31,7 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
     const abort = new AbortController();
     const query = new URLSearchParams({ scope, search: search.trim() });
     if (cursor) query.set("cursor", cursor);
-    void documentRequest<DrawingPage>(`${endpoint}?${query}`, "Рисунките не могат да се заредят.", { signal: abort.signal })
+    void documentRequest<DrawingPage>(`${endpoint}?${query}`, "Упражненията не могат да се заредят.", { signal: abort.signal })
       .then((result) => { if (!abort.signal.aborted) setPage(result); })
       .catch((error: Error) => { if (!abort.signal.aborted) setListError(error.message); });
     return () => abort.abort();
@@ -39,12 +40,13 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
   useEffect(() => {
     if (!selection) return;
     const abort = new AbortController();
-    void documentRequest<{ plan: { id: string; title: string; layout: Exercise } }>(
-      `${endpoint}/${selection}`, "Рисунката не може да се зареди.", { signal: abort.signal },
+    void documentRequest<{ plan: { id: string; title: string; requirements?: string | null; layout: Exercise } }>(
+      `${endpoint}/${selection}`, "Упражнението не може да се зареди.", { signal: abort.signal },
     ).then(({ plan }) => {
       if (abort.signal.aborted) return;
-      if (plan.layout?.version !== 2) throw new Error("Първо копирайте рисунката в новия редактор.");
+      if (plan.layout?.version !== 2) throw new Error("Първо копирайте упражнението в новия редактор.");
       setPreview({ sourceId: plan.id, title: plan.title, layout: plan.layout });
+      setRequirements(plan.requirements ?? "");
     }).catch((error: Error) => { if (!abort.signal.aborted) setPreviewError(error.message); });
     return () => abort.abort();
   }, [endpoint, selection]);
@@ -65,13 +67,13 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
     setPreviewError("");
   }
 
-  return <section className="td-picker" aria-label="Избор на рисунка">
+  return <section className="td-picker" aria-label="Избор на упражнение">
     <div className="td-actions">
-      <h3>Избор на рисунка</h3>
+      <h3>Избор на упражнение</h3>
       <button type="button" className="tp-secondary-btn" onClick={onClose}>Затвори избора</button>
     </div>
     <div className="td-picker-filters">
-      <div className="td-actions" role="group" aria-label="Филтър за рисунки">
+      <div className="td-actions" role="group" aria-label="Филтър за упражнения">
         {(["mine", "club"] as const).map((option) => <button key={option} type="button"
           className="tp-secondary-btn" aria-pressed={scope === option}
           onClick={() => changeFilter(option, search)}>
@@ -81,14 +83,14 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
       <div className="td-field">
         <label htmlFor={searchId}>Търсене по заглавие</label>
         <input id={searchId} type="search" maxLength={200} value={search}
-          placeholder="Търси рисунка" onChange={(event) => changeFilter(scope, event.target.value)} />
+          placeholder="Търси упражнение" onChange={(event) => changeFilter(scope, event.target.value)} />
       </div>
     </div>
     {listError && <div role="alert" className="td-feedback">
       {listError} <button type="button" className="tp-secondary-btn" onClick={() => resetPage(cursor)}>Опитай отново</button>
     </div>}
     {!page && !listError && <FinanceSkeleton variant="form" />}
-    {page?.plans.length === 0 && <p className="td-muted">{search.trim() ? "Няма рисунки, които отговарят на търсенето." : "Няма запазени рисунки в избрания филтър."}</p>}
+    {page?.plans.length === 0 && <p className="td-muted">{search.trim() ? "Няма упражнения, които отговарят на търсенето." : "Няма запазени упражнения в избрания филтър."}</p>}
     {page && <ul className="td-drawing-list">
       {page.plans.map((drawing) => <li key={drawing.id}>
         {drawing.layoutVersion === 2
@@ -111,7 +113,7 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
     {preview && <div className="td-picker-preview">
       <h4>{preview.title}</h4>
       <div className="td-picker-pitch"><PlanPreview exercise={preview.layout} /></div>
-      <button type="button" className="tp-primary-btn" onClick={() => onPick(preview)}>Използвай рисунката</button>
+      <button type="button" className="tp-primary-btn" onClick={() => onPick(preview, requirements)}>Използвай упражнението</button>
     </div>}
   </section>;
 }

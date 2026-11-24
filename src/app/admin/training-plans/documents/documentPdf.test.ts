@@ -32,6 +32,21 @@ it("releases the canvas if PDF creation fails", async () => {
   await expect(createDocumentPdf({} as HTMLElement)).rejects.toThrow("PDF failed");
   expect(canvas).toEqual({ width: 0, height: 0 });
 });
+it("releases each page canvas before it captures the next page", async () => {
+  const pages = [{ style: {} }, { style: {} }];
+  const paper = { querySelectorAll: () => pages } as unknown as HTMLElement;
+  const canvases = [{ width: 2120, height: 1460 }, { width: 2120, height: 1460 }];
+  mocks.capture.mockImplementation(async (page: unknown) => {
+    // The canvas of the page before is already released.
+    if (page === pages[1]) expect(canvases[0]).toEqual({ width: 0, height: 0 });
+    return canvases[pages.indexOf(page as { style: object })];
+  });
+  const addPage = vi.fn();
+  const { addDocumentPages } = await import("./documentPdf");
+  await addDocumentPages({ addImage: mocks.addImage, addPage } as unknown as import("jspdf").jsPDF, paper, true);
+  expect(addPage).toHaveBeenCalledTimes(1);
+  expect(canvases).toEqual([{ width: 0, height: 0 }, { width: 0, height: 0 }]);
+});
 it("uses a safe filename and retains Bulgarian text", () => {
   expect(documentPdfFilename('План: "Пасове" / 1')).toBe("План   Пасове    1.pdf");
   expect(documentPdfFilename("  ")).toBe("План-конспект.pdf");

@@ -1,16 +1,25 @@
+/* One theme for every training-plan page: library, review, editor, documents, microcycles. */
 .tp-page,
 .ke-page {
-  --plan-bg: linear-gradient(135deg, #0d0d0d 0%, #0a0a0a 50%, #0d0d0d 100%);
-  --plan-panel: #1a1a1a;
-  --plan-card: linear-gradient(135deg, #1a1a1a, #151515);
-  --plan-field: #151515;
-  --plan-border: rgba(255, 255, 255, 0.15);
-  --plan-text: #fff;
-  --plan-muted: #bfbfbf;
-  --plan-accent: #9cff9c;
-  --plan-accent-border: rgba(50, 205, 50, 0.5);
-  --plan-selected: rgba(50, 205, 50, 0.16);
-  --plan-title: linear-gradient(90deg, #32cd32, #7fff00);
+  --plan-bg: radial-gradient(ellipse at 91% 79%, #10241c 0%, transparent 37%), #0a1412;
+  --plan-panel: #13221d;
+  --plan-card: #0e1c18;
+  --plan-field: #0b1714;
+  --plan-border: #2b4138;
+  --plan-text: #f3f7f4;
+  --plan-muted: #c5d0ca;
+  --plan-accent: #b9f5b5;
+  --plan-accent-border: #2b8539;
+  --plan-selected: #173b25;
+  --plan-icon: #68db68;
+  --plan-primary-bg: #11421d;
+  --plan-primary-text: #dcfbd8;
+  --plan-danger-bg: #582f31;
+  --plan-danger-border: #985658;
+  --plan-danger-text: #ffd3d1;
+  --plan-warning-bg: #3d3214;
+  --plan-warning-border: #8a6d1f;
+  --plan-warning-text: #ffe2a3;
   color-scheme: dark;
   background: var(--plan-bg);
   color: var(--plan-text);
@@ -23,11 +32,23 @@
   outline-offset: 3px;
 }
 
-.tp-title,
+/* Page titles: plain text with a green icon, no gradient. */
+.tp-page .tp-title,
 .ke-header-bar h1 {
-  background: var(--plan-title);
-  background-clip: text;
-  color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  background: none;
+  color: var(--plan-text);
+  font-weight: 750;
+}
+.tp-page .tp-title svg,
+.ke-header-bar h1 svg {
+  flex: none;
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--plan-icon);
 }
 
 /* Subscription notices use the same muted green as the calculator lock state. */
@@ -71,7 +92,7 @@
   border-inline-start: 3px solid #d78686;
   border-radius: 10px;
   background: #2b1c1e;
-  color: #ffd3d1;
+  color: var(--plan-danger-text);
   font-size: 13px;
   line-height: 1.6;
   overflow-wrap: anywhere;

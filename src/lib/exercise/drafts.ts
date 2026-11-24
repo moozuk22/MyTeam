@@ -1,10 +1,11 @@
-import { MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_TITLE_LENGTH, TRAINING_UUID_PATTERN } from "@/lib/trainingPlans";
+import { MAX_PLAN_DESCRIPTION_LENGTH, MAX_PLAN_REQUIREMENTS_LENGTH, MAX_PLAN_TITLE_LENGTH, TRAINING_UUID_PATTERN } from "@/lib/trainingPlans";
 import { sameExercise, validateExercise, type Exercise } from "./model";
 export type RecoveryDraft = {
   baseRevision: string;
   layout: Exercise;
   title?: string;
   description?: string;
+  requirements?: string;
   categoryId?: string | null;
   savedAt: number;
 };
@@ -22,6 +23,8 @@ export function readDraft(value: string | null): RecoveryDraft | null {
         (typeof d.title === "string" && d.title.length <= MAX_PLAN_TITLE_LENGTH)) &&
       (d.description === undefined ||
         (typeof d.description === "string" && d.description.length <= MAX_PLAN_DESCRIPTION_LENGTH)) &&
+      (d.requirements === undefined ||
+        (typeof d.requirements === "string" && d.requirements.length <= MAX_PLAN_REQUIREMENTS_LENGTH)) &&
       (d.categoryId === undefined || d.categoryId === null ||
         (typeof d.categoryId === "string" && TRAINING_UUID_PATTERN.test(d.categoryId))) &&
       !validateExercise(d.layout)
@@ -37,9 +40,11 @@ export function matchesDraft(
   title: string,
   description = "",
   categoryId: string | null = null,
+  requirements = "",
 ) {
   return (draft.title === undefined || draft.title.trim() === title.trim()) &&
     (draft.description === undefined || draft.description.trim() === description.trim()) &&
+    (draft.requirements === undefined || draft.requirements.trim() === requirements.trim()) &&
     (draft.categoryId === undefined || draft.categoryId === categoryId) &&
     sameExercise(draft.layout, layout);
 }

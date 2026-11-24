@@ -9,7 +9,7 @@ import { INLINE_IMAGE_PREFIX, readTrainingImageSource, trainingImageSource } fro
 export type TrainingImageTx = Omit<typeof prisma, "$extends" | "$transaction" | "$connect" | "$disconnect" | "$on" | "$use">;
 
 export class TrainingImageError extends Error {
-  constructor(message = "Изображението не е налично. Отворете рисунката отново.", public status = 400) {
+  constructor(message = "Изображението не е налично. Отворете упражнението отново.", public status = 400) {
     super(message);
   }
 }
@@ -127,7 +127,7 @@ export async function readEditableTrainingPlan(clubId: string, planId: string) {
     const plan = await tx.trainingPlan.findFirst({
       where: { id: planId, clubId },
       select: {
-        id: true, clubId: true, title: true, description: true, categoryId: true,
+        id: true, clubId: true, title: true, description: true, requirements: true, categoryId: true,
         layout: true, updatedAt: true, createdAt: true,
       },
     });

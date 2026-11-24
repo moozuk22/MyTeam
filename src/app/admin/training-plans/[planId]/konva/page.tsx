@@ -1,3 +1,4 @@
+import BackLink from "../../BackLink";
 import { readEditableTrainingPlan } from "@/lib/exercise/imageStorage";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -39,9 +40,9 @@ export default async function KonvaPage({
       <main>
         <h1>Упражнението не може да се отвори</h1>
         <p>{error}</p>
-        <a href={`/admin/training-plans?${trainingPlanSearch(clubId, groupContext)}`}>
-          Назад към плановете
-        </a>
+        <BackLink href={`/admin/training-plans?${trainingPlanSearch(clubId, groupContext)}`}>
+          Към упражненията
+        </BackLink>
       </main>
     );
   return (
