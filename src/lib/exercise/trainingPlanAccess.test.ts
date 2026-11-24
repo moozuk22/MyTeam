@@ -24,13 +24,14 @@ describe("training subscription enforcement", () => {
     expect((result as NextResponse).status).toBe(403);
     expect(mocks.access).toHaveBeenCalledWith(club, ["coach"]);
   });
-  it.each(["GET", "DELETE"])("keeps %s available without a subscription", async method => {
-    expect(await authorizeTraining(request(method, `/${id}`), club)).not.toBeInstanceOf(NextResponse);
+  it("keeps GET available without a subscription", async () => {
+    expect(await authorizeTraining(request("GET", `/${id}`), club)).not.toBeInstanceOf(NextResponse);
     expect(mocks.access).not.toHaveBeenCalled();
   });
-  it("does not require save access for category changes", async () => {
-    expect(await authorizeTraining(request("POST", "/categories"), club)).not.toBeInstanceOf(NextResponse);
-    expect(mocks.access).not.toHaveBeenCalled();
+  it.each([["DELETE", `/${id}`], ["DELETE", `/documents/${id}`], ["POST", "/categories"], ["PATCH", `/categories/${id}`], ["DELETE", `/categories/${id}`]])("blocks unpaid %s %s also without the save argument", async (method, suffix) => {
+    const result = await authorizeTraining(request(method, suffix), club);
+    expect((result as NextResponse).status).toBe(403);
+    expect(mocks.access).toHaveBeenCalledWith(club, ["coach"]);
   });
   it("allows subscribed saves and admin saves", async () => {
     mocks.access.mockResolvedValue({ enabled: true, canSave: true, canPrint: true });

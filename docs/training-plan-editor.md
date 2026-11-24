@@ -137,9 +137,9 @@ Enable **Черно-бял печат** in the print preview for a white built-i
 
 ## Subscription access
 
-Drawing saves and training document saves and printing require an active training plans subscription. Accounts with the `admin` role can save and print without a subscription. Other accounts can open saved content, draw, and edit forms without active access. Browser draft recovery remains available. A message states that training plans are not activated. Save and Print remain available as controls. If access is inactive, these actions show a subscription error and do not save or print.
+Each change to the training plans data and each print requires an active training plans subscription. This includes saves, deletes, and category changes for drawings, training documents, and microcycles, and plan links to trainings. Accounts with the `admin` role can do these operations without a subscription. Other accounts can open saved content, draw, and edit forms without active access. Browser draft recovery remains available. The drawing library, the drawing editor, the document library, the document editor, and the microcycle page show a message that training plans are not activated. Save, Delete, and Print remain available as controls. If access is inactive, these actions show a subscription error and do not change the data or print.
 
-Each drawing and document save handler explicitly requires save access. The check does not depend on the URL text. The print button checks current access before it opens the browser print dialog. The app hides the document from direct browser print output unless the print action has passed this check. Print preview remains available without a subscription. These controls cannot prevent screenshots or extraction of content already visible in the browser.
+`authorizeTraining` requires save access for each request method other than `GET` and `HEAD`, also when the handler asks only for read access. The check does not depend on the URL text. The print button checks current access before it opens the browser print dialog. The app hides the document from direct browser print output unless the print action has passed this check. Print preview remains available without a subscription. These controls cannot prevent screenshots or extraction of content already visible in the browser.
 
 
 ### Shared image migration

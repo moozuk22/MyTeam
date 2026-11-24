@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TrainingPlanAccess } from "@/lib/trainingPlanSubscriptionDomain";
 
-export const trainingSubscriptionInactiveMessage = "Плановете за тренировки не са активирани. Можете да рисувате и да редактирате формулярите. За запазване и печат е необходим активен абонамент. Свържете се с администратора за активиране.";
+export const trainingSubscriptionInactiveMessage = "Плановете за тренировки не са активирани. Можете да рисувате и да редактирате формулярите. За запазване, изтриване и печат е необходим активен абонамент. Свържете се с администратора за активиране.";
 
-export const trainingSubscriptionMessage = "Не можете да запазвате или печатате, защото нямате активен абонамент за планове за тренировки.";
+/** For the pages without an editor (microcycles and the plan library). */
+export const trainingSubscriptionLockedMessage = "Плановете за тренировки не са активирани. Можете да преглеждате записаните данни. За запазване, изтриване и печат е необходим активен абонамент. Свържете се с администратора за активиране.";
+
+export const trainingSubscriptionMessage = "Не можете да запазвате, изтривате или печатате, защото нямате активен абонамент за планове за тренировки.";
 export function useTrainingPlanAccess(clubId: string) {
   const latest = useRef(0);
   const [access, setAccess] = useState<TrainingPlanAccess | null>(null);
