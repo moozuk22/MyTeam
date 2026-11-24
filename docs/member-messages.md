@@ -14,3 +14,8 @@ The training editor continues to use its existing group endpoint and scope.
 The dialog loads group options when it opens. Failed requests show a retry button.
 Closing the dialog cancels the request. An obsolete response cannot replace current data.
 The send endpoint and its request format are unchanged.
+
+Opening the member's bell marks all their unread notification history as read,
+including notifications older than seven days. The bell then reloads the saved
+read status and count. A failed save keeps the unread state and offers a retry;
+background responses cannot overwrite a newer bell refresh.
