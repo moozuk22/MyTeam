@@ -97,8 +97,9 @@ function PaperSheet({ clubName, logoUrl, week, content, action }: { action?: (id
   </table>;
 }
 
-export default function Workspace({ restore, clubId, coachGroupId, initialWeek, clubLogoUrl, competitionSeason }: { restore?: SessionTarget; competitionSeason: CompetitionSeason; clubId: string; coachGroupId?: string; initialWeek: string; clubLogoUrl?: string }) {
-  const [week, setWeek] = useState(restore?.week ?? initialWeek);
+/** `restore` opens a training after the plan editor. `openGroup` opens the microcycle of a group, for example from a coach notification. */
+export default function Workspace({ restore, openGroup, clubId, coachGroupId, initialWeek, clubLogoUrl, competitionSeason }: { restore?: SessionTarget; openGroup?: { groupKey: string; week: string }; competitionSeason: CompetitionSeason; clubId: string; coachGroupId?: string; initialWeek: string; clubLogoUrl?: string }) {
+  const [week, setWeek] = useState(restore?.week ?? openGroup?.week ?? initialWeek);
   const [data, setData] = useState<Data>();
   const [selected, setSelected] = useState("");
   const [content, setContent] = useState(emptyCycle);
@@ -132,6 +133,9 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
   const [bundle, setBundle] = useState<{ week: boolean; documents: PrintChoice["documents"] }>();
   const bundleRef = useRef<HTMLDivElement>(null);
   const pendingRestore = useRef(restore);
+  const pendingOpen = useRef(restore ? undefined : openGroup);
+  // After a link opens a group, the page scrolls to its microcycle. On a phone the sheet is below the group list.
+  const [scrollToSheet, setScrollToSheet] = useState(false);
   const sheet = useRef<HTMLDivElement>(null);
   const location = new URLSearchParams({ clubId, ...(coachGroupId ? { coachGroupId } : {}) }).toString();
   const endpoint = `/api/admin/clubs/${clubId}/training-plans/microcycles?${location}&week=${week}&version=2`;
@@ -142,6 +146,13 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     fetch(endpoint, { signal: controller.signal }).then(async r => { const value = await r.json(); if (!r.ok) throw new Error(value.error); return value; }).then((value: Data) => {
       if (controller.signal.aborted) return;
       setData(value);
+      const linked = pendingOpen.current;
+      pendingOpen.current = undefined;
+      if (linked) {
+        const cycle = value.cycles.find(c => c.groupKey === linked.groupKey);
+        if (cycle) { setSelected(cycle.groupKey); setContent(cycle.content); setRevision(cycle.revision); setCycleId(cycle.id); setScrollToSheet(true); }
+        else setError(value.groups.some(g => g.key === linked.groupKey) ? "Групата вече няма микроцикъл за тази седмица." : "Групата вече не е налична.");
+      }
       const target = pendingRestore.current;
       if (!target) return;
       const cycle = value.cycles.find(c => c.id === target.cycleId && c.groupKey === target.groupKey);
@@ -167,6 +178,11 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
     row.scrollIntoView({ block: "start" });
     pendingRestore.current = undefined;
   }, [selected, data]);
+  useEffect(() => {
+    if (!scrollToSheet || !selected) return;
+    sheet.current?.closest("section")?.scrollIntoView({ block: "start" });
+    setScrollToSheet(false);
+  }, [scrollToSheet, selected]);
   const navigate = async (fn: () => void) => { if (busy) return; if (!unsaved || await dialogs.confirm("Да се отхвърлят ли незапазените промени?")) fn(); };
   const reset = () => { setDirty(false); setAddGroups([]); setNumberCopiedFrom(""); };
   const goToWeek = (next: string) => navigate(() => { setWeek(next); setSelected(""); reset(); });

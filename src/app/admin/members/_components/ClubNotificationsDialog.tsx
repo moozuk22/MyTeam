@@ -1,10 +1,18 @@
 "use client";
 
+import Link from "next/link";
+import { CalendarRange } from "lucide-react";
 import { NotificationImage } from "@/components/NotificationImage";
 import { NotificationText } from "@/components/NotificationText";
 import { XIcon } from "./members-page-icons";
 import { type ClubNotifications } from "../_hooks/useClubNotifications";
+import { type MemberNotification } from "../_types/members-page-types";
 import { DateInput } from "@/components/DateInput";
+
+/** A microcycle notification opens the microcycle of the group. Other links are not shown as a button. */
+export function microcycleLink(notif: Pick<MemberNotification, "type" | "url">) {
+  return notif.type === "training_microcycle" && notif.url?.startsWith("/admin/training-plans/microcycles?") ? notif.url : null;
+}
 
 type ClubNotificationsDialogProps = {
   clubNotificationsController: Pick<
@@ -193,6 +201,16 @@ export function ClubNotificationsDialog({
                             <NotificationText text={notif.body} />
                           </p>
                           <NotificationImage src={notif.imageUrl} />
+                          {microcycleLink(notif) ? (
+                            <Link
+                              href={microcycleLink(notif)!}
+                              className="amp-btn amp-btn--primary amp-member-notification-action"
+                              onClick={() => setClubNotificationsPanelOpen(false)}
+                            >
+                              <CalendarRange size={16} aria-hidden="true" />
+                              {"Отвори микроцикъла"}
+                            </Link>
+                          ) : null}
                           <div className="amp-member-notification-meta">
                             {typeof notif.teamGroup === "number" ? (
                               <span>

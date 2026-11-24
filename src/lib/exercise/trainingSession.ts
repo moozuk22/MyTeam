@@ -9,15 +9,22 @@ export type TrainingReference = {
 };
 
 export function sessionTarget(value: unknown): SessionTarget | null {
+  const target = groupTarget(value);
+  if (!target) return null;
+  const { cycleId, rowId } = value as Record<string, unknown>;
+  if (typeof cycleId !== "string" || !uuid.test(cycleId) || typeof rowId !== "string" || !uuid.test(rowId)) return null;
+  return { cycleId: cycleId.toLowerCase(), rowId: rowId.toLowerCase(), ...target };
+}
+/** Reads the group and week of a microcycle link, for example from a coach notification. */
+export function groupTarget(value: unknown): { groupKey: string; week: string } | null {
   if (!value || typeof value !== "object") return null;
-  const { cycleId, rowId, groupKey, week } = value as Record<string, unknown>;
-  if (typeof cycleId !== "string" || !uuid.test(cycleId) || typeof rowId !== "string" || !uuid.test(rowId) ||
-      typeof groupKey !== "string" || !/^(custom|training):/.test(groupKey) || !uuid.test(groupKey.substring(groupKey.indexOf(":") + 1)) ||
+  const { groupKey, week } = value as Record<string, unknown>;
+  if (typeof groupKey !== "string" || !/^(custom|training):/.test(groupKey) || !uuid.test(groupKey.substring(groupKey.indexOf(":") + 1)) ||
       typeof week !== "string") return null;
   try {
     if (monday(week) !== week) return null;
   } catch { return null; }
-  return { cycleId: cycleId.toLowerCase(), rowId: rowId.toLowerCase(), groupKey, week };
+  return { groupKey, week };
 }
 export function sessionOrigin(target: SessionTarget) {
   return [target.cycleId, target.groupKey, target.rowId].join("/");

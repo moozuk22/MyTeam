@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { coachAuthor } from "@/lib/exercise/trainingSessionAccess";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
@@ -6,6 +6,7 @@ import { authorizeTraining, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/ex
 import { microcycleGroups } from "@/lib/exercise/microcycleGroups";
 import { monday, parseCycle } from "@/lib/exercise/microcycle";
 import { CycleConflict, RemovedLinks, removeCycle, saveCycle } from "@/lib/exercise/microcycleStore";
+import { notifyNewMicrocycle } from "@/lib/push/microcycleNotifications";
 type Context = { params: Promise<{ id: string }> };
 /** A club has fewer groups than this. The limit keeps one save bounded. */
 const MAX_ADDED_GROUPS = 200;
@@ -105,6 +106,9 @@ async function mutate(request: NextRequest, { params }: Context, remove: boolean
       clubId: id, week, group, revision: body.revision, cycleId: body.cycleId, content, scope: body.scope ?? "all", addGroups,
       confirmedLinks: body.removedLinks ?? 0,
     }));
+    // A save succeeds only when each group still has the microcycle that the editor showed. So these groups had no microcycle before.
+    const created = [...(body.revision === 0 ? [group.key] : []), ...addGroups.filter(g => g.expected === null).map(g => g.key)];
+    if (created.length) after(() => notifyNewMicrocycle(id, week, created));
     return NextResponse.json(saved, { status: body.revision === 0 ? 201 : 200 });
   } catch (error) {
     if (error instanceof CycleConflict) return NextResponse.json({ error: error.message }, { status: 409 });
