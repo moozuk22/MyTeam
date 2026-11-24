@@ -10,3 +10,8 @@ export function removedLinksQuestion(count: number) {
 export function deletedCycleLinksQuestion(count: number) {
   return `Тренировките на микроцикъла имат ${linkCount(count)} към план-конспекти. При изтриване ${removal(count)}. План-конспектите остават в библиотеката.`;
 }
+
+/** The question before a save that also replaces the microcycle of other groups. The number includes the links of both. */
+export function replacedLinksQuestion(count: number) {
+  return `Записът премахва ${linkCount(count)} към план-конспекти на изтрити тренировки или на заменени микроцикли. План-конспектите остават в библиотеката.`;
+}

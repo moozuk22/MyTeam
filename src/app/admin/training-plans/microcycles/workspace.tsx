@@ -14,7 +14,7 @@ import TrainingDocumentDialog from "./TrainingDocumentDialog";
 import PrintChoiceDialog, { type PrintChoice, type PrintTraining } from "./PrintChoiceDialog";
 import GroupShareDialog from "./GroupShareDialog";
 import PastCycleDialog from "./PastCycleDialog";
-import { deletedCycleLinksQuestion, removedLinksQuestion } from "./removedLinks";
+import { deletedCycleLinksQuestion, removedLinksQuestion, replacedLinksQuestion } from "./removedLinks";
 import SaveScopeDialog from "./SaveScopeDialog";
 import dynamic from "next/dynamic";
 import { withCoachImages } from "../documents/documentRequest";
@@ -204,8 +204,11 @@ export default function Workspace({ restore, clubId, coachGroupId, initialWeek, 
         setRevision(remove ? 0 : value.revision); setCycleId(remove ? undefined : value.id); reset(); if (remove) setSelected(""); setReload(v => v + 1);
       }
     } catch (e) { setError(e instanceof Error ? e.message : "Грешка при запис."); } finally { setBusy(false); }
-    if (removedLinks && await dialogs.confirm(remove ? deletedCycleLinksQuestion(removedLinks) : removedLinksQuestion(removedLinks),
-      remove ? { title: "Изтриване на микроцикъл", confirmLabel: "Изтрий" } : { title: "Изтриване на тренировки", confirmLabel: "Запази" }))
+    // The number of a save with replaced microcycles also includes the links of the replaced groups.
+    const question = remove ? deletedCycleLinksQuestion(removedLinks) : replaced.length ? replacedLinksQuestion(removedLinks) : removedLinksQuestion(removedLinks);
+    if (removedLinks && await dialogs.confirm(question,
+      remove ? { title: "Изтриване на микроцикъл", confirmLabel: "Изтрий" }
+        : { title: replaced.length ? "Премахване на връзки" : "Изтриване на тренировки", confirmLabel: "Запази" }))
       await save(remove, scope ?? "all", removedLinks);
   }
   async function applyPast(past: CycleContent, pastWeek: string) {

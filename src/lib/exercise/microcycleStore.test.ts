@@ -125,6 +125,36 @@ it("adds groups and replaces their own microcycle of the week", async () => {
   });
 });
 
+it("stops before a replaced microcycle loses plan links that the user did not accept", async () => {
+  usage([group.key]);
+  const expected = { id: "old", revision: 2 };
+  // A coach linked a plan after the editor loaded. The link does not change the revision.
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: expected }]);
+  tx.trainingSessionDocument.count.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+  const error = await saveCycle(db, input({ addGroups: [{ ...other, expected }], confirmedLinks: 1 })).catch(e => e);
+  // The user sees one number for the removed trainings and the replaced microcycle.
+  expect(error).toBeInstanceOf(RemovedLinks);
+  expect(error.count).toBe(3);
+  expect(tx.trainingSessionDocument.count).toHaveBeenLastCalledWith({ where: { cycleId: "old", groupKey: { in: [other.key] } } });
+  expect(tx.trainingMicrocycleGroup.deleteMany).not.toHaveBeenCalled();
+  expect(tx.trainingSessionDocument.deleteMany).not.toHaveBeenCalled();
+  // After the user accepts the number, the save replaces the microcycle.
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: expected }]);
+  tx.trainingSessionDocument.count.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+  tx.trainingMicrocycleGroup.deleteMany.mockResolvedValue({ count: 1 });
+  await saveCycle(db, input({ addGroups: [{ ...other, expected }], confirmedLinks: 3 }));
+  expect(tx.trainingMicrocycleGroup.createMany).toHaveBeenCalled();
+});
+
+it("stops before a new microcycle replaces a group with plan links", async () => {
+  tx.trainingMicrocycle.create.mockResolvedValue({ id: "new", revision: 1 });
+  const expected = { id: "old", revision: 2 };
+  tx.trainingMicrocycleGroup.findMany.mockResolvedValueOnce([{ groupKey: other.key, cycle: expected }]);
+  tx.trainingSessionDocument.count.mockResolvedValueOnce(1);
+  await expect(saveCycle(db, input({ revision: 0, cycleId: undefined, addGroups: [{ ...other, expected }] }))).rejects.toMatchObject({ count: 1 });
+  expect(tx.trainingMicrocycleGroup.deleteMany).not.toHaveBeenCalled();
+});
+
 it("stops when a replaced microcycle changes after the check", async () => {
   usage([group.key]);
   const expected = { id: "old", revision: 2 };

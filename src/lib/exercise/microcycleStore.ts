@@ -18,7 +18,7 @@ export type CycleSave = {
   /** "group" makes a copy for this group when other groups use the same microcycle. "all" changes it for all groups. */
   scope: "group" | "all";
   addGroups: AddedGroup[];
-  /** The number of plan links on removed trainings that the user accepted to remove. A higher number stops the save again. */
+  /** The number of plan links (of removed trainings and replaced microcycles) that the user accepted to remove. A higher number stops the save again. */
   confirmedLinks?: number;
 };
 
@@ -26,7 +26,7 @@ export class CycleConflict extends Error {
   constructor() { super("Микроцикълът е променен. Презаредете страницата."); }
 }
 
-/** Removed trainings have plan links, and the user did not accept their removal. The save rolls back. */
+/** The save or delete removes plan links, and the user did not accept their removal. The transaction rolls back. */
 export class RemovedLinks extends Error {
   constructor(readonly count: number) { super("Изтритите тренировки имат план-конспекти."); }
 }
@@ -39,44 +39,61 @@ async function release(tx: Tx, clubId: string, week: string, groupKey: string, c
   await tx.trainingMicrocycle.deleteMany({ where: { clubId, id: cycleId, groups: { none: {} } } });
 }
 
+type GroupPlan = { replaced: Map<string, string[]>; joined: AddedGroup[]; links: number };
+
 /**
- * Gives the groups the microcycle `cycleId`. Each change of the groups of a microcycle also increments its revision.
- * The conditional revision update locks a replaced microcycle, so a save of another user cannot change its groups
- * between the check and the replacement.
+ * Checks the groups that get the microcycle `cycleId` and locks each microcycle that they replace.
+ * Each change of the groups of a microcycle also increments its revision. The conditional revision update locks a
+ * replaced microcycle, so a save of another user cannot change its groups between the check and the replacement.
+ * `links` is the number of plan links that the replacement removes.
  */
-async function addGroups(tx: Tx, clubId: string, week: string, cycleId: string, groups: AddedGroup[]) {
-  if (!groups.length) return;
+async function lockAddedGroups(tx: Tx, clubId: string, week: string, cycleId: string, groups: AddedGroup[]): Promise<GroupPlan> {
+  const plan: GroupPlan = { replaced: new Map(), joined: [], links: 0 };
+  if (!groups.length) return plan;
   // Another user can give a group a microcycle (and plan links) after this editor loaded the week.
   // The replacement warning was then not shown, so the save stops.
   const current = await tx.trainingMicrocycleGroup.findMany({
     where: { clubId, week, groupKey: { in: groups.map(g => g.key) } }, select: { groupKey: true, cycle: { select: { id: true, revision: true } } },
   });
-  const replaced = new Map<string, { revision: number; keys: string[] }>();
-  const joined: AddedGroup[] = [];
+  const revisions = new Map<string, number>();
   for (const group of groups) {
     const actual = current.find(item => item.groupKey === group.key)?.cycle;
     if (actual?.id === cycleId) continue;
     if (!actual ? group.expected !== null : actual.id !== group.expected?.id || actual.revision !== group.expected.revision) throw new CycleConflict();
     if (actual) {
-      const entry = replaced.get(actual.id) ?? { revision: actual.revision, keys: [] };
-      entry.keys.push(group.key);
-      replaced.set(actual.id, entry);
+      revisions.set(actual.id, actual.revision);
+      plan.replaced.set(actual.id, [...plan.replaced.get(actual.id) ?? [], group.key]);
     }
-    joined.push(group);
+    plan.joined.push(group);
   }
-  for (const [id, { revision, keys }] of replaced) {
+  for (const [id, revision] of revisions) {
     const changed = await tx.trainingMicrocycle.updateMany({ where: { id, clubId, revision }, data: { revision: { increment: 1 } } });
     if (!changed.count) throw new CycleConflict();
+  }
+  // A coach can link a plan without a change of the revision. The count after the lock includes these links.
+  for (const [id, keys] of plan.replaced)
+    plan.links += await tx.trainingSessionDocument.count({ where: { cycleId: id, groupKey: { in: keys } } });
+  return plan;
+}
+
+/** Moves the groups of a locked plan to the microcycle `cycleId`. */
+async function joinGroups(tx: Tx, clubId: string, week: string, cycleId: string, plan: GroupPlan) {
+  for (const [id, keys] of plan.replaced) {
     // The plan links of these groups are deleted with the group (ON DELETE CASCADE). The plans stay in the library.
     const removed = await tx.trainingMicrocycleGroup.deleteMany({ where: { clubId, week, cycleId: id, groupKey: { in: keys } } });
     if (removed.count !== keys.length) throw new CycleConflict();
   }
-  if (replaced.size) await tx.trainingMicrocycle.deleteMany({ where: { clubId, id: { in: [...replaced.keys()] }, groups: { none: {} } } });
-  if (!joined.length) return;
+  if (plan.replaced.size) await tx.trainingMicrocycle.deleteMany({ where: { clubId, id: { in: [...plan.replaced.keys()] }, groups: { none: {} } } });
+  if (!plan.joined.length) return;
   // A group that got a microcycle after the check gives a unique key error (P2002), and the save rolls back.
   await tx.trainingMicrocycleGroup.createMany({
-    data: joined.map(g => ({ cycleId, clubId, week, groupKey: g.key, groupName: g.name })),
+    data: plan.joined.map(g => ({ cycleId, clubId, week, groupKey: g.key, groupName: g.name })),
   });
+}
+
+/** Stops the save when it removes more plan links than the user accepted. A link made after the confirmation is not removed silently. */
+function checkLinks(input: CycleSave, linked: number) {
+  if (linked > (input.confirmedLinks ?? 0)) throw new RemovedLinks(linked);
 }
 
 /** Saves the microcycle of a group. It returns the microcycle that the group uses after the save. */
@@ -91,7 +108,9 @@ export async function saveCycle(tx: Tx, input: CycleSave) {
       data: { clubId, week, content, groups: { create: { groupKey: group.key, groupName: group.name } } },
       select: { id: true, revision: true },
     });
-    await addGroups(tx, clubId, week, cycle.id, input.addGroups);
+    const plan = await lockAddedGroups(tx, clubId, week, cycle.id, input.addGroups);
+    checkLinks(input, plan.links);
+    await joinGroups(tx, clubId, week, cycle.id, plan);
     return { id: cycle.id, revision: cycle.revision, content };
   }
   const usage = await tx.trainingMicrocycleGroup.findUnique({
@@ -124,11 +143,12 @@ export async function saveCycle(tx: Tx, input: CycleSave) {
   }
   // The plan links of removed trainings are deleted. The plans stay in the library.
   const removedRows = { cycleId: id, rowId: { notIn: content.rows.map(row => row.id) } };
-  // A link made after the confirmation is not removed silently: the user sees the new number.
   const linked = await tx.trainingSessionDocument.count({ where: removedRows });
-  if (linked > (input.confirmedLinks ?? 0)) throw new RemovedLinks(linked);
+  // The user confirms one number: the links of removed trainings and the links of replaced microcycles.
+  const plan = await lockAddedGroups(tx, clubId, week, id, input.addGroups);
+  checkLinks(input, linked + plan.links);
   await tx.trainingSessionDocument.deleteMany({ where: removedRows });
-  await addGroups(tx, clubId, week, id, input.addGroups);
+  await joinGroups(tx, clubId, week, id, plan);
   return { id, revision, content };
 }
 
