@@ -190,7 +190,7 @@ Only custom training groups have a coach group, so team schedule groups send no 
 - The notification is in the bell list of the coach group page. The club page does not show it.
 - The coach group gets a push notification on each device that enabled coach notifications for this coach group.
 
-**Отвори микроцикъла** in the bell list and a click on the push notification open `/admin/training-plans/microcycles?clubId=&coachGroupId=&week=&groupKey=`. The page opens the week and the microcycle of the first group in the read-only coach view. If the group has no microcycle in that week any more, the page shows **Групата вече няма микроцикъл за тази седмица.**
+**Отвори микроцикъла** in the bell list and a click on the push notification open `/admin/training-plans/microcycles?clubId=&coachGroupId=&week=&groupKey=`. The page opens the week and the microcycle of the first group in the read-only coach view, and scrolls to the microcycle. If the group has no microcycle in that week any more, the page shows **Групата вече няма микроцикъл за тази седмица.**
 
 The server sends the notifications after the response (`after()` from `next/server`), one coach group at a time. A failed notification is logged and does not change the saved microcycle.
 
