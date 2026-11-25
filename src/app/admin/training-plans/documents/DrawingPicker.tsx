@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { DrawingSnapshot } from "@/lib/exercise/document";
 import type { Exercise } from "@/lib/exercise/model";
 import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
@@ -71,17 +71,17 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose, onC
   }
 
   return <section className="td-picker" aria-label="Избор на упражнение">
-    <div className="td-actions">
+    <div className="td-picker-head">
       <h3>Избор на упражнение</h3>
-      <div className="td-picker-buttons">
-        {onCreate && <button type="button" className="tp-primary-btn" onClick={onCreate}>
-          <Plus size={16} aria-hidden="true" />Създай ново упражнение
-        </button>}
-        <button type="button" className="tp-secondary-btn" onClick={onClose}>Затвори избора</button>
-      </div>
+      <button type="button" className="tp-icon-btn" onClick={onClose} aria-label="Затвори избора" title="Затвори избора">
+        <X size={18} aria-hidden="true" />
+      </button>
     </div>
+    {onCreate && <button type="button" className="tp-primary-btn td-picker-create" onClick={onCreate}>
+      <Plus size={18} aria-hidden="true" />Създай ново упражнение
+    </button>}
     <div className="td-picker-filters">
-      <div className="td-actions" role="group" aria-label="Филтър за упражнения">
+      <div className="td-picker-scope" role="group" aria-label="Филтър за упражнения">
         {(["mine", "club"] as const).map((option) => <button key={option} type="button"
           className="tp-secondary-btn" aria-pressed={scope === option}
           onClick={() => changeFilter(option, search)}>
