@@ -539,7 +539,9 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
 
 .td-paper-monochrome :is(.td-printed-header, .td-printed-section h3, .td-printed-session-main) { background: #fff; }
 
-@page training-note { size: A4 landscape; margin: 8mm; }
+/* The page has no margin, so the browser has no space for its header and footer (date, page title, address, page number).
+   The 8 mm space is inside the sheet, on each printed page, because printers cannot print to the edge of the paper. */
+@page training-note { size: A4 landscape; margin: 0; }
 @media print {
   html:has(.td-preview), body:has(.td-preview) { margin: 0 !important; padding: 0 !important; min-height: 0 !important; background: white !important; }
   body:has(.td-preview) > :not(:has(.td-preview)),
@@ -564,7 +566,7 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
     width: auto;
     height: auto;
     max-width: none;
-    padding: 0;
+    padding: 8mm;
     break-inside: avoid;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
@@ -581,7 +583,8 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
   .td-preview-multipage .td-print-page {
     box-sizing: border-box;
     width: auto;
-    height: 194mm;
+    height: 210mm;
+    padding: 8mm;
     margin: 0 auto;
     break-after: page;
     page-break-after: always;
