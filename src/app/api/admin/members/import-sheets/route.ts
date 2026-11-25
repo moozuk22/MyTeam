@@ -2,6 +2,7 @@ import { calculatePlayerAge } from "@/lib/playerFields";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
+import { canAccessTrainingClub } from "@/lib/exercise/access";
 import { getGoogleServiceAccountToken } from "@/lib/googleAuth";
 import { randomBytes } from "crypto";
 import { normalizeToMonthStart } from "@/lib/paymentStatus";
@@ -190,7 +191,8 @@ async function createPlayerWithCard({
 // GET — preview only, no DB writes
 export async function GET(request: NextRequest) {
   const token = request.cookies.get("admin_session")?.value;
-  if (!token || !(await verifyAdminToken(token))) {
+  const session = token ? await verifyAdminToken(token) : null;
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -201,6 +203,9 @@ export async function GET(request: NextRequest) {
   }
 
   const clubId = searchParams.get("clubId") ?? "";
+  if (clubId && !canAccessTrainingClub(session, clubId)) {
+    return NextResponse.json({ error: "Нямате достъп до този клуб." }, { status: 403 });
+  }
   let clubBillingInfo: { billingStatus: string; firstBillingMonth: Date | null; defaultPaymentAmount: unknown } | null = null;
   if (clubId) {
     const club = await prisma.club.findUnique({
@@ -235,7 +240,8 @@ export async function GET(request: NextRequest) {
 // POST — import players
 export async function POST(request: NextRequest) {
   const token = request.cookies.get("admin_session")?.value;
-  if (!token || !(await verifyAdminToken(token))) {
+  const session = token ? await verifyAdminToken(token) : null;
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -253,6 +259,9 @@ export async function POST(request: NextRequest) {
 
   if (!spreadsheetId) return NextResponse.json({ error: "spreadsheetId is required" }, { status: 400 });
   if (!clubId) return NextResponse.json({ error: "clubId is required" }, { status: 400 });
+  if (!canAccessTrainingClub(session, clubId)) {
+    return NextResponse.json({ error: "Нямате достъп до този клуб." }, { status: 403 });
+  }
 
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const rawCoachGroupId = body.coachGroupId != null ? String(body.coachGroupId).trim() : null;

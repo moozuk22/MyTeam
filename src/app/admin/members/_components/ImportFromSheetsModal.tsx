@@ -169,6 +169,8 @@ export function ImportFromSheetsModal({
     .map((row) => ({
       rowIndex: row.rowIndex,
       fullName: row.fullName,
+      birthDateIso: row.birthDateIso,
+      jerseyNumber: row.jerseyNumber,
       groupIds: visibleGroups.filter((group) => assignments.has(assignmentKey(row.rowIndex, group.id))).map((group) => group.id),
     }))
     .filter((entry) => entry.groupIds.length > 0);
