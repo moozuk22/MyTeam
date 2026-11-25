@@ -7,6 +7,12 @@ import { randomBytes } from "crypto";
 import { normalizeToMonthStart } from "@/lib/paymentStatus";
 import { parsePaymentAmount } from "@/lib/paymentAmount";
 import { parseAttendanceStartDate } from "@/lib/attendanceStartDate";
+import {
+  assertGroupAssignmentsMatchRows,
+  collectAssignedGroupIds,
+  parseSheetImportGroupAssignments,
+  SheetImportGroupError,
+} from "@/lib/sheetImportGroups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,6 +135,7 @@ async function createPlayerWithCard({
   firstBillingMonth,
   paymentAmount,
   coachGroupId,
+  customGroupIds,
   attendanceStartedAt,
 }: {
   clubId: string;
@@ -139,6 +146,7 @@ async function createPlayerWithCard({
   firstBillingMonth: Date | null;
   paymentAmount: string;
   coachGroupId: string | null;
+  customGroupIds: string[];
   attendanceStartedAt: Date | null;
 }) {
   let lastError: unknown = null;
@@ -160,6 +168,9 @@ async function createPlayerWithCard({
             paymentAmount,
             cards: { create: { cardCode, isActive: true } },
             ...(coachGroupId ? { coachGroups: { connect: [{ id: coachGroupId }] } } : {}),
+            ...(customGroupIds.length > 0
+              ? { customTrainingGroups: { create: customGroupIds.map((groupId) => ({ groupId })) } }
+              : {}),
           },
         });
         if (attendanceStartedAt) {
@@ -234,6 +245,7 @@ export async function POST(request: NextRequest) {
     firstBillingMonth?: unknown;
     paymentAmount?: unknown;
     coachGroupId?: unknown;
+    groupAssignments?: unknown;
   };
 
   const spreadsheetId = String(body.spreadsheetId ?? "").trim();
@@ -257,6 +269,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Coach group not found" }, { status: 404 });
     }
     coachGroupId = rawCoachGroupId;
+  }
+
+  let groupAssignments: ReturnType<typeof parseSheetImportGroupAssignments>;
+  try {
+    groupAssignments = parseSheetImportGroupAssignments(body.groupAssignments);
+  } catch (error) {
+    if (error instanceof SheetImportGroupError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
+  const assignedGroupIds = collectAssignedGroupIds(groupAssignments);
+  if (assignedGroupIds.length > 0) {
+    // Groups must belong to this club and to the same coach-group scope as the import.
+    const foundGroups = await prisma.clubCustomTrainingGroup.count({
+      where: { id: { in: assignedGroupIds }, clubId, coachGroupId },
+    });
+    if (foundGroups !== assignedGroupIds.length) {
+      return NextResponse.json({ error: "Персонализираната група не е намерена." }, { status: 404 });
+    }
   }
 
   // Verify club exists and fetch billing info
@@ -301,6 +333,15 @@ export async function POST(request: NextRequest) {
     const { rows, error } = parseSheetRows(values);
     if (error) return NextResponse.json({ error }, { status: 422 });
 
+    try {
+      assertGroupAssignmentsMatchRows(groupAssignments, rows);
+    } catch (assignmentError) {
+      if (assignmentError instanceof SheetImportGroupError) {
+        return NextResponse.json({ error: assignmentError.message }, { status: assignmentError.status });
+      }
+      throw assignmentError;
+    }
+
     let created = 0;
     let skipped = 0;
     const errors: Array<{ row: number; name: string; reason: string }> = [];
@@ -321,6 +362,7 @@ export async function POST(request: NextRequest) {
           firstBillingMonth: resolvedFirstBillingMonth,
           paymentAmount,
           coachGroupId,
+          customGroupIds: groupAssignments.get(row.rowIndex)?.groupIds ?? [],
           attendanceStartedAt: row.attendanceStartedAtIso ? new Date(row.attendanceStartedAtIso) : null,
         });
         created++;
