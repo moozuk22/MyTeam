@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { Plus } from "lucide-react";
 import type { DrawingSnapshot } from "@/lib/exercise/document";
 import type { Exercise } from "@/lib/exercise/model";
 import FinanceSkeleton from "../../members/_components/FinanceSkeleton";
@@ -12,8 +13,10 @@ const PlanPreview = dynamic(() => import("../PlanPreview"), { ssr: false, loadin
 type DrawingSummary = { id: string; title: string; creatorName: string | null; layoutVersion: number };
 type DrawingPage = { plans: DrawingSummary[]; nextCursor: string | null };
 
-export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
+export default function DrawingPicker({ endpoint, location, onPick, onClose, onCreate }: {
   endpoint: string; location: string; onPick: (drawing: DrawingSnapshot, requirements: string) => void; onClose: () => void;
+  /** Opens the exercise editor for a new exercise. Without it, the picker has no create button. */
+  onCreate?: () => void;
 }) {
   const searchId = useId();
   const [scope, setScope] = useState<"mine" | "club">("mine");
@@ -70,7 +73,12 @@ export default function DrawingPicker({ endpoint, location, onPick, onClose }: {
   return <section className="td-picker" aria-label="Избор на упражнение">
     <div className="td-actions">
       <h3>Избор на упражнение</h3>
-      <button type="button" className="tp-secondary-btn" onClick={onClose}>Затвори избора</button>
+      <div className="td-picker-buttons">
+        {onCreate && <button type="button" className="tp-primary-btn" onClick={onCreate}>
+          <Plus size={16} aria-hidden="true" />Създай ново упражнение
+        </button>}
+        <button type="button" className="tp-secondary-btn" onClick={onClose}>Затвори избора</button>
+      </div>
     </div>
     <div className="td-picker-filters">
       <div className="td-actions" role="group" aria-label="Филтър за упражнения">

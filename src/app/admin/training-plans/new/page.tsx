@@ -5,18 +5,19 @@ import { prisma } from "@/lib/db";
 import { canAccessTrainingClub, findTrainingPlanCoachGroup, UUID_RE } from "@/lib/exercise/access";
 import { listTrainingPlanCategories } from "@/lib/exercise/categories";
 import { EMPTY_EXERCISE } from "@/lib/exercise/model";
+import { readPlanReturn } from "@/lib/exercise/planReturn";
 import EditorLoader from "../[planId]/konva/EditorLoader";
 
 export default async function NewTrainingPlanPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clubId?: string; category?: string; coachGroupId?: string }>;
+  searchParams: Promise<{ clubId?: string; category?: string; coachGroupId?: string; from?: string; section?: string }>;
 }) {
   const token = (await cookies()).get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
   if (!session) redirect("/admin/login");
 
-  const { clubId, category, coachGroupId } = await searchParams;
+  const { clubId, category, coachGroupId, from, section } = await searchParams;
   if (typeof clubId !== "string" || !UUID_RE.test(clubId) || !canAccessTrainingClub(session, clubId))
     notFound();
 
@@ -40,6 +41,7 @@ export default async function NewTrainingPlanPage({
       clubId={clubId}
       coachGroupId={coachGroup?.id}
       userId={session.sub}
+      planReturn={readPlanReturn({ from, section }, clubId, coachGroup?.id) ?? undefined}
     />
   );
 }

@@ -45,9 +45,12 @@ import {
   Waypoints,
   Undo2,
   X,
+  FilePlus2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
+import { planReturnSearch, planReturnUrl, type PlanReturn } from "@/lib/exercise/planReturn";
+import PlanReturnPanel from "./PlanReturnPanel";
 import { countEquipment, FOOTBALL } from "@/lib/exercise/football";
 import {
   HEIGHT,
@@ -426,6 +429,8 @@ export type EditorProps = {
   userId: string;
   coachGroupId?: string;
   initialPanel?: "description" | "equipment";
+  /** The plan document that the coach came from to create the exercise. */
+  planReturn?: PlanReturn;
 };
 function objectLabel(o: ExerciseObject) {
   return o.kind === "player"
@@ -518,7 +523,7 @@ function MovementPreview({ type, arrowhead }: { type: ExerciseTool; arrowhead: b
     </svg>
   );
 }
-export default function Editor({ plan, categories = [], clubId, userId, coachGroupId, initialPanel }: EditorProps) {
+export default function Editor({ plan, categories = [], clubId, userId, coachGroupId, initialPanel, planReturn }: EditorProps) {
   const subscription = useTrainingPlanAccess(clubId);
   const router = useRouter();
   const [planId, setPlanId] = useState(plan.id);
@@ -1092,9 +1097,10 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       categorySelect.current?.focus();
     }
   }
-  async function save(asCopy = false) {
-    if (!subscription.access?.canSave) { setError(trainingSubscriptionMessage); return; }
-    if (savingRef.current || importingImage || recovery || pitchSelection || addingCategory) return;
+  /** Gives the ID of the saved exercise, or null when the save stops or fails. A copy also gives null. */
+  async function save(asCopy = false): Promise<string | null> {
+    if (!subscription.access?.canSave) { setError(trainingSubscriptionMessage); return null; }
+    if (savingRef.current || importingImage || recovery || pitchSelection || addingCategory) return null;
     const snapshotTitle = state.current.title.trim();
     if (!snapshotTitle) {
       closeConflict();
@@ -1102,7 +1108,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       setTitleRequired(true);
       setShowDetails(true);
       requestAnimationFrame(() => titleInput.current?.focus());
-      return;
+      return null;
     }
     savingRef.current = true;
     setSaving(true);
@@ -1134,7 +1140,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       if (res.status === 409 && !asCopy && !creating) {
         setConflict(true);
         setShowConflict(true);
-        return;
+        return null;
       }
       if (!res.ok) throw new Error(payload.error || "Грешка при запис.");
       if (asCopy) {
@@ -1145,7 +1151,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         if (creating) {
           setPlanId(payload.plan.id);
           // Keep the canvas mounted so edits made during the save stay in the editor.
-          window.history.replaceState(null, "", `/admin/training-plans/${payload.plan.id}/konva?${search}`);
+          window.history.replaceState(null, "", `/admin/training-plans/${payload.plan.id}/konva?${search}${planReturn ? `&${planReturnSearch(planReturn)}` : ""}`);
         }
         setSaved(snapshot);
         setTitle(snapshotTitle);
@@ -1167,6 +1173,7 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
         } catch {
           setStorageError(true);
         }
+        return payload.plan.id as string;
       }
     } catch (err) {
       setError(
@@ -1178,6 +1185,15 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
       savingRef.current = false;
       setSaving(false);
     }
+    return null;
+  }
+
+  /** Saves the exercise, then opens the plan document with the exercise in the section. A failed save stays in the editor. */
+  async function saveAndReturn() {
+    if (!planReturn) return;
+    if (conflict && title.trim()) { setShowConflict(true); return; }
+    const id = !dirty && planId ? planId : await save();
+    if (id) router.push(planReturnUrl(planReturn, id));
   }
   const [copyId, setCopyId] = useState<string | null>(null);
   function closeConflict() {
@@ -1588,13 +1604,40 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
             <button
               type="button"
               className="ke-back"
-              aria-label="Към упражненията"
-              onClick={() => navigateAway(`/admin/training-plans?${search}`)}
+              aria-label={planReturn ? "Към план-конспекта" : "Към упражненията"}
+              onClick={() => navigateAway(planReturn ? planReturnUrl(planReturn) : `/admin/training-plans?${search}`)}
             >
               <ArrowLeft size={18} aria-hidden="true" />
-              <span>Към упражненията</span>
+              <span>{planReturn ? "Към план-конспекта" : "Към упражненията"}</span>
             </button>
             <h1><Waypoints size={24} aria-hidden="true" />{planId ? "Редактор на упражнение" : "Ново упражнение"}</h1>
+            {planReturn ? <div className="ke-header-actions">
+              <button
+                type="button"
+                className={planReturn ? undefined : "ke-primary"}
+                disabled={saving || importingImage || (!!subscription.access?.canSave && !dirty && !conflict) || !!recovery || !!pitchSelection || addingCategory}
+                onClick={() => {
+                  if (!subscription.access?.canSave) setError(trainingSubscriptionMessage);
+                  else if (conflict && title.trim()) setShowConflict(true);
+                  else void save();
+                }}
+              >
+                <Save size={18} />
+                {saving ? "Записване…" : "Запази"}
+              </button>
+              <button
+                type="button"
+                className="ke-primary"
+                disabled={saving || importingImage || !!recovery || !!pitchSelection || addingCategory}
+                onClick={() => {
+                  if (!subscription.access?.canSave) setError(trainingSubscriptionMessage);
+                  else void saveAndReturn();
+                }}
+              >
+                <FilePlus2 size={18} aria-hidden="true" />
+                {saving ? "Записване…" : "Запази и добави в план-конспекта"}
+              </button>
+            </div> : (
             <button
               type="button"
               className="ke-primary"
@@ -1608,12 +1651,14 @@ export default function Editor({ plan, categories = [], clubId, userId, coachGro
               <Save size={18} />
               {saving ? "Записване…" : "Запази"}
             </button>
+            )}
             <span className="ke-save-status" role="status">
               {!dirty && planId && <Check size={17} aria-hidden="true" />}
               {dirty ? "Незапазени промени" : status || (planId ? "Промените са запазени" : "Незаписан план")}
             </span>
           </div>
         </header>
+        {planReturn?.target && <PlanReturnPanel planReturn={{ ...planReturn, target: planReturn.target }} clubId={clubId} coachGroupId={coachGroupId} compact={compact} />}
         {(copyId || (error && !showConflict) || storageError) && (
           <div className="ke-feedback" aria-live="polite">
             {copyId && (

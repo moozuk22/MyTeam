@@ -7,6 +7,7 @@ import { trainingPlanSearch } from "@/lib/exercise/planLocation";
 import { currentCompetitionSeason } from "@/lib/exercise/document";
 import { applyCloudinaryTransformToUrl, buildCloudinaryUrlFromUploadPath } from "@/lib/cloudinaryImagePath";
 import { sessionTarget, sessionOrigin } from "@/lib/exercise/trainingSession";
+import { readReturnedExercise } from "@/lib/exercise/planReturn";
 import DocumentWorkspace from "./DocumentWorkspace";
 import "../page.css";
 import "./documents.css";
@@ -14,7 +15,7 @@ import "./documents.css";
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clubId?: string; coachGroupId?: string; document?: string; link?: string; replace?: string }>;
+  searchParams: Promise<{ clubId?: string; coachGroupId?: string; document?: string; link?: string; replace?: string; exercise?: string; section?: string }>;
 }) {
   const [params, cookieStore] = await Promise.all([searchParams, cookies()]);
   const token = cookieStore.get("admin_session")?.value;
@@ -58,5 +59,6 @@ export default async function DocumentsPage({
     selected={selected}
     link={link}
     replace={replace}
+    returned={selected ? readReturnedExercise(params) : undefined}
   />;
 }

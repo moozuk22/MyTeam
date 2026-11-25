@@ -430,6 +430,7 @@ button.td-document-open:disabled { cursor: wait; opacity: .65; }
 }
 .td-picker { display: grid; gap: 10px; margin-top: 12px; }
 .td-picker h3, .td-picker h4, .td-print-toolbar h2 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.td-picker-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .td-picker-preview { display: grid; gap: 8px; justify-items: start; }
 .td-picker-pitch { position: relative; width: 100%; height: 165px; }
 .td-picker-pitch .tp-preview-canvas { width: 100%; height: 100%; }
