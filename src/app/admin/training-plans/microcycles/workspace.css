@@ -289,7 +289,8 @@
 }
 
 @media print {
-  body * { visibility: hidden; }
+  /* Next.js keeps this stylesheet on other pages after a client navigation. Hide content only on the microcycle page. */
+  body:where(:has(.mc-page)) * { visibility: hidden; }
   .mc-print-allowed .mc-sheet, .mc-print-allowed .mc-sheet * { visibility: visible; }
   .mc-sheet { position: absolute; inset: 0 auto auto 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .mcp-table tr { break-inside: avoid; }

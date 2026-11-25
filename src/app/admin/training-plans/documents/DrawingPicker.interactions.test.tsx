@@ -48,8 +48,8 @@ function find(node: ReactNode, predicate: (props: Record<string, unknown>) => bo
   }
   throw new Error("Control not found");
 }
-function setup() {
-  const props = { endpoint: "/drawings", location: "clubId=club", onPick: vi.fn(), onClose: vi.fn() };
+function setup(extra: { onCreate?: () => void } = {}) {
+  const props = { endpoint: "/drawings", location: "clubId=club", onPick: vi.fn(), onClose: vi.fn(), ...extra };
   function render() {
     hooks.cursor = 0; hooks.effectCursor = 0;
     const tree = DrawingPicker(props);
@@ -137,4 +137,33 @@ it("gives each section a distinct picker key when switching within a merged cell
   const second = find(render(), (props) => props.endpoint === "/drawings");
   expect(first.key).toBe("2");
   expect(second.key).toBe("3");
+});
+
+const hasCreate = (node: ReactNode) => {
+  try { find(node, (props) => [props.children].flat().includes("Създай ново упражнение")); return true; } catch { return false; }
+};
+
+it("shows the create button only when the plan can open the exercise editor", () => {
+  hooks.request.mockReturnValue(new Promise(() => {}));
+  expect(hasCreate(setup().render())).toBe(false);
+  reset();
+  const onCreate = vi.fn();
+  const picker = setup({ onCreate });
+  (find(picker.render(), (props) => [props.children].flat().includes("Създай ново упражнение")).props.onClick as () => void)();
+  expect(onCreate).toHaveBeenCalledOnce();
+});
+
+it("creates the exercise for the section of the open picker", () => {
+  const onCreateDrawing = vi.fn();
+  const content = blankDocument();
+  function render() {
+    hooks.cursor = 0;
+    return DocumentFields({ content, disabled: false, drawingEndpoint: "/drawings", location: "clubId=club",
+      onSession: vi.fn(), onSection: vi.fn(), onDrawing: vi.fn(), onMerge: vi.fn(), onCreateDrawing });
+  }
+  (find(render(), (props) => props.children === "Добави упражнение" && props["aria-expanded"] === false).props.onClick as () => void)();
+  const picker = find(render(), (props) => props.endpoint === "/drawings");
+  (picker.props.onCreate as () => void)();
+  expect(picker.key).toBe("0");
+  expect(onCreateDrawing).toHaveBeenCalledWith(0);
 });

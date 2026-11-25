@@ -7,6 +7,7 @@ import { canAccessTrainingClub, UUID_RE } from "@/lib/exercise/access";
 import { listTrainingPlanCategories } from "@/lib/exercise/categories";
 import { isV2, validateExercise } from "@/lib/exercise/model";
 import { trainingPlanSearch } from "@/lib/exercise/planLocation";
+import { readPlanReturn } from "@/lib/exercise/planReturn";
 import EditorLoader from "./EditorLoader";
 
 export default async function KonvaPage({
@@ -14,13 +15,13 @@ export default async function KonvaPage({
   searchParams,
 }: {
   params: Promise<{ planId: string }>;
-  searchParams: Promise<{ clubId?: string; coachGroupId?: string; panel?: string }>;
+  searchParams: Promise<{ clubId?: string; coachGroupId?: string; panel?: string; from?: string; section?: string }>;
 }) {
   const token = (await cookies()).get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
   if (!session) redirect("/admin/login");
   const { planId } = await params;
-  const { clubId, coachGroupId, panel } = await searchParams;
+  const { clubId, coachGroupId, panel, from, section } = await searchParams;
   if (
     !clubId ||
     !UUID_RE.test(clubId) ||
@@ -57,6 +58,7 @@ export default async function KonvaPage({
       coachGroupId={groupContext}
       userId={session.sub}
       initialPanel={panel === "description" || panel === "equipment" ? panel : undefined}
+      planReturn={readPlanReturn({ from, section }, clubId, groupContext) ?? undefined}
     />
   );
 }

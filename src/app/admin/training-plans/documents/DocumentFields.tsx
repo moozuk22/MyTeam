@@ -49,7 +49,7 @@ function Field({ label, value, max, type, id: customId, heading, wrapHeading, re
   </div>;
 }
 
-export default function DocumentFields({ content, disabled, drawingEndpoint, location, sessionSlot, onSession, onSection, onDrawing, onMerge }: {
+export default function DocumentFields({ content, disabled, drawingEndpoint, location, sessionSlot, onSession, onSection, onDrawing, onMerge, onCreateDrawing }: {
   content: PlanContent; disabled: boolean; drawingEndpoint: string; location: string;
   /** Replaces the default text field of a session field, for example with a field that has suggestions. */
   sessionSlot?: (key: keyof SessionFields) => ReactNode;
@@ -58,6 +58,8 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
   /** `requirements` holds the exercise requirements when the coach picks an exercise. */
   onDrawing: (index: number, drawing: DrawingSnapshot | null, requirements?: string) => void;
   onMerge: (merge: Merge) => void;
+  /** Opens the exercise editor to create an exercise for the section. */
+  onCreateDrawing?: (index: number) => void;
 }) {
   const [activePicker, setActivePicker] = useState<number>();
   const pickerButtons = useRef<Record<number, HTMLButtonElement | null>>({});
@@ -115,7 +117,8 @@ export default function DocumentFields({ content, disabled, drawingEndpoint, loc
           })}
         </div>
         {activePicker !== undefined && indices.includes(activePicker) && <DrawingPicker key={activePicker} endpoint={drawingEndpoint} location={location}
-          onPick={(drawing, requirements) => { onDrawing(activePicker, drawing, requirements); closePicker(activePicker); }} onClose={() => closePicker(activePicker)} />}
+          onPick={(drawing, requirements) => { onDrawing(activePicker, drawing, requirements); closePicker(activePicker); }} onClose={() => closePicker(activePicker)}
+          onCreate={onCreateDrawing && (() => onCreateDrawing(activePicker))} />}
       </div>
       <div className="td-edit-split td-edit-footer">
         {indices.map((index) => <div key={index} className="td-fields">

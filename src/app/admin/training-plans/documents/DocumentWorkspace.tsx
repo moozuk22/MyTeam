@@ -202,10 +202,12 @@ function DocumentList({ coach, endpoint, drawingEndpoint, listHref, backHref, co
   </>;
 }
 
-export default function DocumentWorkspace({ target, clubId, clubName, clubLogoUrl, groupName, competitionSeason, location, selected, link = false, replace }: {
+export default function DocumentWorkspace({ target, clubId, clubName, clubLogoUrl, groupName, competitionSeason, location, selected, link = false, replace, returned }: {
   target?: SessionTarget; clubId: string; clubName: string; clubLogoUrl?: string; groupName?: string; competitionSeason: CompetitionSeason; location: string; selected?: string; link?: boolean;
   /** The plan that the coach replaces in the training. */
   replace?: string;
+  /** The exercise that the coach created from the plan, and the section that gets it. */
+  returned?: { exercise: string; section: number };
 }) {
   const drawingEndpoint = `/api/admin/clubs/${clubId}/training-plans`;
   const coach = new URLSearchParams(location).get("coachGroupId");
@@ -263,7 +265,7 @@ export default function DocumentWorkspace({ target, clubId, clubName, clubLogoUr
           : <FinanceSkeleton variant="form" />}
       </section>}
       {(loaded || selected === "new") && <DocumentEditor target={target} clubId={clubId} clubLogoUrl={clubLogoUrl} initial={loaded} groupName={groupName} competitionSeason={competitionSeason} context={context} endpoint={endpoint}
-        drawingEndpoint={drawingEndpoint} location={location} listHref={listHref} link={link} replace={replace} />}
+        drawingEndpoint={drawingEndpoint} location={location} listHref={listHref} link={link} replace={replace} returned={returned} />}
     </div>
   </main>;
 }

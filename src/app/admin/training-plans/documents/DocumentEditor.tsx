@@ -11,6 +11,7 @@ import { sessionUrl, sessionOrigin, sessionTarget, type SessionTarget, type Trai
 import { formatWeekRange } from "@/lib/exercise/microcycle";
 import { groupCycles, resolveTraining, type TrainingOptions } from "@/lib/exercise/trainingOptions";
 import { usageLabel, type TrainingUsage } from "@/lib/exercise/trainingUsage";
+import { newExerciseUrl } from "@/lib/exercise/planReturn";
 import TrainingReferencePanel from "./TrainingReferencePanel";
 import TrainingCombobox from "./TrainingCombobox";
 import BackLink from "../BackLink";
@@ -58,18 +59,22 @@ function withoutTraining(content: PlanContent) {
   return JSON.stringify({ ...content, session });
 }
 
-export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, groupName, competitionSeason, context, endpoint, drawingEndpoint, location, listHref, link = false, replace }: {
+export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, groupName, competitionSeason, context, endpoint, drawingEndpoint, location, listHref, link = false, replace, returned }: {
   target?: SessionTarget; clubId: string; clubLogoUrl?: string; initial?: SavedDocument; groupName?: string; competitionSeason: CompetitionSeason; context: string; endpoint: string; drawingEndpoint: string; location: string; listHref: string;
   /** The plan is not linked to the training yet. Saving links it. */
   link?: boolean;
   /** The plan that this save replaces in the training. */
   replace?: string;
+  /** The exercise that the coach created from this plan. The editor puts it in the section. */
+  returned?: { exercise: string; section: number };
 }) {
   const router = useRouter();
   const coach = new URLSearchParams(location).get("coachGroupId");
   const returnHref = target && sessionUrl("microcycles", location, target);
   const backHref = target && link ? `${sessionUrl("documents", location, target, "choose")}${replace ? `&replace=${replace}` : ""}` : returnHref;
   const storageKey = target && `training-document:${clubId}:${coach}:${sessionOrigin(target)}:${initial?.id ?? "new"}${link ? ":link" : ""}`;
+  // Keeps the draft while the coach creates an exercise in the exercise editor. Plans from the library have no other draft.
+  const handoffKey = `training-document-exercise:${clubId}:${coach}:${target ? sessionOrigin(target) : ""}:${initial?.id ?? "new"}${link ? ":link" : ""}`;
   const [ready, setReady] = useState(!target);
   const [reference, setReference] = useState<{ key: string; value: TrainingReference }>();
   const [referenceError, setReferenceError] = useState<{ key: string; message: string }>();
@@ -113,16 +118,18 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
   const proposedId = useRef<string>(initial?.id ?? "");
   const [changes, setChanges] = useState<Partial<Record<number, string | null>>>({});
   const saveChoice = useRef<HTMLDialogElement>(null);
-  const [previewing, setPreviewing] = useState(() => Boolean(target && initial && !link));
+  const [previewing, setPreviewing] = useState(() => Boolean(target && initial && !link && !returned));
+  const [restored, setRestored] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!storageKey) return;
     try {
-      const raw = sessionStorage.getItem(storageKey);
+      const handoff = sessionStorage.getItem(handoffKey);
+      if (handoff) { sessionStorage.removeItem(handoffKey); setPreviewing(false); }
+      const raw = handoff ?? (storageKey ? sessionStorage.getItem(storageKey) : null);
       if (raw) {
         const draft: Draft = JSON.parse(raw);
         setContent(draft.content); setChanges(draft.changes); setDirty(true);
@@ -134,7 +141,8 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
       }
     } catch { setStorageError(true); }
     setReady(true);
-  }, [storageKey]);
+    setRestored(true);
+  }, [storageKey, handoffKey]);
 
   const initialGroup = useRef(content.session.group);
   useEffect(() => {
@@ -245,17 +253,55 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
     return () => controller.abort();
   }, [extraTargetsJson, ready, drawingEndpoint, location, refresh]);
 
+  const draftJson = useCallback((submitted = pending.current, independent = privateDraft) => {
+    const draft: Draft = { content, changes, saved, id: proposedId.current, pending: submitted,
+      privateDraft: independent, training };
+    return JSON.stringify(draft);
+  }, [content, changes, saved, privateDraft, training]);
   const storeDraft = useCallback((submitted = pending.current, independent = privateDraft) => {
     if (!storageKey || leaving.current) return;
     try {
-      const draft: Draft = { content, changes, saved, id: proposedId.current, pending: submitted,
-        privateDraft: independent, training };
-      sessionStorage.setItem(storageKey, JSON.stringify(draft));
+      sessionStorage.setItem(storageKey, draftJson(submitted, independent));
     } catch { setStorageError(true); }
-  }, [storageKey, content, changes, saved, privateDraft, training]);
+  }, [storageKey, privateDraft, draftJson]);
   useEffect(() => {
     if (dirty && ready) storeDraft();
   }, [dirty, ready, storeDraft]);
+
+  /** Opens the exercise editor for a new exercise for the section. The draft waits for the coach to come back. */
+  function createExercise(index: number) {
+    if (saving) return;
+    if (dirty) {
+      try { sessionStorage.setItem(handoffKey, draftJson()); }
+      catch { setError("Черновата не може да се запази. Запазете план-конспекта, преди да създадете упражнение."); return; }
+    }
+    const from = new URLSearchParams(window.location.search);
+    from.delete("exercise"); from.delete("section");
+    leaving.current = true;
+    navigationBlocked.current = false;
+    router.push(newExerciseUrl(location, `${window.location.pathname}?${from}`, index));
+  }
+
+  // The exercise from the exercise editor goes in the section after the draft is back.
+  const attachRef = useRef(attach);
+  useEffect(() => { attachRef.current = attach; });
+  const returnHandled = useRef(false);
+  useEffect(() => {
+    if (!returned || !restored || returnHandled.current) return;
+    returnHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    params.delete("exercise"); params.delete("section");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${params}`);
+    // No abort: the request runs once, also when the effect runs again.
+    void documentRequest<{ plan: { id: string; title: string; requirements?: string | null; layout: DrawingSnapshot["layout"] } }>(
+      `${drawingEndpoint}/${returned.exercise}`, "Новото упражнение не може да се зареди. Изберете го от „Добави упражнение“.",
+    ).then(async ({ plan }) => {
+      if (plan.layout?.version !== 2) throw new Error("Новото упражнение не може да се добави. Изберете го от „Добави упражнение“.");
+      setPreviewing(false);
+      await attachRef.current(returned.section, { sourceId: plan.id, title: plan.title, layout: plan.layout }, plan.requirements ?? "");
+      setNotice(`Упражнението „${plan.title}“ е в план-конспекта. Запазете план-конспекта.`);
+    }).catch((failure: Error) => setError(failure.message));
+  }, [returned, restored, drawingEndpoint]);
 
   function returnToCycle(href = returnHref) {
     if (!href) return;
@@ -707,7 +753,8 @@ export default function DocumentEditor({ target, clubId, clubLogoUrl, initial, g
         ? <DocumentSheet content={visibleContent} clubLogoUrl={clubLogoUrl} pending={saving} canPrint={!!subscription.access?.canPrint} checkPrint={async () => (await subscription.refresh()).canPrint} />
         : <DocumentFields content={visibleContent} disabled={saving || !ready || (!!target && !initialized.current)} drawingEndpoint={drawingEndpoint} location={location} sessionSlot={sessionSlot}
             onSession={(key, value) => edit(current => ({ ...current, session: { ...current.session, [key]: value } }))}
-            onSection={updateSection} onDrawing={attach} onMerge={(merge) => edit((current) => ({ ...current, merge }))} />}
+            onSection={updateSection} onDrawing={attach} onMerge={(merge) => edit((current) => ({ ...current, merge }))}
+            onCreateDrawing={createExercise} />}
     </div>
   </>;
 }

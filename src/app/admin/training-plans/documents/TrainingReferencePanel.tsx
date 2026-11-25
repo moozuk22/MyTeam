@@ -53,7 +53,7 @@ function ReferenceSkeleton() {
 }
 
 /** The methodist's instructions for the training from the weekly microcycle. They help the coach to fill in the plan. */
-export default function TrainingReferencePanel({ reference, error, refresh, changed, note, group, missing, others = [] }: {
+export default function TrainingReferencePanel({ reference, error, refresh, changed, note, group, missing, others = [], defaultOpen = true }: {
   reference?: TrainingReference; error: string; refresh: () => void; changed: boolean;
   /** Tells the coach that the plan will be linked to another training. */
   note?: string;
@@ -63,8 +63,10 @@ export default function TrainingReferencePanel({ reference, error, refresh, chan
   missing?: boolean;
   /** The instructions of the other checked groups. */
   others?: GroupReference[];
+  /** False shows only the header first. The coach opens the instructions. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
   const body = useId();
   const title = useId();
   const entries = others.length ? mergeReferences([{ group: group ?? "", reference, error: error || undefined, missing }, ...others]) : [];

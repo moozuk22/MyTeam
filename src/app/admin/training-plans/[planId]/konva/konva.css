@@ -1169,3 +1169,27 @@ fieldset:disabled .ke-canvas {
     flex-shrink: 0;
   }
 }
+
+/* The plan document that the coach came from: the methodist's instructions and the way back. */
+.ke-plan-reference .td-reference { margin-block: 0 8px; }
+.ke-page .ke-plan-reference button.td-reference-toggle {
+  justify-content: flex-start;
+  padding: 4px 4px 4px 12px;
+  border: 0;
+  background: transparent;
+}
+.ke-page .ke-plan-reference button.td-reference-refresh { width: 44px; padding: 0; }
+/* "Запази" and "Запази и добави в план-конспекта" side by side. On a phone they take their own row. */
+.ke-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.ke-header-actions > button { padding-inline: 14px; }
+.ke-header-actions > button:not(.ke-primary) { font-weight: 700; }
+@media (min-width: 700px) {
+  .ke-header-bar > .ke-header-actions { grid-column: 4; grid-row: 1; }
+}
