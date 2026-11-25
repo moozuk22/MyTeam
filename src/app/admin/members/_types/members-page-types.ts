@@ -292,6 +292,7 @@ type ParsedPlayerRow = {
   birthDateIso: string | null;
   teamGroup: number | null;
   jerseyNumber: string | null;
+  attendanceStartedAtIso?: string | null;
   warning?: string;
 };
 

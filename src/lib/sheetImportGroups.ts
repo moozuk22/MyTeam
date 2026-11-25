@@ -2,12 +2,17 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const MAX_ASSIGNMENTS = 5000;
 const MAX_GROUPS_PER_ROW = 100;
 
-/** The preview row data that identifies the player, plus the selected groups. */
-export type SheetImportGroupAssignment = {
-  rowIndex: number;
+/** Every previewed row field that the import saves on the player. */
+type SheetImportRowIdentity = {
   fullName: string;
   birthDateIso: string | null;
   jerseyNumber: string | null;
+  attendanceStartedAtIso: string | null;
+};
+
+/** The preview row data that identifies the player, plus the selected groups. */
+export type SheetImportGroupAssignment = SheetImportRowIdentity & {
+  rowIndex: number;
   groupIds: string[];
 };
 
@@ -38,10 +43,11 @@ export function parseSheetImportGroupAssignments(raw: unknown): Map<number, Shee
     const fullName = typeof entry?.fullName === "string" ? entry.fullName.trim() : "";
     const birthDateIso = optionalString(entry?.birthDateIso);
     const jerseyNumber = optionalString(entry?.jerseyNumber);
+    const attendanceStartedAtIso = optionalString(entry?.attendanceStartedAtIso);
     const groupIdsRaw = entry?.groupIds;
     if (
       typeof rowIndex !== "number" || !Number.isInteger(rowIndex) || rowIndex < 2 ||
-      !fullName || birthDateIso === undefined || jerseyNumber === undefined ||
+      !fullName || birthDateIso === undefined || jerseyNumber === undefined || attendanceStartedAtIso === undefined ||
       !Array.isArray(groupIdsRaw) || groupIdsRaw.length > MAX_GROUPS_PER_ROW ||
       result.has(rowIndex)
     ) {
@@ -51,7 +57,7 @@ export function parseSheetImportGroupAssignments(raw: unknown): Map<number, Shee
     if (groupIds.some((id) => !UUID_REGEX.test(id))) {
       throw new SheetImportGroupError("Невалидна персонализирана група.", 400);
     }
-    if (groupIds.length > 0) result.set(rowIndex, { rowIndex, fullName, birthDateIso, jerseyNumber, groupIds });
+    if (groupIds.length > 0) result.set(rowIndex, { rowIndex, fullName, birthDateIso, jerseyNumber, attendanceStartedAtIso, groupIds });
   }
   return result;
 }
@@ -59,12 +65,16 @@ export function parseSheetImportGroupAssignments(raw: unknown): Map<number, Shee
 /**
  * Makes sure each assignment still points at the same player in the sheet,
  * so a sheet edited after the preview cannot put a player in the wrong group.
- * Name, birth date and jersey number are compared, so same-named players
- * that changed rows are also detected.
+ * Every saved row field is compared, so same-named players that changed rows
+ * are also detected. Rows that are equal in every saved field create equal
+ * players, so a swap between them cannot put the wrong data in a group.
  */
 export function assertGroupAssignmentsMatchRows(
   assignments: Map<number, SheetImportGroupAssignment>,
-  rows: Array<{ rowIndex: number; fullName: string; birthDateIso: string | null; jerseyNumber: string | null }>,
+  rows: Array<Omit<SheetImportRowIdentity, "attendanceStartedAtIso"> & {
+    rowIndex: number;
+    attendanceStartedAtIso?: string | null;
+  }>,
 ) {
   const rowsByIndex = new Map(rows.map((row) => [row.rowIndex, row]));
   for (const assignment of assignments.values()) {
@@ -73,7 +83,8 @@ export function assertGroupAssignmentsMatchRows(
       !row ||
       row.fullName !== assignment.fullName ||
       row.birthDateIso !== assignment.birthDateIso ||
-      row.jerseyNumber !== assignment.jerseyNumber
+      row.jerseyNumber !== assignment.jerseyNumber ||
+      (row.attendanceStartedAtIso ?? null) !== assignment.attendanceStartedAtIso
     ) {
       throw new SheetImportGroupError(
         "Таблицата е променена след прегледа. Върнете се назад и я отворете отново.",

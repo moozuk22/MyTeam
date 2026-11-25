@@ -82,9 +82,9 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
     mocks.groupCount.mockResolvedValue(2);
     const response = await POST(request({
       groupAssignments: [
-        { rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA, groupB] },
-        { rowIndex: 4, fullName: "Мартин Велков", birthDateIso: "2015-06-05T00:00:00.000Z", jerseyNumber: "9", groupIds: [groupB] },
-        { rowIndex: 3, fullName: "Георги Токов", birthDateIso: "2016-04-03T00:00:00.000Z", jerseyNumber: null, groupIds: [] },
+        { rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA, groupB] },
+        { rowIndex: 4, fullName: "Мартин Велков", birthDateIso: "2015-06-05T00:00:00.000Z", jerseyNumber: "9", attendanceStartedAtIso: null, groupIds: [groupB] },
+        { rowIndex: 3, fullName: "Георги Токов", birthDateIso: "2016-04-03T00:00:00.000Z", jerseyNumber: null, attendanceStartedAtIso: null, groupIds: [] },
       ],
     }));
     expect(response.status).toBe(200);
@@ -97,7 +97,7 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
 
   it("checks that groups belong to the club and the main-club scope", async () => {
     mocks.groupCount.mockResolvedValue(1);
-    await POST(request({ groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }] }));
+    await POST(request({ groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA] }] }));
     expect(mocks.groupCount).toHaveBeenCalledWith({ where: { id: { in: [groupA] }, clubId, coachGroupId: null } });
   });
 
@@ -105,7 +105,7 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
     mocks.groupCount.mockResolvedValue(1);
     const response = await POST(request({
       coachGroupId,
-      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }],
+      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA] }],
     }));
     expect(response.status).toBe(200);
     expect(mocks.groupCount).toHaveBeenCalledWith({ where: { id: { in: [groupA] }, clubId, coachGroupId } });
@@ -115,7 +115,7 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
   it("rejects groups from another club or scope without creating players", async () => {
     mocks.groupCount.mockResolvedValue(1);
     const response = await POST(request({
-      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA, groupB] }],
+      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA, groupB] }],
     }));
     expect(response.status).toBe(404);
     expect(mocks.playerCreate).not.toHaveBeenCalled();
@@ -124,7 +124,7 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
   it("rejects the import when the sheet changed after the preview", async () => {
     mocks.groupCount.mockResolvedValue(1);
     const response = await POST(request({
-      groupAssignments: [{ rowIndex: 2, fullName: "Друго Име", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }],
+      groupAssignments: [{ rowIndex: 2, fullName: "Друго Име", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA] }],
     }));
     expect(response.status).toBe(409);
     expect(mocks.playerCreate).not.toHaveBeenCalled();
@@ -134,7 +134,7 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
     mocks.auth.mockResolvedValue({ sub: "coach", roles: ["coach"], defaultClubId: "10000000-0000-4000-8000-0000000000ff" });
     mocks.groupCount.mockResolvedValue(1);
     const response = await POST(request({
-      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }],
+      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA] }],
     }));
     expect(response.status).toBe(403);
     expect(mocks.groupCount).not.toHaveBeenCalled();
@@ -166,7 +166,26 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
     mocks.groupCount.mockResolvedValue(1);
     // The preview showed the 2015 player on row 2; the sheet now has the 2016 player there.
     const response = await POST(request({
-      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }],
+      groupAssignments: [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA] }],
+    }));
+    expect(response.status).toBe(409);
+    expect(mocks.playerCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects swapped same-named rows that differ only in attendance start date", async () => {
+    const twins = [
+      ["Име, фамилия", "Роден", "№", "Начална дата на участие"],
+      ["Иван Петров", "", "", "01.12.2026"],
+      ["Иван Петров", "", "", "15.12.2026"],
+    ];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ values: twins }), { status: 200 })));
+    mocks.groupCount.mockResolvedValue(1);
+    // The preview showed the 15.12 player on row 2; the sheet now has the 01.12 player there.
+    const response = await POST(request({
+      groupAssignments: [{
+        rowIndex: 2, fullName: "Иван Петров", birthDateIso: null, jerseyNumber: null,
+        attendanceStartedAtIso: "2026-12-14T22:00:00.000Z", groupIds: [groupA],
+      }],
     }));
     expect(response.status).toBe(409);
     expect(mocks.playerCreate).not.toHaveBeenCalled();
@@ -177,7 +196,7 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
       `http://localhost/api/admin/members/import-sheets?spreadsheetId=sheet-1&clubId=${clubId}`,
       { headers: { cookie: "admin_session=test" } },
     ));
-    const { rows } = await preview.json() as { rows: Array<{ rowIndex: number; fullName: string; birthDateIso: string | null; jerseyNumber: string | null }> };
+    const { rows } = await preview.json() as { rows: Array<{ rowIndex: number; fullName: string; birthDateIso: string | null; jerseyNumber: string | null; attendanceStartedAtIso?: string | null }> };
     mocks.groupCount.mockResolvedValue(1);
     const response = await POST(request({
       groupAssignments: rows.map((row) => ({
@@ -185,6 +204,7 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
         fullName: row.fullName,
         birthDateIso: row.birthDateIso,
         jerseyNumber: row.jerseyNumber,
+        attendanceStartedAtIso: row.attendanceStartedAtIso ?? null,
         groupIds: [groupA],
       })),
     }));
@@ -195,10 +215,11 @@ describe("POST /api/admin/members/import-sheets custom groups", () => {
   it("rejects malformed assignments", async () => {
     for (const groupAssignments of [
       "bad",
-      [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: ["not-a-uuid"] }],
+      [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: ["not-a-uuid"] }],
       [{ rowIndex: 2, fullName: "Иван Петров", groupIds: [groupA] }],
-      [{ rowIndex: "2", fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }],
-      [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }, { rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupB] }],
+      [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", groupIds: [groupA] }],
+      [{ rowIndex: "2", fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA] }],
+      [{ rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupA] }, { rowIndex: 2, fullName: "Иван Петров", birthDateIso: "2015-02-01T00:00:00.000Z", jerseyNumber: "7", attendanceStartedAtIso: null, groupIds: [groupB] }],
     ]) {
       expect((await POST(request({ groupAssignments }))).status).toBe(400);
     }
