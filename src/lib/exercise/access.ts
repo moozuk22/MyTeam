@@ -40,12 +40,14 @@ export async function authorizeTraining(
       { error: "Нямате достъп до този клуб." },
       { status: 403 },
     );
-  if (!["GET", "HEAD"].includes(request.method) && !hasTrustedOrigin(request))
+  const write = !["GET", "HEAD"].includes(request.method);
+  if (write && !hasTrustedOrigin(request))
     return NextResponse.json(
       { error: "Невалиден източник на заявката." },
       { status: 403 },
     );
-  if (requiredAccess === "save") {
+  // Each write needs the subscription, also a delete or a category change.
+  if (requiredAccess === "save" || write) {
     const access = await trainingPlanCapabilities(clubId, session.roles);
     if (!access.canSave) return NextResponse.json(
       { error: "За запазване е необходим активен абонамент за планове за тренировки." },

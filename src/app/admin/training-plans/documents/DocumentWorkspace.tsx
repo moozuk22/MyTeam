@@ -3,6 +3,7 @@
 import { sessionUrl, type SessionTarget, type TrainingReference } from "@/lib/exercise/trainingSession";
 import BackLink from "../BackLink";
 import SectionNav from "../SectionNav";
+import SubscriptionNotice from "../SubscriptionNotice";
 
 import { useBrowserDialogs } from "@/components/admin/BrowserDialogProvider";
 
@@ -92,7 +93,7 @@ function DocumentChoice({ item, coach, endpoint, trainingUrl, context, clubLogoU
   </section>;
 }
 
-function DocumentList({ coach, endpoint, drawingEndpoint, listHref, backHref, context, clubLogoUrl, location, target, replace }: { coach: string | null; endpoint: string; drawingEndpoint: string; listHref: string;
+function DocumentList({ clubId, coach, endpoint, drawingEndpoint, listHref, backHref, context, clubLogoUrl, location, target, replace }: { clubId: string; coach: string | null; endpoint: string; drawingEndpoint: string; listHref: string;
   /** The team page, or the training when the coach chooses a plan for it. */
   backHref: string; context: string; clubLogoUrl?: string; location: string; target?: SessionTarget; replace?: string }) {
   const dialogs = useBrowserDialogs();
@@ -172,6 +173,7 @@ function DocumentList({ coach, endpoint, drawingEndpoint, listHref, backHref, co
       <Link className="tp-primary-btn" href={choose ? listHref.replace("document=choose", "document=new") : `${listHref}&document=new`}><Plus size={16} aria-hidden="true" /> {choose ? "Създай нов план-конспект" : "Нов план-конспект"}</Link>
     </header>
     {!choose && <SectionNav location={location} current="documents" />}
+    <SubscriptionNotice clubId={clubId} />
     {choose && <h2>{replace ? "Избери друг план-конспект" : "Избери съществуващ план-конспект"}</h2>}
     {error && <div role="alert" className="td-feedback">
       {error} <button type="button" className="tp-secondary-btn" onClick={() => navigate(null)}>Обнови списъка</button>
@@ -243,8 +245,8 @@ export default function DocumentWorkspace({ target, clubId, clubName, clubLogoUr
   const context = groupName ? `${clubName} · ${groupName}` : clubName;
   return <main className={`tp-page td-page${!selected || selected === "choose" ? " td-library" : ""}`}>
     <div className="tp-inner td-inner">
-      {!selected && <DocumentList coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint} listHref={listHref} backHref={`/admin/members?${location}`} context={context} location={location} />}
-      {selected === "choose" && target && <DocumentList target={target} coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint}
+      {!selected && <DocumentList clubId={clubId} coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint} listHref={listHref} backHref={`/admin/members?${location}`} context={context} location={location} />}
+      {selected === "choose" && target && <DocumentList clubId={clubId} target={target} coach={coach} endpoint={endpoint} drawingEndpoint={drawingEndpoint}
         listHref={`${sessionUrl("documents", location, target, "choose")}${replaceQuery(replace)}`} replace={replace}
         backHref={sessionUrl("microcycles", location, target)} context={context} clubLogoUrl={clubLogoUrl} location={location} />}
       {selected && selected !== "choose" && selected !== "new" && !loaded && <section aria-label="План-конспект">

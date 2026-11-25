@@ -2,6 +2,7 @@
 
 import { sessionUrl, type SessionTarget } from "@/lib/exercise/trainingSession";
 import SectionNav from "../SectionNav";
+import SubscriptionNotice from "../SubscriptionNotice";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
@@ -421,6 +422,7 @@ export default function Workspace({ restore, openGroup, clubId, coachGroupId, in
         </div>
       </header>
       <SectionNav location={location} current="microcycles" onNavigate={guardNavigation} />
+      <SubscriptionNotice clubId={clubId} />
 
       <section className="mc-week" aria-label="Седмица">
         <button type="button" className="tp-icon-btn" disabled={busy} onClick={() => void goToWeek(shiftWeek(week, -7))} aria-label="Предишна седмица"><ChevronLeft size={20} aria-hidden="true" /></button>

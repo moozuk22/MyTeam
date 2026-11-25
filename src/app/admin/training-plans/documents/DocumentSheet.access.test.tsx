@@ -38,7 +38,7 @@ function click(canPrint: boolean, checkPrint: () => Promise<boolean>, label = "�
 it("does not start a print check without initial access", async () => {
   const check = vi.fn().mockResolvedValue(true);click(false, check);
   expect(check).not.toHaveBeenCalled();expect(print).not.toHaveBeenCalled();
-  expect(hooks.setState).toHaveBeenCalledWith("Не можете да запазвате или печатате, защото нямате активен абонамент за планове за тренировки.");
+  expect(hooks.setState).toHaveBeenCalledWith("Не можете да запазвате, изтривате или печатате, защото нямате активен абонамент за планове за тренировки.");
 });
 it("rejects access that expired after the preview opened", async () => {
   const check = vi.fn().mockResolvedValue(false);click(true, check);
