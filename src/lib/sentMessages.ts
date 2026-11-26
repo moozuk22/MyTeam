@@ -23,39 +23,59 @@ export type RecordSentMessageInput = {
   recipientCount?: number;
 };
 
+const RECORD_ATTEMPTS = 3;
+
+function isForeignKeyError(error: unknown) {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2003";
+}
+
 /**
  * Record a sent message in the history of the sender.
  * The message is already delivered, so a failure is logged and does not stop the request.
+ * A player can be deleted during delivery. That recipient keeps the name snapshot without the player link.
  */
 export async function recordSentMessage(input: RecordSentMessageInput): Promise<void> {
   if (!input.senderUserId) return;
+  const senderUserId = input.senderUserId;
   const recipients = input.recipients ?? [];
-  try {
-    await prisma.$transaction(async (tx) => {
-      const message = await tx.sentMessage.create({
-        data: {
-          senderUserId: input.senderUserId!,
-          audience: input.audience,
-          body: input.body,
-          imageUrl: input.imageUrl ?? null,
-          clubIds: [...new Set(input.clubIds ?? [])],
-          coachGroupIds: [...new Set(input.coachGroupIds ?? [])],
-          recipientCount: input.recipientCount ?? recipients.length,
-        },
-        select: { id: true },
-      });
-      for (let offset = 0; offset < recipients.length; offset += RECIPIENT_CHUNK_SIZE) {
-        await tx.sentMessageRecipient.createMany({
-          data: recipients.slice(offset, offset + RECIPIENT_CHUNK_SIZE).map((recipient) => ({
-            messageId: message.id,
-            playerId: recipient.playerId,
-            playerName: recipient.playerName.trim(),
-          })),
+  for (let attempt = 1; attempt <= RECORD_ATTEMPTS; attempt += 1) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const message = await tx.sentMessage.create({
+          data: {
+            senderUserId,
+            audience: input.audience,
+            body: input.body,
+            imageUrl: input.imageUrl ?? null,
+            clubIds: [...new Set(input.clubIds ?? [])],
+            coachGroupIds: [...new Set(input.coachGroupIds ?? [])],
+            recipientCount: input.recipientCount ?? recipients.length,
+          },
+          select: { id: true },
         });
-      }
-    });
-  } catch (error) {
-    console.error("Sent message history save error:", error);
+        for (let offset = 0; offset < recipients.length; offset += RECIPIENT_CHUNK_SIZE) {
+          const chunk = recipients.slice(offset, offset + RECIPIENT_CHUNK_SIZE);
+          const existing = await tx.player.findMany({
+            where: { id: { in: [...new Set(chunk.map((recipient) => recipient.playerId))] } },
+            select: { id: true },
+          });
+          const existingIds = new Set(existing.map((player) => player.id));
+          await tx.sentMessageRecipient.createMany({
+            data: chunk.map((recipient) => ({
+              messageId: message.id,
+              playerId: existingIds.has(recipient.playerId) ? recipient.playerId : null,
+              playerName: recipient.playerName.trim(),
+            })),
+          });
+        }
+      });
+      return;
+    } catch (error) {
+      // A deletion that commits between the check and the insert fails the foreign key. The next attempt checks again.
+      if (isForeignKeyError(error) && attempt < RECORD_ATTEMPTS) continue;
+      console.error("Sent message history save error:", error);
+      return;
+    }
   }
 }
 

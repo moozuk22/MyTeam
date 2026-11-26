@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => {
-  const tx = { sentMessage: { create: vi.fn() }, sentMessageRecipient: { createMany: vi.fn() } };
+  const tx = { sentMessage: { create: vi.fn() }, sentMessageRecipient: { createMany: vi.fn() }, player: { findMany: vi.fn() } };
   return {
     tx,
     prisma: {
@@ -39,6 +39,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   db.prisma.$transaction.mockImplementation((callback: (tx: typeof db.tx) => unknown) => callback(db.tx));
   db.tx.sentMessage.create.mockResolvedValue({ id: "message" });
+  db.tx.player.findMany.mockImplementation(async (args: { where: { id: { in: string[] } } }) => args.where.id.in.map((id) => ({ id })));
   db.prisma.club.findMany.mockResolvedValue([{ id: clubId, name: "Клуб" }]);
   db.prisma.coachGroup.findMany.mockResolvedValue([{ id: groupId, name: "U12" }]);
   db.prisma.player.findMany.mockResolvedValue([]);
@@ -58,6 +59,29 @@ describe("recordSentMessage", () => {
     }));
     expect(db.tx.sentMessageRecipient.createMany.mock.calls.map(([args]) => args.data.length)).toEqual([1000, 1000, 500]);
     expect(db.tx.sentMessageRecipient.createMany.mock.calls[0][0].data[0]).toEqual({ messageId: "message", playerId: "p0", playerName: "Name 0" });
+  });
+
+  it("keeps the name snapshot without a player link when a recipient was deleted", async () => {
+    db.tx.player.findMany.mockResolvedValue([{ id: "kept" }]);
+    await recordSentMessage({ senderUserId: "user", audience: "players", body: "Hello", recipients: [
+      { playerId: "kept", playerName: "Kept" }, { playerId: "deleted", playerName: "Deleted" },
+    ] });
+    expect(db.tx.sentMessageRecipient.createMany).toHaveBeenCalledWith({ data: [
+      { messageId: "message", playerId: "kept", playerName: "Kept" },
+      { messageId: "message", playerId: null, playerName: "Deleted" },
+    ] });
+    expect(db.tx.sentMessage.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ recipientCount: 2 }) }));
+  });
+
+  it("retries when a recipient is deleted between the check and the insert", async () => {
+    const foreignKeyError = Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" });
+    db.tx.player.findMany
+      .mockResolvedValueOnce([{ id: "racing" }])
+      .mockResolvedValueOnce([]);
+    db.tx.sentMessageRecipient.createMany.mockRejectedValueOnce(foreignKeyError).mockResolvedValue({ count: 1 });
+    await recordSentMessage({ senderUserId: "user", audience: "players", body: "Hello", recipients: [{ playerId: "racing", playerName: "Racing" }] });
+    expect(db.prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(db.tx.sentMessageRecipient.createMany).toHaveBeenLastCalledWith({ data: [{ messageId: "message", playerId: null, playerName: "Racing" }] });
   });
 
   it("does not throw when the history cannot be saved", async () => {

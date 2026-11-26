@@ -123,4 +123,32 @@ describe("coach broadcast history", () => {
       clubIds: ["club"], recipientCount: 1,
     });
   });
+
+  it("records the delivered clubs when another club fails and still reports the failure", async () => {
+    mocks.clubs.mockResolvedValue([{ id: "club", coachGroups: [] }, { id: "broken", coachGroups: [] }]);
+    mocks.history.mockImplementation(async (input: { clubId: string }) => {
+      if (input.clubId === "broken") throw new Error("database unavailable");
+      return {};
+    });
+    mocks.push.mockImplementation(async (clubId: string) => ({ total: 1, sent: clubId === "broken" ? 0 : 1, failed: 0, deactivated: 0 }));
+    await expect(POST(new NextRequest("http://localhost/api/admin/notifications/send-to-coaches", {
+      method: "POST", headers: { cookie: "admin_session=test", "Content-Type": "application/json" },
+      body: JSON.stringify({ clubIds: ["club", "broken"], message: "Hello" }),
+    }))).rejects.toThrow("database unavailable");
+    expect(sentHistory).toHaveBeenCalledOnce();
+    expect(sentHistory).toHaveBeenCalledWith(expect.objectContaining({ clubIds: ["club"], recipientCount: 1 }));
+  });
+
+  it("records a club whose push was delivered before its page message failed", async () => {
+    mocks.history.mockRejectedValue(new Error("database unavailable"));
+    await expect(POST(request(false))).rejects.toThrow("database unavailable");
+    expect(sentHistory).toHaveBeenCalledWith(expect.objectContaining({ clubIds: ["club"], recipientCount: 1 }));
+  });
+
+  it("does not record history when no club received the message", async () => {
+    mocks.push.mockResolvedValue({ total: 0, sent: 0, failed: 0, deactivated: 0 });
+    mocks.history.mockRejectedValue(new Error("database unavailable"));
+    await expect(POST(request(false))).rejects.toThrow("database unavailable");
+    expect(sentHistory).not.toHaveBeenCalled();
+  });
 });
