@@ -5,6 +5,7 @@ import { prisma, withPrismaPoolRetry } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { sendPushToMember } from "@/lib/push/service";
+import { recordSentMessage } from "@/lib/sentMessages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -136,6 +137,16 @@ export async function POST(request: NextRequest) {
       }
     })
   );
+
+  await recordSentMessage({
+    senderUserId: session.sub,
+    audience: "players",
+    body: message,
+    imageUrl: attachment?.imageUrl,
+    clubIds: [clubId],
+    coachGroupIds: coachGroupId ? [coachGroupId] : [],
+    recipients: allowedPlayers.map((player) => ({ playerId: player.id, playerName: player.fullName })),
+  });
 
   return NextResponse.json({
     success: true,

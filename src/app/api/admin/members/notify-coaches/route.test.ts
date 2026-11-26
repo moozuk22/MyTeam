@@ -8,6 +8,8 @@ vi.mock("@/lib/db", () => ({ prisma: { coachGroup: { findMany: mocks.groups } } 
 vi.mock("@/lib/push/adminHistory", () => ({ saveAdminNotificationHistory: mocks.history }));
 vi.mock("@/lib/push/adminService", () => ({ sendPushToClubAdmins: mocks.push }));
 vi.mock("@/lib/push/templates", () => ({ buildNotificationPayload: mocks.template }));
+const sentHistory = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sentMessages", () => ({ recordSentMessage: sentHistory }));
 
 const clubId = "11111111-1111-4111-8111-111111111111";
 const groupId = "22222222-2222-4222-8222-222222222222";
@@ -94,5 +96,30 @@ describe("coach page messages", () => {
     mocks.session.mockResolvedValue(session);
     expect((await POST(request())).status).toBe(status);
     expect(mocks.groups).not.toHaveBeenCalled();
+  });
+});
+
+describe("coach page message history", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.session.mockResolvedValue({ sub: "coach-user", roles: ["coach"] });
+    mocks.groups.mockResolvedValue([{ id: groupId }]);
+    mocks.push.mockResolvedValue({ sent: 1, failed: 0 });
+    mocks.template.mockImplementation(input => ({ title: "Message", body: input.trainerMessage, url: input.url }));
+  });
+
+  it("records the delivered coach groups for the sender", async () => {
+    mocks.history.mockResolvedValue({});
+    expect((await POST(request())).status).toBe(200);
+    expect(sentHistory).toHaveBeenCalledWith({
+      senderUserId: "coach-user", audience: "coaches", body: "Hello",
+      clubIds: [clubId], coachGroupIds: [groupId], recipientCount: 1,
+    });
+  });
+
+  it("does not record a message when no coach page is saved", async () => {
+    mocks.history.mockRejectedValue(new Error("database unavailable"));
+    await POST(request());
+    expect(sentHistory).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { sendPushToClubAdmins } from "@/lib/push/adminService";
 import { saveAdminNotificationHistory } from "@/lib/push/adminHistory";
+import { recordSentMessage } from "@/lib/sentMessages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,6 +135,15 @@ export async function POST(request: NextRequest) {
       return { clubId: club.id, ...sendResult };
     }),
   );
+
+  await recordSentMessage({
+    senderUserId: session.sub,
+    audience: "coaches",
+    body: message,
+    imageUrl: attachment?.imageUrl,
+    clubIds: clubs.map((club) => club.id),
+    recipientCount: clubs.length,
+  });
 
   const summary = results.reduce(
     (acc, r) => { acc.total += r.total; acc.sent += r.sent; acc.failed += r.failed; acc.deactivated += r.deactivated; return acc; },

@@ -9,6 +9,8 @@ vi.mock("@/lib/db", () => ({ prisma: { club: { findMany: mocks.clubs } } }));
 vi.mock("@/lib/push/adminHistory", () => ({ saveAdminNotificationHistory: mocks.history }));
 vi.mock("@/lib/push/adminService", () => ({ sendPushToClubAdmins: mocks.push }));
 vi.mock("@/lib/push/templates", () => ({ buildNotificationPayload: mocks.template }));
+const sentHistory = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sentMessages", () => ({ recordSentMessage: sentHistory }));
 
 function request(includeCoachGroupPages = true) {
   return new NextRequest("http://localhost/api/admin/notifications/send-to-coaches", {
@@ -101,5 +103,24 @@ describe("admin broadcast sender", () => {
     mocks.session.mockResolvedValue({ roles: ["coach"] });
     expect((await POST(request())).status).toBe(403);
     expect(mocks.history).not.toHaveBeenCalled();
+  });
+});
+
+describe("coach broadcast history", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.session.mockResolvedValue({ sub: "admin-user", roles: ["admin"] });
+    mocks.clubs.mockResolvedValue([{ id: "club", coachGroups: [{ id: "group" }] }]);
+    mocks.push.mockResolvedValue({ total: 1, sent: 1, failed: 0, deactivated: 0 });
+    mocks.template.mockImplementation(input => ({ title: "T", body: input.trainerMessage, url: input.url }));
+  });
+
+  it("records one message per send with the selected clubs", async () => {
+    expect((await POST(request())).status).toBe(200);
+    expect(sentHistory).toHaveBeenCalledOnce();
+    expect(sentHistory).toHaveBeenCalledWith({
+      senderUserId: "admin-user", audience: "coaches", body: "Hello", imageUrl: undefined,
+      clubIds: ["club"], recipientCount: 1,
+    });
   });
 });

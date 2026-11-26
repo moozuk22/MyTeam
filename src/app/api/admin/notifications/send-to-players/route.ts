@@ -5,6 +5,7 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { prisma } from "@/lib/db";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { sendPushToMember } from "@/lib/push/service";
+import { recordSentMessage } from "@/lib/sentMessages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
     const players = await prisma.player.findMany({
       where: audience === "clubs" ? { clubId: { in: selectedIds } } : {},
-      select: { id: true, cards: { where: { isActive: true }, orderBy: { createdAt: "desc" }, take: 1, select: { cardCode: true } } },
+      select: { id: true, fullName: true, clubId: true, cards: { where: { isActive: true }, orderBy: { createdAt: "desc" }, take: 1, select: { cardCode: true } } },
     });
     if (!players.length) return NextResponse.json({ error: "Няма състезатели в избрания обхват." }, { status: 404 });
     let attachment: Awaited<ReturnType<typeof uploadMessageImage>> | undefined;
@@ -78,6 +79,14 @@ export async function POST(request: NextRequest) {
         }
       }));
     }
+    await recordSentMessage({
+      senderUserId: session.sub,
+      audience: "players",
+      body: message.trim(),
+      imageUrl: attachment?.imageUrl,
+      clubIds: players.map(player => player.clubId),
+      recipients: players.map(player => ({ playerId: player.id, playerName: player.fullName })),
+    });
     return NextResponse.json({ targetedPlayers: players.length, failedPlayers, summary });
   } catch (error) {
     console.error("Admin player broadcast error:", error);

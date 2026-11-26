@@ -312,6 +312,7 @@ model Player {
   billingCoachGroup            CoachGroup?                     @relation("PlayerBillingCoachGroup", fields: [billingCoachGroupId], references: [id], onDelete: SetNull)
   remainingTrainingCredits     Int                             @default(0) @map("remaining_training_credits")
   limitedTrainingRegistrations LimitedTrainingRegistration[]
+  sentMessageRecipients        SentMessageRecipient[]
 
   @@index([billingCoachGroupId])
   @@index([clubId])
@@ -1222,4 +1223,43 @@ model TrainingSessionDocument {
   @@id([cycleId, groupKey, rowId])
   @@index([documentId, clubId])
   @@map("training_session_documents")
+}
+
+enum SentMessageAudience {
+  players
+  coaches
+
+  @@map("sent_message_audience")
+}
+
+/// A message that an admin or a coach sent. Only the sender can read this history.
+model SentMessage {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  senderUserId   String                 @map("sender_user_id")
+  audience       SentMessageAudience
+  body           String
+  imageUrl       String?                @map("image_url")
+  clubIds        String[]               @default([]) @map("club_ids") @db.Uuid
+  coachGroupIds  String[]               @default([]) @map("coach_group_ids") @db.Uuid
+  recipientCount Int                    @map("recipient_count")
+  sentAt         DateTime               @default(now()) @map("sent_at") @db.Timestamptz(6)
+  recipients     SentMessageRecipient[]
+
+  @@index([senderUserId, sentAt(sort: Desc), id(sort: Desc)])
+  @@index([clubIds], type: Gin)
+  @@index([coachGroupIds], type: Gin)
+  @@map("sent_messages")
+}
+
+model SentMessageRecipient {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId  String      @map("message_id") @db.Uuid
+  playerId   String?     @map("player_id") @db.Uuid
+  playerName String      @map("player_name")
+  message    SentMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  player     Player?     @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([messageId])
+  @@index([playerId, messageId])
+  @@map("sent_message_recipients")
 }
