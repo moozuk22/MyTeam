@@ -38,6 +38,17 @@ function shouldDeactivateSubscription(statusCode: number | null, createdAt: Date
   return false;
 }
 
+/** A failed cleanup must not hide pushes that other devices already received. */
+async function deactivateExpiredSubscription(id: string) {
+  try {
+    await prisma.adminPushSubscription.update({ where: { id }, data: { isActive: false } });
+    return true;
+  } catch (error) {
+    console.error("Admin push subscription deactivation error:", id, error);
+    return false;
+  }
+}
+
 export interface SaveAdminPushSubscriptionInput {
   clubId: string;
   subscription: BrowserPushSubscription;
@@ -167,11 +178,7 @@ export async function sendPushToClubAdmins(
         const statusCode = getPushErrorStatusCode(error);
 
         if (shouldDeactivateSubscription(statusCode, subscription.createdAt)) {
-          deactivated += 1;
-          await prisma.adminPushSubscription.update({
-            where: { id: subscription.id },
-            data: { isActive: false },
-          });
+          if (await deactivateExpiredSubscription(subscription.id)) deactivated += 1;
         } else if (statusCode === 404) {
           console.warn(
             "Admin push endpoint returned 404 but was kept active because it is too new:",
@@ -240,11 +247,7 @@ export async function sendPushToAllClubAdminScopes(
         const statusCode = getPushErrorStatusCode(error);
 
         if (shouldDeactivateSubscription(statusCode, subscription.createdAt)) {
-          deactivated += 1;
-          await prisma.adminPushSubscription.update({
-            where: { id: subscription.id },
-            data: { isActive: false },
-          });
+          if (await deactivateExpiredSubscription(subscription.id)) deactivated += 1;
         } else if (statusCode === 404) {
           console.warn(
             "Admin push endpoint returned 404 but was kept active because it is too new:",
