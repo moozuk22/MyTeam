@@ -11,6 +11,7 @@ import MonthlyFeeModal from "@/app/admin/members/_components/MonthlyFeeModal";
 import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import CoachMessageModal from "@/components/admin/CoachMessageModal";
+import SentMessageHistoryModal from "@/components/admin/SentMessageHistoryModal";
 import ActiveDevicesModal from "@/app/admin/members/_components/ActiveDevicesModal";
 
 import { isCustomTrainingGroupPaletteColor } from "@/lib/customTrainingGroupColors";
@@ -211,6 +212,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
   const [activeDevicesOpen, setActiveDevicesOpen] = useState(false);
 
   const [coachMessageOpen, setCoachMessageOpen] = useState(false);
+  const [sentHistoryOpen, setSentHistoryOpen] = useState(false);
 
   const [trainingFields, setTrainingFields] = useState<TrainingField[]>([]);
 
@@ -1874,9 +1876,14 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
         isCoach={isCoach}
         clubId={clubId}
         setCoachMessageOpen={setCoachMessageOpen}
+        sentHistoryOpen={sentHistoryOpen}
+        setSentHistoryOpen={setSentHistoryOpen}
         coachGroupId={coachGroupId}
         groupOptions={groupOptions}
       />
+      {sentHistoryOpen && (isAdmin || isCoach) && (
+        <SentMessageHistoryModal view={isAdmin ? "admin" : "coach"} onClose={() => setSentHistoryOpen(false)} />
+      )}
       {activeDevicesOpen && (isAdmin || isCoach) && clubId && (
         <ActiveDevicesModal key={clubId} clubId={clubId} onClose={() => setActiveDevicesOpen(false)} />
       )}

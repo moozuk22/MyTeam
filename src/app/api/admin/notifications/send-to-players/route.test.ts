@@ -7,6 +7,8 @@ vi.mock("@/lib/uploadMessageImage", () => ({ uploadMessageImage: mocks.upload })
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: mocks.session }));
 vi.mock("@/lib/db", () => ({ prisma: { club: { count: mocks.count }, player: { findMany: mocks.players } } }));
 vi.mock("@/lib/push/service", () => ({ sendPushToMember: mocks.push }));
+const sentHistory = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sentMessages", () => ({ recordSentMessage: sentHistory }));
 
 const clubA = "11111111-1111-1111-1111-111111111111";
 const clubB = "22222222-2222-2222-2222-222222222222";
@@ -105,4 +107,27 @@ describe("player notifications", () => {
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
+});
+
+describe("player broadcast history", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.session.mockResolvedValue({ sub: "admin-user", roles: ["admin"] });
+    mocks.count.mockResolvedValue(2);
+    mocks.push.mockResolvedValue({ total: 1, sent: 1, failed: 0, deactivated: 0 });
+    mocks.players.mockResolvedValue([
+      { id: "player-a", fullName: "A", clubId: clubA, cards: [] },
+      { id: "player-b", fullName: "B", clubId: clubB, cards: [] },
+    ]);
+  });
+
+  it("records one message with every club and recipient", async () => {
+    expect((await POST(request({ audience: "clubs", clubIds: [clubA, clubB], message: " Hello " }))).status).toBe(200);
+    expect(sentHistory).toHaveBeenCalledOnce();
+    expect(sentHistory).toHaveBeenCalledWith({
+      senderUserId: "admin-user", audience: "players", body: "Hello", imageUrl: undefined,
+      clubIds: [clubA, clubB],
+      recipients: [{ playerId: "player-a", playerName: "A" }, { playerId: "player-b", playerName: "B" }],
+    });
+  });
 });

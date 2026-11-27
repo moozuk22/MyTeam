@@ -3,11 +3,11 @@ import { sendPushToMember } from "./service";
 import { sendPushToAllClubAdminScopes, sendPushToClubAdmins } from "./adminService";
 import { MAX_PUSH_PAYLOAD_BYTES } from "./payload";
 
-const mocks = vi.hoisted(() => ({ subscriptions: vi.fn(), history: vi.fn(), send: vi.fn() }));
+const mocks = vi.hoisted(() => ({ subscriptions: vi.fn(), history: vi.fn(), send: vi.fn(), deactivate: vi.fn() }));
 vi.mock("web-push", () => ({ default: { sendNotification: mocks.send, setVapidDetails: vi.fn() } }));
 vi.mock("@/lib/db", () => ({ prisma: {
   pushSubscription: { findMany: mocks.subscriptions },
-  adminPushSubscription: { findMany: mocks.subscriptions },
+  adminPushSubscription: { findMany: mocks.subscriptions, update: mocks.deactivate },
 } }));
 vi.mock("@/lib/push/vapid", () => ({ getVapidConfig: () => ({ subject: "mailto:test@example.com", publicKey: "public", privateKey: "private" }) }));
 vi.mock("@/lib/push/history", () => ({ saveMemberNotificationHistory: mocks.history }));
@@ -45,5 +45,33 @@ describe("long message delivery", () => {
     expect(Buffer.byteLength(serialized, "utf8")).toBeLessThanOrEqual(MAX_PUSH_PAYLOAD_BYTES);
     expect(JSON.parse(serialized).url).toBe(payload.url);
     expect(payload.body).toBe("😀".repeat(10000));
+  });
+});
+
+describe("admin push cleanup failures", () => {
+  const old = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.subscriptions.mockResolvedValue([
+      { id: "delivered", endpoint: "https://example.com/ok", p256dh: "key", auth: "auth", createdAt: old },
+      { id: "expired", endpoint: "https://example.com/gone", p256dh: "key", auth: "auth", createdAt: old },
+    ]);
+    mocks.send.mockImplementation(async (subscription: { endpoint: string }) => {
+      if (subscription.endpoint.endsWith("/gone")) throw Object.assign(new Error("Gone"), { statusCode: 410 });
+      return {};
+    });
+  });
+
+  it.each([sendPushToClubAdmins, sendPushToAllClubAdminScopes])("reports delivered devices when deactivating an expired device fails", async send => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.deactivate.mockRejectedValue(new Error("database unavailable"));
+    await expect(send("club", { title: "T", body: "B", url: "/" }, null)).resolves.toEqual({ total: 2, sent: 1, failed: 1, deactivated: 0 });
+    expect(mocks.deactivate).toHaveBeenCalledWith({ where: { id: "expired" }, data: { isActive: false } });
+  });
+
+  it.each([sendPushToClubAdmins, sendPushToAllClubAdminScopes])("counts an expired device that was deactivated", async send => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.deactivate.mockResolvedValue({});
+    await expect(send("club", { title: "T", body: "B", url: "/" }, null)).resolves.toEqual({ total: 2, sent: 1, failed: 1, deactivated: 1 });
   });
 });

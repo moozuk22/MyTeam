@@ -17,6 +17,8 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/push/templates", () => ({ buildNotificationPayload: mocks.buildNotificationPayload }));
 vi.mock("@/lib/push/service", () => ({ sendPushToMember: mocks.sendPushToMember }));
+const sentHistory = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sentMessages", () => ({ recordSentMessage: sentHistory }));
 
 const clubId = "11111111-1111-4111-8111-111111111111";
 const memberId = "22222222-2222-4222-8222-222222222222";
@@ -121,4 +123,29 @@ describe("member message permissions", () => {
     expect(mocks.upload).not.toHaveBeenCalled();
   });
 
+});
+
+describe("member message history", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.findMany.mockResolvedValue([{ id: memberId, fullName: "Player", cards: [{ cardCode: "ABC" }] }]);
+    mocks.buildNotificationPayload.mockReturnValue({ title: "Message", body: "Hello" });
+    mocks.sendPushToMember.mockResolvedValue({ sent: 1, failed: 0 });
+  });
+
+  it("records the message for the sender with the coach group and recipients", async () => {
+    mocks.verifyAdminToken.mockResolvedValue({ sub: "coach-user", roles: ["coach"] });
+    expect((await POST(request(coachGroupId, " Hello "))).status).toBe(200);
+    expect(sentHistory).toHaveBeenCalledWith({
+      senderUserId: "coach-user", audience: "players", body: "Hello", imageUrl: undefined,
+      clubIds: [clubId], coachGroupIds: [coachGroupId], recipients: [{ playerId: memberId, playerName: "Player" }],
+    });
+  });
+
+  it("does not record a message when no member is in scope", async () => {
+    mocks.verifyAdminToken.mockResolvedValue({ sub: "coach-user", roles: ["coach"] });
+    mocks.findMany.mockResolvedValue([]);
+    expect((await POST(request())).status).toBe(200);
+    expect(sentHistory).not.toHaveBeenCalled();
+  });
 });

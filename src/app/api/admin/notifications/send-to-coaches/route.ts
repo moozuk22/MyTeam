@@ -5,6 +5,7 @@ import { verifyAdminToken } from "@/lib/adminAuth";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { sendPushToClubAdmins } from "@/lib/push/adminService";
 import { saveAdminNotificationHistory } from "@/lib/push/adminHistory";
+import { recordSentMessage } from "@/lib/sentMessages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +83,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const results = await Promise.all(
+  // Wait for every scope, so that the history records the delivered part when another scope fails.
+  const deliveredClubIds = new Set<string>();
+  const settledClubs = await Promise.allSettled(
     clubs.map(async (club) => {
       const scopes: Array<{ coachGroupId: string | null; url: string }> = [
         {
@@ -97,7 +100,7 @@ export async function POST(request: NextRequest) {
           : []),
       ];
 
-      const scopeResults = await Promise.all(
+      const settledScopes = await Promise.allSettled(
         scopes.map(async (scope) => {
           const pushPayload = buildNotificationPayload({
             type: "admin_message",
@@ -109,6 +112,7 @@ export async function POST(request: NextRequest) {
             pushPayload,
             scope.coachGroupId,
           );
+          if (sendResult.sent > 0) deliveredClubIds.add(club.id);
           await saveAdminNotificationHistory({
             clubId: club.id,
             type: "myteam_message",
@@ -116,9 +120,13 @@ export async function POST(request: NextRequest) {
             coachGroupId: scope.coachGroupId,
             ...attachment,
           });
+          deliveredClubIds.add(club.id);
           return sendResult;
         }),
       );
+      const failedScope = settledScopes.find((result) => result.status === "rejected");
+      if (failedScope) throw failedScope.reason;
+      const scopeResults = settledScopes.map((result) => (result as PromiseFulfilledResult<Awaited<ReturnType<typeof sendPushToClubAdmins>>>).value);
 
       const sendResult = scopeResults.reduce(
         (acc, result) => {
@@ -134,6 +142,23 @@ export async function POST(request: NextRequest) {
       return { clubId: club.id, ...sendResult };
     }),
   );
+
+  const recordedClubIds = clubs.map((club) => club.id).filter((id) => deliveredClubIds.has(id));
+  if (recordedClubIds.length) {
+    await recordSentMessage({
+      senderUserId: session.sub,
+      audience: "coaches",
+      body: message,
+      imageUrl: attachment?.imageUrl,
+      clubIds: recordedClubIds,
+      recipientCount: recordedClubIds.length,
+    });
+  }
+
+  // Keep the previous error behavior: a failed scope fails the request.
+  const failedClub = settledClubs.find((result) => result.status === "rejected");
+  if (failedClub) throw failedClub.reason;
+  const results = settledClubs.map((result) => (result as PromiseFulfilledResult<{ clubId: string; total: number; sent: number; failed: number; deactivated: number }>).value);
 
   const summary = results.reduce(
     (acc, r) => { acc.total += r.total; acc.sent += r.sent; acc.failed += r.failed; acc.deactivated += r.deactivated; return acc; },

@@ -10,8 +10,9 @@ export async function middleware(request: NextRequest) {
 
   const SECRET = new TextEncoder().encode(process.env.ADMIN_SESSION_SECRET || "default_secret_for_safety");
   const COACH_ALLOWED_ADMIN_PAGE_PREFIXES = ["/admin/members", "/admin/coach-home"];
-  const COACH_ALLOWED_ADMIN_API_PREFIXES = ["/api/admin/members", "/api/admin/clubs"];
-  const COACH_ALLOWED_ADMIN_API_EXACT = new Set(["/api/admin/check-session", "/api/admin/logout"]);
+  // Sent message history is limited to the session user in its route handlers.
+  const COACH_ALLOWED_ADMIN_API_PREFIXES = ["/api/admin/members", "/api/admin/clubs", "/api/admin/sent-messages/"];
+  const COACH_ALLOWED_ADMIN_API_EXACT = new Set(["/api/admin/check-session", "/api/admin/logout", "/api/admin/sent-messages"]);
   const requestedNextRaw = request.nextUrl.searchParams.get("next") ?? "";
   const safeRequestedNext =
     requestedNextRaw.startsWith("/admin") && !requestedNextRaw.startsWith("/admin/login")

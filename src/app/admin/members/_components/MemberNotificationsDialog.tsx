@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { History } from "lucide-react";
 import { NotificationImageAttachment } from "@/components/NotificationImageAttachment";
 import { SkeletonLine } from "./FinanceSkeleton";
 import { XIcon, BellIcon } from "./members-page-icons";
@@ -45,6 +46,8 @@ type MemberNotificationsDialogProps = {
   isCoach: boolean;
   clubId: string;
   setCoachMessageOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  sentHistoryOpen: boolean;
+  setSentHistoryOpen: React.Dispatch<React.SetStateAction<boolean>>;
   coachGroupId: string;
   groupOptions: number[];
 };
@@ -58,6 +61,8 @@ export function MemberNotificationsDialog({
   isCoach,
   clubId,
   setCoachMessageOpen,
+  sentHistoryOpen,
+  setSentHistoryOpen,
   coachGroupId,
   groupOptions,
 }: MemberNotificationsDialogProps) {
@@ -90,7 +95,7 @@ export function MemberNotificationsDialog({
   const { isCustomTrainingGroupMode, trainingScheduleGroups } = trainingGroups;
   return (
     <>
-      {notifyPanelOpen && !coachMessageOpen && (
+      {notifyPanelOpen && !coachMessageOpen && !sentHistoryOpen && (
         <div
           className="amp-overlay amp-overlay--confirm"
           onClick={() => {
@@ -115,20 +120,33 @@ export function MemberNotificationsDialog({
               </button>
             </h2>
             <div className="amp-modal-body">
-              {(isAdmin || isCoach) && clubId && (
-                <button
-                  className="amp-btn amp-btn--ghost amp-btn--compact"
-                  type="button"
-                  disabled={notifyBusy}
-                  style={{ marginBottom: 16 }}
-                  onClick={async () => {
-                    await loadCoachGroups();
-                    setCoachMessageOpen(true);
-                  }}
-                >
-                  <BellIcon />
-                  <span>Изпрати до треньори</span>
-                </button>
+              {(isAdmin || isCoach) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+                  {clubId && (
+                    <button
+                      className="amp-btn amp-btn--ghost amp-btn--compact"
+                      type="button"
+                      disabled={notifyBusy}
+                      onClick={async () => {
+                        await loadCoachGroups();
+                        setCoachMessageOpen(true);
+                      }}
+                    >
+                      <BellIcon />
+                      <span>Изпрати до треньори</span>
+                    </button>
+                  )}
+                  <button
+                    className="amp-btn amp-btn--ghost amp-btn--compact"
+                    type="button"
+                    disabled={notifyBusy}
+                    aria-haspopup="dialog"
+                    onClick={() => setSentHistoryOpen(true)}
+                  >
+                    <History size={16} aria-hidden="true" />
+                    <span>История на съобщенията</span>
+                  </button>
+                </div>
               )}
               {(isAdmin || isCoach) && !coachGroupId && coachGroups.length > 0 && (
                 <label className="amp-edit-field" style={{ marginBottom: "12px" }}>

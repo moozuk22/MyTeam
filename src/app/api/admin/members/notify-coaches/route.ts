@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { buildNotificationPayload } from "@/lib/push/templates";
 import { saveAdminNotificationHistory } from "@/lib/push/adminHistory";
 import { sendPushToClubAdmins } from "@/lib/push/adminService";
+import { recordSentMessage } from "@/lib/sentMessages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
   let sent = 0;
   let failed = 0;
   let pushFailed = 0;
+  const deliveredGroupIds: string[] = [];
   for (const group of groups) {
     const payload = buildNotificationPayload({
       type: "admin_message", trainerMessage: raw.message.trim(),
@@ -50,6 +52,7 @@ export async function POST(request: NextRequest) {
     try {
       await saveAdminNotificationHistory({ clubId, coachGroupId: group.id, type: notificationType, payload });
       delivered += 1;
+      deliveredGroupIds.push(group.id);
     } catch {
       failed += 1;
       continue;
@@ -59,6 +62,16 @@ export async function POST(request: NextRequest) {
       sent += result.sent;
       pushFailed += result.failed;
     } catch { pushFailed += 1; }
+  }
+  if (deliveredGroupIds.length) {
+    await recordSentMessage({
+      senderUserId: session.sub,
+      audience: "coaches",
+      body: raw.message.trim(),
+      clubIds: [clubId],
+      coachGroupIds: deliveredGroupIds,
+      recipientCount: deliveredGroupIds.length,
+    });
   }
   return NextResponse.json({ success: failed === 0, delivered, sent, failed, pushFailed });
 }
