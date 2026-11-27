@@ -38,3 +38,12 @@ Use `cursor` for the next page. Admins filter by `clubId`. Coaches filter by
 `coachGroupId`. Both roles filter by `playerId`. A user with both roles gets the admin view.
 `GET /api/admin/sent-messages/filters?q=` returns filter options from the user's own messages only.
 The history belongs to the login account. Coaches who share one account see the same history.
+
+### History dialog
+
+In the **Изпрати съобщение** dialog, select **История на съобщенията** to open the history.
+Admins filter by club and player. Coaches filter by coach group and player.
+The player search narrows the player list. Select **Покажи още** to load the next 20 messages.
+Each card shows the send time (`dd.mm.yyyy HH:mm`, Europe/Sofia), the audience, the text, the image,
+the club or the coach group, and up to five recipient names with the remaining count.
+The middleware lets coaches use `/api/admin/sent-messages` and `/api/admin/sent-messages/filters`.

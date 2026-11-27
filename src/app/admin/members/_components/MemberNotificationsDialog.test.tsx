@@ -23,7 +23,7 @@ function renderDialog(trainingGroups: Props["trainingGroups"], groupOptions: num
       coachGroupManagement={{ loadCoachGroups: vi.fn(), coachGroups: [] }}
       trainingGroups={trainingGroups}
       coachMessageOpen={false} isAdmin={false} isCoach={true} clubId="club"
-      setCoachMessageOpen={vi.fn()} coachGroupId="" groupOptions={groupOptions}
+      setCoachMessageOpen={vi.fn()} sentHistoryOpen={false} setSentHistoryOpen={vi.fn()} coachGroupId="" groupOptions={groupOptions}
     />,
   );
 }
@@ -67,4 +67,10 @@ it("shows a retry action when group options fail to load", () => {
   expect(html).toContain('role="alert"');
   expect(html).toContain("Опитай отново");
   expect(html).not.toContain('aria-busy="true"');
+});
+
+it("offers the sent message history next to the coach message action", () => {
+  const html = renderDialog({ isCustomTrainingGroupMode: false, customTrainingGroups: [], trainingScheduleGroups: [] });
+  expect(html).toContain("История на съобщенията");
+  expect(html).toContain("Изпрати до треньори");
 });
