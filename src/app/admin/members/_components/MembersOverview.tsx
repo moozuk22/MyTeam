@@ -109,7 +109,6 @@ type MembersOverviewProps = {
   setInactivePlayersOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setReportsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   openSchedulerSettings: () => Promise<void>;
-  canUseSchedule2: boolean;
   openTrainingAttendance: (options?: { hideTeamsTab?: boolean; schedule2?: boolean }) => Promise<void>;
   setAttendanceDashboardOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleDownloadMemberLinks: () => Promise<void>;
@@ -162,7 +161,6 @@ export function MembersOverview({
   setInactivePlayersOpen,
   setReportsOpen,
   openSchedulerSettings,
-  canUseSchedule2,
   openTrainingAttendance,
   setAttendanceDashboardOpen,
   handleDownloadMemberLinks,
@@ -435,16 +433,6 @@ export function MembersOverview({
                 <UsersIcon />
                 <span>График</span>
               </button>
-              {isAdmin && canUseSchedule2 && (
-                <button
-                  className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
-                  onClick={() => void openTrainingAttendance({ schedule2: true })}
-                  type="button"
-                >
-                  <CalendarIcon />
-                  <span>График 2</span>
-                </button>
-              )}
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => setAttendanceDashboardOpen(true)}

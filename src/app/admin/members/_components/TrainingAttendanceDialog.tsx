@@ -17,10 +17,12 @@ import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
 import Schedule2 from "./Schedule2";
 import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
+import { type ScheduleLayout } from "../_utils/scheduleLayoutPreference";
 
 type TrainingAttendanceDialogProps = {
   canUseSchedule2: boolean;
   closeTrainingAttendance: () => void;
+  switchTrainingAttendanceLayout: (layout: ScheduleLayout) => void;
   openScheduleEvent: (target?: { groupId: string; date?: string }) => void;
   schedule2RestDays: Record<string, string[]>;
   fetchTrainingWeekSessions: (options?: { week?: number }) => Promise<unknown>;
@@ -136,6 +138,7 @@ type TrainingAttendanceDialogProps = {
 export function TrainingAttendanceDialog({
   canUseSchedule2,
   closeTrainingAttendance,
+  switchTrainingAttendanceLayout,
   openScheduleEvent,
   schedule2RestDays,
   fetchTrainingWeekSessions,
@@ -226,7 +229,7 @@ export function TrainingAttendanceDialog({
           >
             <div className="amp-modal-tint" aria-hidden="true" />
             <h2 className="amp-modal-title">
-              <span className="amp-modal-title-gradient">{schedule2Open ? "График 2" : "Текущ график"}</span>
+              <span className="amp-modal-title-gradient">{schedule2Open ? "График" : "Текущ график"}</span>
               <button
                 className="amp-modal-close"
                 onClick={closeTrainingAttendance}
@@ -237,6 +240,28 @@ export function TrainingAttendanceDialog({
               </button>
             </h2>
             <div className="amp-modal-body">
+              {canUseSchedule2 && (
+                <div className="amp-training-view-switch amp-training-layout-switch" role="group" aria-label="Изглед на графика">
+                  <button
+                    type="button"
+                    className={`amp-btn amp-btn--ghost amp-training-view-btn amp-training-layout-btn--new${schedule2Open ? " is-active" : ""}`}
+                    aria-pressed={schedule2Open}
+                    onClick={() => switchTrainingAttendanceLayout("new")}
+                    disabled={trainingNoteSaving || trainingDaysEditorSaving}
+                  >
+                    Нов изглед
+                  </button>
+                  <button
+                    type="button"
+                    className={`amp-btn amp-btn--ghost amp-training-view-btn${schedule2Open ? "" : " is-active"}`}
+                    aria-pressed={!schedule2Open}
+                    onClick={() => switchTrainingAttendanceLayout("old")}
+                    disabled={trainingNoteSaving || trainingDaysEditorSaving}
+                  >
+                    Стар изглед
+                  </button>
+                </div>
+              )}
               {schedule2Open ? null : trainingAttendanceHideTeamsTab ? (
                 <div
                   className="amp-training-view-switch amp-training-view-switch--single"

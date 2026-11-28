@@ -1239,6 +1239,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
     fetchTrainingWeekSessions,
     openTrainingAttendance,
     closeTrainingAttendance,
+    switchTrainingAttendanceLayout,
     handleTrainingAttendanceViewChange,
     handleTrainingAttendanceMonthChange,
     handleUnifiedGroupChange,
@@ -1348,7 +1349,6 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
       <div className="amp-dot-grid" aria-hidden="true" />
 
       <MembersOverview
-        canUseSchedule2={canUseSchedule2}
         clubNotificationsController={clubNotificationsController}
         memberManagement={memberManagement}
         trainingGroups={trainingGroups}
@@ -1592,6 +1592,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
       <TrainingAttendanceDialog
         canUseSchedule2={canUseSchedule2}
         closeTrainingAttendance={closeTrainingAttendance}
+        switchTrainingAttendanceLayout={switchTrainingAttendanceLayout}
         openScheduleEvent={openScheduleEvent}
         schedule2RestDays={schedule2RestDays}
         fetchTrainingWeekSessions={fetchTrainingWeekSessions}
