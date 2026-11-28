@@ -21,6 +21,7 @@ import { type ScheduleLayout } from "../_utils/scheduleLayoutPreference";
 
 type TrainingAttendanceDialogProps = {
   canUseSchedule2: boolean;
+  isAdmin: boolean;
   closeTrainingAttendance: () => void;
   switchTrainingAttendanceLayout: (layout: ScheduleLayout) => void;
   openScheduleEvent: (target?: { groupId: string; date?: string }) => void;
@@ -137,6 +138,7 @@ type TrainingAttendanceDialogProps = {
 
 export function TrainingAttendanceDialog({
   canUseSchedule2,
+  isAdmin,
   closeTrainingAttendance,
   switchTrainingAttendanceLayout,
   openScheduleEvent,
@@ -313,6 +315,8 @@ export function TrainingAttendanceDialog({
                   restDays={schedule2RestDays}
                   onOpen={(session) => void openTrainingDayDetails(session.date, session.id)}
                   onCreate={(groupId, date) => openScheduleEvent({ groupId, date })}
+                  canCreate={isAdmin || Boolean(coachGroupId)}
+                  editableCoachGroupId={coachGroupId}
                 />
               ) : trainingAttendanceView === "today" ? (
                 <div className="amp-training-week-panel">

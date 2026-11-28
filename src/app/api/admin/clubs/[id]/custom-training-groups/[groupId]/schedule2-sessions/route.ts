@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { canUseSchedule2 } from "@/lib/schedule2Access";
+import { denyTrainingWrite } from "@/lib/trainingWriteAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { isEligibleForMembership, isEligibleForTraining } from "@/lib/attendanceEligibility";
@@ -60,14 +62,16 @@ function parseSession(value: unknown) {
 async function mutate(request: NextRequest, context: Context, operation: "create" | "edit" | "delete") {
   const token = request.cookies.get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
-  if (!session?.roles.includes("admin")) {
+  const { id: clubId, groupId } = await context.params;
+  if (!session || !canUseSchedule2(session, clubId)) {
     return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
   }
   if (!hasTrustedSchedule2Origin(request)) {
     return NextResponse.json({ error: "Адресът на сайта не е разрешен за промени в График 2." }, { status: 403 });
   }
-  const { id: clubId, groupId } = await context.params;
   if (!UUID.test(clubId) || !UUID.test(groupId)) return NextResponse.json({ error: "Невалидна група." }, { status: 400 });
+  const denied = await denyTrainingWrite(session, request, clubId, { type: "customGroup", id: groupId });
+  if (denied) return denied;
   const baseScope = `custom_group:${groupId}`;
   try {
     const body = object(await request.json().catch(() => null));

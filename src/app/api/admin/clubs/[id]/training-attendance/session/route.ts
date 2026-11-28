@@ -9,16 +9,20 @@ import { parseCoachRecurrences, readCoachTrainings } from "@/lib/coachTrainingSc
 import { Prisma } from "@prisma/client";
 import { notifyCoachTrainingChanges } from "@/lib/push/coachTrainingNotifications";
 import { publishTrainingAttendanceUpdated } from "@/lib/trainingAttendanceEvents";
+import { denyTrainingWrite, trainingTargetFromBody } from "@/lib/trainingWriteAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!await verifySession(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await verifySession(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id: clubId } = await params;
   const body = await request.json().catch(() => ({}));
   const date = String(body.date ?? "");
   if (!isIsoDate(date)) return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+  const denied = await denyTrainingWrite(session, request, clubId, await trainingTargetFromBody(clubId, body));
+  if (denied) return denied;
   const trainingDate = isoDateToUtcMidnight(date);
   try {
     if (body.trainingSessionId) {
@@ -147,6 +151,8 @@ export async function PATCH(
   if (rawStatus !== "cancelled") {
     return NextResponse.json({ error: "status must be 'cancelled'" }, { status: 400 });
   }
+  const denied = await denyTrainingWrite(session, request, clubId, await trainingTargetFromBody(clubId, body));
+  if (denied) return denied;
   if (body.trainingSessionId) {
     const row = await prisma.trainingSession.findFirst({ where: { id: String(body.trainingSessionId), clubId, scopeType: "coachGroup" } });
     if (!row?.scopeId) return NextResponse.json({ error: "Training not found" }, { status: 404 });

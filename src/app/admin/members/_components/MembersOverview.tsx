@@ -420,7 +420,13 @@ export function MembersOverview({
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => {
-                  if (coachGroupId) {
+                  // Coaches change only their own coach group's trainings:
+                  // the main page is view only, and club-wide training groups
+                  // stay with admins.
+                  const coachCanEditGroups = Boolean(coachGroupId) && isCustomTrainingGroupMode;
+                  if (!isAdmin && !coachCanEditGroups) {
+                    void openTrainingAttendance({ hideTeamsTab: true });
+                  } else if (coachGroupId) {
                     void openTrainingAttendance();
                   } else if (coachGroups.length >= 1) {
                     void openTrainingAttendance({ hideTeamsTab: true });

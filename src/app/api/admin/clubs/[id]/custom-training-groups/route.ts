@@ -1,4 +1,6 @@
 import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
+import { canUseSchedule2 } from "@/lib/schedule2Access";
+import { denyTrainingWrite } from "@/lib/trainingWriteAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
@@ -155,7 +157,7 @@ export async function GET(
   try {
     const schedule2GroupId = request.nextUrl.searchParams.get("schedule2GroupId");
     if (schedule2GroupId !== null) {
-      if (!session.roles.includes("admin")) {
+      if (!canUseSchedule2(session, id)) {
         return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
       }
       if (!UUID_REGEX.test(schedule2GroupId)) {
@@ -250,6 +252,8 @@ export async function POST(
     return NextResponse.json({ error: "Невалидна треньорска група." }, { status: 400 });
   }
   const coachGroupId = coachGroupIdValue || null;
+  const denied = await denyTrainingWrite(session, request, id, coachGroupId ? { type: "coachGroup", id: coachGroupId } : { type: "clubWide" });
+  if (denied) return denied;
   if (coachGroupId) {
     const coachGroup = await prisma.coachGroup.findFirst({
       where: { id: coachGroupId, clubId: id },

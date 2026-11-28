@@ -1591,6 +1591,7 @@ function AdminMembersPageContent({ canUseSchedule2 }: { canUseSchedule2: boolean
       />
       <TrainingAttendanceDialog
         canUseSchedule2={canUseSchedule2}
+        isAdmin={isAdmin}
         closeTrainingAttendance={closeTrainingAttendance}
         switchTrainingAttendanceLayout={switchTrainingAttendanceLayout}
         openScheduleEvent={openScheduleEvent}

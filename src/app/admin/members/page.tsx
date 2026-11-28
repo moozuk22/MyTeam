@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canUseSchedule2 as canUseSchedule2ForClub } from "@/lib/schedule2Access";
 import { after } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
@@ -92,11 +93,12 @@ export default async function AdminMembersPage(
   const cookieStore = await cookies();
   const token = cookieStore.get("admin_session")?.value;
   const session = token ? await verifyAdminToken(token) : null;
-  const canUseSchedule2 = session?.roles.includes("admin") ?? false;
-  if (session?.roles.includes("coach") && !canUseSchedule2) {
-    const resolvedSearchParams = await searchParams;
-    const clubIdValue = resolvedSearchParams.clubId;
-    const clubId = (Array.isArray(clubIdValue) ? clubIdValue[0] : clubIdValue ?? "").trim();
+  const resolvedSearchParams = await searchParams;
+  const clubIdValue = resolvedSearchParams.clubId;
+  const clubId = (Array.isArray(clubIdValue) ? clubIdValue[0] : clubIdValue ?? "").trim();
+  const isAdmin = session?.roles.includes("admin") ?? false;
+  const canUseSchedule2 = canUseSchedule2ForClub(session, clubId);
+  if (session?.roles.includes("coach") && !isAdmin) {
     if (clubId) {
       const club = await getClubData(clubId);
       if (club?.notifyOnCoachVisit) {

@@ -10,6 +10,7 @@ import { getTodayIsoDateInTimeZone, isoDateToUtcMidnight } from "@/lib/training"
 import { notifyCoachTrainingChanges } from "@/lib/push/coachTrainingNotifications";
 import { publishTrainingAttendanceUpdated } from "@/lib/trainingAttendanceEvents";
 import { applyCoachTrainingLimits, parseCoachTrainingLimits } from "@/lib/coachTrainingLimits";
+import { denyTrainingWrite } from "@/lib/trainingWriteAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,12 +22,14 @@ async function getGroup(request: NextRequest, context: Context) {
   if (!session) return null;
   const { id: clubId, groupId } = await context.params;
   if (!uuid.test(clubId) || !uuid.test(groupId)) return null;
-  return prisma.coachGroup.findFirst({ where: { id: groupId, clubId } });
+  const group = await prisma.coachGroup.findFirst({ where: { id: groupId, clubId } });
+  return group ? { group, session } : null;
 }
 
 export async function GET(request: NextRequest, context: Context) {
-  const group = await getGroup(request, context);
-  if (!group) return NextResponse.json({ error: "Нямате достъп или групата не съществува." }, { status: 404 });
+  const access = await getGroup(request, context);
+  if (!access) return NextResponse.json({ error: "Нямате достъп или групата не съществува." }, { status: 404 });
+  const { group } = access;
   const [trainings, fields, events] = await Promise.all([
     readCoachTrainings(group.clubId, group.id),
     prisma.field.findMany({ where: { clubId: group.clubId }, include: { pieces: { orderBy: { sortOrder: "asc" } } } }),
@@ -41,8 +44,11 @@ export async function GET(request: NextRequest, context: Context) {
 }
 
 export async function PUT(request: NextRequest, context: Context) {
-  const group = await getGroup(request, context);
-  if (!group) return NextResponse.json({ error: "Нямате достъп или групата не съществува." }, { status: 404 });
+  const access = await getGroup(request, context);
+  if (!access) return NextResponse.json({ error: "Нямате достъп или групата не съществува." }, { status: 404 });
+  const { group, session } = access;
+  const denied = await denyTrainingWrite(session, request, group.clubId, { type: "coachGroup", id: group.id });
+  if (denied) return denied;
   try {
     const body = await request.json();
     if (!Array.isArray(body.trainings)) throw new Error("Trainings must be an array");

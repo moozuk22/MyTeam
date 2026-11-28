@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canUseSchedule2 } from "@/lib/schedule2Access";
+import { denyTrainingWrite, trainingTargetFromScopeKey } from "@/lib/trainingWriteAccess";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { hasTrustedSchedule2Origin } from "@/lib/requestOrigin";
@@ -76,7 +78,7 @@ export async function GET(
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
-    if (event.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(event.scopeKey) && !session.roles.includes("admin")) {
+    if (event.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(event.scopeKey) && !canUseSchedule2(session, id)) {
       return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
 
@@ -141,9 +143,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
     if (existing.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(existing.scopeKey) &&
-        (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
+        (!canUseSchedule2(session, id) || !hasTrustedSchedule2Origin(request))) {
       return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
+    const denied = await denyTrainingWrite(session, request, id, trainingTargetFromScopeKey(existing.scopeKey));
+    if (denied) return denied;
 
     const oldMaxSpots = existing.maxSpots;
     const trainingDateUtc = existing.trainingDate;
@@ -261,9 +265,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
     if (existing.scopeKey.startsWith("custom_group:") && getLimitedTrainingSessionId(existing.scopeKey) &&
-        (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
+        (!canUseSchedule2(session, id) || !hasTrustedSchedule2Origin(request))) {
       return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
+    const denied = await denyTrainingWrite(session, request, id, trainingTargetFromScopeKey(existing.scopeKey));
+    if (denied) return denied;
 
     // Clean up auto-created opt-outs before deleting the event
     try {
