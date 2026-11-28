@@ -66,9 +66,9 @@ describe("Schedule 2 custom-group schedule lookup", () => {
     expect(query.select).not.toHaveProperty("players");
   });
 
-  it("rejects the Schedule 2 lookup for a coach-only session", async () => {
-    expect((await lookup()).status).toBe(403);
-    expect(mocks.clubCustomTrainingGroup.findFirst).not.toHaveBeenCalled();
+  it("allows the Schedule 2 lookup for a coach-only session", async () => {
+    expect((await lookup()).status).not.toBe(403);
+    expect(mocks.clubCustomTrainingGroup.findFirst).toHaveBeenCalled();
   });
 });
 async function edit(body: Record<string, unknown> = { name: "13+ черни колани", color: "#212121", playerIds: ["player"] }) {

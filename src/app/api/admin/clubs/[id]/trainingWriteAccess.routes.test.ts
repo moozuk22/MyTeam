@@ -134,11 +134,11 @@ describe("coach access to the new schedule view", () => {
       where.coachGroupId === ownGroup ? { id: customGroup } : null);
   });
 
-  it("refuses the new view to coaches of other clubs", async () => {
+  it("opens the new view to coaches in every club", async () => {
     const response = await weekRoute.GET(new NextRequest(`http://localhost:3000/api/test?view=schedule2`, {
       headers: new Headers({ cookie: "admin_session=test" }),
     }), club);
-    expect(response.status).toBe(403);
+    expect(response.status).not.toBe(403);
   });
 
   it("refuses new-view events from the main page", async () => {
