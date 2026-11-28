@@ -124,10 +124,10 @@ describe("График 2 weekly schedule", () => {
     ]);
   });
 
-  it("rejects coaches before loading planner data while preserving their original schedule access", async () => {
+  it("opens planner data to coaches while preserving their original schedule view", async () => {
     mocks.auth.mockResolvedValue({ roles: ["coach"] });
-    expect((await request("?view=schedule2")).status).toBe(403);
-    expect(mocks.club).not.toHaveBeenCalled();
+    expect((await request("?view=schedule2")).status).toBe(200);
+    mocks.fields.mockClear();
 
     const response = await request("");
     expect(response.status).toBe(200);

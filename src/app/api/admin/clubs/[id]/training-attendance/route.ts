@@ -1,4 +1,6 @@
 import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
+import { canUseSchedule2 } from "@/lib/schedule2Access";
+import { denyTrainingWrite, trainingTargetFromBody } from "@/lib/trainingWriteAccess";
 import { trainingRequiresCheckIn } from "@/lib/trainingAttendanceDefaults";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -172,7 +174,7 @@ export async function GET(
   }
 
   const schedule2 = request.nextUrl.searchParams.get("view") === "schedule2";
-  if (schedule2 && !session.roles.includes("admin")) {
+  if (schedule2 && !canUseSchedule2(session, (await params).id)) {
     return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
   }
 
@@ -725,6 +727,8 @@ export async function PUT(
   const trainingDate = String((body as { trainingDate?: unknown }).trainingDate ?? "").trim();
   const noteRaw = (body as { note?: unknown }).note;
   const note = noteRaw === null || noteRaw === undefined ? "" : String(noteRaw).trim();
+  const denied = await denyTrainingWrite(session, request, id, await trainingTargetFromBody(id, body));
+  if (denied) return denied;
   if (body.trainingSessionId) {
     const row = await prisma.trainingSession.findFirst({ where: { id: String(body.trainingSessionId), clubId: id, scopeType: "coachGroup" } });
     if (!row) return NextResponse.json({ error: "Training not found" }, { status: 404 });
@@ -955,7 +959,7 @@ export async function PATCH(
         tx.player.findFirst({ where: { id: playerId, clubId }, select: { id: true, cards: { where: { isActive: true }, select: { cardCode: true } } } }),
       ]);
       if (!training || !player) return null;
-      if (training.scopeType === "customGroup" && training.occurrenceKey && !session.roles.includes("admin")) return null;
+      if (training.scopeType === "customGroup" && training.occurrenceKey && !canUseSchedule2(session, clubId)) return null;
       if (body.trainingScopeKey && !training.rosterLockedAt && training.scopeType === "customGroup" && training.scopeId) {
         const members = await getExpectedPlayersForScope(tx, clubId, { type: "customGroup", id: training.scopeId });
         const date = utcDateToIsoDate(training.trainingDate);

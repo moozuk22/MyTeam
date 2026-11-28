@@ -24,6 +24,7 @@ import { type TrainingAttendanceState } from "../_hooks/useTrainingAttendanceSta
 import { type MatchEditorState } from "../_hooks/useMatchEditorState";
 
 import type { Schedule2Group, Schedule2Session } from "../_components/Schedule2";
+import { readScheduleLayout, saveScheduleLayout, type ScheduleLayout } from "../_utils/scheduleLayoutPreference";
 
 type Options = {
   canUseSchedule2?: boolean;
@@ -597,7 +598,7 @@ export function createTrainingAttendanceActions({
     if (!clubId) return;
     const openRequest = ++trainingAttendanceOpenRequest.current;
     const currentMonth = getTodayIsoDate().slice(0, 7);
-    const schedule2 = canUseSchedule2 && options?.schedule2 === true;
+    const schedule2 = canUseSchedule2 && (options?.schedule2 ?? readScheduleLayout() === "new");
     setSchedule2Open(schedule2);
     setSchedule2Week(0);
     if (schedule2) {
@@ -649,6 +650,14 @@ export function createTrainingAttendanceActions({
       }
       await fetchTrainingAttendance(undefined, undefined, resolvedGroupId, "trainingGroups");
     }
+  };
+
+  const switchTrainingAttendanceLayout = (layout: ScheduleLayout) => {
+    if (!canUseSchedule2 || (layout === "new") === schedule2Open) return;
+    saveScheduleLayout(layout);
+    const hideTeamsTab = trainingAttendanceHideTeamsTab;
+    closeTrainingAttendance();
+    void openTrainingAttendance({ hideTeamsTab, schedule2: layout === "new" });
   };
 
   const handleTrainingGroupScopeChange = async (nextScope: string) => {
@@ -1134,6 +1143,7 @@ export function createTrainingAttendanceActions({
     fetchTrainingWeekSessions,
     openTrainingAttendance,
     closeTrainingAttendance,
+    switchTrainingAttendanceLayout,
     handleTrainingGroupScopeChange,
     handleTrainingAttendanceViewChange,
     handleTrainingAttendanceMonthChange,

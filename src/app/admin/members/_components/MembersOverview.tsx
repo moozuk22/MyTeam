@@ -109,7 +109,6 @@ type MembersOverviewProps = {
   setInactivePlayersOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setReportsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   openSchedulerSettings: () => Promise<void>;
-  canUseSchedule2: boolean;
   openTrainingAttendance: (options?: { hideTeamsTab?: boolean; schedule2?: boolean }) => Promise<void>;
   setAttendanceDashboardOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleDownloadMemberLinks: () => Promise<void>;
@@ -162,7 +161,6 @@ export function MembersOverview({
   setInactivePlayersOpen,
   setReportsOpen,
   openSchedulerSettings,
-  canUseSchedule2,
   openTrainingAttendance,
   setAttendanceDashboardOpen,
   handleDownloadMemberLinks,
@@ -422,7 +420,13 @@ export function MembersOverview({
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => {
-                  if (coachGroupId) {
+                  // Coaches change only their own coach group's trainings:
+                  // the main page is view only, and club-wide training groups
+                  // stay with admins.
+                  const coachCanEditGroups = Boolean(coachGroupId) && isCustomTrainingGroupMode;
+                  if (!isAdmin && !coachCanEditGroups) {
+                    void openTrainingAttendance({ hideTeamsTab: true });
+                  } else if (coachGroupId) {
                     void openTrainingAttendance();
                   } else if (coachGroups.length >= 1) {
                     void openTrainingAttendance({ hideTeamsTab: true });
@@ -435,16 +439,6 @@ export function MembersOverview({
                 <UsersIcon />
                 <span>График</span>
               </button>
-              {isAdmin && canUseSchedule2 && (
-                <button
-                  className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
-                  onClick={() => void openTrainingAttendance({ schedule2: true })}
-                  type="button"
-                >
-                  <CalendarIcon />
-                  <span>График 2</span>
-                </button>
-              )}
               <button
                 className="amp-download-links-btn amp-scheduler-settings-btn amp-btn--compact"
                 onClick={() => setAttendanceDashboardOpen(true)}

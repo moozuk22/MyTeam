@@ -7,6 +7,8 @@ import { NextRequest } from "next/server";
 const db = vi.hoisted(() => ({ $transaction: vi.fn(), trainingSession: { findMany: vi.fn() } }));
 vi.mock("@/lib/db", () => ({ prisma: db }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: vi.fn().mockResolvedValue({ roles: ["coach"] }) }));
+// Coach page access is covered by trainingWriteAccess tests; these tests check schedule behavior.
+vi.mock("@/lib/trainingWriteAccess", () => ({ denyTrainingWrite: async () => null, trainingTargetFromBody: async () => ({ type: "clubWide" }) }));
 vi.mock("@/lib/push/trainingCancellationNotifications", () => ({ sendTrainingCancellationNotifications: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/push/coachTrainingNotifications", () => ({ notifyCoachTrainingChanges: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/trainingAttendanceEvents", () => ({ publishTrainingAttendanceUpdated: vi.fn() }));

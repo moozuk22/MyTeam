@@ -58,9 +58,14 @@ describe("Schedule 2 attendance details", () => {
     expect(await (await request("&view=schedule2", "2026-11-10")).json()).toMatchObject({ trainingDate: "" });
   });
 
-  it("rejects coaches before reading planner details", async () => {
+  it("lets coaches read planner details", async () => {
     mocks.auth.mockResolvedValue({ roles: ["coach"] });
-    expect((await request("&view=schedule2")).status).toBe(403);
+    expect((await request("&view=schedule2")).status).not.toBe(403);
+  });
+
+  it("rejects requests without a session before reading planner details", async () => {
+    mocks.auth.mockResolvedValue(null);
+    expect((await request("&view=schedule2")).status).toBe(401);
     expect(mocks.club).not.toHaveBeenCalled();
   });
 });

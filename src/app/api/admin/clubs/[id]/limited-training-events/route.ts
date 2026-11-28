@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canUseSchedule2 } from "@/lib/schedule2Access";
+import { denyTrainingWrite, trainingTargetFromScopeKey } from "@/lib/trainingWriteAccess";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
 import { sendPushToMember } from "@/lib/push/service";
@@ -60,7 +62,7 @@ export async function GET(
   const date = request.nextUrl.searchParams.get("date")?.trim() ?? "";
 
   const where: Record<string, unknown> = { clubId: id };
-  if (!session.roles.includes("admin")) {
+  if (!canUseSchedule2(session, id)) {
     where.NOT = { scopeKey: { startsWith: "custom_group:", contains: ":session:" } };
   }
 
@@ -159,9 +161,11 @@ export async function POST(
     const trainingDateUtc = new Date(trainingDate + "T00:00:00.000Z");
     const trainingSessionId = getLimitedTrainingSessionId(scopeKey);
     const customOccurrence = trainingSessionId && scopeKey.startsWith("custom_group:");
-    if (customOccurrence && (!session.roles.includes("admin") || !hasTrustedSchedule2Origin(request))) {
+    if (customOccurrence && (!canUseSchedule2(session, id) || !hasTrustedSchedule2Origin(request))) {
       return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
     }
+    const denied = await denyTrainingWrite(session, request, id, trainingTargetFromScopeKey(scopeKey));
+    if (denied) return denied;
     if (trainingSessionId && !customOccurrence && !await prisma.trainingSession.findFirst({ where: { id: trainingSessionId, clubId: id, scopeId: scopeKey.split(":")[1], scopeType: "coachGroup", status: "scheduled", trainingDate: trainingDateUtc }, select: { id: true } })) return NextResponse.json({ error: "Training not found" }, { status: 404 });
 
     const createEvent = (db: Pick<typeof prisma, "limitedTrainingEvent">) => db.limitedTrainingEvent.create({

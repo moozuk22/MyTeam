@@ -1,4 +1,5 @@
 import { isMatchEventType, matchEventTypeLabel, type MatchEventType } from "@/lib/matchEventType";
+import { canUseSchedule2 } from "@/lib/schedule2Access";
 import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -120,7 +121,7 @@ export async function GET(
   }
 
   const includeFields = request.nextUrl.searchParams.get("view") === "schedule2";
-  if (includeFields && !session.roles.includes("admin")) {
+  if (includeFields && !canUseSchedule2(session, (await params).id)) {
     return NextResponse.json({ error: "Нямате достъп до График 2." }, { status: 403 });
   }
 

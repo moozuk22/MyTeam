@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ prisma: mocks }));
 vi.mock("@/lib/adminAuth", () => ({ verifyAdminToken: vi.fn().mockResolvedValue({ roles: ["coach"] }) }));
+// Coach page access is covered by trainingWriteAccess tests; these tests check schedule behavior.
+vi.mock("@/lib/trainingWriteAccess", () => ({ denyTrainingWrite: async () => null, trainingTargetFromBody: async () => ({ type: "clubWide" }) }));
 vi.mock("@/lib/trainingSessions", () => ({ syncFutureTrainingSessions: vi.fn(), deleteFutureTrainingSessionsForScope: vi.fn() }));
 vi.mock("@/lib/customTrainingGroupColorScope", () => ({ isCustomTrainingGroupColorTakenInScope: vi.fn().mockResolvedValue(false) }));
 vi.mock("@/lib/push/trainingScheduleNotifications", () => ({ shouldNotifyForTrainingDatesChange: vi.fn().mockReturnValue(false), sendTrainingScheduleNotifications: vi.fn() }));

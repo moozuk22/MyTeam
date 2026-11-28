@@ -1,4 +1,5 @@
 import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
+import { denyTrainingWrite } from "@/lib/trainingWriteAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
@@ -182,6 +183,8 @@ export async function POST(
   }
 
   const { id } = await params;
+  const denied = await denyTrainingWrite(session, request, id, { type: "clubWide" });
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
 
   const teamGroups = normalizeTeamGroups((body as { teamGroups?: unknown }).teamGroups);

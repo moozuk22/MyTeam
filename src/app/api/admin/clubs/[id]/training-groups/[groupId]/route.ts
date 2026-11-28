@@ -1,4 +1,5 @@
 import { TRAINING_SELECTION_WINDOW_DAYS } from "@/lib/trainingScheduleWindow";
+import { denyTrainingWrite } from "@/lib/trainingWriteAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyAdminToken } from "@/lib/adminAuth";
@@ -144,6 +145,8 @@ export async function DELETE(
   if (!clubId || !groupId) {
     return NextResponse.json({ error: "Invalid parameters." }, { status: 400 });
   }
+  const denied = await denyTrainingWrite(session, request, clubId, { type: "clubWide" });
+  if (denied) return denied;
 
   try {
     const group = await prisma.clubTrainingScheduleGroup.findFirst({
@@ -191,6 +194,8 @@ export async function PATCH(
   if (!clubId || !groupId) {
     return NextResponse.json({ error: "Invalid parameters." }, { status: 400 });
   }
+  const denied = await denyTrainingWrite(session, request, clubId, { type: "clubWide" });
+  if (denied) return denied;
 
   const body = await request.json().catch(() => ({}));
   const payload = body as {

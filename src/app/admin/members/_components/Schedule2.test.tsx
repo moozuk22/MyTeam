@@ -101,3 +101,57 @@ it.each([false, true])("renders grouped events with details active: %s", (detail
     expect(html).toContain(`role="combobox" aria-label="${label}" aria-haspopup="listbox"`);
   }
 });
+
+it("offers new events only for the coach page's own groups", () => {
+  const date = "2026-11-16";
+  const html = renderToStaticMarkup(
+    <Schedule2
+      dates={[date]}
+      sessions={[]}
+      loading={false}
+      error=""
+      week={0}
+      lastWeek={1}
+      canScheduleDate={() => true}
+      onWeekChange={() => {}}
+      customGroups={[
+        { id: "own", name: "Своя", coachGroupId: "coach-1", coachName: "Треньор 1" },
+        { id: "other", name: "Чужда", coachGroupId: "coach-2", coachName: "Треньор 2" },
+        { id: "club", name: "Клубна", coachGroupId: null, coachName: null },
+      ]}
+      restDays={{}}
+      onOpen={() => {}}
+      onCreate={() => {}}
+      editableCoachGroupId="coach-1"
+    />,
+  );
+
+  expect(html).toContain('aria-label="Ново събитие за Своя,');
+  expect(html).not.toContain('aria-label="Ново събитие за Чужда,');
+  expect(html).not.toContain('aria-label="Ново събитие за Клубна,');
+  expect(html).toContain(">Чужда<");
+  expect(html).not.toContain("Група за ново събитие");
+});
+
+it("hides every create button when the planner is view only", () => {
+  const html = renderToStaticMarkup(
+    <Schedule2
+      dates={["2026-11-16"]}
+      sessions={[]}
+      loading={false}
+      error=""
+      week={0}
+      lastWeek={1}
+      canScheduleDate={() => true}
+      onWeekChange={() => {}}
+      customGroups={[{ id: "own", name: "Своя", coachGroupId: "coach-1", coachName: "Треньор 1" }]}
+      restDays={{}}
+      onOpen={() => {}}
+      onCreate={() => {}}
+      canCreate={false}
+    />,
+  );
+
+  expect(html).not.toContain("Ново събитие");
+  expect(html).toContain(">Своя<");
+});

@@ -3452,6 +3452,49 @@
   box-shadow: 0 0 18px rgba(50, 205, 50, 0.2);
 }
 
+/* «Нов изглед» / «Стар изглед» switch: a glow halo breathes around the new layout. */
+.amp-training-layout-btn--new {
+  position: relative;
+  isolation: isolate;
+  border-color: rgba(50, 205, 50, 0.75);
+  color: #e4ffe0;
+  text-shadow: 0 0 8px rgba(50, 205, 50, 0.55);
+}
+
+.amp-training-layout-btn--new.is-active {
+  border-color: rgba(50, 205, 50, 0.95);
+  background: linear-gradient(135deg, rgba(50, 205, 50, 0.34), rgba(50, 205, 50, 0.16));
+}
+
+/* Only the halo grows and shrinks; the button keeps its size. */
+.amp-training-layout-btn--new::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 18px 2px rgba(50, 205, 50, 0.55), 0 0 6px rgba(50, 205, 50, 0.5);
+  animation: amp-training-layout-breathe 2s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+
+@keyframes amp-training-layout-breathe {
+  from {
+    opacity: 0.45;
+    box-shadow: 0 0 8px 0 rgba(50, 205, 50, 0.45), 0 0 3px rgba(50, 205, 50, 0.4);
+  }
+  to {
+    opacity: 1;
+    box-shadow: 0 0 26px 7px rgba(50, 205, 50, 0.55), 0 0 8px 1px rgba(50, 205, 50, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amp-training-layout-btn--new::before {
+    animation: none;
+  }
+}
+
 /* Club-wide schedule: only «Тази седмица» (no «Отбори» switch) */
 .amp-training-view-switch--single {
   justify-content: center;
@@ -4181,6 +4224,10 @@
     height: 38px;
     border-radius: 12px;
     padding: 0 12px;
+  }
+
+  .amp-training-view-switch.amp-training-layout-switch {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .amp-modal--training-attendance .amp-training-calendar,

@@ -28,6 +28,10 @@ type Props = {
   restDays: Record<string, string[]>;
   onOpen: (session: Schedule2Session) => void;
   onCreate: (groupId: string, date?: string) => void;
+  /** False makes the planner view only (a coach on the main page). */
+  canCreate?: boolean;
+  /** On a coach page, only this coach group's custom groups get create buttons. Empty means all groups. */
+  editableCoachGroupId?: string;
 };
 
 const dayFormat = new Intl.DateTimeFormat("bg-BG", { weekday: "short", timeZone: "UTC" });
@@ -58,7 +62,7 @@ export function schedule2SessionBelongsToGroup(session: Schedule2Session, group:
   return session.eventType === "training" && Boolean(group.coachGroupId && group.coachGroupId === session.coachGroupId);
 }
 
-export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, week, lastWeek, canScheduleDate, onWeekChange, customGroups, restDays, onOpen, onCreate }: Props) {
+export default function Schedule2({ dates, sessions, loading, openingEditor = false, detailsActive = false, error, week, lastWeek, canScheduleDate, onWeekChange, customGroups, restDays, onOpen, onCreate, canCreate = true, editableCoachGroupId = "" }: Props) {
   const [view, setView] = useState<"team" | "field">("team");
   const [team, setTeam] = useState("");
   const [field, setField] = useState("");
@@ -76,8 +80,10 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
   const activeField = fields.includes(field) ? field : "";
   const visibleSessions = teamSessions.filter((session) => !activeField || getField(session) === activeField)
     .sort((a, b) => (a.trainingTime || "99:99").localeCompare(b.trainingTime || "99:99"));
-  const newGroupId = customGroups.find(({ id }) => id === newGroup)?.id ?? customGroups[0]?.id;
-  const groupOptions = customGroups.map(({ id, name }) => ({ value: id, label: name }));
+  const canEditGroup = (group: Schedule2Group) => canCreate && (!editableCoachGroupId || group.coachGroupId === editableCoachGroupId);
+  const editableGroups = customGroups.filter(canEditGroup);
+  const newGroupId = editableGroups.find(({ id }) => id === newGroup)?.id ?? editableGroups[0]?.id;
+  const groupOptions = editableGroups.map(({ id, name }) => ({ value: id, label: name }));
 
   function eventButton(session: Schedule2Session, fieldView = false) {
     const isMatch = session.eventType === "match";
@@ -110,10 +116,12 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
           {!loading && <p>{dates.length > 0 && `${formatDay(dates[0])} – ${formatDay(dates[dates.length - 1])} · `}{visibleSessions.length} събития</p>}
         </div>
         <div className={styles.actions}>
-          {customGroups.length > 1 && newGroupId && (
+          {editableGroups.length > 1 && newGroupId && (
             <Schedule2Select label="Група за ново събитие" value={newGroupId} options={groupOptions} onChange={setNewGroup} />
           )}
-          <button className={styles.create} type="button" disabled={loading || openingEditor || !newGroupId} onClick={() => { if (newGroupId) onCreate(newGroupId); }}>+ Ново събитие</button>
+          {canCreate && (
+            <button className={styles.create} type="button" disabled={loading || openingEditor || !newGroupId} onClick={() => { if (newGroupId) onCreate(newGroupId); }}>+ Ново събитие</button>
+          )}
         </div>
       </header>
 
@@ -186,7 +194,7 @@ export default function Schedule2({ dates, sessions, loading, openingEditor = fa
                   {dates.map((date) => {
                     const entries = visibleSessions.filter((session) => session.date === date && schedule2SessionBelongsToGroup(session, group));
                     const restDay = entries.length === 0 && restDays[group.id]?.includes(date);
-                    const canAddEvent = !activeField && canScheduleDate(date);
+                    const canAddEvent = !activeField && canScheduleDate(date) && canEditGroup(group);
                     return (
                       <td key={date}>
                         {entries.map((session) => eventButton(session))}
